@@ -26,6 +26,14 @@
                        OnClick="OnZoomIn" />
         <MudIconButton Icon="@Icons.Material.Filled.CenterFocusStrong"
                        OnClick="OnCenterTree" />
+
+        <!-- Year range slider -->
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Style="min-width:200px;">
+            <MudSlider T="int" Min="20" Max="500" Value="@YearRange"
+                       ValueChanged="@(v => { YearRange = v; OnYearRangeChanged.InvokeAsync(v); })"
+                       Style="width:140px;" />
+            <span style="font-size:11px; color:var(--ft-text-muted); min-width:45px;">@YearRange yr</span>
+        </MudStack>
     </MudStack>
 </MudPaper>
 </div>
@@ -36,8 +44,10 @@
     [Parameter] public EventCallback OnCenterTree { get; set; }
     [Parameter] public EventCallback OnToggleTheme { get; set; }
     [Parameter] public EventCallback OnSignOut { get; set; }
+    [Parameter] public EventCallback<int> OnYearRangeChanged { get; set; }
 
     [Parameter] public bool IsDark { get; set; }
+    [Parameter] public int YearRange { get; set; } = 100;
 
     @code {
         private bool _dragging;

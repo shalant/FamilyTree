@@ -32,6 +32,8 @@ else
          style="overflow: auto;
         height: calc(100vh - 64px);
         background: var(--ft-surface);">
+        <CustomToolbar YearRange="_visibleYearRange"
+                       OnYearRangeChanged="@(y => _canvas?.SetVisibleYearRange(y))" />
         <FamilyTreeCanvas @ref="_canvas"
                           People="_people"
                           Couples="_couples"
