@@ -72,10 +72,18 @@ else
     </div>
 
     @* Scrollable tree viewport *@
-    <div id="tree-viewport"
+    @* <div id="tree-viewport"
          style="overflow:auto;
         height:calc(100vh - 120px);
-        background:var(--ft-surface);">
+        background:var(--ft-surface);"> *@
+        <div id="tree-viewport"
+             style="overflow:auto;
+            height:100vh;
+            background:var(--ft-surface);
+            position:fixed;
+            inset:0;
+            z-index:0;">
+
         <CustomToolbar IsDark="_isDark"
                        OnZoomIn="ZoomIn"
                        OnZoomOut="ZoomOut"
