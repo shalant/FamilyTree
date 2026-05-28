@@ -78,10 +78,10 @@ public class FamilyTreeLayoutEngine
     private const int NodeSpacingX = 120;
     private const int PaddingX = 90;
     private const int PaddingY = 10;
-    private const int FocusSize = 68;
-    private const int Gen1Size = 56;
-    private const int DefaultSize = 48;
-    private const double PxPerYear = 45.0;  // pixels per year on Y-axis
+    private const int FocusSize = 80;       // increased from 68
+    private const int Gen1Size = 70;        // increased from 56
+    private const int DefaultSize = 60;     // increased from 48
+    private const double PxPerYear = 15.0;  // pixels per year on Y-axis (compact layout)
 
     public FamilyTreeLayout ComputeLayout(
         List<PersonDto> people,
