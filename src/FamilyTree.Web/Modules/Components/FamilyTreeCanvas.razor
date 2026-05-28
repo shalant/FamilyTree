@@ -1,7 +1,8 @@
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Shared.DTOs
+@using FamilyTree.Web.Services
 
-@inject ILogger<FamilyTreeCanvas> Logger
+@inject FamilyTreeLayoutEngine LayoutEngine
 
 <div style="width:100%; background:var(--ft-surface);">
 
@@ -34,46 +35,37 @@
 
     @* ── Tree canvas ─────────────────────────────────────────────────────── *@
     <div style="position:relative;
-        width:@(_canvasWidth)px;
-        height:@(_canvasHeight)px;
-        margin:0 auto 48px; 
+        width:@(_layout.CanvasWidth)px;
+        height:@(_layout.CanvasHeight)px;
+        margin:0 auto 48px;
         transform: translate(@($"{_offsetX}px"), @($"{_offsetY}px")) scale(@_zoom);
         transform-origin: center center;">
 
-        @* Generation band backgrounds *@
-        @foreach (var band in _bands)
+        @* Generation band backgrounds (time-based decade markers) *@
+        @foreach (var band in _layout.Bands)
         {
-            var rel = band.Depth - _focusDepth;
+            var opacity = GetBandOpacityByYear(band.Depth);
             <div style="position:absolute; left:0; top:@(band.Top)px;
-                width:@(_canvasWidth)px; height:@(band.Height)px;
-                @GetBandStyle(rel)">
+                width:@(_layout.CanvasWidth)px; height:@(band.Height)px;
+                background:rgba(74, 174, 109, @opacity);">
             </div>
         }
 
-        @* Generation band labels *@
-        @foreach (var band in _bands)
+        @* Generation band labels (decade markers) *@
+        @foreach (var band in _layout.Bands)
         {
-            var rel = band.Depth - _focusDepth;
-            var labelColor = rel switch
-            {
-                >= 2 => "var(--ft-green-800)",
-                1 => "var(--ft-green-800)",
-                0 => "var(--ft-green-700)",
-                _ => "var(--ft-green-600)"
-            };
-            var label = GenerationLabel(rel);
             <div style="position:absolute; left:24px; top:@(band.Top + 12)px;
-                font-size:11px; font-weight:600; color:@labelColor; letter-spacing:0.05em;
-                font-family:var(--ft-font-body); pointer-events:none; opacity:0.75;">
-                @label
+                font-size:11px; font-weight:600; color:var(--ft-green-700); letter-spacing:0.05em;
+                font-family:var(--ft-font-body); pointer-events:none; opacity:0.7;">
+                @band.Depth
             </div>
         }
 
         @* ── SVG connectors ──────────────────────────────────────────────── *@
         <svg style="position:absolute; top:0; left:0;
-            width:@(_canvasWidth)px; height:@(_canvasHeight)px;
+            width:@(_layout.CanvasWidth)px; height:@(_layout.CanvasHeight)px;
             pointer-events:none; overflow:visible;">
-            @foreach (var family in _families)
+            @foreach (var family in _layout.Connectors)
             {
                 @* Couple bracket: U-arc between two partners *@
                 @if (family.Couple is { } arc)
@@ -137,7 +129,7 @@
         </svg>
 
         @* Scroll anchor — zero-size div at the focus node for JS scroll-to-focus *@
-        @if (FocusPerson is not null && _nodes.FirstOrDefault(n => n.IsFocus) is { } focusNode)
+        @if (FocusPerson is not null && _layout.Nodes.FirstOrDefault(n => n.IsFocus) is { } focusNode)
         {
             <div id="node-@FocusPerson.Id"
                  style="position:absolute;
@@ -146,13 +138,13 @@
         }
 
         @* Person nodes *@
-        @foreach (var node in _nodes)
+        @foreach (var node in _layout.Nodes)
         {
             <PersonNode Person="@node.Person"
                         Left="@(node.X - node.Size / 2)"
                         Top="@(node.Y - node.Size / 2)"
                         Size="@node.Size"
-                        RelativeDepth="@(node.Depth - _focusDepth)"
+                        RelativeDepth="@(node.Depth - _layout.FocusDepth)"
                         IsFocus="@node.IsFocus"
                         OnClick="OnPersonSelected" />
         }
@@ -165,381 +157,40 @@
     [Parameter] public Guid? FocusId { get; set; }
     [Parameter] public EventCallback<PersonDto> OnPersonSelected { get; set; }
 
+    // ── Computed layout (from FamilyTreeLayoutEngine) ──────────────────────
+    private FamilyTreeLayout _layout = FamilyTreeLayout.Empty;
+
     private PersonDto? FocusPerson =>
         People.FirstOrDefault(p => p.Id == FocusId);
-
-    // ── Layout constants ──────────────────────────────────────────────────
-
-    private const int NodeSpacingX = 120;
-    private const int PaddingX = 90;
-    private const int PaddingY = 10;
-    private const int FocusSize = 68;
-    private const int Gen1Size = 56;
-    private const int DefaultSize = 48;
-
-    // ── State ─────────────────────────────────────────────────────────────
-
-    private List<LayoutNode> _nodes = [];
-    private List<FamilyUnit> _families = [];
-    private List<GenerationBand> _bands = [];
-    private int _canvasWidth;
-    private int _canvasHeight;
-    private int _focusDepth;
 
     // Zoom & pan state
     private double _zoom = 1.0;
     private double _offsetX = 0;
     private double _offsetY = 0;
 
-    // Track the root node (focus person)
-    private LayoutNode? _rootNode;
-
-
-    private record GenerationBand(int Depth, double Top, double Height);
-
-    protected override void OnParametersSet() => BuildLayout();
-
-    // ── Layout ───────────────────────────────────────────────────────────
-
-    private void BuildLayout()
+    /// <summary>
+    /// Invoked when component parameters change. Recomputes layout via FamilyTreeLayoutEngine.
+    /// The engine handles all positioning logic: depth computation, birth year timelines,
+    /// connected component identification, and node positioning.
+    /// </summary>
+    protected override void OnParametersSet()
     {
-        if (!People.Any()) return;
-
-        var depths = ComputeDepths();
-        Console.WriteLine($"[BuildLayout] Canvas will be {_canvasWidth}×{_canvasHeight}, FocusId={FocusId}");
-
-        foreach (var p in People)
-        {
-            var parentsStr = string.Join(",", p.ParentIds?.Select(id => People.FirstOrDefault(x => x.Id == id)?.FirstName ?? id.ToString()[..4]) ?? []);
-            var spousesStr = string.Join(",", p.SpouseIds?.Select(id => People.FirstOrDefault(x => x.Id == id)?.FirstName ?? id.ToString()[..4]) ?? []);
-            Logger.LogWarning("[FT] {Name,-10} parents:[{Parents}]  spouses:[{Spouses}]  depth:{Depth}",
-                p.FirstName, parentsStr, spousesStr, depths.GetValueOrDefault(p.Id, -99));
-        }
-        Logger.LogWarning("[FT] Couples: {Count}", Couples.Count);
-
-        var focusPerson = FocusId.HasValue
-            ? People.FirstOrDefault(p => p.Id == FocusId.Value)
-            : People.FirstOrDefault();
-
-        _focusDepth = focusPerson is not null && depths.TryGetValue(focusPerson.Id, out var fd)
-            ? fd : 0;
-
-        // Group by depth (descending = oldest ancestors first = top of canvas).
-        // People not reached by any depth-traversal pass default to _focusDepth
-        // so they appear in the focus row rather than at an arbitrary position.
-        var byDepth = People
-            .GroupBy(p => depths.GetValueOrDefault(p.Id, _focusDepth))
-            .OrderByDescending(g => g.Key)
-            .ToList();
-
-        var generationCount = byDepth.Count;
-        var rowHeight = Math.Clamp(600 / generationCount, 110, 180);
-        var maxPerRow = byDepth.Max(g => g.Count());
-
-        // Wide enough for the busiest row plus generous padding on each side.
-        _canvasWidth = Math.Max(maxPerRow * NodeSpacingX + PaddingX * 4, 900);
-        _canvasHeight = generationCount * rowHeight + PaddingY * 2 + 40;
-
-        var nodeMap = new Dictionary<Guid, LayoutNode>();
-        var rowIndex = 0;
-
-        foreach (var group in byDepth)
-        {
-            // ── Sort so spouses are placed adjacent ──────────────────────
-            // Walk the raw list; whenever we seat a person, immediately seat
-            // their spouse next if that spouse is in the same depth row.
-            // This ensures the couple U-arc never spans across a third person.
-            var raw = group.ToList();
-            var placed = new HashSet<Guid>();
-            var members = new List<PersonDto>();
-            foreach (var person in raw)
-            {
-                if (placed.Contains(person.Id)) continue;
-                placed.Add(person.Id);
-                members.Add(person);
-                var spouseInRow = raw.FirstOrDefault(m =>
-                    !placed.Contains(m.Id) &&
-                    person.SpouseIds != null &&
-                    person.SpouseIds.Contains(m.Id));
-                if (spouseInRow is not null)
-                {
-                    placed.Add(spouseInRow.Id);
-                    members.Add(spouseInRow);
-                }
-            }
-            // ─────────────────────────────────────────────────────────────
-
-            var count = members.Count;
-            var rowY = PaddingY + rowIndex * rowHeight + FocusSize / 2;
-
-            // Centre each row around X = 0 (relative origin).
-            // A single global shift below moves everything so the focus
-            // person lands at exactly canvasWidth / 2.
-            var startX = -(count - 1) * NodeSpacingX / 2.0;
-
-            for (int i = 0; i < count; i++)
-            {
-                var person = members[i];
-                var depth = depths.GetValueOrDefault(person.Id, _focusDepth);
-                var relDep = depth - _focusDepth;
-                var isFocus = person.Id == FocusId;
-                var size = isFocus ? FocusSize
-                              : Math.Abs(relDep) <= 1 ? Gen1Size
-                              : DefaultSize;
-
-                nodeMap[person.Id] = new LayoutNode
-                {
-                    Person = person,
-                    X = (int)(startX + i * NodeSpacingX),
-                    Y = rowY,
-                    Depth = depth,
-                    IsFocus = isFocus,
-                    Size = size
-                };
-            }
-            rowIndex++;
-        }
-
-        if (FocusId.HasValue && nodeMap.TryGetValue(FocusId.Value, out var root))
-        {
-            _rootNode = root;
-        }
-        else
-        {
-            _rootNode = nodeMap.Values.FirstOrDefault();
-        }
-        // ── Single global shift ──────────────────────────────────────────
-        // Find all X positions and center them.
-        var allX = nodeMap.Values.Select(n => n.X).ToList();
-        var minX = allX.Any() ? allX.Min() : 0;
-        var maxX = allX.Any() ? allX.Max() : 0;
-        var rowCentreX = (minX + maxX) / 2.0;
-        var canvasCentreX = _canvasWidth / 2.0;
-        var shift = canvasCentreX - rowCentreX;
-
-        foreach (var key in nodeMap.Keys.ToList())
-            nodeMap[key] = nodeMap[key] with { X = (int)(nodeMap[key].X + shift) };
-
-        _bands = byDepth
-            .Select((g, i) => new GenerationBand(g.Key, PaddingY + i * rowHeight, rowHeight))
-            .ToList();
-
-        _nodes = [.. nodeMap.Values];
-        BuildConnectors(nodeMap);
+        _layout = LayoutEngine.ComputeLayout(People, Couples, FocusId);
+        CenterOnFocus();
     }
 
-    // ── Connectors ────────────────────────────────────────────────────────
-    //
-    //  CoupleArc    — U-shaped bracket between two partners
-    //  StemLine     — vertical line from couple heart to children's span
-    //  SiblingSpan  — horizontal bow across all siblings
-    //  ChildDrop    — bezier from span level down to one child's node top
-    //  FamilyUnit   — one complete family group
-
-    private record CoupleArc(
-        double PartnerAX, double PartnerAY,
-        double PartnerBX, double PartnerBY,
-        double PeakY,
-        double MidX,
-        double HeartY
-    );
-    private record StemLine(double X, double TopY, double BotY);
-    private record SiblingSpan(double LeftX, double RightX, double Y);
-    private record ChildDrop(double CenterX, double BotY);
-    private record FamilyUnit(
-        CoupleArc? Couple,
-        StemLine Stem,
-        SiblingSpan? Span,
-        IReadOnlyList<ChildDrop> Drops
-    );
-
-    private void BuildConnectors(Dictionary<Guid, LayoutNode> nodeMap)
+    /// <summary>
+    /// Centers the view on the focus person.
+    /// </summary>
+    private void CenterOnFocus()
     {
-        _families = [];
-        var routedChildren = new HashSet<Guid>();
-
-        foreach (var couple in Couples)
-        {
-            var unit = BuildCoupledFamily(couple, nodeMap, routedChildren);
-            if (unit is not null) _families.Add(unit);
-        }
-
-        foreach (var person in People)
-        {
-            if (routedChildren.Contains(person.Id)) continue;
-            foreach (var parentId in person.ParentIds ?? [])
-            {
-                var unit = BuildSingleParentLine(parentId, person.Id, nodeMap);
-                if (unit is not null) _families.Add(unit);
-            }
-        }
+        var focusNode = _layout.Nodes.FirstOrDefault(n => n.IsFocus);
+        if (focusNode == null) return;
+        _offsetX = (_layout.CanvasWidth / 2.0) - focusNode.X;
+        _offsetY = (_layout.CanvasHeight / 2.0) - focusNode.Y;
     }
 
-    private FamilyUnit? BuildCoupledFamily(
-        CoupleDto couple,
-        Dictionary<Guid, LayoutNode> nodeMap,
-        HashSet<Guid> routedChildren)
-    {
-        if (!nodeMap.TryGetValue(couple.PersonAId, out var a)) return null;
-        if (!nodeMap.TryGetValue(couple.PersonBId, out var b)) return null;
-
-        var sharedY = Math.Max(a.Y, b.Y);
-        var aBottomY = sharedY + a.Size / 2.0;
-        var bBottomY = sharedY + b.Size / 2.0;
-        var midX = (a.X + b.X) / 2.0;
-        var peakY = Math.Min(aBottomY, bBottomY) - 22;
-        var heartY = peakY + 3;
-        var arc = new CoupleArc(a.X, aBottomY, b.X, bBottomY, peakY, midX, heartY);
-
-        var children = couple.ChildIds
-            .Where(nodeMap.ContainsKey)
-            .Select(id => nodeMap[id])
-            .ToList();
-
-        foreach (var c in children) routedChildren.Add(c.Person.Id);
-
-        if (!children.Any())
-            return new FamilyUnit(arc, new StemLine(midX, heartY, heartY), null, []);
-
-        var spanY = children.Min(c => c.Y - c.Size / 2.0) - 18;
-        var stem = new StemLine(midX, heartY, spanY);
-        var span = children.Count > 1
-            ? new SiblingSpan(children.Min(c => (double)c.X),
-                              children.Max(c => (double)c.X), spanY)
-            : null;
-        var drops = children.Select(c => new ChildDrop(c.X, c.Y - c.Size / 2.0)).ToList();
-
-        return new FamilyUnit(arc, stem, span, drops);
-    }
-
-    private FamilyUnit? BuildSingleParentLine(
-        Guid parentId, Guid childId,
-        Dictionary<Guid, LayoutNode> nodeMap)
-    {
-        if (!nodeMap.TryGetValue(parentId, out var parent)) return null;
-        if (!nodeMap.TryGetValue(childId, out var child)) return null;
-
-        var parentBottomY = parent.Y + parent.Size / 2.0;
-        var childTopY = child.Y - child.Size / 2.0;
-        var midY = parentBottomY + (childTopY - parentBottomY) / 2.0;
-
-        return new FamilyUnit(
-            null,
-            new StemLine(parent.X, parentBottomY, midY),
-            null,
-            [new ChildDrop(child.X, childTopY)]
-        );
-    }
-
-    // ── Depth computation ─────────────────────────────────────────────────
-
-    private Dictionary<Guid, int> ComputeDepths()
-    {
-        var depths = new Dictionary<Guid, int>();
-
-        var focus = FocusId.HasValue
-            ? People.FirstOrDefault(p => p.Id == FocusId.Value)
-            : People.FirstOrDefault();
-        if (focus is null) return depths;
-
-        depths[focus.Id] = 0;
-
-        // ── Pass 1: BFS upward through ParentIds ────────────────────────
-        var queue = new Queue<PersonDto>();
-        queue.Enqueue(focus);
-        while (queue.Count > 0)
-        {
-            var current = queue.Dequeue();
-            foreach (var pid in current.ParentIds ?? [])
-            {
-                var parent = People.FirstOrDefault(p => p.Id == pid);
-                if (parent is null || depths.ContainsKey(parent.Id)) continue;
-                depths[parent.Id] = depths[current.Id] + 1;
-                queue.Enqueue(parent);
-            }
-        }
-
-        // ── Pass 2: push depths downward to children of known-depth people
-        // Reaches siblings, cousins, etc. who share a known-depth parent.
-        foreach (var person in People)
-            foreach (var pid in person.ParentIds ?? [])
-                if (depths.TryGetValue(pid, out var pd) && !depths.ContainsKey(person.Id))
-                    depths[person.Id] = pd - 1;
-
-        // ── Pass 3: propagate depths sideways through spouse relationships ──
-        // Two sources are checked so we don't depend on just one being wired:
-        //   a) PersonDto.SpouseIds  — always populated by the API
-        //   b) CoupleDto list       — populated by CoupleHelper.Derive()
-        // Iterate until stable to handle in-law chains (A↔B↔C).
-        bool changed = true;
-        while (changed)
-        {
-            changed = false;
-
-            // 3a — SpouseIds on every PersonDto (most reliable source)
-            foreach (var person in People)
-            {
-                if (!depths.TryGetValue(person.Id, out var personDepth)) continue;
-                foreach (var spouseId in person.SpouseIds ?? [])
-                {
-                    if (!depths.ContainsKey(spouseId))
-                    {
-                        depths[spouseId] = personDepth;
-                        changed = true;
-                    }
-                }
-            }
-
-            // 3b — CoupleDto pairs (catches anything not in SpouseIds)
-            foreach (var couple in Couples)
-            {
-                bool aKnown = depths.TryGetValue(couple.PersonAId, out var da);
-                bool bKnown = depths.TryGetValue(couple.PersonBId, out var db);
-                if (aKnown && !bKnown) { depths[couple.PersonBId] = da; changed = true; }
-                else if (bKnown && !aKnown) { depths[couple.PersonAId] = db; changed = true; }
-            }
-        }
-
-        // ── Normalise: shift so the oldest known ancestor is at depth 0 ──
-        var minDepth = depths.Values.DefaultIfEmpty(0).Min();
-        foreach (var key in depths.Keys.ToList())
-            depths[key] -= minDepth;
-
-        return depths;
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────
-
-    private static string GenerationLabel(int relativeDepth) => relativeDepth switch
-    {
-        0 => "You",
-        1 => "Parents",
-        2 => "Grandparents",
-        3 => "Great-grandparents",
-        >= 4 => $"Great-grandparents ×{relativeDepth - 2}",
-        -1 => "Children",
-        -2 => "Grandchildren",
-        -3 => "Great-grandchildren",
-        _ => $"Great-grandchildren ×{Math.Abs(relativeDepth) - 2}"
-    };
-
-    private static string GetBandStyle(int relativeDepth)
-    {
-        var opacity = relativeDepth switch
-        {
-            >= 3 => 0.18,    // great-great-grandparents (darkest)
-            2 => 0.14,       // great-grandparents
-            1 => 0.10,       // grandparents
-            0 => 0.06,       // parents
-            -1 => 0.05,      // focus
-            -2 => 0.04,      // children
-            _ => 0.03        // further descendants (lightest)
-        };
-        var rgba = $"rgba(74, 174, 109, {opacity})";
-        return $"background: {rgba};";
-    }
-
-    private static string F(double v) => v.ToString("F1");
+    // ── Zoom & Pan ────────────────────────────────────────────────────────
 
     public void ZoomIn()
     {
@@ -547,42 +198,26 @@
         StateHasChanged();
     }
 
+    private static string F(double v) => v.ToString("F1");
+
     public void ZoomOut()
     {
         _zoom /= 1.1;
         StateHasChanged();
     }
 
-    public void CenterOnRoot()
+    /// <summary>
+    /// Calculates band opacity based on birth year for time-gradient visualization.
+    /// Older years (ancestors) appear darker; newer years (descendants) appear lighter.
+    /// </summary>
+    private double GetBandOpacityByYear(int year)
     {
-        if (_rootNode is null)
-            return;
-
-        _offsetX = CalculateCenterX(_rootNode);
-        _offsetY = CalculateCenterY(_rootNode);
-
-        StateHasChanged();
+        var allYears = _layout.Nodes.Select(n => n.Person.BirthDate?.Year ?? DateTime.Now.Year).Distinct().ToList();
+        if (!allYears.Any()) return 0.08;
+        var minY = allYears.Min();
+        var maxY = allYears.Max();
+        var normalized = maxY == minY ? 0.5 : (double)(year - minY) / (maxY - minY);
+        return 0.15 - (normalized * 0.12);  // 0.15 (dark) to 0.03 (light)
     }
 
-    private double CalculateCenterX(LayoutNode node)
-    {
-        return (_canvasWidth / 2.0) - node.X;
-    }
-
-    private double CalculateCenterY(LayoutNode node)
-    {
-        return (_canvasHeight / 2.0) - node.Y;
-    }
-
-    // ── Records ───────────────────────────────────────────────────────────
-
-    private record LayoutNode
-    {
-        public PersonDto Person { get; init; } = null!;
-        public int X { get; init; }
-        public int Y { get; init; }
-        public int Depth { get; init; }
-        public bool IsFocus { get; init; }
-        public int Size { get; init; }
-    }
 }

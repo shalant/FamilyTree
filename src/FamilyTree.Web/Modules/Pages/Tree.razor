@@ -66,8 +66,9 @@ else
             Snackbar.Add(result.Message, Severity.Error);
         }
 
-        // TODO: replace FirstOrDefault with the authenticated user's saved focus id
-        _focusId = _people.FirstOrDefault()?.Id;
+        // TODO: replace with authenticated user's saved focus id
+        // Focus on youngest person so ancestors are above, descendants below
+        _focusId = _people.OrderByDescending(p => p.BirthDate).FirstOrDefault()?.Id;
         _loading = false;
     }
 

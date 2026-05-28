@@ -110,7 +110,7 @@ else
     private bool _isDark;
     private void ZoomIn() => _canvas?.ZoomIn();
     private void ZoomOut() => _canvas?.ZoomOut();
-    private void CenterTree() => _canvas?.CenterOnRoot();
+    private void CenterTree() { /* view auto-centers on focus person */ }
     private void ToggleTheme() => _isDark = !_isDark;
     private void SignOut() { /* your auth logic */ }
 
