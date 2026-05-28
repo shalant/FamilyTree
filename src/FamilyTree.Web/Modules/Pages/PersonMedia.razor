@@ -1,0 +1,498 @@
+﻿@page "/people/{Id:guid}/media"
+@rendermode InteractiveServer
+
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Modules.Components
+@using MudBlazor
+
+@inject IPersonService PersonService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_person?.FirstName ?? "Person")'s media</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Success" />
+}
+else if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning" Class="ma-4">Person not found.</MudAlert>
+}
+else
+{
+    <div style="max-width:860px; margin:0 auto; padding:24px 24px 48px;
+        font-family:var(--ft-font-body);">
+
+        @* ── Breadcrumb / back ───────────────────────────────────────────── *@
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:24px;">
+            <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+                           Style="color:var(--ft-gray-500);"
+                           OnClick="@(() => Nav.NavigateTo("/"))" />
+            <div>
+                <div style="font-size:12px; color:var(--ft-gray-300);
+                    letter-spacing:0.04em; margin-bottom:1px;">
+                    Family tree
+                </div>
+                <div style="font-size:18px; font-weight:500; font-style:italic;
+                    font-family:var(--ft-font-display); color:var(--ft-green-800);
+                    line-height:1.1;">
+                    @_person!.FullName
+                </div>
+            </div>
+        </div>
+
+        @* ── Tab switcher ─────────────────────────────────────────────────── *@
+        <div style="display:flex; border-bottom:1px solid var(--ft-line-border);
+            margin-bottom:28px; gap:4px;">
+            <button @onclick="@(() => _tab = Tab.Photos)"
+                    style="padding:8px 20px; border:none; background:transparent; cursor:pointer;
+                font-size:14px; font-family:var(--ft-font-body);
+                color:@(_tab == Tab.Photos ? "var(--ft-green-700)" : "var(--ft-gray-400)");
+                border-bottom:@(_tab == Tab.Photos ? "2px solid var(--ft-green-600)" : "2px solid transparent");
+                margin-bottom:-1px; font-weight:@(_tab == Tab.Photos ? "600" : "400");">
+                Photos
+                @if (_photos.Any())
+                {
+                    <span style="margin-left:6px; font-size:11px; background:var(--ft-green-50);
+                        color:var(--ft-green-700); padding:1px 6px; border-radius:10px;
+                        font-weight:600;">
+                        @_photos.Count
+                    </span>
+                }
+            </button>
+            <button @onclick="@(() => _tab = Tab.Records)"
+                    style="padding:8px 20px; border:none; background:transparent; cursor:pointer;
+                font-size:14px; font-family:var(--ft-font-body);
+                color:@(_tab == Tab.Records ? "var(--ft-green-700)" : "var(--ft-gray-400)");
+                border-bottom:@(_tab == Tab.Records ? "2px solid var(--ft-green-600)" : "2px solid transparent");
+                margin-bottom:-1px; font-weight:@(_tab == Tab.Records ? "600" : "400");">
+                Records
+                @if (_records.Any())
+                {
+                    <span style="margin-left:6px; font-size:11px; background:var(--ft-green-50);
+                        color:var(--ft-green-700); padding:1px 6px; border-radius:10px;
+                        font-weight:600;">
+                        @_records.Count
+                    </span>
+                }
+            </button>
+        </div>
+
+        @* ── Photos tab ───────────────────────────────────────────────────── *@
+        @if (_tab == Tab.Photos)
+        {
+            @* Upload zone *@
+            <div style="margin-bottom:28px;">
+                <MediaUploadZone Label="Drop photos here or click to browse"
+                                 Hint="JPG, PNG, HEIC, WebP · max 20 MB each"
+                                 Accept="image/*"
+                                 Multiple="true"
+                                 OnFilesSelected="OnPhotosSelected" />
+            </div>
+
+            @if (_photos.Any())
+            {
+                @* Photo grid *@
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));
+                    gap:12px;">
+                    @foreach (var photo in _photos)
+                    {
+                        <div style="position:relative; aspect-ratio:1; border-radius:8px;
+                            overflow:hidden; background:var(--ft-surface-card);
+                            border:0.5px solid var(--ft-line-border);"
+                             @onmouseenter="@(() => photo.Hovered = true)"
+                             @onmouseleave="@(() => photo.Hovered = false)">
+                            <img src="@photo.Url" alt="@photo.Caption"
+                                 style="width:100%; height:100%; object-fit:cover;" />
+                            @if (photo.Hovered)
+                            {
+                                <div style="position:absolute; inset:0; background:rgba(0,0,0,0.45);
+                                    display:flex; flex-direction:column; align-items:center;
+                                    justify-content:flex-end; padding:10px; gap:6px;">
+                                    @if (!string.IsNullOrWhiteSpace(photo.Caption))
+                                    {
+                                        <div style="font-size:12px; color:#fff; text-align:center;
+                                            text-shadow:0 1px 3px rgba(0,0,0,0.6);">
+                                            @photo.Caption
+                                        </div>
+                                    }
+                                    <div style="display:flex; gap:6px;">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                                       Size="Size.Small"
+                                                       Style="color:#fff; background:rgba(255,255,255,0.15);"
+                                                       OnClick="@(() => EditPhoto(photo))" />
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                                       Size="Size.Small"
+                                                       Style="color:#fff; background:rgba(255,255,255,0.15);"
+                                                       OnClick="@(() => DeletePhoto(photo))" />
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div style="text-align:center; padding:40px 0; color:var(--ft-gray-300);">
+                    <MudIcon Icon="@Icons.Material.Outlined.PhotoLibrary"
+                             Style="font-size:40px; display:block; margin:0 auto 10px;" />
+                    <div style="font-size:14px;">No photos yet</div>
+                    <div style="font-size:12px; margin-top:4px;">
+                        Drag photos above or click to browse
+                    </div>
+                </div>
+            }
+        }
+
+        @* ── Records tab ─────────────────────────────────────────────────── *@
+        @if (_tab == Tab.Records)
+        {
+            @* Quick-add form *@
+            <div style="background:var(--ft-surface-card); border:0.5px solid var(--ft-line-border);
+                border-radius:10px; padding:20px; margin-bottom:28px;">
+                <div style="font-size:11px; letter-spacing:0.07em; text-transform:uppercase;
+                    color:var(--ft-gray-300); margin-bottom:16px;">
+                    Add a record
+                </div>
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect @bind-Value="_newRecordType"
+                                   Label="Document type"
+                                   Variant="Variant.Outlined"
+                                   Dense="true">
+                            @foreach (var group in RecordTypes)
+                            {
+                                <MudListSubheader>@group.Key</MudListSubheader>
+                                @foreach (var type in group.Value)
+                                {
+                                    <MudSelectItem Value="@type">@type</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker Date="@_newRecordDate"
+                                       DateChanged="@(v => _newRecordDate = v)"
+                                       Label="Date on document (optional)"
+                                       DateFormat="dd/MM/yyyy"
+                                       Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_newRecordCaption"
+                                      Label="Brief description (optional)"
+                                      Variant="Variant.Outlined"
+                                      Dense="true" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MediaUploadZone Label="Drop file here or click to browse"
+                                         Hint="PDF, JPG, PNG, TIFF · max 50 MB"
+                                         Accept=".pdf,image/*"
+                                         Multiple="false"
+                                         Compact="false"
+                                         OnFilesSelected="OnRecordFileSelected" />
+                        @if (!string.IsNullOrWhiteSpace(_pendingRecordFileName))
+                        {
+                            <div style="display:flex; align-items:center; gap:8px;
+                                margin-top:8px; font-size:12px; color:var(--ft-green-700);">
+                                <MudIcon Icon="@Icons.Material.Outlined.AttachFile"
+                                         Style="font-size:16px;" />
+                                @_pendingRecordFileName
+                            </div>
+                        }
+                    </MudItem>
+                </MudGrid>
+
+                <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+                    <MudButton Variant="Variant.Filled"
+                               Disabled="@(string.IsNullOrWhiteSpace(_newRecordType) || string.IsNullOrWhiteSpace(_pendingRecordFileName))"
+                               Style="background:var(--ft-green-600); color:#fff;"
+                               OnClick="AddRecord">
+                        @if (_savingRecord)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        }
+                        Save record
+                    </MudButton>
+                </div>
+            </div>
+
+            @* Records list *@
+            @if (_records.Any())
+            {
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    @foreach (var rec in _records)
+                    {
+                        <div style="display:flex; align-items:center; gap:14px;
+                            padding:14px 16px; border-radius:8px;
+                            background:var(--ft-surface-card);
+                            border:0.5px solid var(--ft-line-border);">
+                            <div style="width:38px; height:38px; border-radius:8px; flex-shrink:0;
+                                display:flex; align-items:center; justify-content:center;
+                                background:var(--ft-green-50);">
+                                <MudIcon Icon="@RecordIcon(rec.DocType)"
+                                         Style="font-size:20px; color:var(--ft-green-600);" />
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-size:13px; font-weight:500; color:var(--ft-gray-700);
+                                    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    @rec.DocType
+                                </div>
+                                <div style="font-size:12px; color:var(--ft-gray-300); margin-top:1px;">
+                                    @if (rec.Date.HasValue)
+                                    {
+                                        <span>@rec.Date.Value.ToString("d MMM yyyy")</span>
+                                        <span style="margin:0 4px;">·</span>
+                                    }
+                                    @rec.FileName
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(rec.Caption))
+                                {
+                                    <div style="font-size:12px; color:var(--ft-gray-400);
+                                        margin-top:2px; font-style:italic;">
+                                        @rec.Caption
+                                    </div>
+                                }
+                            </div>
+                            <div style="display:flex; gap:4px; flex-shrink:0;">
+                                <MudIconButton Icon="@Icons.Material.Outlined.OpenInNew"
+                                               Size="Size.Small"
+                                               Style="color:var(--ft-gray-400);"
+                                               Href="@rec.Url" Target="_blank" />
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                               Size="Size.Small"
+                                               Style="color:var(--ft-gray-300);"
+                                               OnClick="@(() => DeleteRecord(rec))" />
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div style="text-align:center; padding:40px 0; color:var(--ft-gray-300);">
+                    <MudIcon Icon="@Icons.Material.Outlined.FolderOpen"
+                             Style="font-size:40px; display:block; margin:0 auto 10px;" />
+                    <div style="font-size:14px;">No records yet</div>
+                    <div style="font-size:12px; margin-top:4px;">
+                        Birth certificates, marriage records, obituaries and more
+                    </div>
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private enum Tab { Photos, Records }
+
+    private PersonDto? _person;
+    private bool _loading = true;
+    private bool _notFound;
+    private Tab _tab = Tab.Photos;
+
+    // ── Photos ───────────────────────────────────────────────────────────
+
+    private List<PhotoItem> _photos = [];
+    private bool _uploadingPhoto;
+
+    private class PhotoItem
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Url { get; set; } = "";
+        public string FileName { get; set; } = "";
+        public string? Caption { get; set; }
+        public bool Hovered { get; set; }
+    }
+
+    // ── Records ──────────────────────────────────────────────────────────
+
+    private List<RecordItem> _records = [];
+    private bool _savingRecord;
+    private string? _newRecordType;
+    private DateTime? _newRecordDate;
+    private string _newRecordCaption = "";
+    private string? _pendingRecordFileName;
+    private IBrowserFile? _pendingRecordFile;
+
+    private class RecordItem
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Url { get; set; } = "";
+        public string FileName { get; set; } = "";
+        public string? DocType { get; set; }
+        public string? Caption { get; set; }
+        public DateOnly? Date { get; set; }
+    }
+
+    // ── Document type taxonomy ────────────────────────────────────────────
+
+    private static readonly Dictionary<string, List<string>> RecordTypes = new()
+    {
+        ["Vital records"] = ["Birth certificate", "Marriage certificate",
+                              "Death certificate", "Divorce decree"],
+        ["Immigration"] = ["Passport", "Naturalization papers",
+                              "Ship manifest", "Visa / entry permit"],
+        ["Military"] = ["Draft card", "Service record",
+                              "Discharge papers", "Medal citation"],
+        ["Civil records"] = ["Census record", "Property deed",
+                              "Will / probate", "Tax record"],
+        ["Press"] = ["Obituary", "Newspaper article", "Magazine feature"],
+        ["Other"] = ["Letter", "Diary / journal", "Photograph", "Other document"]
+    };
+
+    // ── Lifecycle ────────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await PersonService.GetByIdAsync(Id);
+        if (!result.Success)
+        {
+            _notFound = true;
+            _loading = false;
+            return;
+        }
+        _person = result.Data!;
+        _loading = false;
+
+        // TODO: load media from API
+        // var mediaResult = await MediaService.GetByPersonAsync(Id);
+        // if (mediaResult.Success)
+        // {
+        //     _photos  = mediaResult.Data!.Where(m => m.Type == "photo").Select(...).ToList();
+        //     _records = mediaResult.Data!.Where(m => m.Type == "record").Select(...).ToList();
+        // }
+    }
+
+    // ── Photo handlers ────────────────────────────────────────────────────
+
+    private async Task OnPhotosSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        foreach (var file in files)
+        {
+            // TODO: POST each file to /api/people/{Id}/media with type=photo
+            //   using var content = new MultipartFormDataContent();
+            //   using var stream  = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+            //   content.Add(new StreamContent(stream), "file", file.Name);
+            //   content.Add(new StringContent("photo"), "type");
+            //   var response = await Http.PostAsync($"/api/people/{Id}/media", content);
+            //   var created  = await response.Content.ReadFromJsonAsync<MediaDto>();
+            //   _photos.Add(new PhotoItem { Id = created.Id, Url = created.Url, FileName = file.Name });
+
+            // Stub: show a local preview while API is not yet built
+            _photos.Add(new PhotoItem
+            {
+                FileName = file.Name,
+                Caption = null,
+                Url = "" // placeholder — will be blob URL after API
+            });
+            Snackbar.Add($"{file.Name} queued — upload endpoint not yet available.", Severity.Info);
+        }
+        StateHasChanged();
+    }
+
+    private void EditPhoto(PhotoItem photo)
+    {
+        // TODO: open inline caption editor or a small dialog
+    }
+
+    private void DeletePhoto(PhotoItem photo)
+    {
+        // TODO: DELETE /api/people/{Id}/media/{photo.Id}
+        _photos.Remove(photo);
+    }
+
+    // ── Record handlers ───────────────────────────────────────────────────
+
+    private async Task OnRecordFileSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        var file = files.FirstOrDefault();
+        if (file is null) return;
+        _pendingRecordFile = file;
+        _pendingRecordFileName = file.Name;
+        await Task.CompletedTask;
+    }
+
+    private async Task AddRecord()
+    {
+        if (_pendingRecordFile is null || string.IsNullOrWhiteSpace(_newRecordType)) return;
+
+        _savingRecord = true;
+        try
+        {
+            // TODO: POST to /api/people/{Id}/media with type=record
+            //   using var content = new MultipartFormDataContent();
+            //   using var stream  = _pendingRecordFile.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+            //   content.Add(new StreamContent(stream), "file", _pendingRecordFile.Name);
+            //   content.Add(new StringContent("record"),        "type");
+            //   content.Add(new StringContent(_newRecordType),  "docType");
+            //   content.Add(new StringContent(_newRecordCaption), "caption");
+            //   if (_newRecordDate.HasValue)
+            //       content.Add(new StringContent(_newRecordDate.Value.ToString("O")), "date");
+            //   var response = await Http.PostAsync($"/api/people/{Id}/media", content);
+            //   var created  = await response.Content.ReadFromJsonAsync<MediaDto>();
+
+            // Stub: add locally
+            _records.Add(new RecordItem
+            {
+                FileName = _pendingRecordFile.Name,
+                DocType = _newRecordType,
+                Caption = string.IsNullOrWhiteSpace(_newRecordCaption) ? null : _newRecordCaption,
+                Date = _newRecordDate.HasValue ? DateOnly.FromDateTime(_newRecordDate.Value) : null,
+                Url = "#" // placeholder
+            });
+
+            Snackbar.Add($"{_newRecordType} saved — upload endpoint not yet available.", Severity.Info);
+            ResetRecordForm();
+        }
+        finally
+        {
+            _savingRecord = false;
+        }
+    }
+
+    private void ResetRecordForm()
+    {
+        _newRecordType = null;
+        _newRecordDate = null;
+        _newRecordCaption = "";
+        _pendingRecordFile = null;
+        _pendingRecordFileName = null;
+    }
+
+    private void DeleteRecord(RecordItem rec)
+    {
+        // TODO: DELETE /api/people/{Id}/media/{rec.Id}
+        _records.Remove(rec);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    private static string RecordIcon(string? docType) => docType switch
+    {
+        "Birth certificate" => Icons.Material.Outlined.ChildCare,
+        "Marriage certificate" => Icons.Material.Outlined.Favorite,
+        "Death certificate" => Icons.Material.Outlined.EventBusy,
+        "Divorce decree" => Icons.Material.Outlined.HeartBroken,
+        "Obituary" => Icons.Material.Outlined.Newspaper,
+        "Newspaper article" => Icons.Material.Outlined.Newspaper,
+        "Military service record"
+            or "Draft card"
+            or "Discharge papers"
+            or "Medal citation" => Icons.Material.Outlined.MilitaryTech,
+        "Census record" => Icons.Material.Outlined.TableChart,
+        "Property deed"
+            or "Will / probate" => Icons.Material.Outlined.AccountBalance,
+        "Passport"
+            or "Ship manifest"
+            or "Naturalization papers"
+            or "Visa / entry permit" => Icons.Material.Outlined.Flight,
+        "Letter"
+            or "Diary / journal" => Icons.Material.Outlined.MenuBook,
+        _ => Icons.Material.Outlined.Description
+    };
+}

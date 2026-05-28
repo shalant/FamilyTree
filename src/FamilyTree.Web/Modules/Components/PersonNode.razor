@@ -1,0 +1,88 @@
+@using FamilyTree.Shared.DTOs.Person
+
+@* Rendered absolutely by FamilyTreeCanvas — receives pre-computed Left/Top/Size.
+   RelativeDepth: 0 = focus person, +N = Nth-generation ancestor, -N = Nth-generation descendant. *@
+
+<div class="person-node @(IsFocus ? "person-node--focus" : "")"
+     style="left:@(Left)px; top:@(Top)px; width:@(Size)px; height:@(Size)px;
+    border:@BorderWidth solid @BorderColor; background:@BgColor;"
+     @onclick="() => OnClick.InvokeAsync(Person)"
+     @onmouseenter="OnMouseEnter"
+     @onmouseleave="OnMouseLeave">
+    @if (!string.IsNullOrWhiteSpace(Person.ProfilePhotoUrl))
+    {
+        <img src="@Person.ProfilePhotoUrl"
+             alt="@Person.FullName"
+             style="width:100%; height:100%; border-radius:50%; object-fit:cover;" />
+    }
+    else
+    {
+        <span style="font-size:@FontSize; font-weight:500; color:@TextColor;">
+            @Initials
+        </span>
+    }
+</div>
+
+<div class="person-label person-label--name"
+     style="left:@(Left - (LabelWidth - Size) / 2)px; top:@(Top + Size + 5)px;">
+    @Person.FirstName
+</div>
+
+<div class="person-label person-label--year"
+     style="left:@(Left - (LabelWidth - Size) / 2)px; top:@(Top + Size + 20)px;">
+    @Person.BirthDate?.Year
+</div>
+
+@code {
+    [Parameter, EditorRequired] public PersonDto Person { get; set; } = null!;
+    [Parameter, EditorRequired] public int Left { get; set; }
+    [Parameter, EditorRequired] public int Top { get; set; }
+    [Parameter, EditorRequired] public int Size { get; set; }
+    [Parameter, EditorRequired] public int RelativeDepth { get; set; }
+    [Parameter, EditorRequired] public bool IsFocus { get; set; }
+    [Parameter] public EventCallback<PersonDto> OnClick { get; set; }
+
+    private const int LabelWidth = 88;
+    private bool _hovered;
+
+    private string Initials =>
+        $"{Person.FirstName?.FirstOrDefault()}{Person.LastName?.FirstOrDefault()}"
+        .ToUpperInvariant();
+
+    // Return a CSS string — unit is required.
+    private string FontSize => IsFocus
+        ? "15px"
+        : Math.Abs(RelativeDepth) >= 2 ? "12px" : "13px";
+
+    private string BorderWidth => IsFocus ? "2px" : "1px";
+
+    // Colour fades with distance from the focus person in both directions.
+    private string BorderColor => (_hovered && !IsFocus)
+        ? "var(--ft-green-600)"
+        : IsFocus
+            ? "var(--ft-focus-border)"
+            : Math.Abs(RelativeDepth) == 1   // parents / children
+                ? "var(--ft-leaf-mid)"
+                : Math.Abs(RelativeDepth) == 2   // grandparents / grandchildren
+                    ? "var(--ft-gray-400)"
+                    : "var(--ft-gray-100)";           // more distant
+
+    private string BgColor => (_hovered && !IsFocus)
+        ? "var(--ft-green-50)"
+        : IsFocus
+            ? "var(--ft-focus-fill)"
+            : "var(--ft-surface-card)";
+
+    private string TextColor => (_hovered && !IsFocus)
+        ? "var(--ft-green-800)"
+        : IsFocus
+            ? "var(--ft-focus-text)"
+            : Math.Abs(RelativeDepth) >= 3
+                ? "var(--ft-gray-400)"
+                : Math.Abs(RelativeDepth) == 2
+                    ? "var(--ft-gray-500)"
+                    : "var(--ft-gray-700)";
+
+    private void OnMouseEnter() { _hovered = true; StateHasChanged(); }
+    private void OnMouseLeave() { _hovered = false; StateHasChanged(); }
+}

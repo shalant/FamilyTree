@@ -1,0 +1,266 @@
+﻿@using FamilyTree.Shared.DTOs.Person
+@using MudBlazor
+
+@inject NavigationManager Nav
+
+<MudDrawer Open="@(Person is not null)"
+           OpenChanged="@(v => { if (!v) OnClose.InvokeAsync(); })"
+           Anchor="Anchor.End"
+           Elevation="2"
+           Variant="DrawerVariant.Temporary"
+           Width="300px">
+
+    @if (Person is not null)
+    {
+        <div style="display:flex; flex-direction:column; height:100%;
+            background:var(--ft-surface); font-family:var(--ft-font-body);">
+
+            @* ── Header ─────────────────────────────────────────────────── *@
+            <div style="display:flex; align-items:center; justify-content:space-between;
+                padding:16px 16px 14px;
+                border-bottom:0.5px solid var(--ft-line-border);">
+                <div style="font-size:17px; font-weight:500; font-style:italic;
+                    font-family:var(--ft-font-display); color:var(--ft-green-800);
+                    line-height:1.2;">
+                    @Person.FullName
+                </div>
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                               Size="Size.Small"
+                               Style="color:var(--ft-gray-300);"
+                               OnClick="() => OnClose.InvokeAsync()" />
+            </div>
+
+            @* ── Scrollable body ─────────────────────────────────────────── *@
+            <div style="flex:1; overflow-y:auto; padding:20px 16px 8px;">
+
+                @* Avatar *@
+                <div style="display:flex; justify-content:center; margin-bottom:20px;">
+                    <div style="width:76px; height:76px; border-radius:50%; overflow:hidden;
+                        display:flex; align-items:center; justify-content:center;
+                        font-size:22px; font-weight:500; letter-spacing:0.02em;
+                        background:var(--ft-focus-fill); color:var(--ft-focus-text);
+                        border:2px solid var(--ft-focus-border);">
+                        @if (!string.IsNullOrWhiteSpace(Person.ProfilePhotoUrl))
+                        {
+                            <img src="@Person.ProfilePhotoUrl" alt="@Person.FullName"
+                                 style="width:100%; height:100%; object-fit:cover;" />
+                        }
+                        else
+                        {
+                            @Initials
+                        }
+                    </div>
+                </div>
+
+                @* Vital dates *@
+                <div style="display:flex; flex-direction:column; gap:7px; margin-bottom:8px;">
+                    @if (Person.BirthDate.HasValue)
+                    {
+                        <div style="display:flex; align-items:center; gap:9px;">
+                            <MudIcon Icon="@Icons.Material.Outlined.Cake"
+                                     Style="font-size:16px; color:var(--ft-gray-300);" />
+                            <span style="font-size:13px; color:var(--ft-gray-700);">
+                                Born @Person.BirthDate.Value.ToString("d MMM yyyy")
+                            </span>
+                        </div>
+                    }
+                    @if (Person.DeathDate.HasValue)
+                    {
+                        <div style="display:flex; align-items:center; gap:9px;">
+                            <MudIcon Icon="@Icons.Material.Outlined.EventBusy"
+                                     Style="font-size:16px; color:var(--ft-gray-300);" />
+                            <span style="font-size:13px; color:var(--ft-gray-700);">
+                                Died @Person.DeathDate.Value.ToString("d MMM yyyy")
+                            </span>
+                        </div>
+                    }
+                    @if (Person.Age.HasValue)
+                    {
+                        <div style="display:flex; align-items:center; gap:9px;">
+                            <MudIcon Icon="@Icons.Material.Outlined.Person"
+                                     Style="font-size:16px; color:var(--ft-gray-300);" />
+                            <span style="font-size:13px; color:var(--ft-gray-500);">
+                                Age @Person.Age
+                            </span>
+                        </div>
+                    }
+                </div>
+
+                @* Relationships — grouped by type *@
+                @if (_related.Any())
+                {
+                    <div style="margin-top:20px;">
+                        @foreach (var group in _related.GroupBy(r => r.Kind))
+                        {
+                            <div style="margin-bottom:14px;">
+                                <div style="font-size:10px; letter-spacing:0.08em;
+                                    text-transform:uppercase; color:var(--ft-gray-300);
+                                    margin-bottom:5px;">
+                                    @group.Key@(group.Count() > 1 ? "s" : "")
+                                </div>
+                                @foreach (var rel in group)
+                                {
+                                    <div style="display:flex; align-items:center;
+                                        justify-content:space-between;
+                                        padding:7px 10px; margin-bottom:2px;
+                                        border-radius:6px; cursor:pointer;
+                                        background:var(--ft-surface-card);
+                                        border:0.5px solid var(--ft-line-border);"
+                                         @onclick="() => OnFocusPerson.InvokeAsync(rel.Person)">
+                                        <span style="font-size:13px; color:var(--ft-gray-700);">
+                                            @rel.Person.FirstName @rel.Person.LastName
+                                        </span>
+                                        @if (rel.Person.BirthDate.HasValue)
+                                        {
+                                            <span style="font-size:11px; color:var(--ft-gray-300);
+                                                flex-shrink:0; margin-left:8px;">
+                                                @rel.Person.BirthDate.Value.Year
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+                @* Notes *@
+                @if (!string.IsNullOrWhiteSpace(Person.BiographyNotes))
+                {
+                    <div style="margin-top:4px; margin-bottom:8px;">
+                        <div style="font-size:10px; letter-spacing:0.08em;
+                            text-transform:uppercase; color:var(--ft-gray-300);
+                            margin-bottom:6px;">
+                            Notes
+                        </div>
+                        <p style="font-size:13px; color:var(--ft-gray-500);
+                            line-height:1.65; margin:0;">
+                            @Person.BiographyNotes
+                        </p>
+                    </div>
+                }
+
+                @* ── Media strip ─────────────────────────────────────────── *@
+                <div style="margin-top:20px; padding-top:16px;
+                    border-top:0.5px solid var(--ft-line-border);">
+                    <div style="display:flex; align-items:center;
+                        justify-content:space-between; margin-bottom:10px;">
+                        <div style="font-size:10px; letter-spacing:0.08em;
+                            text-transform:uppercase; color:var(--ft-gray-300);">
+                            Photos &amp; records
+                        </div>
+                        <button style="font-size:12px; color:var(--ft-green-600); border:none;
+                            background:transparent; cursor:pointer; padding:0;
+                            font-family:var(--ft-font-body);"
+                                @onclick="NavigateToMedia">
+                            View all →
+                        </button>
+                    </div>
+
+                    @* Photo thumbnails — populated once media API is live *@
+                    @if (Person.ProfilePhotoUrl is not null || _previewPhotos.Any())
+                    {
+                        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+                            @foreach (var url in _previewPhotos.Take(4))
+                            {
+                                <div style="width:52px; height:52px; border-radius:6px; overflow:hidden;
+                                    border:0.5px solid var(--ft-line-border); flex-shrink:0;">
+                                    <img src="@url" style="width:100%; height:100%; object-fit:cover;" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        @* Empty state — tappable to go straight to media page *@
+                        <button style="width:100%; padding:10px; border-radius:6px; cursor:pointer;
+                            border:1.5px dashed var(--ft-line-border); background:transparent;
+                            color:var(--ft-gray-300); font-size:12px;
+                            font-family:var(--ft-font-body); display:flex;
+                            align-items:center; justify-content:center; gap:6px;"
+                                @onclick="NavigateToMedia">
+                            <MudIcon Icon="@Icons.Material.Outlined.AddPhotoAlternate"
+                                     Style="font-size:16px;" />
+                            Add photos &amp; records
+                        </button>
+                    }
+                </div>
+
+            </div>
+
+            @* ── Actions ─────────────────────────────────────────────────── *@
+            <div style="border-top:0.5px solid var(--ft-line-border); padding:12px 16px;">
+                <MudButton Variant="Variant.Outlined" FullWidth="true"
+                           StartIcon="@Icons.Material.Outlined.Edit"
+                           Style="border-color:var(--ft-line-border);
+                    color:var(--ft-gray-700); margin-bottom:2px;"
+                           OnClick="() => OnEdit.InvokeAsync(Person)">
+                    Edit
+                </MudButton>
+                <MudButton Variant="Variant.Text" FullWidth="true"
+                           StartIcon="@Icons.Material.Outlined.AccountTree"
+                           Style="color:var(--ft-green-600); margin-bottom:2px;"
+                           OnClick="() => OnFocusPerson.InvokeAsync(Person)">
+                    Focus tree here
+                </MudButton>
+                <MudButton Variant="Variant.Text" FullWidth="true"
+                           Color="Color.Error"
+                           StartIcon="@Icons.Material.Outlined.DeleteOutline"
+                           OnClick="() => OnDelete.InvokeAsync(Person)">
+                    Delete
+                </MudButton>
+            </div>
+
+        </div>
+    }
+</MudDrawer>
+
+@code {
+    [Parameter] public PersonDto? Person { get; set; }
+    [Parameter] public List<PersonDto> AllPeople { get; set; } = [];
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<PersonDto> OnEdit { get; set; }
+    [Parameter] public EventCallback<PersonDto> OnFocusPerson { get; set; }
+    [Parameter] public EventCallback<PersonDto> OnDelete { get; set; }
+
+    private record RelatedPerson(PersonDto Person, string Kind);
+
+    private List<RelatedPerson> _related = [];
+    private List<string> _previewPhotos = [];  // populated by media API when ready
+
+    protected override void OnParametersSet()
+    {
+        _related = [];
+        if (Person is null) return;
+
+        // Order: parents → spouses → children
+        foreach (var id in Person.ParentIds ?? [])
+        {
+            var p = AllPeople.FirstOrDefault(x => x.Id == id);
+            if (p is not null) _related.Add(new(p, "Parent"));
+        }
+        foreach (var id in Person.SpouseIds ?? [])
+        {
+            var p = AllPeople.FirstOrDefault(x => x.Id == id);
+            if (p is not null) _related.Add(new(p, "Spouse"));
+        }
+        foreach (var id in Person.ChildIds ?? [])
+        {
+            var p = AllPeople.FirstOrDefault(x => x.Id == id);
+            if (p is not null) _related.Add(new(p, "Child"));
+        }
+
+        // TODO: load thumbnail preview URLs from media API
+        // _previewPhotos = await MediaService.GetPreviewUrlsAsync(Person.Id, limit: 4);
+    }
+
+    private void NavigateToMedia()
+    {
+        if (Person is null) return;
+        Nav.NavigateTo($"/people/{Person.Id}/media");
+    }
+
+    private string Initials => Person is null ? ""
+        : $"{Person.FirstName?.FirstOrDefault()}{Person.LastName?.FirstOrDefault()}"
+          .ToUpperInvariant();
+}

@@ -1,0 +1,94 @@
+﻿@page "/settings"
+@rendermode InteractiveServer
+
+@using MudBlazor
+
+<PageTitle>Settings</PageTitle>
+
+<MudStack Spacing="4" Class="mt-4" MaxWidth="600px" Style="margin:auto;">
+
+    <!-- Page Title -->
+    <MudText Typo="Typo.h5"
+             Style="font-style:italic; font-family:Georgia,serif;
+                    color:var(--ft-green-800);">
+        Settings
+    </MudText>
+
+    <!-- Account Section -->
+    <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">Account</MudText>
+
+        <MudText Class="mb-4" Style="color:var(--ft-text-muted); font-size:14px;">
+            Account details will appear here once authentication is enabled.
+        </MudText>
+
+        <MudButton Variant="Variant.Outlined"
+                   Disabled="true"
+                   StartIcon="@Icons.Material.Outlined.Person">
+            Manage Account
+        </MudButton>
+    </MudPaper>
+
+    <!-- Appearance Section -->
+    @* <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">Appearance</MudText>
+
+        <MudSwitch T="bool" @bind-Checked="_isDark"
+                   Color="Color.Primary"
+                   ValueChanged="ToggleTheme"
+                   Label="Dark mode" />
+
+        <MudSelect @bind-Value="_color" Label="Accent color" Disabled="true" Class="mt-4">
+            <MudSelectItem Value="green">Green (default)</MudSelectItem>
+            <MudSelectItem Value="blue">Blue</MudSelectItem>
+            <MudSelectItem Value="neutral">Neutral</MudSelectItem>
+        </MudSelect>
+    </MudPaper> *@
+
+    <!-- Tree Display Section -->
+    <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">Tree Display</MudText>
+
+        <MudSwitch T="bool" @bind-Checked="_showPhotos"
+                   Label="Show profile photos" />
+
+        <MudSwitch T="bool" @bind-Checked="_compactMode"
+                   Label="Compact layout" />
+
+        <MudSwitch T="bool" @bind-Checked="_showYears"
+                   Label="Show birth/death years" />
+    </MudPaper>
+
+    <!-- Data Section -->
+    <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">Data</MudText>
+
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Outlined.Upload"
+                   Disabled="true"
+                   Class="mb-2">
+            Import GEDCOM
+        </MudButton>
+
+        <MudButton Variant="Variant.Outlined"
+                   StartIcon="@Icons.Material.Outlined.Download"
+                   Disabled="true">
+            Export GEDCOM
+        </MudButton>
+    </MudPaper>
+
+</MudStack>
+
+@code {
+    private bool _isDark = false;
+    private bool _showPhotos = true;
+    private bool _compactMode = false;
+    private bool _showYears = true;
+    private string _color = "green";
+
+    private void ToggleTheme(bool value)
+    {
+        _isDark = value;
+        // Wire to your theme service later
+    }
+}

@@ -1,0 +1,190 @@
+﻿@* ═══════════════════════════════════════════════════════════════════════════
+   MediaUploadZone — polished drag-and-drop / click-to-browse upload zone.
+
+   Improvements over v1:
+   • Animated spinning dashed border while dragging (CSS only, no JS)
+   • File count + size summary chip shown after selection
+   • Accepts the queued-file list back so parent can reset it
+   • Dark-mode aware via --ft-* vars
+   • Accessible: role="button", keyboard-operable via the label
+   ═══════════════════════════════════════════════════════════════════════════ *@
+
+<div style="display:flex; flex-direction:column; gap:8px;">
+
+    <label class="@ZoneClass"
+           role="button"
+           aria-label="@(Label)"
+           tabindex="0"
+           @ondragenter="OnDragEnter"
+           @ondragleave="OnDragLeave"
+           @ondragover:preventDefault="true"
+           @ondrop:preventDefault="true"
+           @ondrop="OnDrop">
+
+        @* Invisible InputFile covers the entire zone *@
+        <InputFile id="@_inputId"
+                   OnChange="HandleInputChange"
+                   multiple="@Multiple"
+                   accept="@Accept"
+                   style="position:absolute; inset:0; opacity:0; cursor:pointer;
+        width:100%; height:100%;" />
+
+        @if (Compact)
+        {
+            @* ── Compact single-line ──────────────────────────────────────── *@
+            <div class="ft-upload-inner" style="display:flex; align-items:center;
+                justify-content:center; gap:8px; pointer-events:none;">
+                <MudIcon Icon="@UploadIcon" Style="font-size:18px; color:var(--ft-green-600);" />
+                <span style="font-size:13px; color:var(--ft-green-600);">@Label</span>
+            </div>
+        }
+        else
+        {
+            @* ── Full drop zone ───────────────────────────────────────────── *@
+            <div style="pointer-events:none; display:flex; flex-direction:column;
+                align-items:center; gap:10px;">
+
+                @* Icon — switches on drag *@
+                <div style="width:52px; height:52px; border-radius:50%; display:flex;
+                    align-items:center; justify-content:center;
+                    background:var(--ft-green-50); transition:background 0.15s;">
+                    <MudIcon Icon="@UploadIcon"
+                             Style="font-size:26px; color:var(--ft-green-600);" />
+                </div>
+
+                @* Primary label *@
+                <div style="font-size:14px; color:var(--ft-text-primary); font-weight:500;
+                    text-align:center; line-height:1.4;">
+                    @(_dragging ? "Release to upload" : Label)
+                </div>
+
+                @* Hint *@
+                @if (!string.IsNullOrWhiteSpace(Hint))
+                {
+                    <div style="font-size:12px; color:var(--ft-text-muted); text-align:center;">
+                        @Hint
+                    </div>
+                }
+
+                @* Browse button affordance *@
+                @if (!_dragging)
+                {
+                    <div style="font-size:12px; color:var(--ft-green-600);
+                        border:1px solid var(--ft-green-600); border-radius:6px;
+                        padding:4px 14px; margin-top:2px;">
+                        Browse files
+                    </div>
+                }
+            </div>
+        }
+    </label>
+
+    @* ── Queued files summary chip ──────────────────────────────────────── *@
+    @if (_queued.Count > 0)
+    {
+        <div style="display:flex; align-items:center; justify-content:space-between;
+            padding:8px 12px; border-radius:8px;
+            background:var(--ft-green-50); border:0.5px solid var(--ft-green-200);">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline"
+                         Style="font-size:16px; color:var(--ft-green-600);" />
+                <span style="font-size:13px; color:var(--ft-green-700);">
+                    @_queued.Count file@(_queued.Count == 1 ? "" : "s") selected
+                    @if (_totalBytes > 0)
+                    {
+                        <span style="opacity:0.7;"> — @FormatBytes(_totalBytes)</span>
+                    }
+                </span>
+            </div>
+            <button style="border:none; background:transparent; cursor:pointer; padding:0;
+                color:var(--ft-gray-400); font-size:18px; line-height:1;"
+                    title="Clear selection"
+                    @onclick="ClearQueue"
+                    @onclick:stopPropagation="true">
+                ×
+            </button>
+        </div>
+    }
+
+</div>
+
+@code {
+    // ── Parameters ────────────────────────────────────────────────────────
+
+    /// <summary>Text shown inside the zone when not dragging.</summary>
+    [Parameter] public string Label { get; set; } = "Drop files here or click to browse";
+
+    /// <summary>Secondary hint line (e.g. "JPG, PNG up to 20 MB").</summary>
+    [Parameter] public string Hint { get; set; } = "";
+
+    /// <summary>HTML accept attribute, e.g. "image/*" or ".pdf,image/*"</summary>
+    [Parameter] public string Accept { get; set; } = "*/*";
+
+    /// <summary>Allow selecting multiple files at once.</summary>
+    [Parameter] public bool Multiple { get; set; } = true;
+
+    /// <summary>Compact single-line layout — use inside a form row.</summary>
+    [Parameter] public bool Compact { get; set; }
+
+    /// <summary>Called with the full list of selected files after each pick.</summary>
+    [Parameter] public EventCallback<IReadOnlyList<IBrowserFile>> OnFilesSelected { get; set; }
+
+    /// <summary>Called when the user clears the queue.</summary>
+    [Parameter] public EventCallback OnCleared { get; set; }
+
+    // ── State ─────────────────────────────────────────────────────────────
+
+    private bool _dragging;
+    private string _inputId = $"upload-{Guid.NewGuid():N}";
+    private List<IBrowserFile> _queued = [];
+    private long _totalBytes;
+
+    // ── Derived ───────────────────────────────────────────────────────────
+
+    private string UploadIcon => _dragging
+        ? Icons.Material.Outlined.FileDownload
+        : Icons.Material.Outlined.UploadFile;
+
+    private string ZoneClass => string.Join(" ",
+        "media-upload-zone",
+        _dragging ? "media-upload-zone--active" : "");
+
+    private string ZoneStyle =>
+        $"display:block; position:relative; border-radius:{(Compact ? "8px" : "12px")}; " +
+        $"padding:{(Compact ? "12px 16px" : "32px 24px")}; " +
+        $"text-align:center; cursor:pointer; " +
+        $"border:1.5px dashed {(_dragging ? "var(--ft-green-500)" : "var(--ft-line-border)")}; " +
+        $"background:{(_dragging ? "var(--ft-green-50)" : "var(--ft-surface-card)")}; " +
+        $"transition:all 0.15s ease;";
+
+    // ── Event handlers ────────────────────────────────────────────────────
+
+    private void OnDragEnter() => _dragging = true;
+    private void OnDragLeave() => _dragging = false;
+    private void OnDrop() => _dragging = false;
+
+    private async Task HandleInputChange(InputFileChangeEventArgs e)
+    {
+        _dragging = false;
+        var files = e.GetMultipleFiles(50);
+        _queued = [.. files];
+        _totalBytes = _queued.Sum(f => f.Size);
+        await OnFilesSelected.InvokeAsync(files);
+    }
+
+    private async Task ClearQueue()
+    {
+        _queued = [];
+        _totalBytes = 0;
+        await OnCleared.InvokeAsync();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+        _ => $"{bytes / (1024.0 * 1024):F1} MB"
+    };
+}

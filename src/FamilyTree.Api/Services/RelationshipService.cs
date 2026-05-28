@@ -1,0 +1,224 @@
+using FamilyTree.Api.Data;
+using FamilyTree.Api.Mappers;
+using FamilyTree.Api.Models;
+using FamilyTree.Shared;
+using FamilyTree.Shared.DTOs;
+using FamilyTree.Shared.DTOs.Relationship;
+using FamilyTree.Shared.Enums;
+using Microsoft.EntityFrameworkCore;
+
+namespace FamilyTree.Api.Services;
+
+public class RelationshipService(
+    IDbContextFactory<AppDbContext> dbFactory,
+    ILogger<RelationshipService> logger) : IRelationshipService
+{
+    public async Task<ServiceResponse<List<RelationshipDto>>> GetAllAsync(
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var rels = await ctx.Relationships
+                .AsNoTracking()
+                .OrderBy(r => r.CreatedAt)
+                .Select(r => RelationshipMapper.MapRelationshipToDto(r))
+                .ToListAsync(ct);
+
+            return ServiceResponse<List<RelationshipDto>>.Ok(rels);
+        }
+        catch (OperationCanceledException)
+        {
+            return ServiceResponse<List<RelationshipDto>>.Fail(
+                "Request was cancelled.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading all relationships");
+            return ServiceResponse<List<RelationshipDto>>.Fail(
+                "An error occurred loading relationships.");
+        }
+    }
+
+    public async Task<ServiceResponse<List<RelationshipDto>>> GetForPersonAsync(
+        Guid personId, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var rels = await ctx.Relationships
+                .AsNoTracking()
+                .Where(r => r.PersonAId == personId || r.PersonBId == personId)
+                .OrderBy(r => r.CreatedAt)
+                .Select(r => RelationshipMapper.MapRelationshipToDto(r))
+                .ToListAsync(ct);
+
+            return ServiceResponse<List<RelationshipDto>>.Ok(rels);
+        }
+        catch (OperationCanceledException)
+        {
+            return ServiceResponse<List<RelationshipDto>>.Fail(
+                "Request was cancelled.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading relationships for person {Id}", personId);
+            return ServiceResponse<List<RelationshipDto>>.Fail(
+                "An error occurred loading relationships for this person.");
+        }
+    }
+
+    public async Task<ServiceResponse<RelationshipDto>> CreateAsync(
+        RelationshipUpsertDto request, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            // Canonical ordering — lower ID is always PersonA
+            var (a, b) = request.PersonAId < request.PersonBId
+                ? (request.PersonAId, request.PersonBId)
+                : (request.PersonBId, request.PersonAId);
+
+            // Prevent duplicate relationships of the same type
+            var exists = await ctx.Relationships.AnyAsync(
+                r => r.PersonAId == a &&
+                     r.PersonBId == b &&
+                     r.Type == request.Type, ct);
+
+            if (exists)
+                return ServiceResponse<RelationshipDto>.Fail(
+                    "This relationship already exists.");
+
+            var ruleError = await ValidateNewRelationshipAsync(ctx, request, ct);
+            if (ruleError != null)
+                return ServiceResponse<RelationshipDto>.Fail(ruleError);
+
+            var relationship = new Relationship
+            {
+                PersonAId = a,
+                PersonBId = b,
+                Type = request.Type,
+                StartDate = request.StartDate,
+                Notes = request.Notes?.Trim(),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            ctx.Relationships.Add(relationship);
+            await ctx.SaveChangesAsync(ct);
+
+            return ServiceResponse<RelationshipDto>.Ok(RelationshipMapper.MapRelationshipToDto(relationship));
+        }
+        catch (OperationCanceledException)
+        {
+            return ServiceResponse<RelationshipDto>.Fail(
+                "Request was cancelled.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error creating relationship");
+            return ServiceResponse<RelationshipDto>.Fail(
+                "An error occurred creating this relationship.");
+        }
+    }
+
+    public async Task<ServiceResponse> DeleteAsync(
+        Guid id, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var relationship = await ctx.Relationships
+                .FirstOrDefaultAsync(r => r.Id == id, ct);
+
+            if (relationship is null)
+                return ServiceResponse.Fail($"Relationship {id} not found.");
+
+            ctx.Relationships.Remove(relationship);
+            await ctx.SaveChangesAsync(ct);
+
+            return ServiceResponse.Ok();
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            logger.LogWarning(ex,
+                "Concurrency conflict deleting relationship {Id}", id);
+            return ServiceResponse.Fail(
+                "This record was modified by someone else. Please reload and try again.");
+        }
+        catch (OperationCanceledException)
+        {
+            return ServiceResponse.Fail("Request was cancelled.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error deleting relationship {Id}", id);
+            return ServiceResponse.Fail(
+                "An error occurred deleting this relationship.");
+        }
+    }
+
+    private async Task<string?> ValidateNewRelationshipAsync(
+        AppDbContext ctx, RelationshipUpsertDto request, CancellationToken ct)
+    {
+        if (request.PersonAId == request.PersonBId)
+            return "A person cannot be related to themselves.";
+
+        if (request.Type is RelationshipType.Parent or RelationshipType.Adopted)
+        {
+            var parent = await ctx.People.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == request.PersonAId, ct);
+            var child = await ctx.People.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == request.PersonBId, ct);
+
+            if (parent != null && child != null)
+            {
+                if (parent.DeathDate.HasValue && child.BirthDate.HasValue &&
+                    child.BirthDate.Value > parent.DeathDate.Value.AddMonths(9))
+                    return $"{parent.FirstName} {parent.LastName} died on {parent.DeathDate:d} " +
+                           $"and cannot be the parent of {child.FirstName}, born {child.BirthDate:d}.";
+
+                if (parent.BirthDate.HasValue && child.BirthDate.HasValue)
+                {
+                    var ageGap = child.BirthDate.Value.Year - parent.BirthDate.Value.Year;
+                    if (ageGap < 12)
+                        return $"{parent.FirstName} would have been {ageGap} year(s) old when " +
+                               $"{child.FirstName} was born — too young to be a parent.";
+                    if (ageGap > 80)
+                        return $"{parent.FirstName} would have been {ageGap} years old when " +
+                               $"{child.FirstName} was born — too large an age gap.";
+                }
+            }
+        }
+
+        if (request.Type == RelationshipType.Spouse)
+        {
+            var aId = request.PersonAId;
+            var bId = request.PersonBId;
+
+            var personA = await ctx.People.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == aId, ct);
+            var personB = await ctx.People.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == bId, ct);
+
+            var aHasSpouse = await ctx.Relationships.AnyAsync(
+                r => (r.PersonAId == aId || r.PersonBId == aId) &&
+                     r.Type == RelationshipType.Spouse &&
+                     r.EndDate == null, ct);
+            if (aHasSpouse)
+                return $"{personA?.FirstName ?? "This person"} is already in an active marriage.";
+
+            var bHasSpouse = await ctx.Relationships.AnyAsync(
+                r => (r.PersonAId == bId || r.PersonBId == bId) &&
+                     r.Type == RelationshipType.Spouse &&
+                     r.EndDate == null, ct);
+            if (bHasSpouse)
+                return $"{personB?.FirstName ?? "This person"} is already in an active marriage.";
+        }
+
+        return null;
+    }
+}

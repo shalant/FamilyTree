@@ -1,0 +1,73 @@
+﻿@inject NavigationManager Nav
+
+<div id="toolbar-container"
+     style="top:@_initialTop}px; left:@_initialLeft}px;"
+     @onmousedown="StartDrag"
+     @onmouseup="StopDrag"
+     @onmousemove="DragMove">
+<MudPaper Elevation="1"
+          Class="pa-2 mb-2"
+          Style="display:flex; align-items:center; justify-content:space-between;
+                 background:var(--ft-surface-card); border-radius:8px;">
+
+    <!-- Left side actions -->
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="@(() => Nav.NavigateTo("/people/add"))">
+            Add Person
+        </MudButton>
+
+        <MudIconButton Icon="@Icons.Material.Filled.ZoomOut"
+                       OnClick="OnZoomOut" />
+        <MudIconButton Icon="@Icons.Material.Filled.ZoomIn"
+                       OnClick="OnZoomIn" />
+        <MudIconButton Icon="@Icons.Material.Filled.CenterFocusStrong"
+                       OnClick="OnCenterTree" />
+    </MudStack>
+</MudPaper>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnZoomIn { get; set; }
+    [Parameter] public EventCallback OnZoomOut { get; set; }
+    [Parameter] public EventCallback OnCenterTree { get; set; }
+    [Parameter] public EventCallback OnToggleTheme { get; set; }
+    [Parameter] public EventCallback OnSignOut { get; set; }
+
+    [Parameter] public bool IsDark { get; set; }
+
+    @code {
+        private bool _dragging;
+        private double _startX, _startY;
+        private double _initialLeft = 20, _initialTop = 20;
+
+        private void StartDrag(MouseEventArgs e)
+        {
+            _dragging = true;
+            _startX = e.ClientX;
+            _startY = e.ClientY;
+        }
+
+        private void StopDrag(MouseEventArgs e)
+        {
+            _dragging = false;
+        }
+
+        private void DragMove(MouseEventArgs e)
+        {
+            if (!_dragging) return;
+
+            var dx = e.ClientX - _startX;
+            var dy = e.ClientY - _startY;
+            _initialLeft += dx;
+            _initialTop += dy;
+            _startX = e.ClientX;
+            _startY = e.ClientY;
+
+            StateHasChanged();
+        }
+    }
+}

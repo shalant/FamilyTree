@@ -1,0 +1,293 @@
+﻿@using FamilyTree.Shared.DTOs.Person
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+
+<MudStack Spacing="4" MaxWidth="680px" Style="margin:auto; font-family:var(--ft-font-body);">
+
+    <!-- Identity Card -->
+    <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
+        <MudText Typo="Typo.h5" Class="mb-3">Identity</MudText>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="6">
+                <MudTextField @bind-Value="_firstName"
+                              Label="First name"
+                              Required="true"
+                              RequiredError="First name is required."
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudTextField @bind-Value="_lastName"
+                              Label="Last name"
+                              Required="true"
+                              RequiredError="Last name is required."
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudDatePicker @bind-Date="_birthDate"
+                               Label="Date of birth"
+                               DateFormat="dd/MM/yyyy"
+                               Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudDatePicker @bind-Date="_deathDate"
+                               Label="Date of death"
+                               DateFormat="dd/MM/yyyy"
+                               Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <!-- Profile Photo Card -->
+    <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
+        <MudText Typo="Typo.h5" Class="mb-3">Profile photo</MudText>
+
+        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center">
+            <MudAvatar Size="Size.Large"
+                       Text="@Initials"
+                       Src="@_photoUrl"
+                       Style="border:2px solid var(--ft-focus-border);" />
+
+            <MudStack Spacing="2" Style="flex:1;">
+                <MudTextField @bind-Value="_photoUrl"
+                              Label="Photo URL"
+                              Placeholder="https://..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Outlined.Link"
+                              Variant="Variant.Outlined" />
+
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                    <InputFile id="photo-upload"
+                               accept="image/*"
+                               style="display:none;"
+                               OnChange="OnPhotoFileSelected" />
+                    <MudButton HtmlTag="label"
+                               for="photo-upload"
+                               Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Outlined.UploadFile"
+                               Style="color:var(--ft-gray-600); font-size:13px;">
+                        Upload file
+                    </MudButton>
+                    @if (!string.IsNullOrWhiteSpace(_uploadStatus))
+                    {
+                        <MudText Typo="Typo.caption" Style="color:var(--ft-gray-400);">
+                            @_uploadStatus
+                        </MudText>
+                    }
+                </MudStack>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
+    <!-- Relationships Card -->
+    <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
+        <MudText Typo="Typo.h5" Class="mb-3">Relationships</MudText>
+
+        <MudStack Spacing="3">
+
+            <!-- Parents -->
+            <MudStack>
+                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600);">Parents</MudText>
+
+                <MudAutocomplete T="PersonDto"
+                                 SearchFunc="SearchParents"
+                                 ValueChanged="AddParent"
+                                 ToStringFunc="@(p => p?.FullName ?? "")"
+                                 Label="Search by name…"
+                                 Variant="Variant.Outlined"
+                                 Dense="true" />
+
+                <MudChipSet T="string">
+                    @foreach (var id in _parentIds)
+                    {
+                        var person = AllPeople.FirstOrDefault(p => p.Id == id);
+                        if (person is not null)
+                        {
+                            <MudChip T="string" OnClose="@(() => RemoveParent(id))"
+                                     Style="background:var(--ft-green-50); color:var(--ft-green-800);">
+                                @person.FullName
+                                @if (person.BirthDate.HasValue)
+                                {
+                                    <span style="opacity:0.6; margin-left:4px;">
+                                        @person.BirthDate.Value.Year
+                                    </span>
+                                }
+                            </MudChip>
+                        }
+                    }
+                </MudChipSet>
+            </MudStack>
+
+            <!-- Spouses -->
+            <MudStack>
+                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600);">Spouses / partners</MudText>
+
+                <MudAutocomplete T="PersonDto"
+                                 SearchFunc="SearchSpouses"
+                                 ValueChanged="AddSpouse"
+                                 ToStringFunc="@(p => p?.FullName ?? "")"
+                                 Label="Search by name…"
+                                 Variant="Variant.Outlined"
+                                 Dense="true" />
+
+                <MudChipSet T="string">
+                    @foreach (var id in _spouseIds)
+                    {
+                        var person = AllPeople.FirstOrDefault(p => p.Id == id);
+                        if (person is not null)
+                        {
+                            <MudChip T="string" OnClose="@(() => RemoveSpouse(id))"
+                                     Style="background:var(--ft-green-50); color:var(--ft-green-800);">
+                                @person.FullName
+                                @if (person.BirthDate.HasValue)
+                                {
+                                    <span style="opacity:0.6; margin-left:4px;">
+                                        @person.BirthDate.Value.Year
+                                    </span>
+                                }
+                            </MudChip>
+                        }
+                    }
+                </MudChipSet>
+            </MudStack>
+
+        </MudStack>
+    </MudPaper>
+
+    <!-- Notes Card -->
+    <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
+        <MudText Typo="Typo.h5" Class="mb-3">Notes</MudText>
+
+        <MudTextField @bind-Value="_notes"
+                      Label="Biography, stories, context…"
+                      Lines="4"
+                      AutoGrow="true"
+                      Variant="Variant.Outlined" />
+    </MudPaper>
+
+    <!-- Actions -->
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center"
+              Style="border-top:0.5px solid var(--ft-line-border); padding-top:8px;">
+        <MudButton Variant="Variant.Text"
+                   Style="color:var(--ft-gray-500);"
+                   OnClick="() => OnCancel.InvokeAsync()">
+            Cancel
+        </MudButton>
+
+        <MudButton Variant="Variant.Filled"
+                   Style="background:var(--ft-green-600); color:#fff; min-width:140px;"
+                   OnClick="Submit">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            @SubmitLabel
+        </MudButton>
+    </MudStack>
+
+</MudStack>
+
+@code {
+    [Parameter] public PersonUpsertDto? Initial { get; set; }
+    [Parameter] public Guid? EditingId { get; set; }
+    [Parameter] public List<PersonDto> AllPeople { get; set; } = [];
+    [Parameter] public string SubmitLabel { get; set; } = "Save";
+    [Parameter] public EventCallback<PersonUpsertDto> OnSubmit { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private bool _saving;
+    private string _firstName = "";
+    private string _lastName = "";
+    private string _notes = "";
+    private string _photoUrl = "";
+    private string _uploadStatus = "";
+    private DateTime? _birthDate;
+    private DateTime? _deathDate;
+    private HashSet<Guid> _parentIds = [];
+    private HashSet<Guid> _spouseIds = [];
+
+    protected override void OnParametersSet()
+    {
+        if (Initial is null) return;
+
+        _firstName = Initial.FirstName ?? "";
+        _lastName = Initial.LastName ?? "";
+        _notes = Initial.BiographyNotes ?? "";
+        _photoUrl = Initial.ProfilePhotoUrl ?? "";
+        _birthDate = Initial.BirthDate?.ToDateTime(TimeOnly.MinValue);
+        _deathDate = Initial.DeathDate?.ToDateTime(TimeOnly.MinValue);
+        _parentIds = [..Initial.ParentIds];
+        _spouseIds = [..Initial.SpouseIds];
+    }
+
+    private Task<IEnumerable<PersonDto>> SearchParents(string value, CancellationToken _) =>
+        Task.FromResult(AllPeople
+            .Where(p => p.Id != EditingId && !_parentIds.Contains(p.Id))
+            .Where(p => string.IsNullOrWhiteSpace(value) ||
+                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(8));
+
+    private void AddParent(PersonDto? person)
+    {
+        if (person is not null)
+            _parentIds.Add(person.Id);
+    }
+
+    private void RemoveParent(Guid id) => _parentIds.Remove(id);
+
+    private Task<IEnumerable<PersonDto>> SearchSpouses(string value, CancellationToken _) =>
+        Task.FromResult(AllPeople
+            .Where(p => p.Id != EditingId && !_spouseIds.Contains(p.Id))
+            .Where(p => string.IsNullOrWhiteSpace(value) ||
+                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(8));
+
+    private void AddSpouse(PersonDto? person)
+    {
+        if (person is not null)
+            _spouseIds.Add(person.Id);
+    }
+
+    private void RemoveSpouse(Guid id) => _spouseIds.Remove(id);
+
+    private async Task OnPhotoFileSelected(InputFileChangeEventArgs e)
+    {
+        _uploadStatus = $"{e.File.Name} selected — upload endpoint not yet available.";
+        await Task.CompletedTask;
+    }
+
+    private string Initials =>
+        $"{_firstName.FirstOrDefault()}{_lastName.FirstOrDefault()}".ToUpperInvariant().Trim();
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_firstName) ||
+            string.IsNullOrWhiteSpace(_lastName))
+        {
+            StateHasChanged();
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var dto = new PersonUpsertDto
+            {
+                FirstName = _firstName.Trim(),
+                LastName = _lastName.Trim(),
+                BirthDate = _birthDate.HasValue ? DateOnly.FromDateTime(_birthDate.Value) : null,
+                DeathDate = _deathDate.HasValue ? DateOnly.FromDateTime(_deathDate.Value) : null,
+                BiographyNotes = _notes.Trim(),
+                ProfilePhotoUrl = _photoUrl.Trim(),
+                ParentIds = [.._parentIds],
+                SpouseIds = [.._spouseIds]
+            };
+
+            await OnSubmit.InvokeAsync(dto);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

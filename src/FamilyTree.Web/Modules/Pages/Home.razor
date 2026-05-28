@@ -1,0 +1,171 @@
+@page "/"
+@rendermode InteractiveServer
+
+@using FamilyTree.Api.Services
+@using FamilyTree.Shared.DTOs
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Modules.Components
+@using FamilyTree.Web.Services
+@using MudBlazor
+
+@inject IPersonService PersonService
+@inject NavigationManager Nav
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Family Tree</PageTitle>
+
+@if (_loading)
+{
+    <div style="display:flex; align-items:center; justify-content:center;
+        height:60vh;">
+        <MudProgressCircular Indeterminate="true" Color="Color.Success" />
+    </div>
+}
+else if (!_people.Any())
+{
+    <div style="display:flex; flex-direction:column; align-items:center;
+        justify-content:center; height:70vh; text-align:center;
+        padding:0 24px;">
+        <div style="font-size:28px; font-weight:500; font-style:italic;
+            font-family:Georgia,serif; color:var(--ft-green-800);
+            margin-bottom:12px;">
+            Your family tree
+        </div>
+        <div style="font-size:14px; color:var(--ft-gray-400);
+            max-width:360px; line-height:1.7; margin-bottom:28px;">
+            Add your first family member to begin. The tree will grow as you
+            connect parents, children, and spouses.
+        </div>
+        <MudButton Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   Href="/people/add"
+                   Style="background:var(--ft-green-600); color:#fff;">
+            Add first person
+        </MudButton>
+    </div>
+}
+else
+{
+    @* Slim hero strip *@
+    <div style="text-align:center; padding:20px 0 0; background:var(--ft-surface);">
+        <div style="display:inline-flex; align-items:center; gap:8px;
+            background:var(--ft-green-50);
+            border:0.5px solid var(--ft-line-border);
+            border-radius:20px; padding:5px 14px;
+            font-size:12px; color:var(--ft-green-600);
+            margin-bottom:4px;">
+            <i class="ti ti-tree" style="font-size:13px;" aria-hidden="true"></i>
+            @if (_focusPerson is not null)
+            {
+                <span>@_focusPerson.FullName's tree</span>
+            }
+            else
+            {
+                <span>Family tree</span>
+            }
+        </div>
+        <div style="font-size:11px; color:var(--ft-gray-200);
+            letter-spacing:0.05em; margin-bottom:0;">
+            @_people.Count @(_people.Count == 1 ? "person" : "people")
+        </div>
+    </div>
+
+    @* Scrollable tree viewport *@
+    <div id="tree-viewport"
+         style="overflow:auto;
+        height:calc(100vh - 120px);
+        background:var(--ft-surface);">
+        <CustomToolbar IsDark="_isDark"
+                       OnZoomIn="ZoomIn"
+                       OnZoomOut="ZoomOut"
+                       OnCenterTree="CenterTree"
+                       OnToggleTheme="ToggleTheme"
+                       OnSignOut="SignOut" />
+        <FamilyTreeCanvas @ref="_canvas"
+            People="_people"
+                          Couples="_couples"
+                          FocusId="_focusPerson?.Id"
+                          OnPersonSelected="HandlePersonSelected" />
+    </div>
+}
+
+<PersonDetailDrawer Person="_detailPerson"
+                    AllPeople="_people"
+                    OnClose="() => _detailPerson = null"
+                    OnEdit="@(p => Nav.NavigateTo($"/people/{p.Id}/edit"))"
+                    OnFocusPerson="SetFocus"
+                    OnDelete="PromptDelete" />
+
+@code {
+    private List<PersonDto> _people = [];
+    private List<CoupleDto> _couples = [];
+    private PersonDto? _focusPerson;
+    private PersonDto? _detailPerson;
+    private bool _loading = true;
+
+    private FamilyTreeCanvas? _canvas;
+
+    // TOOLBAR
+    private bool _isDark;
+    private void ZoomIn() => _canvas?.ZoomIn();
+    private void ZoomOut() => _canvas?.ZoomOut();
+    private void CenterTree() => _canvas?.CenterOnRoot();
+    private void ToggleTheme() => _isDark = !_isDark;
+    private void SignOut() { /* your auth logic */ }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await PersonService.GetAllAsync();
+        if (result.Success)
+        {
+            _people = result.Data!;
+            _couples = CoupleHelper.Derive(_people);
+            _focusPerson = _people.FirstOrDefault();
+            // TODO: replace FirstOrDefault with the authenticated user's saved focus person
+        }
+        else
+        {
+            Snackbar.Add(result.Message, Severity.Error);
+        }
+        _loading = false;
+    }
+
+    private void HandlePersonSelected(PersonDto person) =>
+        _detailPerson = person;
+
+    private void SetFocus(PersonDto person)
+    {
+        _focusPerson = person;
+        _detailPerson = null;
+    }
+
+    private async Task PromptDelete(PersonDto person)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message,      $"Delete {person.FullName}? This cannot be undone." },
+            { x => x.ConfirmLabel, "Delete" }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete person", parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+        {
+            var response = await PersonService.DeleteAsync(person.Id);
+            Snackbar.ShowResult(response, $"{person.FullName} deleted.");
+
+            if (response.Success)
+            {
+                var refresh = await PersonService.GetAllAsync();
+                if (refresh.Success)
+                {
+                    _people = refresh.Data!;
+                    _couples = CoupleHelper.Derive(_people);
+                }
+                _detailPerson = null;
+            }
+        }
+    }
+}

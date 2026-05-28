@@ -1,0 +1,350 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   FamilyTree — design tokens + global styles
+   ───────────────────────────────────────────────────────────────────────────
+   All colour/spacing decisions live here as --ft-* custom properties.
+   MudBlazor writes  data-theme="dark"  on <html> when IsDarkMode is true —
+   the [data-theme="dark"] block below overrides every token so every
+   component that uses --ft-* vars gets dark mode for free.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Light mode (default) ─────────────────────────────────────────────────── */
+:root {
+    /* Greens */
+    --ft-green-50: #f0faf4;
+    --ft-green-100: #d6f2e0;
+    --ft-green-200: #aee5c4;
+    --ft-green-300: #7dcca3;
+    --ft-green-400: #4db282;
+    --ft-green-500: #2e9966;
+    --ft-green-600: #1e7d50;
+    --ft-green-700: #15623d;
+    --ft-green-800: #0f472c;
+    --ft-green-900: #082d1b;
+    /* Grays */
+    --ft-gray-50: #f8f9fa;
+    --ft-gray-100: #f1f3f5;
+    --ft-gray-200: #e9ecef;
+    --ft-gray-300: #adb5bd;
+    --ft-gray-400: #868e96;
+    --ft-gray-500: #495057;
+    --ft-gray-600: #343a40;
+    --ft-gray-700: #212529;
+    --ft-gray-800: #16191d;
+    --ft-gray-900: #0d0f12;
+    /* Surfaces */
+    --ft-surface: #ffffff;
+    --ft-surface-card: #f8faf9;
+    --ft-surface-elevated: #ffffff;
+    --ft-line-border: #dee2e6;
+    /* Focus / selected node */
+    --ft-focus-fill: var(--ft-green-100);
+    --ft-focus-border: var(--ft-green-500);
+    --ft-focus-text: var(--ft-green-800);
+    --ft-focus-ring: var(--ft-green-400);
+    /* Tree connector lines */
+    --ft-line-couple: var(--ft-green-400); /* U-arc between spouses */
+    --ft-line-parent: var(--ft-gray-300); /* stem + drops to children */
+    /* Generation band backgrounds */
+    --ft-band-grandparents: var(--ft-green-50);
+    --ft-band-parents: var(--ft-green-100);
+    --ft-band-children: var(--ft-green-50);
+    /* Tree node accent */
+    --ft-leaf-mid: var(--ft-green-300);
+    /* Typography */
+    --ft-font-body: 'Inter', system-ui, sans-serif;
+    --ft-font-display: 'Lora', Georgia, serif;
+    /* Semantic colours */
+    --ft-text-primary: var(--ft-gray-700);
+    --ft-text-secondary: var(--ft-gray-500);
+    --ft-text-muted: var(--ft-gray-300);
+    /* Shadows */
+    --ft-shadow-sm: 0 1px 3px rgba(0, 0, 0, .08);
+    --ft-shadow-md: 0 4px 12px rgba(0, 0, 0, .10);
+}
+
+/* ── Dark mode ────────────────────────────────────────────────────────────── */
+/*
+   MudBlazor sets data-theme="dark" on <html> when IsDarkMode = true.
+   We also handle .dark-mode on <body> as a manual-toggle fallback.
+*/
+[data-theme="dark"],
+.dark-mode {
+    /* Greens — inverted (dark bg, lighter fg) */
+    --ft-green-50: #0d2318;
+    --ft-green-100: #143322;
+    --ft-green-200: #1e4d33;
+    --ft-green-300: #2e6b48;
+    --ft-green-400: #3d8a5e;
+    --ft-green-500: #4faa78;
+    --ft-green-600: #72c299;
+    --ft-green-700: #9dd6ba;
+    --ft-green-800: #c8ebda;
+    --ft-green-900: #e8f7f0;
+    /* Grays — inverted */
+    --ft-gray-50: #0d0f12;
+    --ft-gray-100: #16191d;
+    --ft-gray-200: #1e2227;
+    --ft-gray-300: #6c757d;
+    --ft-gray-400: #868e96;
+    --ft-gray-500: #adb5bd;
+    --ft-gray-600: #ced4da;
+    --ft-gray-700: #dee2e6;
+    --ft-gray-800: #f1f3f5;
+    --ft-gray-900: #f8f9fa;
+    /* Surfaces */
+    --ft-surface: #121417;
+    --ft-surface-card: #1a1d21;
+    --ft-surface-elevated: #1e2227;
+    --ft-line-border: #2e3238;
+    /* Focus / selected node */
+    --ft-focus-fill: #143322;
+    --ft-focus-border: var(--ft-green-500);
+    --ft-focus-text: var(--ft-green-800);
+    --ft-focus-ring: var(--ft-green-500);
+    /* Tree connector lines */
+    --ft-line-couple: var(--ft-green-500);
+    --ft-line-parent: var(--ft-gray-400);
+    /* Generation band backgrounds */
+    --ft-band-grandparents: var(--ft-green-50);
+    --ft-band-parents: var(--ft-green-100);
+    --ft-band-children: var(--ft-green-50);
+    /* Tree node accent */
+    --ft-leaf-mid: var(--ft-green-400);
+    /* Semantic */
+    --ft-text-primary: var(--ft-gray-700);
+    --ft-text-secondary: var(--ft-gray-500);
+    --ft-text-muted: var(--ft-gray-300);
+    /* Shadows */
+    --ft-shadow-sm: 0 1px 3px rgba(0, 0, 0, .40);
+    --ft-shadow-md: 0 4px 12px rgba(0, 0, 0, .50);
+}
+
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--ft-font-body);
+    background: var(--ft-surface);
+    color: var(--ft-text-primary);
+    -webkit-font-smoothing: antialiased;
+}
+
+.custom-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    background: var(--ft-green-600);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 500;
+    margin-left: 6px;
+    border: 2px solid var(--ft-green-400);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* ── Page ──────────────────────────────────────────────────────── */
+
+.page-header {
+    align-items: center;
+    justify-content: center;    
+    font-size: 32px;
+    font-weight: 500;
+    font-style: italic;
+    font-family: var(--ft-font-display);
+    color: var(--ft-green-800);
+    margin-bottom: 28px;
+    margin-top: 28px;
+}
+
+/* ── Blazor error UI ──────────────────────────────────────────────────────── */
+
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, .2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+    }
+
+/* ── Scrollbar (webkit) ───────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--ft-line-border);
+    border-radius: 3px;
+}
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--ft-gray-300);
+    }
+
+/* ── Tree generation bands ────────────────────────────────────────────────── */
+
+.ft-band--grandparents {
+    background: var(--ft-band-grandparents);
+    opacity: 0.25;
+}
+
+.ft-band--parents {
+    background: var(--ft-band-parents);
+    opacity: 0.40;
+}
+
+.ft-band--children {
+    background: var(--ft-band-children);
+    opacity: 0.25;
+}
+
+/* ── Person node ──────────────────────────────────────────────────────────── */
+
+.person-node {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--ft-surface-card);
+    border: 1.2px solid var(--ft-gray-400);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: var(--ft-shadow-sm);
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+
+    .person-node:hover {
+        transform: scale(1.05);
+        box-shadow: var(--ft-shadow-md);
+    }
+
+.person-node--focus {
+    background: var(--ft-focus-fill);
+    color: var(--ft-focus-text);
+    border-color: var(--ft-focus-border);
+    box-shadow: 0 0 0 3px var(--ft-focus-ring);
+    animation: ft-focus-pulse 1.4s ease-in-out infinite;
+}
+
+.person-node__initials {
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* ── Person label (name + year below each node) ───────────────────────────── */
+
+.person-label {
+    position: absolute;
+    width: 88px;
+    text-align: center;
+    pointer-events: none;
+    user-select: none;
+    font-family: var(--ft-font-body);
+}
+
+.person-label--name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ft-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.person-label--year {
+    font-size: 10px;
+    color: var(--ft-text-muted);
+    margin-top: 1px;
+}
+
+/* ── Toolbar ───────────────────────────────────────────────────────────── */
+#toolbar-container {
+    position: absolute;
+    z-index: 1000;
+    cursor: move;
+    transition: top 0.05s linear, left 0.05s linear;
+}
+
+#toolbar-container.dragging {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+
+@keyframes ft-focus-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 3px var(--ft-focus-ring);
+    }
+
+    50% {
+        box-shadow: 0 0 0 6px color-mix(in srgb, var(--ft-focus-ring) 40%, transparent);
+    }
+}
+
+@keyframes ft-dash-spin {
+    to {
+        stroke-dashoffset: -48;
+    }
+}
+
+/* ── Media upload zone ────────────────────────────────────────────────────── */
+
+.media-upload-zone {
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+.media-upload-zone--active {
+    box-shadow: 0 0 0 3px var(--ft-green-200);
+}
+
+/* ── MudBlazor palette overrides ──────────────────────────────────────────── */
+/*
+   Forward our tokens into MudBlazor's own palette vars so MudBlazor
+   components (Snackbar, Dialog, Drawer, etc.) also respond to dark mode.
+   These live under :root — no [data-theme] block needed because they
+   reference --ft-* vars which already switch on theme change.
+*/
+
+:root {
+    --mud-palette-surface: var(--ft-surface);
+    --mud-palette-background: var(--ft-surface);
+    --mud-palette-background-grey: var(--ft-surface-card);
+    --mud-palette-table-lines: var(--ft-line-border);
+    --mud-palette-divider: var(--ft-line-border);
+    --mud-palette-text-primary: var(--ft-text-primary);
+    --mud-palette-text-secondary: var(--ft-text-secondary);
+    --mud-palette-primary: var(--ft-green-600);
+    --mud-palette-primary-darken: var(--ft-green-700);
+    --mud-palette-primary-lighten: var(--ft-green-400);
+    --mud-palette-primary-text: #ffffff;
+    --mud-palette-success: var(--ft-green-600);
+    --mud-palette-overlay-dark: rgba(0, 0, 0, .5);
+    --mud-palette-drawer-background: var(--ft-surface-card);
+    --mud-palette-appbar-background: var(--ft-surface-card);
+}

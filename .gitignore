@@ -1,0 +1,23 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+.vscode/
+*.DotSettings.user
+
+# Secrets — never commit these
+**/appsettings.Production.json
+**/appsettings.Staging.json
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Publish output
+publish/

@@ -1,0 +1,102 @@
+@page "/people"
+@rendermode InteractiveServer
+
+@using FamilyTree.Api.Services
+@using FamilyTree.Shared.DTOs.Person
+@using MudBlazor
+
+@inject IPersonService PersonService
+@inject NavigationManager Nav
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>People</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center"
+          Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h5"
+             Style="font-style:italic; font-family:Georgia,serif;
+                    color:var(--ft-green-800);">
+        Family members
+    </MudText>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <MudTextField @bind-Value="_search"
+                      Placeholder="Search..."
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      Style="min-width:200px;" />
+        <MudButton Variant="Variant.Filled"
+                   Style="background:var(--ft-green-600); color:#fff;"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   Href="/people/add">
+            Add person
+        </MudButton>
+    </MudStack>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Success" Class="mb-4" />
+}
+else if (!_people.Any())
+{
+    <MudAlert Severity="Severity.Info">
+        No people added yet.
+        <MudLink Href="/people/add">Add the first family member.</MudLink>
+    </MudAlert>
+}
+else
+{
+    <MudTable Items="FilteredPeople" Hover="true"
+              T="PersonDto" OnRowClick="@(e => Nav.NavigateTo($"/people/{e.Item!.Id}/edit"))"
+              Style="background:var(--ft-surface);">
+        <HeaderContent>
+            <MudTh>
+                <MudTableSortLabel SortBy="new Func<PersonDto,object>(p => p.LastName)">
+                    Name
+                </MudTableSortLabel>
+            </MudTh>
+            <MudTh>Born</MudTh>
+            <MudTh>Died</MudTh>
+            <MudTh>Age</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate Context="person">
+            <MudTd DataLabel="Name">@person.FullName</MudTd>
+            <MudTd DataLabel="Born">@person.BirthDate?.ToString("d MMM yyyy")</MudTd>
+            <MudTd DataLabel="Died">@person.DeathDate?.ToString("d MMM yyyy")</MudTd>
+            <MudTd DataLabel="Age">@person.Age</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Size="Size.Small"
+                               OnClick="@(() => Nav.NavigateTo($"/people/{person.Id}/edit"))"
+                               Title="Edit" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private List<PersonDto> _people  = [];
+    private bool            _loading = true;
+    private string          _search  = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await PersonService.GetAllAsync();
+        if (result.Success)
+            _people = result.Data!;
+        else
+            Snackbar.Add(result.Message, Severity.Error);
+
+        _loading = false;
+    }
+
+    private IEnumerable<PersonDto> FilteredPeople => string.IsNullOrWhiteSpace(_search)
+        ? _people
+        : _people.Where(p => p.FullName.Contains(_search, StringComparison.OrdinalIgnoreCase));
+}

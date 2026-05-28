@@ -1,0 +1,70 @@
+﻿/* ─────────────────────────────────────────────
+   FamilyTree design tokens
+   Import in wwwroot/css/app.css:
+     @import 'design-tokens.css';
+   ───────────────────────────────────────────── */
+
+:root {
+    /* Surfaces */
+    --ft-surface: #f7f5f0; /* warm ivory — main canvas bg */
+    --ft-surface-card: #ffffff; /* node and card backgrounds */
+    --ft-surface-hover: #E1F5EE; /* node hover fill */
+    /* Green ramp — primary botanical palette */
+    --ft-green-900: #04342C;
+    --ft-green-800: #085041; /* headlines, focus labels */
+    --ft-green-600: #0F6E56; /* primary accent, borders on hover */
+    --ft-green-400: #1D9E75; /* medium accent */
+    --ft-green-200: #5DCAA5; /* parent-child connector lines */
+    --ft-green-100: #9FE1CB; /* couple connector lines (lighter) */
+    --ft-green-50: #E1F5EE; /* light fills, hover bg */
+    /* Green leaf accents */
+    --ft-leaf-mid: #97C459;
+    --ft-leaf-light: #C0DD97; /* border rules, dividers */
+    /* Brown ramp — warm secondary */
+    --ft-brown-800: #412402;
+    --ft-brown-600: #633806; /* subtitle text */
+    --ft-brown-400: #854F0B; /* secondary labels */
+    --ft-brown-200: #EF9F27; /* warm mid — reserved, not used for lines */
+    --ft-brown-50: #FAEEDA; /* warm light fill */
+    /* Focus node — purple (keep the accidental magic) */
+    --ft-focus-fill: #534AB7;
+    --ft-focus-border: #534AB7;
+    --ft-focus-text: #ffffff;
+    --ft-focus-ring: #EEEDFE;
+    /* Neutral ramp */
+    --ft-gray-700: #444441; /* primary label text */
+    --ft-gray-500: #5F5E5A; /* secondary text */
+    --ft-gray-400: #888780; /* node default stroke */
+    --ft-gray-200: #B4B2A9; /* year text, disabled */
+    --ft-gray-100: #D3D1C7; /* subtle borders */
+    --ft-gray-50: #F1EFE8; /* page background option */
+    /* Connector lines */
+    --ft-line-parent: #5DCAA5; /* parent→child, 1.2px */
+    --ft-line-couple: #9FE1CB; /* couple arc, 0.8px */
+    --ft-line-spread: #5DCAA5; /* spread bar + child drops, 1.2px */
+    --ft-line-border: #C0DD97; /* canvas border rule */
+    /* Node sizing */
+    --ft-node-focus: 64px;
+    --ft-node-gen1: 52px;
+    --ft-node-gen2: 52px;
+    --ft-node-gen3: 44px;
+    /* Typography */
+    --ft-font-display: Georgia, 'Times New Roman', serif;
+    --ft-font-body: system-ui, -apple-system, sans-serif;
+    /* Spacing */
+    --ft-gen-gap-x: 24px; /* horizontal gap between nodes */
+    --ft-gen-gap-y: 56px; /* vertical gap between generations */
+    --ft-canvas-pad-x: 80px;
+    --ft-canvas-pad-y: 60px;
+    /* Radii */
+    --ft-radius-card: 12px;
+    --ft-radius-sm: 8px;
+    --ft-band-grandparents: #f5e9d7;
+    --ft-band-parents: #e8f3e8;
+    --ft-band-children: #e7f0f9;
+    --ft-surface: #fdfaf5;
+    --ft-line-parent: #a8c8a8;
+    --ft-line-couple: #b8a898;
+    --ft-focus-ring: #a8d8a8;
+    --ft-green-600: #5b8c5b;
+}

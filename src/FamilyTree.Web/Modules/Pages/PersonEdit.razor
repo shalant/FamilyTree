@@ -1,0 +1,97 @@
+﻿@page "/people/{Id:guid}/edit"
+@rendermode InteractiveServer
+
+@using FamilyTree.Api.Services
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Modules.Components
+@using FamilyTree.Web.Services
+@using MudBlazor
+
+@inject IPersonService PersonService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Edit person</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Success" />
+}
+else if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning">Person not found.</MudAlert>
+}
+else
+{
+    @* <div style="padding:32px 24px; max-width:720px;"> *@
+        @* <div style="font-size:22px; font-weight:500; font-style:italic;
+            font-family:var(--ft-font-display); color:var(--ft-green-800);
+            margin-bottom:28px;">
+            Edit @_person!.FullName
+        </div> *@
+    <MudContainer MaxWidth="MaxWidth.Medium" Class="pb-8" Style="margin:auto;">
+        <div class="page-header">
+            Edit @_person!.FullName
+        </div>
+            <MudCard Class="pa-4 mb-4">
+                <PersonForm Initial="_formModel"
+                            EditingId="@Id"
+                            AllPeople="_allPeople"
+                            SubmitLabel="Save changes"
+                            OnSubmit="HandleSubmit"
+                            OnCancel="@(() => Nav.NavigateTo("/"))" />
+            </MudCard>
+        </MudContainer>
+    @* </div> *@
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private PersonDto? _person;
+    private PersonUpsertDto? _formModel;
+    private List<PersonDto> _allPeople = [];
+    private bool _loading = true;
+    private bool _notFound;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var personResult = await PersonService.GetByIdAsync(Id);
+        var allResult = await PersonService.GetAllAsync();
+
+        if (!personResult.Success)
+        {
+            Snackbar.Add(personResult.Message, Severity.Error);
+            _notFound = true;
+            _loading = false;
+            return;
+        }
+
+        if (!allResult.Success)
+            Snackbar.Add(allResult.Message, Severity.Warning);
+
+        _person = personResult.Data!;
+        _allPeople = allResult.Data ?? [];
+        _formModel = new PersonUpsertDto
+        {
+            FirstName = _person.FirstName,
+            LastName = _person.LastName,
+            BirthDate = _person.BirthDate,
+            DeathDate = _person.DeathDate,
+            BiographyNotes = _person.BiographyNotes,               // was BiographyNotes — fixed
+            ProfilePhotoUrl = _person.ProfilePhotoUrl,    // TODO: add to PersonUpsertDto if not present
+            ParentIds = _person.ParentIds ?? [],
+            SpouseIds = _person.SpouseIds ?? []
+        };
+        _loading = false;
+    }
+
+    private async Task HandleSubmit(PersonUpsertDto dto)
+    {
+        var result = await PersonService.UpdateAsync(Id, dto);
+        Snackbar.ShowResult(result, $"{_person!.FullName} saved.");
+
+        if (result.Success)
+            Nav.NavigateTo("/");   // back to the tree
+    }
+}

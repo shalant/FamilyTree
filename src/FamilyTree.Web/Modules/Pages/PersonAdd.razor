@@ -1,0 +1,81 @@
+﻿@page "/people/add"
+@rendermode InteractiveServer
+
+@using FamilyTree.Api.Services
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Modules.Components
+@using FamilyTree.Web.Services
+@using MudBlazor
+
+@inject IPersonService PersonService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Add person</PageTitle>
+
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Medium" Class="pb-8" Style="margin:auto;">
+        <div class="page-header">
+            Add person
+        </div>
+
+        <MudCard Class="pa-4 mb-4">
+            <PersonForm AllPeople="_allPeople"
+                        SubmitLabel="Add person"
+                        OnSubmit="HandleSubmit"
+                        OnCancel="@(() => Nav.NavigateTo("/people"))" />
+        </MudCard>
+    </MudContainer>
+}
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert>
+}
+
+@code {
+    private List<PersonDto> _allPeople = [];
+    private bool _loading = true;
+    private string _error = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var result = await PersonService.GetAllAsync();
+            if (result.Success)
+                _allPeople = result.Data!;
+            else
+                Snackbar.Add(result.Message, Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;  // always unblock the UI
+        }
+    }
+
+    private async Task HandleSubmit(PersonUpsertDto dto)
+    {
+        Console.WriteLine($"HandleSubmit fired for {dto.FirstName} {dto.LastName}");
+        try
+        {
+            await PersonService.CreateAsync(dto);
+            Nav.NavigateTo("/people");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

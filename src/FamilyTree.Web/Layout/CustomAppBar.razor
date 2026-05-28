@@ -1,0 +1,305 @@
+﻿@* ═══════════════════════════════════════════════════════════════════════════
+   AppHeader — top navigation bar.
+
+   Slots:
+   ┌──────────────────────────────────────────────────────────────────────┐
+   │  🌳 FamilyTree   [  🔍 Search people…  ]   + ☀ ○ (avatar)         │
+   └──────────────────────────────────────────────────────────────────────┘
+
+   Search navigates to /?focus={personId} — Home.razor picks up the param
+   and sets that person as the tree focus.
+   ═══════════════════════════════════════════════════════════════════════════ *@
+
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Services
+@using MudBlazor
+
+@inject IPersonService PersonService
+@inject ThemeService Theme
+@inject NavigationManager Nav
+
+@* ── AppBar shell ─────────────────────────────────────────────────────────── *@
+<MudAppBar Elevation="0"
+           Style="background:var(--ft-surface-card);
+    border-bottom:0.5px solid var(--ft-line-border);
+    color:var(--ft-text-primary);
+    padding:0 16px;">
+
+    @* Brand wordmark *@
+    <div style="display:flex; align-items:center; gap:8px; cursor:pointer;
+        flex-shrink:0; margin-right:20px;"
+         @onclick='() => Nav.NavigateTo("/")'>
+        <MudIcon Icon="@Icons.Material.Outlined.Park"
+                 Style="color:var(--ft-green-600); font-size:22px;" />
+        <span style="font-family:var(--ft-font-display); font-style:italic;
+            font-size:18px; font-weight:600; color:var(--ft-green-800);
+            letter-spacing:-0.01em; white-space:nowrap;">
+            FamilyTree
+        </span>
+    </div>
+
+    @* ── People search ──────────────────────────────────────────────────── *@
+    <div style="flex:1; max-width:420px;">
+        <MudAutocomplete T="PersonDto"
+                         Value="_searchSelection"
+                         SearchFunc="SearchPeople"
+                         ValueChanged="OnPersonSelected"
+                         ToStringFunc="@(p => p?.FullName ?? "")"
+                         Placeholder="Search people…"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Dense"
+                         Adornment="Adornment.Start"
+                         AdornmentIcon="@Icons.Material.Outlined.Search"
+                         AdornmentColor="Color.Default"
+                         ResetValueOnEmptyText="true"
+                         CoerceText="false"
+                         Clearable="true"
+                         Dense="true"
+                         MaxItems="8"
+                         Style="background:var(--ft-surface); border-radius:8px;"
+                         PopoverClass="ft-search-popover">
+            <ItemTemplate Context="person">
+                <div style="display:flex; align-items:center; gap:10px; padding:6px 4px;">
+                    @* Mini avatar *@
+                    <div style="width:28px; height:28px; border-radius:50%; flex-shrink:0;
+                        background:var(--ft-focus-fill); color:var(--ft-focus-text);
+                        display:flex; align-items:center; justify-content:center;
+                        font-size:11px; font-weight:500; overflow:hidden;">
+                        @if (!string.IsNullOrWhiteSpace(person.ProfilePhotoUrl))
+                        {
+                            <img src="@person.ProfilePhotoUrl" alt=""
+                                 style="width:100%; height:100%; object-fit:cover;" />
+                        }
+                        else
+                        {
+                            @MiniInitials(person)
+                        }
+                    </div>
+                    @* Name + dates *@
+                    <div style="display:flex; flex-direction:column; line-height:1.3;">
+                        <span style="font-size:13px; color:var(--ft-text-primary);">
+                            @person.FullName
+                        </span>
+                        @if (person.BirthDate.HasValue || person.DeathDate.HasValue)
+                        {
+                            <span style="font-size:11px; color:var(--ft-text-muted);">
+                                @(person.BirthDate?.Year.ToString() ?? "?")
+                                @(person.DeathDate.HasValue ? $"– {person.DeathDate.Value.Year}" : "")
+                            </span>
+                        }
+                    </div>
+                </div>
+            </ItemTemplate>
+            <NoItemsTemplate>
+                <div style="padding:12px 16px; font-size:13px; color:var(--ft-text-muted);">
+                    No matches found
+                </div>
+            </NoItemsTemplate>
+        </MudAutocomplete>
+    </div>
+
+    <MudSpacer />
+
+    @* ── Quick-add person ───────────────────────────────────────────────── *@
+    <MudTooltip Text="Add person" Placement="Placement.Bottom">
+        <MudIconButton Icon="@Icons.Material.Outlined.PersonAdd"
+                       Style="color:var(--ft-green-600);"
+                       OnClick='() => Nav.NavigateTo("/people/add")' />
+    </MudTooltip>
+
+    @* ── People list ────────────────────────────────────────────────────── *@
+    <MudTooltip Text="People list" Placement="Placement.Bottom">
+        <MudIconButton Icon="@Icons.Material.Outlined.People"
+                       Style="color:var(--ft-gray-400);"
+                       OnClick='() => Nav.NavigateTo("/people")' />
+    </MudTooltip>
+
+    @* ── Dark-mode toggle ───────────────────────────────────────────────── *@
+    <MudTooltip Text="@(_isDark ? "Light mode" : "Dark mode")" Placement="Placement.Bottom">
+        <MudIconButton Icon="@(_isDark? Icons.Material.Outlined.LightMode
+                                                                                                : Icons.Material.Outlined.DarkMode)"
+                       Style="color:var(--ft-gray-400);"
+                       OnClick="ToggleTheme" />
+    </MudTooltip>
+
+    @* ── User avatar ────────────────────────────────────────────────────── *@
+    <MudMenu AnchorOrigin="Origin.BottomRight"
+             TransformOrigin="Origin.TopRight"
+             Dense="true">
+        <ActivatorContent>
+            @* Avatar bubble — swap src for real photo when auth is wired.*@
+
+            @* <div
+                 style="width:32px; height:32px; border-radius:50%; cursor:pointer;
+                background:var(--ft-green-600); color:#fff;
+                display:flex; align-items:center; justify-content:center;
+                font-size:13px; font-weight:500; margin-left:6px;
+                border:2px solid var(--ft-green-400);
+                overflow:hidden; flex-shrink:0;">
+                @if (!string.IsNullOrWhiteSpace(_userPhotoUrl))
+                {
+                    <img src="@_userPhotoUrl" alt="You"
+                         style="width:100%; height:100%; object-fit:cover;" />
+                }
+                else
+                {
+                    @_userInitials
+                }
+            </div> *@
+            <div @onclick="@context.ToggleAsync" class="custom-avatar" style="cursor: pointer">
+
+                <MudAvatar Size="Size.Medium"
+                           Color="Color.Primary"
+                           Style="cursor:pointer;">
+                    @if (!string.IsNullOrWhiteSpace(_userPhotoUrl))
+                    {
+                        <img src="@_userPhotoUrl" alt="You"
+                             style="width:100%; height:100%; object-fit:cover;" />
+                    }
+                    else
+                    {
+                        @_userInitials
+                    }
+                </MudAvatar>
+            </div>
+        </ActivatorContent>
+        <ChildContent>
+            @* User identity header *@
+            <div style="padding:12px 16px 10px; border-bottom:0.5px solid var(--ft-line-border);
+                min-width:180px;">
+                <div style="font-size:13px; font-weight:500; color:var(--ft-text-primary);">
+                    @_userName
+                </div>
+                <div style="font-size:11px; color:var(--ft-text-muted); margin-top:2px;">
+                    @_userEmail
+                </div>
+            </div>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Settings"
+                         OnClick='() => Nav.NavigateTo("/settings")'>
+                Settings
+            </MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Logout"
+                         Style="color:var(--ft-gray-500);"
+                         OnClick="SignOut">
+                Sign out
+            </MudMenuItem>
+        </ChildContent>
+    </MudMenu>
+    @* <MudMenu AnchorOrigin="Origin.BottomRight"
+             TransformOrigin="Origin.TopRight"
+             Dense="true"
+             Class="ft-user-menu">
+
+        <ActivatorContent>
+            <MudAvatar Size="Size.Medium"
+                       Color="Color.Primary"
+                       Style="cursor:pointer;"
+                       Text="D" />
+        </ActivatorContent>
+
+        <ChildContent>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Person" Href="/account">Account</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Settings" Href="/settings">Settings</MudMenuItem>
+            <MudDivider />
+            <MudMenuItem Icon="@Icons.Material.Outlined.HelpOutline" Href="/help">Help</MudMenuItem>
+            <MudDivider />
+            <MudMenuItem Icon="@Icons.Material.Outlined.Logout"
+                         Style="color:#A32D2D;"
+                         OnClick="SignOut">Sign out</MudMenuItem>
+        </ChildContent>
+    </MudMenu> *@
+</MudAppBar>
+
+@code {
+    // ── Parameters ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Raised when the user picks a person in the search box.
+    /// Navigate to /?focus={id} — the tree will centre on them.
+    /// </summary>
+    [Parameter] public EventCallback<PersonDto> OnPersonFocused { get; set; }
+
+    /// <summary>Kept in sync with MainLayout's IsDarkMode binding.</summary>
+    [Parameter] public bool IsDark { get; set; }
+    [Parameter] public EventCallback<bool> IsDarkChanged { get; set; }
+
+    // ── State ─────────────────────────────────────────────────────────────
+
+    private PersonDto? _searchSelection;
+    private List<PersonDto> _allPeople = [];
+    private bool _isDark;
+
+    // TODO: replace with real auth claims when auth is wired
+    private string _userName = "Doug";
+    private string _userEmail = "";
+    private string _userInitials = "D";
+    private string _userPhotoUrl = "";
+    RenderFragment<MenuContext> ActivatorContent;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await PersonService.GetAllAsync();
+        if (result.Success)
+            _allPeople = result.Data ?? [];
+
+        _isDark = Theme.IsDark;
+        Theme.OnChange += OnThemeChanged;
+    }
+
+    protected override void OnParametersSet() => _isDark = IsDark;
+
+    public void Dispose() => Theme.OnChange -= OnThemeChanged;
+
+    // ── Search ────────────────────────────────────────────────────────────
+
+    private Task<IEnumerable<PersonDto>> SearchPeople(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Task.FromResult(_allPeople.Take(6));
+
+        var results = _allPeople
+            .Where(p => p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(8);
+        return Task.FromResult(results);
+    }
+
+    private void OnPersonSelected(PersonDto? person)
+    {
+        if (person is null) return;
+
+        // Navigate to the tree with this person as focus.
+        // Home.razor reads [SupplyParameterFromQuery] Guid? Focus.
+        Nav.NavigateTo($"/?focus={person.Id}");
+        _searchSelection = null;    // clear the input after nav
+    }
+
+    // ── Theme ─────────────────────────────────────────────────────────────
+
+    private async Task ToggleTheme()
+    {
+        await Theme.ToggleAsync();
+        _isDark = Theme.IsDark;
+        await IsDarkChanged.InvokeAsync(_isDark);
+    }
+
+    private void OnThemeChanged()
+    {
+        _isDark = Theme.IsDark;
+        InvokeAsync(StateHasChanged);
+    }
+
+
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    private static string MiniInitials(PersonDto p) =>
+        $"{p.FirstName?.FirstOrDefault()}{p.LastName?.FirstOrDefault()}"
+        .ToUpperInvariant().Trim();
+
+    private void SignOut()
+    {
+        // TODO: hook into your auth provider (e.g. Nav.NavigateTo("/logout", forceLoad:true))
+    }
+}

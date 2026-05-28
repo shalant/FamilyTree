@@ -1,0 +1,24 @@
+@using Microsoft.AspNetCore.Components.Routing
+@using MudBlazor
+
+<MudNavMenu Class="pa-2">
+    <MudText Typo="Typo.overline" Class="px-4 mt-2 mb-1 mud-text-secondary">
+        Navigate
+    </MudText>
+    <MudNavLink Href="/tree" Match="NavLinkMatch.All"
+                Icon="@Icons.Material.Filled.AccountTree">
+        Tree View
+    </MudNavLink>
+    <MudNavLink Href="/people"
+                Icon="@Icons.Material.Filled.People">
+        People
+    </MudNavLink>
+    <MudDivider Class="my-2" />
+    <MudText Typo="Typo.overline" Class="px-4 mt-2 mb-1 mud-text-secondary">
+        Add
+    </MudText>
+    <MudNavLink Href="/people/add"
+                Icon="@Icons.Material.Filled.PersonAdd">
+        Add Person
+    </MudNavLink>
+</MudNavMenu>

@@ -1,0 +1,17 @@
+# 1. Start SQL Server in Docker
+docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Dev!Password123" `
+  -p 1433:1433 --name familytree-db -d `
+  mcr.microsoft.com/mssql/server:2022-latest
+
+# 2. Create first migration and apply it
+cd src/FamilyTree.Api
+dotnet ef migrations add InitialCreate
+dotnet ef database update
+
+# 3. (Optional) Run seed.sql in SSMS for test data
+
+# 4. Terminal 1 — API (Scalar UI at https://localhost:7001/scalar/v1)
+cd src/FamilyTree.Api && dotnet watch
+
+# 5. Terminal 2 — Web
+cd src/FamilyTree.Web && dotnet watch

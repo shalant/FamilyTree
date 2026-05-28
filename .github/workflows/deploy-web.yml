@@ -1,0 +1,38 @@
+name: Deploy Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/FamilyTree.Web/**'
+      - 'src/FamilyTree.Shared/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore src/FamilyTree.Web/FamilyTree.Web.csproj
+
+      - name: Build
+        run: dotnet build src/FamilyTree.Web/FamilyTree.Web.csproj --no-restore -c Release
+
+      - name: Publish
+        run: dotnet publish src/FamilyTree.Web/FamilyTree.Web.csproj -c Release -o publish/web
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEB_APP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEB_PUBLISH_PROFILE }}
+          package: publish/web
