@@ -15,7 +15,8 @@
 <MudLayout>
     <CustomAppBar @bind-IsDark="_isDark" />
 
-    <MudMainContent Style="background:var(--ft-surface); min-height:100vh;">
+    @* <MudMainContent Style="background:var(--ft-surface); min-height:100vh;"> *@
+    <MudMainContent Class="ft-main">
         @Body
     </MudMainContent>
 

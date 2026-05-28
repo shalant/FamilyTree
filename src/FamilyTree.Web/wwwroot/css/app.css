@@ -219,6 +219,14 @@ html, body {
 
 /* ── Tree generation bands ────────────────────────────────────────────────── */
 
+.ft-main {
+    padding: 0;
+    margin: 0;
+    background: none;
+    min-height: 0;
+}
+
+
 .ft-band--grandparents {
     background: var(--ft-band-grandparents);
     opacity: 0.25;
@@ -233,6 +241,18 @@ html, body {
     background: var(--ft-band-children);
     opacity: 0.25;
 }
+
+.tree-viewport {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--ft-surface);
+    overflow: auto;
+    z-index: 0;
+}
+
 
 /* ── Person node ──────────────────────────────────────────────────────────── */
 
@@ -307,6 +327,14 @@ html, body {
 #toolbar-container.dragging {
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
+
+#toolbar-container {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+}
+
 
 /* ── Animations ───────────────────────────────────────────────────────────── */
 
