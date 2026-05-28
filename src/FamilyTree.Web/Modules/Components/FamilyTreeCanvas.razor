@@ -169,7 +169,6 @@
     private double _zoom = 1.0;
     private double _offsetX = 0;
     private double _offsetY = 0;
-    private const double ViewportHeight = 500.0;  // approximate usable height
 
     /// <summary>
     /// Invoked when component parameters change. Recomputes layout via FamilyTreeLayoutEngine.
@@ -184,7 +183,7 @@
 
     /// <summary>
     /// Calculates zoom level to fit the VisibleYearRange in viewport, then centers on focus.
-    /// Zoom formula: viewport_height / (visible_year_range * pixels_per_year)
+    /// Approach: zoom is capped at 1.0 to keep content visible, offset centers on focus.
     /// </summary>
     private void CalculateZoomAndCenter()
     {
@@ -199,12 +198,14 @@
 
         // Calculate zoom to fit VisibleYearRange in viewport
         const double pxPerYear = 45.0;
+        const double viewportHeight = 650.0;  // approximate usable height
         var contentHeightForRange = VisibleYearRange * pxPerYear;
-        _zoom = ViewportHeight / contentHeightForRange;
+        _zoom = viewportHeight / contentHeightForRange;
+        _zoom = Math.Min(_zoom, 1.0);  // Never zoom in beyond 1x (content would go off-screen)
 
         // Center on focus node
         _offsetX = (_layout.CanvasWidth / 2.0) - focusNode.X;
-        _offsetY = (ViewportHeight / 2.0) - focusNode.Y;
+        _offsetY = (viewportHeight / 2.0) - focusNode.Y;
     }
 
     public void SetVisibleYearRange(int years)
