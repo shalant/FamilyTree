@@ -1,0 +1,24 @@
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="Caption"
+                      Label="Caption"
+                      Placeholder="Add a caption for this photo..."
+                      Lines="3"
+                      AutoGrow="true"
+                      Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string Caption { get; set; } = "";
+
+    private void Cancel() => MudDialog.Cancel();
+    private void Submit() => MudDialog.Close(Caption);
+}

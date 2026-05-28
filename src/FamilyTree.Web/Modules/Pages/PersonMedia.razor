@@ -2,12 +2,17 @@
 @rendermode InteractiveServer
 
 @using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Shared.DTOs.Medium
+@using FamilyTree.Api.Services
 @using FamilyTree.Web.Modules.Components
+@using FamilyTree.Web.Modules.Dialogs
 @using MudBlazor
 
 @inject IPersonService PersonService
+@inject IMediumService MediumService
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>@(_person?.FirstName ?? "Person")'s media</PageTitle>
 
@@ -357,53 +362,137 @@ else
             return;
         }
         _person = result.Data!;
-        _loading = false;
 
-        // TODO: load media from API
-        // var mediaResult = await MediaService.GetByPersonAsync(Id);
-        // if (mediaResult.Success)
-        // {
-        //     _photos  = mediaResult.Data!.Where(m => m.Type == "photo").Select(...).ToList();
-        //     _records = mediaResult.Data!.Where(m => m.Type == "record").Select(...).ToList();
-        // }
+        var mediaResult = await MediumService.GetByPersonIdAsync(Id);
+        if (mediaResult.Success)
+        {
+            _photos = mediaResult.Data!
+                .Where(m => m.Type == "photo")
+                .Select(m => new PhotoItem
+                {
+                    Id = m.Id,
+                    Url = m.Url,
+                    FileName = m.FileName,
+                    Caption = m.Caption
+                })
+                .ToList();
+
+            _records = mediaResult.Data!
+                .Where(m => m.Type == "record")
+                .Select(m => new RecordItem
+                {
+                    Id = m.Id,
+                    Url = m.Url,
+                    FileName = m.FileName,
+                    DocType = m.Caption,
+                    Date = null
+                })
+                .ToList();
+        }
+
+        _loading = false;
     }
 
     // ── Photo handlers ────────────────────────────────────────────────────
 
     private async Task OnPhotosSelected(IReadOnlyList<IBrowserFile> files)
     {
+        _uploadingPhoto = true;
         foreach (var file in files)
         {
-            // TODO: POST each file to /api/people/{Id}/media with type=photo
-            //   using var content = new MultipartFormDataContent();
-            //   using var stream  = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
-            //   content.Add(new StreamContent(stream), "file", file.Name);
-            //   content.Add(new StringContent("photo"), "type");
-            //   var response = await Http.PostAsync($"/api/people/{Id}/media", content);
-            //   var created  = await response.Content.ReadFromJsonAsync<MediaDto>();
-            //   _photos.Add(new PhotoItem { Id = created.Id, Url = created.Url, FileName = file.Name });
-
-            // Stub: show a local preview while API is not yet built
-            _photos.Add(new PhotoItem
+            try
             {
-                FileName = file.Name,
-                Caption = null,
-                Url = "" // placeholder — will be blob URL after API
-            });
-            Snackbar.Add($"{file.Name} queued — upload endpoint not yet available.", Severity.Info);
+                using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+
+                var dto = new MediumUpsertDto
+                {
+                    PersonId = Id,
+                    FileName = file.Name,
+                    MimeType = file.ContentType,
+                    Type = "photo"
+                };
+
+                var result = await MediumService.CreateAsync(dto, stream, CancellationToken.None);
+                if (result.Success)
+                {
+                    var medium = result.Data!;
+                    _photos.Add(new PhotoItem
+                    {
+                        Id = medium.Id,
+                        Url = medium.Url,
+                        FileName = file.Name,
+                        Caption = null
+                    });
+                    Snackbar.Add($"{file.Name} uploaded successfully", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add($"Failed to upload {file.Name}: {result.Message}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error uploading {file.Name}: {ex.Message}", Severity.Error);
+            }
         }
+        _uploadingPhoto = false;
         StateHasChanged();
     }
 
-    private void EditPhoto(PhotoItem photo)
+    private async Task EditPhoto(PhotoItem photo)
     {
-        // TODO: open inline caption editor or a small dialog
+        var parameters = new DialogParameters<CaptionDialog>
+        {
+            { x => x.Caption, photo.Caption ?? "" }
+        };
+
+        var dialog = await DialogService.ShowAsync<CaptionDialog>("Edit photo caption", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is string newCaption)
+        {
+            try
+            {
+                var dto = new MediumUpsertDto
+                {
+                    PersonId = Id,
+                    FileName = photo.FileName,
+                    Caption = newCaption,
+                    Type = "photo"
+                };
+
+                var updateResult = await MediumService.UpdateAsync(photo.Id, dto);
+                if (updateResult.Success)
+                {
+                    photo.Caption = newCaption;
+                    Snackbar.Add("Caption updated", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add($"Failed to update caption: {updateResult.Message}", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error updating caption: {ex.Message}", Severity.Error);
+            }
+            StateHasChanged();
+        }
     }
 
-    private void DeletePhoto(PhotoItem photo)
+    private async Task DeletePhoto(PhotoItem photo)
     {
-        // TODO: DELETE /api/people/{Id}/media/{photo.Id}
-        _photos.Remove(photo);
+        var result = await MediumService.DeleteAsync(photo.Id);
+        if (result.Success)
+        {
+            _photos.Remove(photo);
+            Snackbar.Add("Photo deleted", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add($"Failed to delete photo: {result.Message}", Severity.Error);
+        }
+        StateHasChanged();
     }
 
     // ── Record handlers ───────────────────────────────────────────────────
@@ -424,29 +513,41 @@ else
         _savingRecord = true;
         try
         {
-            // TODO: POST to /api/people/{Id}/media with type=record
-            //   using var content = new MultipartFormDataContent();
-            //   using var stream  = _pendingRecordFile.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
-            //   content.Add(new StreamContent(stream), "file", _pendingRecordFile.Name);
-            //   content.Add(new StringContent("record"),        "type");
-            //   content.Add(new StringContent(_newRecordType),  "docType");
-            //   content.Add(new StringContent(_newRecordCaption), "caption");
-            //   if (_newRecordDate.HasValue)
-            //       content.Add(new StringContent(_newRecordDate.Value.ToString("O")), "date");
-            //   var response = await Http.PostAsync($"/api/people/{Id}/media", content);
-            //   var created  = await response.Content.ReadFromJsonAsync<MediaDto>();
+            using var stream = _pendingRecordFile.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
 
-            // Stub: add locally
-            _records.Add(new RecordItem
+            var dto = new MediumUpsertDto
             {
+                PersonId = Id,
                 FileName = _pendingRecordFile.Name,
-                DocType = _newRecordType,
-                Caption = string.IsNullOrWhiteSpace(_newRecordCaption) ? null : _newRecordCaption,
-                Date = _newRecordDate.HasValue ? DateOnly.FromDateTime(_newRecordDate.Value) : null,
-                Url = "#" // placeholder
-            });
+                MimeType = _pendingRecordFile.ContentType,
+                Type = "record",
+                Caption = $"{_newRecordType}" + (string.IsNullOrWhiteSpace(_newRecordCaption) ? "" : $": {_newRecordCaption}")
+            };
 
-            Snackbar.Add($"{_newRecordType} saved — upload endpoint not yet available.", Severity.Info);
+            var result = await MediumService.CreateAsync(dto, stream, CancellationToken.None);
+            if (result.Success)
+            {
+                var medium = result.Data!;
+                _records.Add(new RecordItem
+                {
+                    Id = medium.Id,
+                    FileName = _pendingRecordFile.Name,
+                    DocType = _newRecordType,
+                    Caption = string.IsNullOrWhiteSpace(_newRecordCaption) ? null : _newRecordCaption,
+                    Date = _newRecordDate.HasValue ? DateOnly.FromDateTime(_newRecordDate.Value) : null,
+                    Url = medium.Url
+                });
+                Snackbar.Add($"{_newRecordType} saved successfully", Severity.Success);
+                _pendingRecordFile = null;
+                _pendingRecordFileName = null;
+                _newRecordType = null;
+                _newRecordCaption = "";
+                _newRecordDate = null;
+            }
+            else
+            {
+                Snackbar.Add($"Failed to save record: {result.Message}", Severity.Error);
+            }
             ResetRecordForm();
         }
         finally

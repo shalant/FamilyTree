@@ -1,7 +1,9 @@
 ﻿@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Api.Services
 @using MudBlazor
 
 @inject NavigationManager Nav
+@inject IMediumService MediumService
 
 <MudDrawer Open="@(Person is not null)"
            OpenChanged="@(v => { if (!v) OnClose.InvokeAsync(); })"
@@ -250,8 +252,15 @@
             if (p is not null) _related.Add(new(p, "Child"));
         }
 
-        // TODO: load thumbnail preview URLs from media API
-        // _previewPhotos = await MediaService.GetPreviewUrlsAsync(Person.Id, limit: 4);
+        var mediaResult = await MediumService.GetByPersonIdAsync(Person.Id);
+        if (mediaResult.Success)
+        {
+            _previewPhotos = mediaResult.Data!
+                .Where(m => m.Type == "photo")
+                .Take(4)
+                .Select(m => m.Url)
+                .ToList();
+        }
     }
 
     private void NavigateToMedia()

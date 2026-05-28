@@ -9,6 +9,12 @@ Console.WriteLine(">>> Program.cs started");
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load User Secrets FIRST
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets<Program>();
+}
+
 // ── Services ──────────────────────────────────────────────────
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -31,6 +37,8 @@ var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"]
 //    client.BaseAddress = new Uri(apiBaseUrl);
 //});
 
+
+
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
@@ -38,7 +46,15 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
 
 builder.Services.AddScoped<IPersonService, PersonService>();
 builder.Services.AddScoped<IRelationshipService, RelationshipService>();
+builder.Services.AddScoped<IMediumService, MediumService>();
+builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddSingleton(_ =>
+{
+    var connectionString = builder.Configuration["AzureStorage:ConnectionString"];
+    return new Azure.Storage.Blobs.BlobServiceClient(connectionString);
+});
+
 
 // ── Pipeline ──────────────────────────────────────────────────
 var app = builder.Build();

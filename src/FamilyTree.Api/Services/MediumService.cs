@@ -94,10 +94,13 @@ public class MediumService(
     //  CREATE
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse<MediumDto>> CreateAsync(
-        MediumUpsertDto dto, CancellationToken ct = default)
+        MediumUpsertDto dto, Stream fileStream, CancellationToken ct = default)
     {
         try
         {
+            var fileName = $"{dto.Type}-{Guid.NewGuid()}{Path.GetExtension(dto.FileName)}";
+            var url = await blobStorage.UploadAsync(fileStream, fileName, dto.MimeType, ct);
+
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var medium = new Medium
@@ -108,7 +111,7 @@ public class MediumService(
                 Caption = dto.Caption,
                 MimeType = dto.MimeType,
                 Type = dto.Type,
-                Url = "blob://placeholder",  // TODO: Populate from blob storage
+                Url = url,
                 CreatedAt = DateTime.UtcNow,
             };
 
@@ -119,9 +122,9 @@ public class MediumService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error creating medium");
+            logger.LogError(ex, "Error creating medium with file upload");
             return ServiceResponse<MediumDto>.Fail(
-                "An error occurred creating this media.");
+                "An error occurred uploading and creating this media.");
         }
     }
 
