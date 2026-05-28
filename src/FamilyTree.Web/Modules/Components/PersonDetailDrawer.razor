@@ -230,7 +230,7 @@
     private List<RelatedPerson> _related = [];
     private List<string> _previewPhotos = [];  // populated by media API when ready
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
         _related = [];
         if (Person is null) return;

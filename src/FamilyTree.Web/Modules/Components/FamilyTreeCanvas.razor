@@ -44,9 +44,9 @@
         @foreach (var band in _bands)
         {
             var rel = band.Depth - _focusDepth;
-            <div class="@GetBandClass(rel)"
-                 style="position:absolute; left:0; top:@(band.Top)px;
-                width:@(_canvasWidth)px; height:@(band.Height)px;">
+            <div style="position:absolute; left:0; top:@(band.Top)px;
+                width:@(_canvasWidth)px; height:@(band.Height)px;
+                @GetBandStyle(rel)">
             </div>
         }
 
@@ -54,10 +54,18 @@
         @foreach (var band in _bands)
         {
             var rel = band.Depth - _focusDepth;
-            <div style="position:absolute; left:20px; top:@(band.Top + 10)px;
-                font-size:13px; font-weight:500; color:var(--ft-text-muted);
-                font-family:var(--ft-font-body); pointer-events:none;">
-                @GenerationLabel(rel)
+            var labelColor = rel switch
+            {
+                >= 2 => "var(--ft-green-800)",
+                1 => "var(--ft-green-800)",
+                0 => "var(--ft-green-700)",
+                _ => "var(--ft-green-600)"
+            };
+            var label = GenerationLabel(rel);
+            <div style="position:absolute; left:24px; top:@(band.Top + 12)px;
+                font-size:11px; font-weight:600; color:@labelColor; letter-spacing:0.05em;
+                font-family:var(--ft-font-body); pointer-events:none; opacity:0.75;">
+                @label
             </div>
         }
 
@@ -198,6 +206,7 @@
         if (!People.Any()) return;
 
         var depths = ComputeDepths();
+        Console.WriteLine($"[BuildLayout] Canvas will be {_canvasWidth}×{_canvasHeight}, FocusId={FocusId}");
 
         foreach (var p in People)
         {
@@ -300,16 +309,16 @@
             _rootNode = nodeMap.Values.FirstOrDefault();
         }
         // ── Single global shift ──────────────────────────────────────────
-        // Move every node so the focus person lands at the canvas midpoint.
-        // All rows shift by the same delta, preserving sibling spacing and
-        // connector geometry identically.
-        var canvasCentreX = _canvasWidth / 2;
-        var focusRowX = FocusId.HasValue && nodeMap.TryGetValue(FocusId.Value, out var fn)
-                            ? fn.X : 0;
-        var shift = canvasCentreX - focusRowX;
+        // Find all X positions and center them.
+        var allX = nodeMap.Values.Select(n => n.X).ToList();
+        var minX = allX.Any() ? allX.Min() : 0;
+        var maxX = allX.Any() ? allX.Max() : 0;
+        var rowCentreX = (minX + maxX) / 2.0;
+        var canvasCentreX = _canvasWidth / 2.0;
+        var shift = canvasCentreX - rowCentreX;
 
         foreach (var key in nodeMap.Keys.ToList())
-            nodeMap[key] = nodeMap[key] with { X = nodeMap[key].X + shift };
+            nodeMap[key] = nodeMap[key] with { X = (int)(nodeMap[key].X + shift) };
 
         _bands = byDepth
             .Select((g, i) => new GenerationBand(g.Key, PaddingY + i * rowHeight, rowHeight))
@@ -514,13 +523,21 @@
         _ => $"Great-grandchildren ×{Math.Abs(relativeDepth) - 2}"
     };
 
-    private static string GetBandClass(int relativeDepth) => relativeDepth switch
+    private static string GetBandStyle(int relativeDepth)
     {
-        >= 2 => "ft-band--grandparents",
-        1 => "ft-band--parents",
-        0 => "ft-band--parents",
-        _ => "ft-band--children"
-    };
+        var opacity = relativeDepth switch
+        {
+            >= 3 => 0.18,    // great-great-grandparents (darkest)
+            2 => 0.14,       // great-grandparents
+            1 => 0.10,       // grandparents
+            0 => 0.06,       // parents
+            -1 => 0.05,      // focus
+            -2 => 0.04,      // children
+            _ => 0.03        // further descendants (lightest)
+        };
+        var rgba = $"rgba(74, 174, 109, {opacity})";
+        return $"background: {rgba};";
+    }
 
     private static string F(double v) => v.ToString("F1");
 

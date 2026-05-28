@@ -4,7 +4,7 @@
    RelativeDepth: 0 = focus person, +N = Nth-generation ancestor, -N = Nth-generation descendant. *@
 
 <div class="person-node @(IsFocus ? "person-node--focus" : "")"
-     style="left:@(Left)px; top:@(Top)px; width:@(Size)px; height:@(Size)px;
+     style="position:absolute; left:@(Left)px; top:@(Top)px; width:@(Size)px; height:@(Size)px;
     border:@BorderWidth solid @BorderColor; background:@BgColor;"
      @onclick="() => OnClick.InvokeAsync(Person)"
      @onmouseenter="OnMouseEnter"
@@ -24,12 +24,12 @@
 </div>
 
 <div class="person-label person-label--name"
-     style="left:@(Left - (LabelWidth - Size) / 2)px; top:@(Top + Size + 5)px;">
+     style="position:absolute; left:@(Left - (LabelWidth - Size) / 2)px; top:@(Top + Size + 5)px;">
     @Person.FirstName
 </div>
 
 <div class="person-label person-label--year"
-     style="left:@(Left - (LabelWidth - Size) / 2)px; top:@(Top + Size + 20)px;">
+     style="position:absolute; left:@(Left - (LabelWidth - Size) / 2)px; top:@(Top + Size + 20)px;">
     @Person.BirthDate?.Year
 </div>
 
