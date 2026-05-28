@@ -38,8 +38,14 @@
         width:@(_layout.CanvasWidth)px;
         height:@(_layout.CanvasHeight)px;
         margin:0 auto 48px;
-        transform: translate(@($"{_offsetX}px"), @($"{_offsetY}px")) scale(@_zoom);
-        transform-origin: center center;">
+        background:rgba(0,0,0,0.02);">
+
+        @if (!_layout.Nodes.Any())
+        {
+            <div style="position:absolute;top:100px;left:50%;transform:translateX(-50%);color:var(--ft-text-muted);">
+                No people to display
+            </div>
+        }
 
         @* Generation band backgrounds (time-based decade markers) *@
         @foreach (var band in _layout.Bands)
