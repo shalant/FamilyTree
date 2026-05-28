@@ -28,6 +28,22 @@ else if (!_people.Any())
 }
 else
 {
+    <!-- Page header floating on top with glass effect -->
+    <div style="position:fixed; top:20px; right:20px; z-index:5000; pointer-events:auto;">
+        <div style="background:rgba(255,255,255,0.7); backdrop-filter:blur(10px); padding:16px 24px; border-radius:12px; border:1px solid rgba(255,255,255,0.3); box-shadow:0 8px 32px rgba(0,0,0,0.1);">
+            <div style="font-size:14px; font-weight:500; color:var(--ft-text-primary);">
+                @if (FocusPerson is not null)
+                {
+                    <span>@FocusPerson.FirstName's family tree</span>
+                    @if (FocusPerson.BirthDate.HasValue)
+                    {
+                        <span style="color:var(--ft-text-muted); font-size:12px;"> · @FocusPerson.BirthDate.Value.Year</span>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
     <div id="tree-viewport"
          style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--ft-surface); overflow:hidden; z-index:1;">
 
@@ -52,7 +68,7 @@ else
                     AllPeople="_people"
                     OnClose="() => _detailPerson = null"
                     OnEdit="@(p => Nav.NavigateTo($"/people/{p.Id}/edit"))"
-                    OnFocusPerson="FocusPerson"
+                    OnFocusPerson="@(p => HandleFocusPerson(p))"
                     OnDelete="PromptDelete" />
 
 @code {
@@ -61,8 +77,11 @@ else
     private PersonDto? _detailPerson;
     private bool _loading = true;
     private Guid? _focusId;
-    private int _visibleYearRange = 100;  // ±50 years from focus
+    private int _visibleYearRange = 100;
     private FamilyTreeCanvas? _canvas;
+
+    private PersonDto? FocusPerson =>
+        _people.FirstOrDefault(p => p.Id == _focusId);
 
     protected override async Task OnInitializedAsync()
     {
@@ -128,7 +147,7 @@ else
         _detailPerson = person;
     }
 
-    private void FocusPerson(PersonDto person)
+    private void HandleFocusPerson(PersonDto person)
     {
         _focusId = person.Id;
         _detailPerson = null;
