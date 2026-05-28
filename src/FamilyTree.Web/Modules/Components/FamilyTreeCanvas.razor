@@ -34,7 +34,7 @@
     </div>
 
     @* ── Viewport container (clips to window, applies zoom) ─────────────────── *@
-    <div style="width:100%; height:600px; overflow:hidden; position:relative; background:rgba(0,0,0,0.01);">
+    <div style="width:100%; height:700px; overflow:hidden; position:relative; background:rgba(0,0,0,0.01);">
 
     @* ── Tree canvas (scrollable content, scaled for zoom) ──────────────────── *@
     <div style="position:absolute;
@@ -193,19 +193,10 @@
     {
         _layout = LayoutEngine.ComputeLayout(People, Couples, FocusId);
 
-        // On first load or data change, reset to show full year range
+        // On first load, set default to show ±2-3 generations (reasonable default)
         if (!_initialized)
         {
-            var birthYears = People
-                .Select(p => p.BirthDate?.Year ?? DateTime.Now.Year)
-                .Distinct()
-                .ToList();
-            if (birthYears.Any())
-            {
-                var minYear = birthYears.Min();
-                var maxYear = birthYears.Max();
-                VisibleYearRange = Math.Max(50, maxYear - minYear + 20);  // Full range + 20yr padding
-            }
+            VisibleYearRange = 80;  // ~±2-3 generations (25yr per gen * 3 = 75yr, rounded to 80)
             _initialized = true;
         }
 
@@ -231,7 +222,7 @@
 
         // Calculate zoom to fit VisibleYearRange in viewport
         const double pxPerYear = 45.0;
-        const double viewportHeight = 600.0;
+        const double viewportHeight = 700.0;
         var contentHeightForRange = VisibleYearRange * pxPerYear;
         _zoom = viewportHeight / contentHeightForRange;
 
