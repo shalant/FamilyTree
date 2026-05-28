@@ -192,8 +192,27 @@
     protected override void OnParametersSet()
     {
         _layout = LayoutEngine.ComputeLayout(People, Couples, FocusId);
+
+        // On first load or data change, reset to show full year range
+        if (!_initialized)
+        {
+            var birthYears = People
+                .Select(p => p.BirthDate?.Year ?? DateTime.Now.Year)
+                .Distinct()
+                .ToList();
+            if (birthYears.Any())
+            {
+                var minYear = birthYears.Min();
+                var maxYear = birthYears.Max();
+                VisibleYearRange = Math.Max(50, maxYear - minYear + 20);  // Full range + 20yr padding
+            }
+            _initialized = true;
+        }
+
         CalculateZoomAndCenter();
     }
+
+    private bool _initialized = false;
 
     /// <summary>
     /// Calculates zoom level to fit the VisibleYearRange in viewport, then centers on focus.
