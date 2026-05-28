@@ -301,10 +301,20 @@ public class FamilyTreeLayoutEngine
             }
         }
 
-        // Default to current year
-        var currentYear = DateTime.Now.Year;
-        foreach (var person in people.Where(p => !years.ContainsKey(p.Id)))
-            years[person.Id] = currentYear;
+        // Default unknown people to the median year (more stable than current year)
+        if (years.Any())
+        {
+            var sortedYears = years.Values.OrderBy(y => y).ToList();
+            var defaultYear = sortedYears[sortedYears.Count / 2];
+            foreach (var person in people.Where(p => !years.ContainsKey(p.Id)))
+                years[person.Id] = defaultYear;
+        }
+        else
+        {
+            var currentYear = DateTime.Now.Year;
+            foreach (var person in people)
+                years[person.Id] = currentYear;
+        }
 
         return years;
     }

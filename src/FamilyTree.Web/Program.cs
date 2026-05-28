@@ -49,6 +49,7 @@ builder.Services.AddScoped<IRelationshipService, RelationshipService>();
 builder.Services.AddScoped<IMediumService, MediumService>();
 builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<FamilyTreeLayoutEngine>();
 builder.Services.AddSingleton(_ =>
 {
     var connectionString = builder.Configuration["AzureStorage:ConnectionString"];
