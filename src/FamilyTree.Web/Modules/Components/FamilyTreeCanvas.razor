@@ -155,7 +155,9 @@
     [Parameter] public List<PersonDto> People { get; set; } = [];
     [Parameter] public List<CoupleDto> Couples { get; set; } = [];
     [Parameter] public Guid? FocusId { get; set; }
+    [Parameter] public int VisibleYearRange { get; set; } = 100;  // years to display (±50 from focus)
     [Parameter] public EventCallback<PersonDto> OnPersonSelected { get; set; }
+    [Parameter] public EventCallback<int> OnVisibleYearRangeChanged { get; set; }
 
     // ── Computed layout (from FamilyTreeLayoutEngine) ──────────────────────
     private FamilyTreeLayout _layout = FamilyTreeLayout.Empty;
@@ -167,6 +169,7 @@
     private double _zoom = 1.0;
     private double _offsetX = 0;
     private double _offsetY = 0;
+    private const double ViewportHeight = 500.0;  // approximate usable height
 
     /// <summary>
     /// Invoked when component parameters change. Recomputes layout via FamilyTreeLayoutEngine.
@@ -176,34 +179,57 @@
     protected override void OnParametersSet()
     {
         _layout = LayoutEngine.ComputeLayout(People, Couples, FocusId);
-        CenterOnFocus();
+        CalculateZoomAndCenter();
     }
 
     /// <summary>
-    /// Centers the view on the focus person.
+    /// Calculates zoom level to fit the VisibleYearRange in viewport, then centers on focus.
+    /// Zoom formula: viewport_height / (visible_year_range * pixels_per_year)
     /// </summary>
-    private void CenterOnFocus()
+    private void CalculateZoomAndCenter()
     {
         var focusNode = _layout.Nodes.FirstOrDefault(n => n.IsFocus);
-        if (focusNode == null) return;
+        if (focusNode == null)
+        {
+            _zoom = 1.0;
+            _offsetX = 0;
+            _offsetY = 0;
+            return;
+        }
+
+        // Calculate zoom to fit VisibleYearRange in viewport
+        const double pxPerYear = 45.0;
+        var contentHeightForRange = VisibleYearRange * pxPerYear;
+        _zoom = ViewportHeight / contentHeightForRange;
+
+        // Center on focus node
         _offsetX = (_layout.CanvasWidth / 2.0) - focusNode.X;
-        _offsetY = (_layout.CanvasHeight / 2.0) - focusNode.Y;
+        _offsetY = (ViewportHeight / 2.0) - focusNode.Y;
+    }
+
+    public void SetVisibleYearRange(int years)
+    {
+        if (VisibleYearRange != years)
+        {
+            VisibleYearRange = years;
+            CalculateZoomAndCenter();
+            OnVisibleYearRangeChanged.InvokeAsync(years);
+            StateHasChanged();
+        }
     }
 
     // ── Zoom & Pan ────────────────────────────────────────────────────────
 
     public void ZoomIn()
     {
-        _zoom *= 1.1;
-        StateHasChanged();
+        SetVisibleYearRange(Math.Max(20, (int)(VisibleYearRange * 0.85)));  // show fewer years = zoom in
     }
 
     private static string F(double v) => v.ToString("F1");
 
     public void ZoomOut()
     {
-        _zoom /= 1.1;
-        StateHasChanged();
+        SetVisibleYearRange(Math.Min(500, (int)(VisibleYearRange * 1.15)));  // show more years = zoom out
     }
 
     /// <summary>

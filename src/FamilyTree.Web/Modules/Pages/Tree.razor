@@ -32,10 +32,13 @@ else
          style="overflow: auto;
         height: calc(100vh - 64px);
         background: var(--ft-surface);">
-        <FamilyTreeCanvas People="_people"
+        <FamilyTreeCanvas @ref="_canvas"
+                          People="_people"
                           Couples="_couples"
                           FocusId="_focusId"
-                          OnPersonSelected="OpenDetail" />
+                          VisibleYearRange="_visibleYearRange"
+                          OnPersonSelected="OpenDetail"
+                          OnVisibleYearRangeChanged="@(y => _visibleYearRange = y)" />
     </div>
 }
 
@@ -52,6 +55,8 @@ else
     private PersonDto? _detailPerson;
     private bool _loading = true;
     private Guid? _focusId;
+    private int _visibleYearRange = 100;  // ±50 years from focus
+    private FamilyTreeCanvas? _canvas;
 
     protected override async Task OnInitializedAsync()
     {
@@ -67,8 +72,13 @@ else
         }
 
         // TODO: replace with authenticated user's saved focus id
-        // Focus on youngest person so ancestors are above, descendants below
-        _focusId = _people.OrderByDescending(p => p.BirthDate).FirstOrDefault()?.Id;
+        // Try to focus on Ava first, then fall back to youngest person
+        var ava = _people.FirstOrDefault(p => p.FirstName == "Ava");
+        if (ava != null)
+            _focusId = ava.Id;
+        else
+            _focusId = _people.OrderByDescending(p => p.BirthDate).FirstOrDefault()?.Id;
+
         _loading = false;
     }
 
