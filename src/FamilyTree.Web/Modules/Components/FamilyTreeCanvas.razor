@@ -33,12 +33,18 @@
         }
     </div>
 
-    @* ── Tree canvas ─────────────────────────────────────────────────────── *@
-    <div style="position:relative;
+    @* ── Viewport container (clips to window, applies zoom) ─────────────────── *@
+    <div style="width:100%; height:600px; overflow:hidden; position:relative; background:rgba(0,0,0,0.01);">
+
+    @* ── Tree canvas (scrollable content, scaled for zoom) ──────────────────── *@
+    <div style="position:absolute;
         width:@(_layout.CanvasWidth)px;
         height:@(_layout.CanvasHeight)px;
-        margin:0 auto 48px;
+        left:@(_offsetX)px;
+        top:@(_offsetY)px;
         background:rgba(0,0,0,0.02);
+        transform:scale(@_zoom);
+        transform-origin:0 0;
         border:1px solid #ccc;">
 
         @if (!_layout.Nodes.Any())
@@ -156,6 +162,7 @@
                         OnClick="OnPersonSelected" />
         }
     </div>
+    </div>
 </div>
 
 @code {
@@ -205,27 +212,14 @@
 
         // Calculate zoom to fit VisibleYearRange in viewport
         const double pxPerYear = 45.0;
-        const double viewportHeight = 700.0;  // approximate usable height
+        const double viewportHeight = 600.0;
         var contentHeightForRange = VisibleYearRange * pxPerYear;
         _zoom = viewportHeight / contentHeightForRange;
-        _zoom = Math.Min(_zoom, 1.0);  // Cap at 1x (never zoom beyond natural size)
 
-        // Calculate canvas center
-        var canvasCenterX = _layout.CanvasWidth / 2.0;
-        var canvasCenterY = _layout.CanvasHeight / 2.0;
-
-        // Calculate viewport center
-        const double viewportCenterX = 400.0;  // approximate (varies with container width)
-        const double viewportCenterY = viewportHeight / 2.0;
-
-        // For transform: translate(offset) scale(zoom) with transform-origin: center center
-        // The node appears at: (offset + nodePos - canvasCenter) * zoom + canvasCenter
-        // We want it at viewport center, so:
-        // (offset + nodePos - canvasCenter) * zoom + canvasCenter = viewportCenter
-        // offset = (viewportCenter - canvasCenter) / zoom - nodePos + canvasCenter
-
-        _offsetX = ((viewportCenterX - canvasCenterX) / _zoom) - focusNode.X + canvasCenterX;
-        _offsetY = ((viewportCenterY - canvasCenterY) / _zoom) - focusNode.Y + canvasCenterY;
+        // Position canvas so focus node is centered in viewport
+        // With transform-origin: 0 0 (top-left), offset directly positions the canvas
+        _offsetX = (viewportHeight / 2.0) - (focusNode.X * _zoom);
+        _offsetY = (viewportHeight / 2.0) - (focusNode.Y * _zoom);
     }
 
     public void SetVisibleYearRange(int years)
