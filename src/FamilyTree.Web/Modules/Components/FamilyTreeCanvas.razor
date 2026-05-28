@@ -183,7 +183,7 @@
 
     /// <summary>
     /// Calculates zoom level to fit the VisibleYearRange in viewport, then centers on focus.
-    /// Approach: zoom is capped at 1.0 to keep content visible, offset centers on focus.
+    /// With transform-origin: center center, scale happens around canvas center.
     /// </summary>
     private void CalculateZoomAndCenter()
     {
@@ -198,14 +198,27 @@
 
         // Calculate zoom to fit VisibleYearRange in viewport
         const double pxPerYear = 45.0;
-        const double viewportHeight = 650.0;  // approximate usable height
+        const double viewportHeight = 700.0;  // approximate usable height
         var contentHeightForRange = VisibleYearRange * pxPerYear;
         _zoom = viewportHeight / contentHeightForRange;
-        _zoom = Math.Min(_zoom, 1.0);  // Never zoom in beyond 1x (content would go off-screen)
+        _zoom = Math.Min(_zoom, 1.0);  // Cap at 1x (never zoom beyond natural size)
 
-        // Center on focus node
-        _offsetX = (_layout.CanvasWidth / 2.0) - focusNode.X;
-        _offsetY = (viewportHeight / 2.0) - focusNode.Y;
+        // Calculate canvas center
+        var canvasCenterX = _layout.CanvasWidth / 2.0;
+        var canvasCenterY = _layout.CanvasHeight / 2.0;
+
+        // Calculate viewport center
+        const double viewportCenterX = 400.0;  // approximate (varies with container width)
+        const double viewportCenterY = viewportHeight / 2.0;
+
+        // For transform: translate(offset) scale(zoom) with transform-origin: center center
+        // The node appears at: (offset + nodePos - canvasCenter) * zoom + canvasCenter
+        // We want it at viewport center, so:
+        // (offset + nodePos - canvasCenter) * zoom + canvasCenter = viewportCenter
+        // offset = (viewportCenter - canvasCenter) / zoom - nodePos + canvasCenter
+
+        _offsetX = ((viewportCenterX - canvasCenterX) / _zoom) - focusNode.X + canvasCenterX;
+        _offsetY = ((viewportCenterY - canvasCenterY) / _zoom) - focusNode.Y + canvasCenterY;
     }
 
     public void SetVisibleYearRange(int years)
