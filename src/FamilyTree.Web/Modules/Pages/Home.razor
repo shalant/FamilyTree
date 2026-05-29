@@ -2,8 +2,10 @@
 @layout TreeLayout
 @rendermode InteractiveServer
 
+@using Microsoft.JSInterop
 @using FamilyTree.Api.Services
 @using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Shared.DTOs
 @using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Services
 @using MudBlazor
@@ -16,7 +18,10 @@
 
 <PageTitle>Family Tree</PageTitle>
 
-<LoginOverlay OnGuest="HideIntro" />
+@if (_showIntro)
+{
+    <LoginOverlay OnGuest="HideIntro" />
+}
 
 @if (_loading)
 {
@@ -62,7 +67,8 @@ else
                  PeopleCount="_people.Count"
                  CoupleCount="_couples.Count"
                  OnCenterTree="CenterTree"
-                 OnShare="ShareView" />
+                 OnShare="ShareView"
+                 Visible="(_detailPerson == null)"/>
 }
 
 <PersonDetailDrawer Person="_detailPerson"
@@ -105,6 +111,17 @@ else
         _loading = false;
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Task.Delay(10000);
+            _showIntro = false;
+            StateHasChanged();
+        }
+    }
+
+
     private void HandlePersonSelected(PersonDto person) =>
         _detailPerson = person;
 
@@ -120,12 +137,11 @@ else
             await _canvas.CenterTree();
     }
 
-    private Task ShareView()
+    private async Task ShareView()
     {
         var url = Nav.ToAbsoluteUri($"/?focus={_focusPerson?.Id}");
-        Clipboard.Default.SetTextAsync(url.ToString());
+        await JS.InvokeVoidAsync("copyText", url.ToString());
         Snackbar.Add("Link copied to clipboard", Severity.Success);
-        return Task.CompletedTask;
     }
 
     private async Task PromptDelete(PersonDto person)

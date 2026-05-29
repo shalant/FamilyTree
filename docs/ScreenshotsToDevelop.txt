@@ -1,0 +1,114 @@
+ScreenshotsToDevelop
+
+
+1. Hero Screenshot — The Full Family Tree Canvas
+This is your “wow” moment.
+
+What to capture:
+
+A medium‑sized tree (6–12 people)
+
+Connectors visible (parents, spouses, children)
+
+A focused node highlighted
+
+Light mode (looks clean and friendly)
+
+Why it matters:  
+This instantly communicates complexity, UI polish, and the uniqueness of your project.
+
+2. Dark Mode Version of the Tree
+Same view, but in dark mode.
+
+Why:  
+Dark mode is a visual flex. It shows your design token system and theme engineering.
+
+3. Pan + Zoom Interaction (GIF or 2–3 stills)
+If you can record a GIF, even better.
+
+What to show:
+
+Smooth zoom in/out
+
+Panning across the tree
+
+The canvas clamping (no white edges)
+
+Why:  
+This demonstrates custom JS interop, state management, and UX engineering.
+
+4. Person Detail Drawer
+This is one of your nicest UI components.
+
+What to show:
+
+Drawer open on the right
+
+Tree still visible behind it
+
+Buttons for Edit / Delete / Focus
+
+Profile photo if available
+
+Why:  
+Shows your component architecture and interaction design.
+
+5. Add/Edit Person Form
+This shows your form engineering and MudBlazor integration.
+
+What to capture:
+
+First/Last name fields
+
+Date pickers
+
+Relationship selectors (parents/spouses)
+
+Upload zone if present
+
+Validation messages
+
+Why:  
+Hiring managers love seeing clean, well‑structured forms.
+
+6. Media Upload Zone
+Your upload zone is visually strong.
+
+What to show:
+
+Drag‑and‑drop state
+
+Hover animation
+
+File list after selection
+
+Light or dark mode
+
+Why:  
+Demonstrates UX polish and Azure Blob integration.
+
+7. List View (People Table)
+This shows the “business app” side of your project.
+
+What to capture:
+
+Search bar
+
+Sortable columns
+
+Profile thumbnails
+
+Action buttons (View/Edit/Delete)
+
+Why:  
+This is the part that screams “I can build real internal tools.”
+
+⭐ Optional “extra credit” screenshots
+8. Architecture Diagram
+Even a simple block diagram looks professional.
+
+9. Mobile View
+If your layout is responsive, show it.
+
+10. CI/CD Pipeline Badge or Screenshot
+Shows engineering maturity.

@@ -12,78 +12,93 @@
 
 <PageTitle>People</PageTitle>
 
-<MudStack Row="true" AlignItems="AlignItems.Center"
-          Justify="Justify.SpaceBetween" Class="mb-4">
-    <MudText Typo="Typo.h5"
-             Style="font-style:italic; font-family:Georgia,serif;
-                    color:var(--ft-green-800);">
-        Family members
-    </MudText>
-    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-        <MudTextField @bind-Value="_search"
-                      Placeholder="Search..."
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      Immediate="true"
-                      Style="min-width:200px;" />
-        <MudButton Variant="Variant.Filled"
-                   Style="background:var(--ft-green-600); color:#fff;"
-                   StartIcon="@Icons.Material.Filled.PersonAdd"
-                   Href="/people/add">
-            Add person
-        </MudButton>
-    </MudStack>
-</MudStack>
+<MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface);">
+    <MudStack Row="true" AlignItems="AlignItems.Center"
+              Justify="Justify.SpaceBetween" Class="mb-4">
+        <MudText Typo="Typo.h5"
+                 Style="font-style:italic; font-family:Georgia,serif;
+            color:var(--ft-green-800);">
+            Family members
+        </MudText>
 
-@if (_loading)
-{
-    <MudProgressLinear Indeterminate="true" Color="Color.Success" Class="mb-4" />
-}
-else if (!_people.Any())
-{
-    <MudAlert Severity="Severity.Info">
-        No people added yet.
-        <MudLink Href="/people/add">Add the first family member.</MudLink>
-    </MudAlert>
-}
-else
-{
-    <MudTable Items="FilteredPeople" Hover="true"
-              T="PersonDto" OnRowClick="@(e => Nav.NavigateTo($"/people/{e.Item!.Id}/edit"))"
-              Style="background:var(--ft-surface);">
-        <HeaderContent>
-            <MudTh>
-                <MudTableSortLabel SortBy="new Func<PersonDto,object>(p => p.LastName)">
-                    Name
-                </MudTableSortLabel>
-            </MudTh>
-            <MudTh>Born</MudTh>
-            <MudTh>Died</MudTh>
-            <MudTh>Age</MudTh>
-            <MudTh></MudTh>
-        </HeaderContent>
-        <RowTemplate Context="person">
-            <MudTd DataLabel="Name">@person.FullName</MudTd>
-            <MudTd DataLabel="Born">@person.BirthDate?.ToString("d MMM yyyy")</MudTd>
-            <MudTd DataLabel="Died">@person.DeathDate?.ToString("d MMM yyyy")</MudTd>
-            <MudTd DataLabel="Age">@person.Age</MudTd>
-            <MudTd>
-                <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                               Size="Size.Small"
-                               OnClick="@(() => Nav.NavigateTo($"/people/{person.Id}/edit"))"
-                               Title="Edit" />
-            </MudTd>
-        </RowTemplate>
-        <PagerContent>
-            <MudTablePager />
-        </PagerContent>
-    </MudTable>
-}
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudTextField @bind-Value="_search"
+                          Placeholder="Search..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          Class="search-field" />
+            <MudTooltip Text="Add person" Placement="Placement.Bottom">
+                <MudIconButton Icon="@Icons.Material.Outlined.PersonAdd"
+                               Color="Color.Success"
+                               OnClick='() => Nav.NavigateTo("/people/add")' />
+            </MudTooltip>
+        </MudStack>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Success" Class="mb-4" />
+    }
+    else if (!_people.Any())
+    {
+        <MudPaper Elevation="2" Class="pa-6 mx-auto text-center"
+                  Style="max-width:420px; background:rgba(245,245,245,0.4);
+            backdrop-filter:blur(12px); border-radius:12px;">
+            <MudText Typo="Typo.h6" Style="font-style:italic; color:var(--ft-green-800);">
+                No family members yet
+            </MudText>
+            <MudText Typo="Typo.body2" Style="color:var(--ft-gray-500);">
+                Add your first person to begin building your tree.
+            </MudText>
+            <MudButton Variant="Variant.Filled"
+                       StartIcon="@Icons.Material.Filled.PersonAdd"
+                       Href="/people/add"
+                       Style="background:var(--ft-green-600); color:#fff; margin-top:16px;">
+                Add person
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudTable Items="FilteredPeople" Hover="true"
+                  T="PersonDto"
+                  OnRowClick="@(e => Nav.NavigateTo($"/people/{e.Item!.Id}/edit"))"
+                  Class="people-table">
+            <HeaderContent>
+                <MudTh><MudTableSortLabel T="PersonDto" SortBy="p => p.LastName">Name</MudTableSortLabel></MudTh>
+                <MudTh>Born</MudTh>
+                <MudTh>Died</MudTh>
+                <MudTh>Age</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+
+            <RowTemplate Context="person">
+                <MudTd DataLabel="Name">@person.FullName</MudTd>
+                <MudTd DataLabel="Born">@person.BirthDate?.ToString("d MMM yyyy")</MudTd>
+                <MudTd DataLabel="Died">@person.DeathDate?.ToString("d MMM yyyy")</MudTd>
+                <MudTd DataLabel="Age">@person.Age</MudTd>
+                <MudTd>
+                    <MudTooltip Text="Edit" Placement="Placement.Left">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       OnClick="@(() => Nav.NavigateTo($"/people/{person.Id}/edit"))" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    }
+</MudPaper>
 
 @code {
-    private List<PersonDto> _people  = [];
-    private bool            _loading = true;
-    private string          _search  = "";
+    private List<PersonDto> _people = [];
+    private bool _loading = true;
+    private string _search = "";
 
     protected override async Task OnInitializedAsync()
     {

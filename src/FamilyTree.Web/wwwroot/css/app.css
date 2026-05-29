@@ -181,6 +181,27 @@ html, body {
     cursor: pointer;
 }
 
+.hero-overlay {
+    position: fixed;
+    top: 72px;
+    right: 24px;
+    z-index: 5000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.hero-header {
+    margin-bottom: 16px;
+}
+
+.hero-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+
 .hero-glass {
     position: fixed;
     top: 72px;
@@ -201,7 +222,8 @@ html, body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
     color: var(--ft-text-primary);
     font-family: var(--ft-font-display);
-    transition: background 0.3s ease, box-shadow 0.3s ease;
+    /*transition: background 0.3s ease, box-shadow 0.3s ease;*/
+    transition: all 0.3s ease-in-out;
     /*fade in*/
     /*opacity: 0;*/
     animation: heroFadeIn 0.6s ease-out;
@@ -218,14 +240,21 @@ html, body {
 
     .hero-glass:hover {
         backdrop-filter: blur(24px);
-        transform: translateY(-1px);
+        /*transform: translateY(-1px);*/
         transition: all 0.25s ease;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
     }
 
-    .hero-glass.expanded {
+    /*.hero-glass.expanded {
         width: 320px;
         height: auto;
         background: rgba(255,255,255,0.65);
+    }*/
+    .hero-glass.expanded {
+        width: 320px;
+        background: rgba(255,255,255,0.65);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+        transform: scale(1.03);
     }
 
 .hero-title {
@@ -528,6 +557,26 @@ html, body {
     -webkit-backdrop-filter: blur(24px);
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
 }
+/* ── Person List Page ───────────────────────────────────────────────────────────── */
+
+.people-table .mud-table-row:hover {
+    background: var(--ft-surface-card);
+    box-shadow: var(--ft-shadow-md);
+    transition: all 0.25s ease;
+}
+
+.people-table .mud-table-cell {
+    padding: 12px 16px;
+}
+
+.search-field {
+    min-width: 220px;
+    border-radius: 8px;
+    background: rgba(245,245,245,0.4);
+    backdrop-filter: blur(8px);
+}
+
+
 /* ── Animations ───────────────────────────────────────────────────────────── */
 
 @keyframes ft-focus-pulse {

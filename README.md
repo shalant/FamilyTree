@@ -1,5 +1,66 @@
 # 🌳 FamilyTree  
+
 A modern, full‑stack family tree application built with **Blazor Server (.NET 10)**, **ASP.NET Core Web API**, **SQL Server**, and **MudBlazor** — featuring a custom layout engine, smooth pan/zoom canvas, Azure‑backed media uploads, and a clean, token‑driven dark/light theme.
+
+---
+
+## 🎨 Screenshots
+
+> A visual tour of FamilyTree’s interactive UI and design system.
+
+### 1. Hero — Full Family Tree Canvas
+
+![FamilyTree Hero](docs/screenshots/familytree-hero.png)
+
+A medium‑sized tree with visible connectors, focus node, and the glass hero overlay in light mode.
+
+---
+
+### 2. Dark Mode Tree
+
+![FamilyTree Dark Mode](docs/screenshots/familytree-hero-dark.png)
+
+The same tree in dark mode, showing the token‑driven theme, glass surfaces, and contrast tuning.
+
+---
+
+### 3. Person Detail Drawer
+
+![Person Detail Drawer](docs/screenshots/familytree-person-drawer.png)
+
+Right‑side detail drawer with actions (Edit, Delete, Focus) while the tree remains visible behind it.
+
+---
+
+### 4. Edit Person Form
+
+![Edit Person Form](docs/screenshots/familytree-edit-person.png)
+
+A clean, reusable form with validation, date pickers, and relationship selectors.
+
+---
+
+### 5. Add Person (Dark Mode)
+
+![Add Person Dark](docs/screenshots/familytree-add-person-dark.png)
+
+Dark‑mode variant of the person form, demonstrating consistent theming and accessibility.
+
+---
+
+### 6. Media Upload Zone
+
+![Media Upload Zone](docs/screenshots/familytree-media-upload.png)
+
+Drag‑and‑drop upload zone with hover animation and file list, backed by Azure Blob Storage.
+
+---
+
+### 7. People List View
+
+![People List View](docs/screenshots/familytree-people-list.png)
+
+Sortable, searchable MudBlazor table for managing family members — the “business app” side of the project.
 
 ---
 
@@ -36,17 +97,16 @@ A modern, full‑stack family tree application built with **Blazor Server (.NET 
 
 ## 🏗️ Architecture Overview
 
-FamilyTree.Web  (Blazor Server — Azure App Service F1)
-│  Typed HTTP client calls
-▼
-FamilyTree.Api  (ASP.NET Core Web API — Azure App Service F1)
-│  EF Core, business logic
-▼
-Azure SQL Database  (free tier — 100k vCore-sec/mo, 32 GB)
+FamilyTree.Web  (Blazor Server — Azure App Service F1)  
+│  Typed HTTP client calls  
+▼  
+FamilyTree.Api  (ASP.NET Core Web API — Azure App Service F1)  
+│  EF Core, business logic  
+▼  
+Azure SQL Database  (free tier — 100k vCore‑sec/mo, 32 GB)
 
-Code
+**Local development:**
 
-**Local development:**  
 - SQL Server runs in Docker  
 - Both .NET projects run with `dotnet watch`  
 - Hot reload + debugging supported  
@@ -56,6 +116,7 @@ Code
 
 ## 📁 Project Structure
 
+```text
 FamilyTree/
 ├── src/
 │   ├── FamilyTree.Shared/        # Shared DTOs, enums
@@ -70,83 +131,3 @@ FamilyTree/
 ├── database/                     # Seed scripts, queries
 ├── docs/                         # Deployment, ADRs, UI docs
 └── .github/workflows/            # CI/CD pipelines
-
-Code
-
----
-
-## 🚀 Quick Start
-
-### 1. Start SQL Server (Docker)
-
-```bash
-docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Dev!Password123" \
-  -p 1433:1433 --name familytree-db --restart unless-stopped -d \
-  mcr.microsoft.com/mssql/server:2022-latest
-2. Apply migrations
-bash
-cd src/FamilyTree.Api
-dotnet ef database update
-3. Run the API
-bash
-cd src/FamilyTree.Api
-dotnet watch
-# Swagger at https://localhost:7001/swagger
-4. Run the Web App
-bash
-cd src/FamilyTree.Web
-dotnet watch
-# App at https://localhost:7000
-🧩 UI Architecture
-Two-view pattern
-Tree View — SVG-based, interactive, layout computed in C#
-
-List View — searchable, sortable MudBlazor table
-
-Component Responsibilities
-Component	Responsibility
-FamilyTreeCanvas	Layout + SVG connectors, emits events
-PersonNode	Presentational node
-PersonDetailDrawer	Read-only detail view
-PersonForm	Shared add/edit form
-ConfirmDialog	Reusable destructive-action dialog
-People.razor	Orchestrator: navigation + dialogs
-
-
-🧪 Testing
-API tests using xUnit + WebApplicationFactory
-
-UI tests for Blazor components
-
-CI/CD runs tests on every push to master
-
-☁️ Deployment
-GitHub Actions builds + deploys both Web and API
-
-Azure App Service (free tier)
-
-Azure SQL Database (free tier)
-
-Full instructions in [Looks like the result wasn't safe to show. Let's switch things up and try something else!]
-
-🧠 What I Learned
-Designing a custom layout engine for hierarchical data
-
-Managing pan/zoom state in Blazor with JS interop
-
-Building a token-driven design system for dark/light mode
-
-Structuring a clean API + shared DTO layer
-
-Handling secure media uploads to Azure Blob Storage
-
-Creating reusable, idiomatic MudBlazor components
-
-Implementing a multi-project CI/CD pipeline
-
-📜 License
-MIT License — free to use, modify, and build upon.
-
-👋 About the Author
-Built by Doug Rosenberg — full‑stack .NET engineer, musician, and UI/UX enthusiast.
-I love building tools that blend clean architecture with expressive, modern interfaces.
