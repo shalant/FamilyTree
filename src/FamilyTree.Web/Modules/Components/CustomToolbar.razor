@@ -1,85 +1,45 @@
-﻿@inject NavigationManager Nav
+@inject NavigationManager Nav
 
-<div id="toolbar-container"
-     style="top:{@_initialTop}px; left:{@_initialLeft}px;"
-     @onmousedown="StartDrag"
-     @onmouseup="StopDrag"
-     @onmousemove="DragMove">
-<MudPaper Elevation="1"
-          Class="pa-2 mb-2"
-          Style="display:flex; align-items:center; justify-content:space-between;
-                 background:rgba(255,255,255,0.6); backdrop-filter:blur(10px);
-                 border:1px solid rgba(255,255,255,0.3);
-                 border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.1);">
+<MudPaper Elevation="2"
+          Class="pa-2"
+          Style="display:flex; align-items:center; gap:4px;
+                 background:rgba(255,255,255,0.72); backdrop-filter:blur(12px);
+                 -webkit-backdrop-filter:blur(12px);
+                 border:1px solid rgba(255,255,255,0.35);
+                 border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.12);">
 
-    <!-- Left side actions -->
-    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.PersonAdd"
+               Size="Size.Small"
+               OnClick="@(() => Nav.NavigateTo("/people/add"))">
+        Add Person
+    </MudButton>
 
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.PersonAdd"
-                   OnClick="@(() => Nav.NavigateTo("/people/add"))">
-            Add Person
-        </MudButton>
+    <MudDivider Vertical="true" FlexItem="true" Style="height:28px; margin:0 4px;" />
 
+    <MudTooltip Text="Zoom out">
         <MudIconButton Icon="@Icons.Material.Filled.ZoomOut"
+                       Size="Size.Small"
                        OnClick="OnZoomOut" />
-        <MudIconButton Icon="@Icons.Material.Filled.ZoomIn"
-                       OnClick="OnZoomIn" />
-        <MudIconButton Icon="@Icons.Material.Filled.CenterFocusStrong"
-                       OnClick="OnCenterTree" />
+    </MudTooltip>
 
-        <!-- Year range slider -->
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Style="min-width:200px;">
-            <MudSlider T="int" Min="20" Max="500" Value="@YearRange"
-                       ValueChanged="@(v => { YearRange = v; OnYearRangeChanged.InvokeAsync(v); })"
-                       Style="width:140px;" />
-            <span style="font-size:11px; color:var(--ft-text-muted); min-width:45px;">@YearRange yr</span>
-        </MudStack>
-    </MudStack>
+    <MudTooltip Text="Zoom in">
+        <MudIconButton Icon="@Icons.Material.Filled.ZoomIn"
+                       Size="Size.Small"
+                       OnClick="OnZoomIn" />
+    </MudTooltip>
+
+    <MudTooltip Text="Center on focus person">
+        <MudIconButton Icon="@Icons.Material.Filled.CenterFocusStrong"
+                       Size="Size.Small"
+                       OnClick="OnCenterTree" />
+    </MudTooltip>
+
 </MudPaper>
-</div>
 
 @code {
     [Parameter] public EventCallback OnZoomIn { get; set; }
     [Parameter] public EventCallback OnZoomOut { get; set; }
     [Parameter] public EventCallback OnCenterTree { get; set; }
-    [Parameter] public EventCallback OnToggleTheme { get; set; }
-    [Parameter] public EventCallback OnSignOut { get; set; }
-    [Parameter] public EventCallback<int> OnYearRangeChanged { get; set; }
-
-    [Parameter] public bool IsDark { get; set; }
-    [Parameter] public int YearRange { get; set; } = 100;
-
-    @code {
-        private bool _dragging;
-        private double _startX, _startY;
-        private double _initialLeft = 20, _initialTop = 20;
-
-        private void StartDrag(MouseEventArgs e)
-        {
-            _dragging = true;
-            _startX = e.ClientX;
-            _startY = e.ClientY;
-        }
-
-        private void StopDrag(MouseEventArgs e)
-        {
-            _dragging = false;
-        }
-
-        private void DragMove(MouseEventArgs e)
-        {
-            if (!_dragging) return;
-
-            var dx = e.ClientX - _startX;
-            var dy = e.ClientY - _startY;
-            _initialLeft += dx;
-            _initialTop += dy;
-            _startX = e.ClientX;
-            _startY = e.ClientY;
-
-            StateHasChanged();
-        }
-    }
 }

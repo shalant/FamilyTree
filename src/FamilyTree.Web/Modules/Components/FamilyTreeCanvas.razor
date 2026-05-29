@@ -1,140 +1,129 @@
-@using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Shared.DTOs
+@using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Services
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
 
 @inject FamilyTreeLayoutEngine LayoutEngine
+@inject IJSRuntime JS
 
-<div style="width:100%; height:100%; background:var(--ft-surface); position:relative;">
+@* Full-screen fixed viewport — covers 100vw × 100vh behind the floating UI *@
+<div id="ft-viewport"
+     style="position:fixed; top:0; left:0; width:100vw; height:100vh;
+            overflow:hidden; background:var(--ft-surface); z-index:1;">
 
-    @* ── Viewport container (clips to window, applies zoom) ─────────────────── *@
-    <div style="width:100%; height:100%; overflow:hidden; position:relative; background:rgba(0,0,0,0.01);">
+    @* JS-only transform wrapper — Blazor never touches this element's style *@
+    <div id="ft-transform"
+         style="position:absolute; left:0; top:0;
+                transform-origin:0 0; will-change:transform;">
 
-    @* ── Tree canvas (scrollable content, scaled for zoom) ──────────────────── *@
-    <div style="position:absolute;
-        width:@(_layout.CanvasWidth)px;
-        height:@(_layout.CanvasHeight)px;
-        left:@(_offsetX)px;
-        top:@(_offsetY)px;
-        background:rgba(0,0,0,0.02);
-        transform:scale(@_zoom);
-        transform-origin:0 0;
-        border:1px solid #ccc;">
+        @* Content div — Blazor manages width/height here *@
+        <div style="position:relative;
+                    width:@(_layout.CanvasWidth)px;
+                    height:@(_layout.CanvasHeight)px;">
 
-        @if (!_layout.Nodes.Any())
-        {
-            <div style="position:absolute;top:100px;left:50%;transform:translateX(-50%);color:var(--ft-text-muted);">
-                No people to display
-            </div>
-        }
-
-        @* Generation band backgrounds (time-based decade markers) *@
-        @foreach (var band in _layout.Bands)
-        {
-            var opacity = GetBandOpacityByYear(band.Depth);
-            <div style="position:absolute; left:0; top:@(band.Top)px;
-                width:@(_layout.CanvasWidth)px; height:@(band.Height)px;
-                background:rgba(74, 174, 109, @opacity);">
-            </div>
-        }
-
-        @* Generation band labels (decade markers) *@
-        @foreach (var band in _layout.Bands)
-        {
-            <div style="position:absolute; left:24px; top:@(band.Top + 12)px;
-                font-size:11px; font-weight:600; color:var(--ft-green-700); letter-spacing:0.05em;
-                font-family:var(--ft-font-body); pointer-events:none; opacity:0.7;">
-                @band.Depth
-            </div>
-        }
-
-        @* ── SVG connectors ──────────────────────────────────────────────── *@
-        <svg style="position:absolute; top:0; left:0;
-            width:@(_layout.CanvasWidth)px; height:@(_layout.CanvasHeight)px;
-            pointer-events:none; overflow:visible;">
-            @foreach (var family in _layout.Connectors)
+            @if (!_layout.Nodes.Any())
             {
-                @* Couple bracket: U-arc between two partners *@
-                @if (family.Couple is { } arc)
-                {
-                    <path d="M @F(arc.PartnerAX) @F(arc.PartnerAY)
-                    C @F(arc.PartnerAX) @F(arc.PeakY),
-                    @F(arc.PartnerBX) @F(arc.PeakY),
-                    @F(arc.PartnerBX) @F(arc.PartnerBY)"
-                          fill="none"
-                          stroke="var(--ft-line-couple)"
-                          stroke-width="0.8"
-                          stroke-linecap="round" />
-                    <circle cx="@F(arc.MidX)" cy="@F(arc.HeartY)"
-                            r="2.5" fill="var(--ft-line-couple)" />
-                    <svg:text x="@F(arc.MidX - 4)" y="@F(arc.HeartY - 6)"
-                              font-size="10" fill="var(--ft-green-600)">❤</svg:text>
-                }
-
-                @* Stem: vertical line from couple heart down to children's span level *@
-                @if (family.Stem.TopY < family.Stem.BotY)
-                {
-                    <path d="M @F(family.Stem.X) @F(family.Stem.TopY)
-                    C @F(family.Stem.X) @F(family.Stem.TopY + 28),
-                    @F(family.Stem.X) @F(family.Stem.BotY - 28),
-                    @F(family.Stem.X) @F(family.Stem.BotY)"
-                          fill="none"
-                          stroke="var(--ft-line-parent)"
-                          stroke-width="1.2"
-                          stroke-linecap="round" />
-                }
-
-                @* Sibling span: gentle bow across the top of all children *@
-                @if (family.Span is { } span)
-                {
-                    var bowY = span.Y + 8.0;
-                    <path d="M @F(span.LeftX)  @F(span.Y)
-                    C @F(span.LeftX)  @F(bowY),
-                    @F(span.RightX) @F(bowY),
-                    @F(span.RightX) @F(span.Y)"
-                          fill="none"
-                          stroke="var(--ft-line-parent)"
-                          stroke-width="1.2"
-                          stroke-linecap="round" />
-                }
-
-                @* Child drops: one bezier per child from span down to node top *@
-                @foreach (var drop in family.Drops)
-                {
-                    var lean = (drop.CenterX - family.Stem.X) * 0.18;
-                    var fromY = family.Stem.BotY;
-                    <path d="M @F(drop.CenterX)        @F(fromY)
-                    C @F(drop.CenterX + lean) @F(fromY + 16),
-                    @F(drop.CenterX - lean) @F(drop.BotY - 16),
-                    @F(drop.CenterX)        @F(drop.BotY)"
-                          fill="none"
-                          stroke="var(--ft-line-parent)"
-                          stroke-width="1.2"
-                          stroke-linecap="round" />
-                }
+                <div style="position:absolute;top:100px;left:50%;transform:translateX(-50%);color:var(--ft-text-muted);">
+                    No people to display
+                </div>
             }
-        </svg>
 
-        @* Scroll anchor — zero-size div at the focus node for JS scroll-to-focus *@
-        @if (FocusPerson is not null && _layout.Nodes.FirstOrDefault(n => n.IsFocus) is { } focusNode)
-        {
-            <div id="node-@FocusPerson.Id"
-                 style="position:absolute;
-            left:@(focusNode.X)px; top:@(focusNode.Y)px;
-            width:0; height:0; pointer-events:none;" />
-        }
+            @* Generation band backgrounds *@
+            @foreach (var band in _layout.Bands)
+            {
+                var opacity = GetBandOpacityByYear(band.Depth);
+                <div style="position:absolute; left:0; top:@(band.Top)px;
+                    width:@(_layout.CanvasWidth)px; height:@(band.Height)px;
+                    background:rgba(74, 174, 109, @opacity);">
+                </div>
+            }
 
-        @* Person nodes *@
-        @foreach (var node in _layout.Nodes)
-        {
-            <PersonNode Person="@node.Person"
-                        Left="@(node.X - node.Size / 2)"
-                        Top="@(node.Y - node.Size / 2)"
-                        Size="@node.Size"
-                        RelativeDepth="@(node.Depth - _layout.FocusDepth)"
-                        IsFocus="@node.IsFocus"
-                        OnClick="OnPersonSelected" />
-        }
-    </div>
+            @* Generation band labels *@
+            @foreach (var band in _layout.Bands)
+            {
+                <div style="position:absolute; left:24px; top:@(band.Top + 12)px;
+                    font-size:11px; font-weight:600; color:var(--ft-green-700); letter-spacing:0.05em;
+                    font-family:var(--ft-font-body); pointer-events:none; opacity:0.7;">
+                    @band.Depth
+                </div>
+            }
+
+            @* SVG connectors *@
+            <svg style="position:absolute; top:0; left:0;
+                width:@(_layout.CanvasWidth)px; height:@(_layout.CanvasHeight)px;
+                pointer-events:none; overflow:visible;">
+                @foreach (var family in _layout.Connectors)
+                {
+                    @if (family.Couple is { } arc)
+                    {
+                        <path d="M @F(arc.PartnerAX) @F(arc.PartnerAY)
+                        C @F(arc.PartnerAX) @F(arc.PeakY),
+                        @F(arc.PartnerBX) @F(arc.PeakY),
+                        @F(arc.PartnerBX) @F(arc.PartnerBY)"
+                              fill="none"
+                              stroke="var(--ft-line-couple)"
+                              stroke-width="0.8"
+                              stroke-linecap="round" />
+                        <circle cx="@F(arc.MidX)" cy="@F(arc.HeartY)"
+                                r="2.5" fill="var(--ft-line-couple)" />
+                        <svg:text x="@F(arc.MidX - 4)" y="@F(arc.HeartY - 6)"
+                                  font-size="10" fill="var(--ft-green-600)">❤</svg:text>
+                    }
+
+                    @if (family.Stem.TopY < family.Stem.BotY)
+                    {
+                        <path d="M @F(family.Stem.X) @F(family.Stem.TopY)
+                        C @F(family.Stem.X) @F(family.Stem.TopY + 28),
+                        @F(family.Stem.X) @F(family.Stem.BotY - 28),
+                        @F(family.Stem.X) @F(family.Stem.BotY)"
+                              fill="none"
+                              stroke="var(--ft-line-parent)"
+                              stroke-width="1.2"
+                              stroke-linecap="round" />
+                    }
+
+                    @if (family.Span is { } span)
+                    {
+                        var bowY = span.Y + 8.0;
+                        <path d="M @F(span.LeftX)  @F(span.Y)
+                        C @F(span.LeftX)  @F(bowY),
+                        @F(span.RightX) @F(bowY),
+                        @F(span.RightX) @F(span.Y)"
+                              fill="none"
+                              stroke="var(--ft-line-parent)"
+                              stroke-width="1.2"
+                              stroke-linecap="round" />
+                    }
+
+                    @foreach (var drop in family.Drops)
+                    {
+                        var lean = (drop.CenterX - family.Stem.X) * 0.18;
+                        var fromY = family.Stem.BotY;
+                        <path d="M @F(drop.CenterX)        @F(fromY)
+                        C @F(drop.CenterX + lean) @F(fromY + 16),
+                        @F(drop.CenterX - lean) @F(drop.BotY - 16),
+                        @F(drop.CenterX)        @F(drop.BotY)"
+                              fill="none"
+                              stroke="var(--ft-line-parent)"
+                              stroke-width="1.2"
+                              stroke-linecap="round" />
+                    }
+                }
+            </svg>
+
+            @* Person nodes *@
+            @foreach (var node in _layout.Nodes)
+            {
+                <PersonNode Person="@node.Person"
+                            Left="@(node.X - node.Size / 2)"
+                            Top="@(node.Y - node.Size / 2)"
+                            Size="@node.Size"
+                            RelativeDepth="@(node.Depth - _layout.FocusDepth)"
+                            IsFocus="@node.IsFocus"
+                            OnClick="OnPersonSelected" />
+            }
+        </div>
     </div>
 </div>
 
@@ -142,98 +131,79 @@
     [Parameter] public List<PersonDto> People { get; set; } = [];
     [Parameter] public List<CoupleDto> Couples { get; set; } = [];
     [Parameter] public Guid? FocusId { get; set; }
-    [Parameter] public int VisibleYearRange { get; set; } = 100;  // years to display (±50 from focus)
     [Parameter] public EventCallback<PersonDto> OnPersonSelected { get; set; }
-    [Parameter] public EventCallback<int> OnVisibleYearRangeChanged { get; set; }
 
-    // ── Computed layout (from FamilyTreeLayoutEngine) ──────────────────────
     private FamilyTreeLayout _layout = FamilyTreeLayout.Empty;
+    private IJSObjectReference? _jsModule;
+    private Guid? _prevFocusId;
 
-    private PersonDto? FocusPerson =>
-        People.FirstOrDefault(p => p.Id == FocusId);
-
-    // Zoom & pan state
-    private double _zoom = 1.0;
-    private double _offsetX = 0;
-    private double _offsetY = 0;
-
-    /// <summary>
-    /// Invoked when component parameters change. Recomputes layout via FamilyTreeLayoutEngine.
-    /// The engine handles all positioning logic: depth computation, birth year timelines,
-    /// connected component identification, and node positioning.
-    /// </summary>
     protected override void OnParametersSet()
     {
         _layout = LayoutEngine.ComputeLayout(People, Couples, FocusId);
-
-        // On first load, set default to show a good portion of the tree
-        if (!_initialized)
-        {
-            VisibleYearRange = 150;  // With smaller pixels-per-year (15), shows 5-6 generations comfortably
-            _initialized = true;
-        }
-
-        CalculateZoomAndCenter();
     }
 
-    private bool _initialized = false;
-
-    /// <summary>
-    /// Calculates zoom level to fit the VisibleYearRange in viewport, then centers on focus.
-    /// With transform-origin: center center, scale happens around canvas center.
-    /// </summary>
-    private void CalculateZoomAndCenter()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import", "/js/canvas-interaction.js");
+
+            var focusNode = _layout.Nodes.FirstOrDefault(n => n.IsFocus);
+            var fx = focusNode?.X ?? _layout.CanvasWidth / 2.0;
+            var fy = focusNode?.Y ?? _layout.CanvasHeight / 2.0;
+            await _jsModule.InvokeVoidAsync("init", "ft-viewport", "ft-transform", fx, fy);
+            _prevFocusId = FocusId;
+        }
+        else if (FocusId != _prevFocusId && _jsModule != null)
+        {
+            var focusNode = _layout.Nodes.FirstOrDefault(n => n.IsFocus);
+            if (focusNode != null)
+                await _jsModule.InvokeVoidAsync("centerOn", focusNode.X, focusNode.Y);
+            _prevFocusId = FocusId;
+        }
+    }
+
+    public async Task ZoomIn()
+    {
+        if (_jsModule != null) await _jsModule.InvokeVoidAsync("zoomIn");
+    }
+
+    public async Task ZoomOut()
+    {
+        if (_jsModule != null) await _jsModule.InvokeVoidAsync("zoomOut");
+    }
+
+    public async Task CenterTree()
+    {
+        if (_jsModule == null) return;
         var focusNode = _layout.Nodes.FirstOrDefault(n => n.IsFocus);
-        if (focusNode == null)
-        {
-            _zoom = 1.0;
-            _offsetX = 0;
-            _offsetY = 0;
-            return;
-        }
-
-        // Calculate zoom to fit VisibleYearRange in viewport
-        const double pxPerYear = 15.0;  // matches FamilyTreeLayoutEngine
-        const double viewportHeight = 900.0;  // approximate full viewport height
-        var contentHeightForRange = VisibleYearRange * pxPerYear;
-        _zoom = viewportHeight / contentHeightForRange;
-
-        // Position canvas so focus node is centered in viewport
-        // With transform-origin: 0 0 (top-left), offset directly positions the canvas
-        _offsetX = (viewportHeight / 2.0) - (focusNode.X * _zoom);
-        _offsetY = (viewportHeight / 2.0) - (focusNode.Y * _zoom);
+        var fx = focusNode?.X ?? _layout.CanvasWidth / 2.0;
+        var fy = focusNode?.Y ?? _layout.CanvasHeight / 2.0;
+        await _jsModule.InvokeVoidAsync("centerOn", fx, fy);
     }
 
-    public void SetVisibleYearRange(int years)
+    public async ValueTask DisposeAsync()
     {
-        if (VisibleYearRange != years)
+        if (_jsModule is null) return;
+
+        try
         {
-            VisibleYearRange = years;
-            CalculateZoomAndCenter();
-            OnVisibleYearRangeChanged.InvokeAsync(years);
-            StateHasChanged();
+            await _jsModule.InvokeVoidAsync("dispose");
+            await _jsModule.DisposeAsync();
         }
-    }
-
-    // ── Zoom & Pan ────────────────────────────────────────────────────────
-
-    public void ZoomIn()
-    {
-        SetVisibleYearRange(Math.Max(20, (int)(VisibleYearRange * 0.85)));  // show fewer years = zoom in
+        catch (JSDisconnectedException)
+        {
+            // Circuit already disposed — ignore
+        }
+        catch (JSException)
+        {
+            // JS runtime unavailable — ignore
+        }
     }
 
     private static string F(double v) => v.ToString("F1");
 
-    public void ZoomOut()
-    {
-        SetVisibleYearRange(Math.Min(500, (int)(VisibleYearRange * 1.15)));  // show more years = zoom out
-    }
-
-    /// <summary>
-    /// Calculates band opacity based on birth year for time-gradient visualization.
-    /// Older years (ancestors) appear darker; newer years (descendants) appear lighter.
-    /// </summary>
     private double GetBandOpacityByYear(int year)
     {
         var allYears = _layout.Nodes.Select(n => n.Person.BirthDate?.Year ?? DateTime.Now.Year).Distinct().ToList();
@@ -241,7 +211,6 @@
         var minY = allYears.Min();
         var maxY = allYears.Max();
         var normalized = maxY == minY ? 0.5 : (double)(year - minY) / (maxY - minY);
-        return 0.15 - (normalized * 0.12);  // 0.15 (dark) to 0.03 (light)
+        return 0.15 - (normalized * 0.12);
     }
-
 }

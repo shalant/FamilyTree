@@ -1,4 +1,5 @@
 @page "/"
+@layout TreeLayout
 @rendermode InteractiveServer
 
 @using FamilyTree.Api.Services
@@ -17,25 +18,21 @@
 
 @if (_loading)
 {
-    <div style="display:flex; align-items:center; justify-content:center;
-        height:60vh;">
+    <div style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:10;">
         <MudProgressCircular Indeterminate="true" Color="Color.Success" />
     </div>
 }
 else if (!_people.Any())
 {
-    <div style="display:flex; flex-direction:column; align-items:center;
-        justify-content:center; height:70vh; text-align:center;
-        padding:0 24px;">
+    <div style="position:fixed; inset:0; display:flex; flex-direction:column;
+        align-items:center; justify-content:center; text-align:center; padding:0 24px; z-index:10;">
         <div style="font-size:28px; font-weight:500; font-style:italic;
-            font-family:Georgia,serif; color:var(--ft-green-800);
-            margin-bottom:12px;">
+            font-family:Georgia,serif; color:var(--ft-green-800); margin-bottom:12px;">
             Your family tree
         </div>
         <div style="font-size:14px; color:var(--ft-gray-400);
             max-width:360px; line-height:1.7; margin-bottom:28px;">
-            Add your first family member to begin. The tree will grow as you
-            connect parents, children, and spouses.
+            Add your first family member to begin.
         </div>
         <MudButton Variant="Variant.Filled"
                    StartIcon="@Icons.Material.Filled.PersonAdd"
@@ -47,55 +44,40 @@ else if (!_people.Any())
 }
 else
 {
-    @* Slim hero strip *@
-    <div style="text-align:center; padding:20px 0 0; background:var(--ft-surface);">
-        <div style="display:inline-flex; align-items:center; gap:8px;
-            background:var(--ft-green-50);
-            border:0.5px solid var(--ft-line-border);
-            border-radius:20px; padding:5px 14px;
-            font-size:12px; color:var(--ft-green-600);
-            margin-bottom:4px;">
-            <i class="ti ti-tree" style="font-size:13px;" aria-hidden="true"></i>
-            @if (_focusPerson is not null)
-            {
-                <span>@_focusPerson.FullName's tree</span>
-            }
-            else
-            {
-                <span>Family tree</span>
-            }
-        </div>
-        <div style="font-size:11px; color:var(--ft-gray-200);
-            letter-spacing:0.05em; margin-bottom:0;">
-            @_people.Count @(_people.Count == 1 ? "person" : "people")
-        </div>
+    @* Canvas fills the entire screen *@
+    <FamilyTreeCanvas @ref="_canvas"
+                      People="_people"
+                      Couples="_couples"
+                      FocusId="_focusPerson?.Id"
+                      OnPersonSelected="HandlePersonSelected" />
+
+    @* Toolbar — bottom-left floating pill *@
+    <div style="position:fixed; bottom:24px; left:24px; z-index:10000;">
+        <CustomToolbar OnZoomIn="@(async () => { if (_canvas != null) await _canvas.ZoomIn(); })"
+                       OnZoomOut="@(async () => { if (_canvas != null) await _canvas.ZoomOut(); })"
+                       OnCenterTree="@(async () => { if (_canvas != null) await _canvas.CenterTree(); })" />
     </div>
 
-    @* Scrollable tree viewport *@
-    @* <div id="tree-viewport"
-         style="overflow:auto;
-        height:calc(100vh - 120px);
-        background:var(--ft-surface);"> *@
-        <div id="tree-viewport"
-             style="overflow:auto;
-            height:100vh;
-            background:var(--ft-surface);
-            position:fixed;
-            inset:0;
-            z-index:0;">
-
-        <CustomToolbar IsDark="_isDark"
-                       OnZoomIn="ZoomIn"
-                       OnZoomOut="ZoomOut"
-                       OnCenterTree="CenterTree"
-                       OnToggleTheme="ToggleTheme"
-                       OnSignOut="SignOut" />
-        <FamilyTreeCanvas @ref="_canvas"
-            People="_people"
-                          Couples="_couples"
-                          FocusId="_focusPerson?.Id"
-                          OnPersonSelected="HandlePersonSelected" />
-    </div>
+    @* Focus person info — top-right floating chip *@
+    @if (_focusPerson is not null)
+    {
+        <div style="position:fixed; top:72px; right:20px; z-index:5000;">
+            <div style="background:rgba(255,255,255,0.72); backdrop-filter:blur(12px);
+                        -webkit-backdrop-filter:blur(12px);
+                        padding:10px 18px; border-radius:10px;
+                        border:1px solid rgba(255,255,255,0.35);
+                        box-shadow:0 4px 20px rgba(0,0,0,0.08);
+                        font-size:13px; font-weight:500; color:var(--ft-text-primary);">
+                @_focusPerson.FirstName's family tree
+                @if (_focusPerson.BirthDate.HasValue)
+                {
+                    <span style="color:var(--ft-text-muted); font-size:12px; margin-left:6px;">
+                        · @_focusPerson.BirthDate.Value.Year
+                    </span>
+                }
+            </div>
+        </div>
+    }
 }
 
 <PersonDetailDrawer Person="_detailPerson"
@@ -106,21 +88,14 @@ else
                     OnDelete="PromptDelete" />
 
 @code {
+    [SupplyParameterFromQuery] public Guid? Focus { get; set; }
+
     private List<PersonDto> _people = [];
     private List<CoupleDto> _couples = [];
     private PersonDto? _focusPerson;
     private PersonDto? _detailPerson;
     private bool _loading = true;
-
     private FamilyTreeCanvas? _canvas;
-
-    // TOOLBAR
-    private bool _isDark;
-    private void ZoomIn() => _canvas?.ZoomIn();
-    private void ZoomOut() => _canvas?.ZoomOut();
-    private void CenterTree() { /* view auto-centers on focus person */ }
-    private void ToggleTheme() => _isDark = !_isDark;
-    private void SignOut() { /* your auth logic */ }
 
     protected override async Task OnInitializedAsync()
     {
@@ -129,8 +104,10 @@ else
         {
             _people = result.Data!;
             _couples = CoupleHelper.Derive(_people);
-            _focusPerson = _people.FirstOrDefault();
-            // TODO: replace FirstOrDefault with the authenticated user's saved focus person
+
+            _focusPerson = Focus.HasValue
+                ? _people.FirstOrDefault(p => p.Id == Focus.Value) ?? _people.FirstOrDefault()
+                : _people.FirstOrDefault();
         }
         else
         {
