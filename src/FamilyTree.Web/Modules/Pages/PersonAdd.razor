@@ -69,8 +69,15 @@ else
         Console.WriteLine($"HandleSubmit fired for {dto.FirstName} {dto.LastName}");
         try
         {
-            await PersonService.CreateAsync(dto);
-            Nav.NavigateTo("/people");
+            var result = await PersonService.CreateAsync(dto);
+            if (result.Success)
+            {
+                Nav.NavigateTo("/people");
+            }
+            else
+            {
+                _error = result.Message;
+            }
         }
         catch (Exception ex)
         {
