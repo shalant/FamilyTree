@@ -20,10 +20,11 @@
 
 @* ── AppBar shell ─────────────────────────────────────────────────────────── *@
 <MudAppBar Elevation="0"
-           Style="background:var(--ft-surface-card);
-    border-bottom:0.5px solid var(--ft-line-border);
-    color:var(--ft-text-primary);
-    padding:0 16px;">
+           Style="background: rgba(245,245,245,0.4) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);">
 
     @* Brand wordmark *@
     <div style="display:flex; align-items:center; gap:8px; cursor:pointer;

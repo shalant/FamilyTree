@@ -335,6 +335,27 @@ html, body {
     z-index: 10;
 }
 
+.toolbar-background {
+    
+}
+
+
+.mud-appbar.appbar-background,
+.mud-appbar {
+    background: rgba(245,245,245,0.4) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .mud-appbar {
+    background: rgba(18, 20, 23, 0.35) !important;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+}
+
 
 /* ── Animations ───────────────────────────────────────────────────────────── */
 

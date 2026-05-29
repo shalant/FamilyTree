@@ -1,7 +1,8 @@
 // Figma-style pan/zoom for the family tree canvas.
 // JS owns the transform; Blazor owns the content — no style conflicts.
 
-const EDGE_MARGIN = 150; // min pixels of canvas that must remain in viewport
+// const EDGE_MARGIN = 150; // min pixels of canvas that must remain in viewport
+const EDGE_MARGIN = 40; // min pixels of canvas that must remain in viewport
 
 let _viewport = null;
 let _transform = null;
@@ -122,17 +123,26 @@ function _clampPan() {
     const cw = content.offsetWidth  * _zoom;
     const ch = content.offsetHeight * _zoom;
 
-    const minX = EDGE_MARGIN - cw;
-    const maxX = vw - EDGE_MARGIN;
-    _panX = minX > maxX
-        ? (vw - cw) / 2                          // canvas fits — center it
-        : Math.max(minX, Math.min(maxX, _panX));
+    // const minX = EDGE_MARGIN - cw;
+    // const maxX = vw - EDGE_MARGIN;
+    // _panX = minX > maxX
+    //     ? (vw - cw) / 2                          // canvas fits — center it
+    //     : Math.max(minX, Math.min(maxX, _panX));
 
-    const minY = EDGE_MARGIN - ch;
-    const maxY = vh - EDGE_MARGIN;
-    _panY = minY > maxY
-        ? (vh - ch) / 2
-        : Math.max(minY, Math.min(maxY, _panY));
+    // const minY = EDGE_MARGIN - ch;
+    // const maxY = vh - EDGE_MARGIN;
+    // _panY = minY > maxY
+    //     ? (vh - ch) / 2
+    //     : Math.max(minY, Math.min(maxY, _panY));
+
+    const minX = vw - cw;
+    const maxX = 0;
+    _panX = Math.min(maxX, Math.max(minX, _panX));
+
+    const minY = vh - ch;
+    const maxY = 0;
+    _panY = Math.min(maxY, Math.max(minY, _panY));
+
 }
 
 function _applyTransform() {
