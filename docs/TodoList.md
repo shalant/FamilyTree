@@ -3,7 +3,7 @@
 ## Quick Wins (In Progress)
 - [ ] Auth — Identity/OAuth setup + token validation across API & Web
 - [x] ~~Blob~~ — Azure Blob Storage integrated for photo uploads
-- [ ] Validation — Data validation on PersonUpsertDto and related models
+- [x] ~~Validation~~ — Data validation on DTOs + business logic + file handling
 - [ ] Toolbar — Floating UI controls (zoom, reset, focus actions)
 
 ## Completed Features
