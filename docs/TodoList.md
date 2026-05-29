@@ -1,10 +1,10 @@
 # Family App Todo
 
 ## Quick Wins (In Progress)
-- [ ] Auth
-- [x] ~~Blob~~
-- [ ] Validation
-- [ ] Toolbar?
+- [ ] Auth — Identity/OAuth setup + token validation across API & Web
+- [x] ~~Blob~~ — Azure Blob Storage integrated for photo uploads
+- [ ] Validation — Data validation on PersonUpsertDto and related models
+- [ ] Toolbar — Floating UI controls (zoom, reset, focus actions)
 
 ## Completed Features
 - [x] ~~Delete photo~~

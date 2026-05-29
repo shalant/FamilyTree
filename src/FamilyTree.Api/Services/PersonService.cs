@@ -86,10 +86,16 @@ public class PersonService(
     {
         try
         {
+            var dtoValidation = ValidationHelper.ValidateDto(dto);
+            if (!dtoValidation.Success) return ServiceResponse<PersonDto>.Fail(dtoValidation.Message);
+
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var dateError = ValidatePersonDates(dto);
             if (dateError != null) return ServiceResponse<PersonDto>.Fail(dateError);
+
+            var nameError = ValidatePersonNames(dto);
+            if (nameError != null) return ServiceResponse<PersonDto>.Fail(nameError);
 
             var parentError = await ValidateParentRelationshipsAsync(ctx, dto, ct);
             if (parentError != null) return ServiceResponse<PersonDto>.Fail(parentError);
@@ -139,6 +145,9 @@ public class PersonService(
     {
         try
         {
+            var dtoValidation = ValidationHelper.ValidateDto(dto);
+            if (!dtoValidation.Success) return ServiceResponse<PersonDto>.Fail(dtoValidation.Message);
+
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var person = await ctx.People
@@ -149,6 +158,9 @@ public class PersonService(
 
             var dateError = ValidatePersonDates(dto);
             if (dateError != null) return ServiceResponse<PersonDto>.Fail(dateError);
+
+            var nameError = ValidatePersonNames(dto);
+            if (nameError != null) return ServiceResponse<PersonDto>.Fail(nameError);
 
             var parentError = await ValidateParentRelationshipsAsync(ctx, dto, ct);
             if (parentError != null) return ServiceResponse<PersonDto>.Fail(parentError);
@@ -277,12 +289,25 @@ public class PersonService(
     private static string? ValidatePersonDates(PersonUpsertDto dto)
     {
         var today = DateOnly.FromDateTime(DateTime.Today);
+        var yearBound = new DateOnly(1800, 1, 1);
+
         if (dto.BirthDate.HasValue && dto.BirthDate.Value > today)
             return "Birth date cannot be in the future.";
+        if (dto.BirthDate.HasValue && dto.BirthDate.Value < yearBound)
+            return "Birth date cannot be before 1800.";
         if (dto.DeathDate.HasValue && dto.DeathDate.Value > today)
             return "Death date cannot be in the future.";
         if (dto.BirthDate.HasValue && dto.DeathDate.HasValue && dto.BirthDate.Value >= dto.DeathDate.Value)
             return "Birth date must be before death date.";
+        return null;
+    }
+
+    private static string? ValidatePersonNames(PersonUpsertDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.FirstName))
+            return "First name cannot be empty or whitespace.";
+        if (string.IsNullOrWhiteSpace(dto.LastName))
+            return "Last name cannot be empty or whitespace.";
         return null;
     }
 

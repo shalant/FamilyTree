@@ -98,10 +98,22 @@ public class MediumService(
     {
         try
         {
-            var fileName = $"{dto.Type}-{Guid.NewGuid()}{Path.GetExtension(dto.FileName)}";
-            var url = await blobStorage.UploadAsync(fileStream, fileName, dto.MimeType, ct);
+            var dtoValidation = ValidationHelper.ValidateDtoNonGeneric(dto);
+            if (!dtoValidation.Success)
+                return ServiceResponse<MediumDto>.Fail(dtoValidation.Message);
+
+            var fileError = ValidateMediumFile(fileStream, dto);
+            if (fileError != null)
+                return ServiceResponse<MediumDto>.Fail(fileError);
 
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var personExists = await ctx.People.AnyAsync(p => p.Id == dto.PersonId, ct);
+            if (!personExists)
+                return ServiceResponse<MediumDto>.Fail($"Person {dto.PersonId} not found.");
+
+            var fileName = $"{dto.Type}-{Guid.NewGuid()}{Path.GetExtension(dto.FileName)}";
+            var url = await blobStorage.UploadAsync(fileStream, fileName, dto.MimeType, ct);
 
             var medium = new Medium
             {
@@ -136,6 +148,10 @@ public class MediumService(
     {
         try
         {
+            var dtoValidation = ValidationHelper.ValidateDtoNonGeneric(dto);
+            if (!dtoValidation.Success)
+                return ServiceResponse<MediumDto>.Fail(dtoValidation.Message);
+
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var medium = await ctx.Media.FirstOrDefaultAsync(m => m.Id == id, ct);
@@ -189,8 +205,29 @@ public class MediumService(
     }
 
     // ─────────────────────────────────────────────────────────────
-    //  HELPERS
+    //  VALIDATION & HELPERS
     // ─────────────────────────────────────────────────────────────
+    private static readonly HashSet<string> AllowedMimeTypes = new()
+    {
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+    };
+
+    private static readonly long MaxFileSizeBytes = 50 * 1024 * 1024; // 50 MB
+
+    private static string? ValidateMediumFile(Stream fileStream, MediumUpsertDto dto)
+    {
+        if (fileStream.Length > MaxFileSizeBytes)
+            return $"File size exceeds 50 MB limit. Uploaded file is {fileStream.Length / (1024 * 1024)} MB.";
+
+        if (!string.IsNullOrEmpty(dto.MimeType) && !AllowedMimeTypes.Contains(dto.MimeType))
+            return $"File type '{dto.MimeType}' is not allowed. Allowed types: {string.Join(", ", AllowedMimeTypes)}";
+
+        return null;
+    }
+
     private static MediumDto MapToDto(Medium medium) => new()
     {
         Id = medium.Id,

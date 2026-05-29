@@ -75,6 +75,10 @@ public class RelationshipService(
     {
         try
         {
+            var dtoValidation = ValidationHelper.ValidateDtoNonGeneric(request);
+            if (!dtoValidation.Success)
+                return ServiceResponse<RelationshipDto>.Fail(dtoValidation.Message);
+
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             // Canonical ordering — lower ID is always PersonA
@@ -166,6 +170,11 @@ public class RelationshipService(
     {
         if (request.PersonAId == request.PersonBId)
             return "A person cannot be related to themselves.";
+
+        // Validate date range
+        if (request.StartDate.HasValue && request.EndDate.HasValue &&
+            request.StartDate.Value >= request.EndDate.Value)
+            return "Start date must be before end date.";
 
         if (request.Type is RelationshipType.Parent or RelationshipType.Adopted)
         {
