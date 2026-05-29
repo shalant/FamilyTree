@@ -18,7 +18,7 @@ A medium‑sized tree with visible connectors, focus node, and the glass hero ov
 
 ### 2. Dark Mode Tree
 
-![FamilyTree Dark Mode](docs/screenshots/familytree-hero-dark.png)
+![FamilyTree Dark Mode](docs/screenshots/familytree-hero__dark.png)
 
 The same tree in dark mode, showing the token‑driven theme, glass surfaces, and contrast tuning.
 
@@ -26,7 +26,7 @@ The same tree in dark mode, showing the token‑driven theme, glass surfaces, an
 
 ### 3. Person Detail Drawer
 
-![Person Detail Drawer](docs/screenshots/familytree-person-drawer.png)
+![Person Detail Drawer](docs/screenshots/familytree-detaildrawer.png)
 
 Right‑side detail drawer with actions (Edit, Delete, Focus) while the tree remains visible behind it.
 
@@ -34,7 +34,7 @@ Right‑side detail drawer with actions (Edit, Delete, Focus) while the tree rem
 
 ### 4. Edit Person Form
 
-![Edit Person Form](docs/screenshots/familytree-edit-person.png)
+![Edit Person Form](docs/screenshots/familytree-edit.png)
 
 A clean, reusable form with validation, date pickers, and relationship selectors.
 
@@ -42,7 +42,7 @@ A clean, reusable form with validation, date pickers, and relationship selectors
 
 ### 5. Add Person (Dark Mode)
 
-![Add Person Dark](docs/screenshots/familytree-add-person-dark.png)
+![Add Person Dark](docs/screenshots/familytree-add__dark.png)
 
 Dark‑mode variant of the person form, demonstrating consistent theming and accessibility.
 
@@ -50,7 +50,7 @@ Dark‑mode variant of the person form, demonstrating consistent theming and acc
 
 ### 6. Media Upload Zone
 
-![Media Upload Zone](docs/screenshots/familytree-media-upload.png)
+![Media Upload Zone](docs/screenshots/familytree-mediazone.png)
 
 Drag‑and‑drop upload zone with hover animation and file list, backed by Azure Blob Storage.
 
@@ -58,7 +58,7 @@ Drag‑and‑drop upload zone with hover animation and file list, backed by Azur
 
 ### 7. People List View
 
-![People List View](docs/screenshots/familytree-people-list.png)
+![People List View](docs/screenshots/familytree-personlist.png)
 
 Sortable, searchable MudBlazor table for managing family members — the “business app” side of the project.
 
