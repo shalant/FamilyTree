@@ -1,7 +1,7 @@
 // Figma-style pan/zoom for the family tree canvas.
 // JS owns the transform; Blazor owns the content — no style conflicts.
 
-const EDGE_MARGIN = 150; // minimum pixels of canvas that must remain visible
+const EDGE_MARGIN = 150; // min pixels of canvas that must remain in viewport
 
 let _viewport = null;
 let _transform = null;
@@ -21,9 +21,13 @@ export function init(viewportId, transformId, focusX, focusY) {
 
     const rect = _viewport.getBoundingClientRect();
     _zoom = 0.85;
-    _panX = rect.width / 2 - focusX * _zoom;
+    _panX = rect.width  / 2 - focusX * _zoom;
     _panY = rect.height / 2 - focusY * _zoom;
+    _clampPan();
     _applyTransform();
+
+    // Reveal after the correct position is applied — prevents the SSR-position flash
+    _viewport.style.opacity = '1';
 
     _viewport.addEventListener('wheel', _onWheel, { passive: false });
     _viewport.addEventListener('mousedown', _onMouseDown);
@@ -59,7 +63,7 @@ export function zoomOut() {
 export function centerOn(focusX, focusY) {
     if (!_viewport) return;
     const rect = _viewport.getBoundingClientRect();
-    _panX = rect.width / 2 - focusX * _zoom;
+    _panX = rect.width  / 2 - focusX * _zoom;
     _panY = rect.height / 2 - focusY * _zoom;
     _clampPan();
     _applyTransform();
@@ -107,24 +111,28 @@ function _onMouseUp() {
     if (_viewport) _viewport.style.cursor = 'grab';
 }
 
-// Prevent the canvas from being panned so far that only EDGE_MARGIN px remain visible.
+// Prevent panning past EDGE_MARGIN px beyond canvas boundaries.
+// When the canvas is smaller than the viewport (zoomed out), center it instead.
 function _clampPan() {
     if (!_viewport || !_transform) return;
     const vw = _viewport.clientWidth;
     const vh = _viewport.clientHeight;
     const content = _transform.firstElementChild;
     if (!content) return;
-    const cw = content.offsetWidth * _zoom;
+    const cw = content.offsetWidth  * _zoom;
     const ch = content.offsetHeight * _zoom;
 
-    // panX: left edge of canvas in screen coords
-    // Canvas right edge must stay >= EDGE_MARGIN from left of viewport
-    _panX = Math.max(_panX, EDGE_MARGIN - cw);
-    // Canvas left edge must stay <= vw - EDGE_MARGIN from right of viewport
-    _panX = Math.min(_panX, vw - EDGE_MARGIN);
-    // Same for Y
-    _panY = Math.max(_panY, EDGE_MARGIN - ch);
-    _panY = Math.min(_panY, vh - EDGE_MARGIN);
+    const minX = EDGE_MARGIN - cw;
+    const maxX = vw - EDGE_MARGIN;
+    _panX = minX > maxX
+        ? (vw - cw) / 2                          // canvas fits — center it
+        : Math.max(minX, Math.min(maxX, _panX));
+
+    const minY = EDGE_MARGIN - ch;
+    const maxY = vh - EDGE_MARGIN;
+    _panY = minY > maxY
+        ? (vh - ch) / 2
+        : Math.max(minY, Math.min(maxY, _panY));
 }
 
 function _applyTransform() {
