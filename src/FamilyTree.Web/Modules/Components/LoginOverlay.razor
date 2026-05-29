@@ -1,0 +1,49 @@
+﻿@if (Show)
+{
+    <div class="intro-overlay" @onclick="Dismiss">
+        <div class="intro-glass" @onclick:stopPropagation="true">
+            <div class="intro-title">Welcome to FamilyTree</div>
+            <div class="intro-subtitle">
+                Visualize generations, connect stories, and grow your roots.
+            </div>
+
+            <MudTextField T="string" Label="Email" Variant="Variant.Outlined" />
+            <MudTextField T="string" Label="Password" Variant="Variant.Outlined" InputType="InputType.Password" />
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="intro-btn">
+                Login
+            </MudButton>
+
+            <MudButton Variant="Variant.Text" Color="Color.Secondary" Class="intro-btn"
+                       OnClick="ContinueAsGuest">
+                Continue as guest
+            </MudButton>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback OnGuest { get; set; }
+
+    private bool Show { get; set; } = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(10000);
+        FadeOut();
+    }
+
+    private void Dismiss() => FadeOut();
+
+    private async void FadeOut()
+    {
+        Show = false;
+        StateHasChanged();
+    }
+
+    private async Task ContinueAsGuest()
+    {
+        await OnGuest.InvokeAsync();
+        FadeOut();
+    }
+}

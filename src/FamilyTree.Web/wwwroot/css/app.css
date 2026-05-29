@@ -127,10 +127,12 @@
 
 html, body {
     width: 100vw;
-    height: 100vh;
+    /*height: 100vh;*/
+    height: auto;
     margin: 0;
     padding: 0;
-    overflow: hidden;
+    /*overflow: hidden;*/
+    overflow-y: auto;
     font-family: var(--ft-font-body);
     background: var(--ft-surface);
     color: var(--ft-text-primary);
@@ -159,7 +161,7 @@ html, body {
 
 .page-header {
     align-items: center;
-    justify-content: center;    
+    justify-content: center;
     font-size: 32px;
     font-weight: 500;
     font-style: italic;
@@ -179,6 +181,188 @@ html, body {
     cursor: pointer;
 }
 
+.hero-glass {
+    position: fixed;
+    top: 72px;
+    right: 24px;
+    z-index: 5000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    padding: 18px 24px;
+    border-radius: 12px;
+    /*background: rgba(255, 255, 255, 0.55);*/
+    background: rgba(245,245,245,0.3);
+    backdrop-filter: blur(20px);
+    /*-webkit-backdrop-filter: blur(20px);*/
+    -webkit-backdrop-filter: blur(12px);
+    /*border: 1px solid rgba(255, 255, 255, 0.35);*/
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    color: var(--ft-text-primary);
+    font-family: var(--ft-font-display);
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+    /*fade in*/
+    /*opacity: 0;*/
+    animation: heroFadeIn 0.6s ease-out;
+}
+
+    .hero-glass::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: radial-gradient(circle at top right, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.1) 70%);
+        z-index: -1;
+    }
+
+    .hero-glass:hover {
+        backdrop-filter: blur(24px);
+        transform: translateY(-1px);
+        transition: all 0.25s ease;
+    }
+
+    .hero-glass.expanded {
+        width: 320px;
+        height: auto;
+        background: rgba(255,255,255,0.65);
+    }
+
+.hero-title {
+    font-size: 22px;
+    font-weight: 600;
+    font-style: italic;
+    color: var(--ft-green-800);
+}
+
+.hero-subtitle {
+    font-size: 13px;
+    color: var(--ft-text-muted);
+}
+
+.hero-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+}
+
+.hero-expanded {
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--ft-text-secondary);
+}
+
+.hero-stat {
+    margin-bottom: 4px;
+}
+
+.hero-quote {
+    margin-top: 12px;
+    font-style: italic;
+    color: var(--ft-text-muted);
+}
+
+.hero-expanded-actions {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+[data-theme="dark"] .hero-glass {
+    background: rgba(18, 20, 23, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.hero-title {
+    font-size: 22px;
+    font-weight: 600;
+    font-style: italic;
+    color: var(--ft-green-800);
+}
+
+.hero-subtitle {
+    font-size: 13px;
+    color: var(--ft-text-muted);
+}
+
+.login-overlay {
+    position: fixed;
+    inset: 0;
+    background: url('/images/tree-bg.jpg') center/cover no-repeat;
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.login-glass {
+    background: rgba(255,255,255,0.45);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 40px 48px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    max-width: 400px;
+}
+
+.login-title {
+    font-size: 28px;
+    font-weight: 600;
+    font-style: italic;
+    color: var(--ft-green-800);
+    margin-bottom: 12px;
+}
+
+.login-subtitle {
+    font-size: 14px;
+    color: var(--ft-gray-500);
+    margin-bottom: 24px;
+}
+
+.intro-overlay {
+    position: fixed;
+    inset: 0;
+    backdrop-filter: blur(12px);
+    background: rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: introFadeIn 0.4s ease-out;
+}
+
+.intro-glass {
+    background: rgba(255,255,255,0.45);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 40px 48px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    max-width: 400px;
+    animation: introSlideUp 0.5s ease-out;
+}
+
+.intro-title {
+    font-size: 28px;
+    font-weight: 600;
+    font-style: italic;
+    color: var(--ft-green-800);
+    margin-bottom: 12px;
+}
+
+.intro-subtitle {
+    font-size: 14px;
+    color: var(--ft-gray-500);
+    margin-bottom: 24px;
+}
+
+.intro-btn {
+    width: 100%;
+    margin-top: 12px;
+}
 /* ── Blazor error UI ──────────────────────────────────────────────────────── */
 
 #blazor-error-ui {
@@ -196,7 +380,6 @@ html, body {
     #blazor-error-ui .dismiss {
         cursor: pointer;
     }
-
 /* ── Scrollbar (webkit) ───────────────────────────────────────────────────── */
 
 ::-webkit-scrollbar {
@@ -216,7 +399,6 @@ html, body {
     ::-webkit-scrollbar-thumb:hover {
         background: var(--ft-gray-300);
     }
-
 /* ── Tree generation bands ────────────────────────────────────────────────── */
 
 .ft-main {
@@ -252,8 +434,6 @@ html, body {
     overflow: auto;
     z-index: 0;
 }
-
-
 /* ── Person node ──────────────────────────────────────────────────────────── */
 
 .person-node {
@@ -289,7 +469,6 @@ html, body {
     pointer-events: none;
     user-select: none;
 }
-
 /* ── Person label (name + year below each node) ───────────────────────────── */
 
 .person-label {
@@ -315,7 +494,6 @@ html, body {
     color: var(--ft-text-muted);
     margin-top: 1px;
 }
-
 /* ── Toolbar ───────────────────────────────────────────────────────────── */
 #toolbar-container {
     position: absolute;
@@ -324,9 +502,9 @@ html, body {
     transition: top 0.05s linear, left 0.05s linear;
 }
 
-#toolbar-container.dragging {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-}
+    #toolbar-container.dragging {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
 
 #toolbar-container {
     position: fixed;
@@ -334,11 +512,6 @@ html, body {
     right: 12px;
     z-index: 10;
 }
-
-.toolbar-background {
-    
-}
-
 
 .mud-appbar.appbar-background,
 .mud-appbar {
@@ -355,8 +528,6 @@ html, body {
     -webkit-backdrop-filter: blur(24px);
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
 }
-
-
 /* ── Animations ───────────────────────────────────────────────────────────── */
 
 @keyframes ft-focus-pulse {
@@ -375,6 +546,45 @@ html, body {
     }
 }
 
+@keyframes fadeInHero {
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes heroFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes introFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes introSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
 /* ── Media upload zone ────────────────────────────────────────────────────── */
 
 .media-upload-zone {
@@ -384,7 +594,6 @@ html, body {
 .media-upload-zone--active {
     box-shadow: 0 0 0 3px var(--ft-green-200);
 }
-
 /* ── MudBlazor palette overrides ──────────────────────────────────────────── */
 /*
    Forward our tokens into MudBlazor's own palette vars so MudBlazor

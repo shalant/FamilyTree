@@ -1,0 +1,65 @@
+﻿@using FamilyTree.Shared.DTOs.Person
+
+<div class="hero-overlay @(Expanded ? "expanded" : "")">
+    <div class="hero-header">
+        <div class="hero-title">@FocusPerson?.FirstName's Family Tree</div>
+
+        @if (FocusPerson?.BirthDate is not null)
+        {
+            <div class="hero-subtitle">
+                Born @FocusPerson.BirthDate.Value.Year
+            </div>
+        }
+    </div>
+
+    <div class="hero-actions">
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Edit"
+                   Href="@($"/people/{FocusPerson?.Id}/edit")">
+            Edit Profile
+        </MudButton>
+
+        <MudButton Variant="Variant.Text" OnClick="ToggleExpand">
+            @(Expanded ? "Collapse" : "Expand")
+        </MudButton>
+    </div>
+
+    @if (Expanded)
+    {
+        <div class="hero-expanded">
+            <div class="hero-stat">Members: @PeopleCount</div>
+            <div class="hero-stat">Relationships: @CoupleCount</div>
+
+            <div class="hero-quote">
+                “Roots and branches, bound by love.”
+            </div>
+
+            <div class="hero-expanded-actions">
+                <MudButton Variant="Variant.Text"
+                           StartIcon="@Icons.Material.Filled.CenterFocusStrong"
+                           OnClick="OnCenterTree">
+                    Center Tree
+                </MudButton>
+
+                <MudButton Variant="Variant.Text"
+                           StartIcon="@Icons.Material.Filled.Share"
+                           OnClick="OnShare">
+                    Share View
+                </MudButton>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public PersonDto? FocusPerson { get; set; }
+    [Parameter] public int PeopleCount { get; set; }
+    [Parameter] public int CoupleCount { get; set; }
+    [Parameter] public EventCallback OnCenterTree { get; set; }
+    [Parameter] public EventCallback OnShare { get; set; }
+
+    private bool Expanded { get; set; }
+
+    private void ToggleExpand() => Expanded = !Expanded;
+}

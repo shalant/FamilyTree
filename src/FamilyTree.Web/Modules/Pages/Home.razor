@@ -3,7 +3,6 @@
 @rendermode InteractiveServer
 
 @using FamilyTree.Api.Services
-@using FamilyTree.Shared.DTOs
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Services
@@ -13,8 +12,11 @@
 @inject NavigationManager Nav
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageTitle>Family Tree</PageTitle>
+
+<LoginOverlay OnGuest="HideIntro" />
 
 @if (_loading)
 {
@@ -44,40 +46,23 @@ else if (!_people.Any())
 }
 else
 {
-    @* Canvas fills the entire screen *@
     <FamilyTreeCanvas @ref="_canvas"
                       People="_people"
                       Couples="_couples"
                       FocusId="_focusPerson?.Id"
                       OnPersonSelected="HandlePersonSelected" />
 
-    @* Toolbar — bottom-left floating pill *@
     <div style="position:fixed; bottom:24px; left:24px; z-index:10000;">
         <CustomToolbar OnZoomIn="@(async () => { if (_canvas != null) await _canvas.ZoomIn(); })"
                        OnZoomOut="@(async () => { if (_canvas != null) await _canvas.ZoomOut(); })"
                        OnCenterTree="@(async () => { if (_canvas != null) await _canvas.CenterTree(); })" />
     </div>
 
-    @* Focus person info — top-right floating chip *@
-    @if (_focusPerson is not null)
-    {
-        <div style="position:fixed; top:72px; right:20px; z-index:5000;">
-            <div style="background:rgba(255,255,255,0.72); backdrop-filter:blur(12px);
-                        -webkit-backdrop-filter:blur(12px);
-                        padding:10px 18px; border-radius:10px;
-                        border:1px solid rgba(255,255,255,0.35);
-                        box-shadow:0 4px 20px rgba(0,0,0,0.08);
-                        font-size:13px; font-weight:500; color:var(--ft-text-primary);">
-                @_focusPerson.FirstName's family tree
-                @if (_focusPerson.BirthDate.HasValue)
-                {
-                    <span style="color:var(--ft-text-muted); font-size:12px; margin-left:6px;">
-                        · @_focusPerson.BirthDate.Value.Year
-                    </span>
-                }
-            </div>
-        </div>
-    }
+    <HeroOverlayComponent FocusPerson="_focusPerson"
+                 PeopleCount="_people.Count"
+                 CoupleCount="_couples.Count"
+                 OnCenterTree="CenterTree"
+                 OnShare="ShareView" />
 }
 
 <PersonDetailDrawer Person="_detailPerson"
@@ -88,6 +73,10 @@ else
                     OnDelete="PromptDelete" />
 
 @code {
+    private bool _showIntro = true;
+
+    private void HideIntro() => _showIntro = false;
+
     [SupplyParameterFromQuery] public Guid? Focus { get; set; }
 
     private List<PersonDto> _people = [];
@@ -123,6 +112,20 @@ else
     {
         _focusPerson = person;
         _detailPerson = null;
+    }
+
+    private async Task CenterTree()
+    {
+        if (_canvas != null)
+            await _canvas.CenterTree();
+    }
+
+    private Task ShareView()
+    {
+        var url = Nav.ToAbsoluteUri($"/?focus={_focusPerson?.Id}");
+        Clipboard.Default.SetTextAsync(url.ToString());
+        Snackbar.Add("Link copied to clipboard", Severity.Success);
+        return Task.CompletedTask;
     }
 
     private async Task PromptDelete(PersonDto person)

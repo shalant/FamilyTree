@@ -104,3 +104,26 @@
 3. Collaboration (Phase 3) — 6–8 weeks
 4. Intelligence (Phase 4) — ongoing enhancements
 5. Polish (Phase 5) — continuous refinement
+
+
+
+GEDCOM import/export
+
+Collaboration mode
+
+Timeline view
+
+AI‑assisted relationship suggestions
+
+Mobile layout improvements
+
+
+🌈 Optional “wow” features
+
+Timeline slider: drag to filter visible generations by year range.
+
+Animated connectors: subtle pulse along parent lines when focusing.
+
+Photo avatars: circular crops with soft shadows.
+
+Shareable view: generate a read‑only link for a specific focus person.
