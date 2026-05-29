@@ -64,6 +64,30 @@ Sortable, searchable MudBlazor table for managing family members — the “busi
 
 ---
 
+## ⏱️ Development Time
+This project was designed and built in 3 days — from initial concept to a fully interactive, themed, data‑driven application.
+That includes:
+
+Custom SVG layout engine
+
+Pan/zoom canvas with physics
+
+Dark/light design token system
+
+CRUD forms + validation
+
+Drawer‑based detail UI
+
+Azure Blob media uploads
+
+Full API + SQL backend
+
+CI/CD pipeline
+
+The rapid turnaround reflects my experience with .NET, Blazor, UI architecture, and full‑stack delivery.
+
+---
+
 ## ✨ Features
 
 - **Interactive family tree canvas**  
