@@ -1,0 +1,333 @@
+@page "/import"
+@rendermode InteractiveServer
+
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Modules.Components
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Forms
+
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Import data</PageTitle>
+
+<div style="max-width:860px; margin:0 auto; padding:28px 24px 64px;
+    font-family:var(--ft-font-body);">
+
+    @* ── Back + header ────────────────────────────────────────────────────── *@
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:28px;">
+        <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
+                       Style="color:var(--ft-gray-500);"
+                       OnClick='() => Nav.NavigateTo("/dashboard")' />
+        <div>
+            <div style="font-size:12px; color:var(--ft-gray-300); letter-spacing:0.04em; margin-bottom:1px;">
+                Dashboard
+            </div>
+            <div style="font-size:22px; font-weight:600; font-style:italic;
+                font-family:var(--ft-font-display); color:var(--ft-green-800); line-height:1.1;">
+                Import family data
+            </div>
+        </div>
+    </div>
+
+    @* ── Format tabs ──────────────────────────────────────────────────────── *@
+    <div style="display:flex; border-bottom:1px solid var(--ft-line-border);
+        margin-bottom:28px; gap:2px; overflow-x:auto;">
+        @foreach (var tab in _tabs)
+        {
+            <button @onclick="@(() => _activeTab = tab.Key)"
+                    style="padding:9px 18px; border:none; background:transparent; cursor:pointer;
+                font-size:13px; font-family:var(--ft-font-body); white-space:nowrap;
+                color:@(_activeTab == tab.Key ? "var(--ft-green-700)" : "var(--ft-gray-400)");
+                border-bottom:@(_activeTab == tab.Key ? "2px solid var(--ft-green-600)" : "2px solid transparent");
+                margin-bottom:-1px; font-weight:@(_activeTab == tab.Key ? "600" : "400");">
+                @tab.Value.Icon  @tab.Value.Label
+            </button>
+        }
+    </div>
+
+    @* ── GEDCOM tab ───────────────────────────────────────────────────────── *@
+    @if (_activeTab == "gedcom")
+    {
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">
+            <div>
+                <div style="font-size:15px; font-weight:600; color:var(--ft-gray-700); margin-bottom:8px;">
+                    Upload a GEDCOM file
+                </div>
+                <div style="font-size:13px; color:var(--ft-gray-400); line-height:1.7; margin-bottom:20px;">
+                    GEDCOM (.ged) is the universal genealogy exchange format. Export from Ancestry,
+                    MyHeritage, FamilySearch, or any genealogy software and upload here.
+                </div>
+                <MediaUploadZone Accept=".ged,.gedcom"
+                                 Label="Drop your .ged file here"
+                                 Hint="or click to browse"
+                                 OnFilesSelected="OnGedcomSelected" />
+                @if (_gedcomFile != null)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-3">
+                        <strong>@_gedcomFile.Name</strong> selected (@FormatSize(_gedcomFile.Size))
+                    </MudAlert>
+                }
+            </div>
+            <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-green-50); border-radius:var(--ft-radius-card);">
+                <div style="font-size:12px; font-weight:600; text-transform:uppercase;
+                    letter-spacing:0.07em; color:var(--ft-green-700); margin-bottom:10px;">
+                    What gets imported
+                </div>
+                @foreach (var item in new[]{ "All people with names, dates, and places",
+                    "Parent–child relationships", "Spouse/partner pairings",
+                    "Sibling relationships", "Biographical notes", "Profile photos (if embedded)" })
+                {
+                    <div style="display:flex; gap:8px; margin-bottom:6px; font-size:13px; color:var(--ft-gray-600);">
+                        <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline"
+                                 Style="font-size:15px; color:var(--ft-green-600); flex-shrink:0; margin-top:1px;" />
+                        @item
+                    </div>
+                }
+            </MudPaper>
+        </div>
+    }
+
+    @* ── PDF / Document tab ───────────────────────────────────────────────── *@
+    @if (_activeTab == "pdf")
+    {
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">
+            <div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                    <div style="font-size:15px; font-weight:600; color:var(--ft-gray-700);">
+                        Upload a PDF or document
+                    </div>
+                    <div style="background:var(--ft-focus-fill); color:#fff; font-size:10px;
+                        font-weight:600; padding:2px 7px; border-radius:10px; letter-spacing:0.04em;">
+                        AI-powered
+                    </div>
+                </div>
+                <div style="font-size:13px; color:var(--ft-gray-400); line-height:1.7; margin-bottom:20px;">
+                    Upload any PDF, Word doc, or scanned document containing family information.
+                    Our AI reads it and extracts names, dates, places, and relationships — even
+                    from handwritten-style or informal formats.
+                </div>
+                <MediaUploadZone Accept=".pdf,.doc,.docx,.txt"
+                                 Label="Drop your document here"
+                                 Hint=".pdf, .doc, .docx, .txt supported"
+                                 OnFilesSelected="OnDocumentSelected" />
+                @if (_documentFile != null)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-3">
+                        <strong>@_documentFile.Name</strong> ready for extraction
+                    </MudAlert>
+                }
+            </div>
+            <div>
+                <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-focus-ring); border-radius:var(--ft-radius-card); margin-bottom:12px;">
+                    <div style="font-size:12px; font-weight:600; text-transform:uppercase;
+                        letter-spacing:0.07em; color:var(--ft-focus-fill); margin-bottom:8px;">
+                        How it works
+                    </div>
+                    @foreach (var (step, desc) in new (string,string)[]{
+                        ("1. Upload", "Your document is sent to our AI extraction pipeline"),
+                        ("2. Review", "We show you every person and relationship found"),
+                        ("3. Confirm", "Check, edit, or exclude entries before committing"),
+                        ("4. Import", "Accepted records are added to your tree")
+                    })
+                    {
+                        <div style="display:flex; gap:10px; margin-bottom:8px;">
+                            <div style="font-size:11px; font-weight:700; color:var(--ft-focus-fill);
+                                min-width:16px; padding-top:1px;">@step.Split('.')[0]</div>
+                            <div style="font-size:12px; color:var(--ft-gray-600); line-height:1.5;">
+                                <strong>@step.Split('.')[1].Trim()</strong> — @desc
+                            </div>
+                        </div>
+                    }
+                </MudPaper>
+                <MudAlert Severity="Severity.Warning" Dense="true">
+                    AI extraction is in development. Preview will show results before anything is saved.
+                </MudAlert>
+            </div>
+        </div>
+    }
+
+    @* ── Excel / CSV tab ──────────────────────────────────────────────────── *@
+    @if (_activeTab == "excel")
+    {
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">
+            <div>
+                <div style="font-size:15px; font-weight:600; color:var(--ft-gray-700); margin-bottom:8px;">
+                    Upload a spreadsheet
+                </div>
+                <div style="font-size:13px; color:var(--ft-gray-400); line-height:1.7; margin-bottom:20px;">
+                    Upload an Excel (.xlsx) or CSV file. Use our template for the fastest import,
+                    or map your own columns in the next step.
+                </div>
+                <MediaUploadZone Accept=".xlsx,.xls,.csv"
+                                 Label="Drop your spreadsheet here"
+                                 Hint=".xlsx, .xls, .csv supported"
+                                 OnFilesSelected="OnSpreadsheetSelected" />
+                @if (_spreadsheetFile != null)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-3">
+                        <strong>@_spreadsheetFile.Name</strong> ready to map
+                    </MudAlert>
+                }
+                <div style="margin-top:16px;">
+                    <button style="font-size:13px; color:var(--ft-green-600); background:transparent;
+                        border:none; cursor:pointer; padding:0; text-decoration:underline;
+                        font-family:var(--ft-font-body);">
+                        Download template (.xlsx)
+                    </button>
+                </div>
+            </div>
+            <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-green-50); border-radius:var(--ft-radius-card);">
+                <div style="font-size:12px; font-weight:600; text-transform:uppercase;
+                    letter-spacing:0.07em; color:var(--ft-green-700); margin-bottom:10px;">
+                    Template columns
+                </div>
+                @foreach (var col in new[]{ "FirstName *", "LastName *", "MiddleName",
+                    "MaidenName", "BirthDate (MM/DD/YYYY)", "BirthPlace",
+                    "DeathDate (MM/DD/YYYY)", "DeathPlace", "Gender",
+                    "ParentFullName1", "ParentFullName2", "SpouseFullName", "Notes" })
+                {
+                    <div style="font-size:12px; color:var(--ft-gray-600); padding:2px 0;
+                        font-family:monospace;">
+                        @col
+                    </div>
+                }
+            </MudPaper>
+        </div>
+    }
+
+    @* ── Paste text tab ───────────────────────────────────────────────────── *@
+    @if (_activeTab == "text")
+    {
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">
+            <div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                    <div style="font-size:15px; font-weight:600; color:var(--ft-gray-700);">
+                        Paste free text
+                    </div>
+                    <div style="background:var(--ft-focus-fill); color:#fff; font-size:10px;
+                        font-weight:600; padding:2px 7px; border-radius:10px; letter-spacing:0.04em;">
+                        AI-powered
+                    </div>
+                </div>
+                <div style="font-size:13px; color:var(--ft-gray-400); line-height:1.7; margin-bottom:16px;">
+                    Paste any text containing family information — a family history essay,
+                    an email chain, old letters, a Wikipedia article, anything. Our AI will
+                    extract people and relationships.
+                </div>
+                <MudTextField @bind-Value="_pasteText"
+                              Label="Paste your text here…"
+                              Lines="12"
+                              AutoGrow="true"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Style="font-size:13px; font-family:monospace;" />
+                <div style="font-size:11px; color:var(--ft-gray-300); margin-top:6px;">
+                    @_pasteText.Length / 50,000 characters
+                </div>
+            </div>
+            <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-focus-ring); border-radius:var(--ft-radius-card);">
+                <div style="font-size:12px; font-weight:600; text-transform:uppercase;
+                    letter-spacing:0.07em; color:var(--ft-focus-fill); margin-bottom:10px;">
+                    Works great with
+                </div>
+                @foreach (var ex in new[]{ "Family history essays or memoirs",
+                    "Old letters or diaries (transcribed)",
+                    "Email threads about family history",
+                    "Wikipedia / newspaper articles",
+                    "Ancestry message board posts",
+                    "Handwritten notes (typed out)" })
+                {
+                    <div style="display:flex; gap:8px; margin-bottom:7px; font-size:13px; color:var(--ft-gray-600);">
+                        <MudIcon Icon="@Icons.Material.Outlined.TextSnippet"
+                                 Style="font-size:14px; color:var(--ft-focus-fill); flex-shrink:0; margin-top:2px;" />
+                        @ex
+                    </div>
+                }
+            </MudPaper>
+        </div>
+    }
+
+    @* ── Preview placeholder ──────────────────────────────────────────────── *@
+    @if (_showPreview)
+    {
+        <div style="margin-top:32px; border-top:1px solid var(--ft-line-border); padding-top:28px;">
+            <div style="font-size:15px; font-weight:600; color:var(--ft-gray-700); margin-bottom:4px;">
+                Import preview
+            </div>
+            <div style="font-size:13px; color:var(--ft-gray-400); margin-bottom:16px;">
+                Review these records before they are added to your tree.
+                Uncheck any you want to skip.
+            </div>
+            <MudAlert Severity="Severity.Info">
+                Preview is not yet available — AI extraction is coming soon. Your file has been received.
+            </MudAlert>
+        </div>
+    }
+
+    @* ── Action bar ───────────────────────────────────────────────────────── *@
+    <div style="margin-top:32px; padding-top:20px; border-top:0.5px solid var(--ft-line-border);
+        display:flex; justify-content:space-between; align-items:center;">
+        <MudButton Variant="Variant.Text" Style="color:var(--ft-gray-400);"
+                   OnClick='() => Nav.NavigateTo("/dashboard")'>
+            Cancel
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Disabled="@(!HasFile)"
+                   Style="background:var(--ft-green-600); color:#fff; min-width:160px;"
+                   StartIcon="@Icons.Material.Outlined.Visibility"
+                   OnClick="PreviewImport">
+            Preview import
+        </MudButton>
+    </div>
+
+</div>
+
+@code {
+    private string _activeTab = "gedcom";
+    private bool _showPreview;
+    private string _pasteText = "";
+
+    private IBrowserFile? _gedcomFile;
+    private IBrowserFile? _documentFile;
+    private IBrowserFile? _spreadsheetFile;
+
+    private readonly Dictionary<string, (string Label, string Icon)> _tabs = new()
+    {
+        ["gedcom"] = ("GEDCOM", "📋"),
+        ["pdf"]    = ("PDF / Document", "🤖"),
+        ["excel"]  = ("Excel / CSV", "📊"),
+        ["text"]   = ("Paste text", "✍️"),
+    };
+
+    private bool HasFile => _activeTab switch
+    {
+        "gedcom" => _gedcomFile != null,
+        "pdf"    => _documentFile != null,
+        "excel"  => _spreadsheetFile != null,
+        "text"   => _pasteText.Trim().Length > 20,
+        _ => false
+    };
+
+    private void OnGedcomSelected(IReadOnlyList<IBrowserFile> files) =>
+        _gedcomFile = files.FirstOrDefault();
+
+    private void OnDocumentSelected(IReadOnlyList<IBrowserFile> files) =>
+        _documentFile = files.FirstOrDefault();
+
+    private void OnSpreadsheetSelected(IReadOnlyList<IBrowserFile> files) =>
+        _spreadsheetFile = files.FirstOrDefault();
+
+    private void PreviewImport()
+    {
+        _showPreview = true;
+        Snackbar.Add("File received — preview pipeline coming soon.", Severity.Info);
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024} KB",
+        _ => $"{bytes / (1024 * 1024):F1} MB"
+    };
+}

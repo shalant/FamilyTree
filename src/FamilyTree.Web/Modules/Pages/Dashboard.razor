@@ -1,0 +1,332 @@
+@page "/dashboard"
+@rendermode InteractiveServer
+
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Modules.Dialogs
+@using MudBlazor
+
+@inject IPersonService PersonService
+@inject IMediumService MediumService
+@inject NavigationManager Nav
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Dashboard</PageTitle>
+
+<div style="max-width:960px; margin:0 auto; padding:32px 24px 64px;
+    font-family:var(--ft-font-body);">
+
+    @* ── Header ───────────────────────────────────────────────────────────── *@
+    <div style="margin-bottom:32px;">
+        <div style="font-size:26px; font-weight:600; font-style:italic;
+            font-family:var(--ft-font-display); color:var(--ft-green-800);
+            line-height:1.2; margin-bottom:4px;">
+            Your Family Tree
+        </div>
+        <div style="font-size:14px; color:var(--ft-gray-400);">
+            Manage, import, and export your family history
+        </div>
+    </div>
+
+    @* ── Stat cards ───────────────────────────────────────────────────────── *@
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Success" Class="mb-6" />
+    }
+    else
+    {
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px;">
+            <StatCard Icon="@Icons.Material.Outlined.People"
+                      Label="Total people"
+                      Value="@_totalPeople.ToString()"
+                      Href="/people" />
+            <StatCard Icon="@Icons.Material.Outlined.FavoriteBorder"
+                      Label="Living"
+                      Value="@_living.ToString()"
+                      Accent="var(--ft-green-600)" />
+            <StatCard Icon="@Icons.Material.Outlined.AccountTree"
+                      Label="Generations"
+                      Value="@_generations.ToString()"
+                      Accent="var(--ft-focus-fill)" />
+            <StatCard Icon="@Icons.Material.Outlined.PhotoLibrary"
+                      Label="Photos & records"
+                      Value="@_mediaCount.ToString()"
+                      Href="/people" />
+        </div>
+    }
+
+    @* ── Two-column layout ────────────────────────────────────────────────── *@
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
+
+        @* Quick actions *@
+        <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+            <SectionHeading Icon="@Icons.Material.Outlined.Bolt" Title="Quick actions" />
+            <MudStack Spacing="2">
+                <ActionRow Icon="@Icons.Material.Outlined.AccountTree"
+                           Label="View family tree"
+                           Sub="Browse and navigate your tree"
+                           OnClick='() => Nav.NavigateTo("/")' />
+                <ActionRow Icon="@Icons.Material.Outlined.PersonAdd"
+                           Label="Add a person"
+                           Sub="Create a new family member"
+                           OnClick='() => Nav.NavigateTo("/people/add")' />
+                <ActionRow Icon="@Icons.Material.Outlined.People"
+                           Label="People list"
+                           Sub="Browse and search all members"
+                           OnClick='() => Nav.NavigateTo("/people")' />
+                <ActionRow Icon="@Icons.Material.Outlined.Upload"
+                           Label="Import data"
+                           Sub="GEDCOM, PDF, Excel, CSV, or text"
+                           OnClick='() => Nav.NavigateTo("/import")'
+                           Accent="true" />
+            </MudStack>
+        </MudPaper>
+
+        @* Export *@
+        <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+            <SectionHeading Icon="@Icons.Material.Outlined.Download" Title="Export your data" />
+            <MudStack Spacing="2">
+                <ExportRow Label="GEDCOM (.ged)"
+                           Sub="Universal genealogy format — works with Ancestry, MyHeritage, etc."
+                           Icon="@Icons.Material.Outlined.FamilyRestroom"
+                           Disabled="true" DisabledReason="Coming soon" />
+                <ExportRow Label="Excel (.xlsx)"
+                           Sub="Spreadsheet with all people and relationships"
+                           Icon="@Icons.Material.Outlined.TableChart"
+                           Disabled="true" DisabledReason="Coming soon" />
+                <ExportRow Label="CSV"
+                           Sub="Plain comma-separated values"
+                           Icon="@Icons.Material.Outlined.GridOn"
+                           Disabled="true" DisabledReason="Coming soon" />
+                <ExportRow Label="PDF report"
+                           Sub="Printable family tree summary"
+                           Icon="@Icons.Material.Outlined.PictureAsPdf"
+                           Disabled="true" DisabledReason="Coming soon" />
+            </MudStack>
+        </MudPaper>
+    </div>
+
+    @* ── Second row ───────────────────────────────────────────────────────── *@
+    <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px; margin-bottom:20px;">
+
+        @* Recent additions *@
+        <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+            <SectionHeading Icon="@Icons.Material.Outlined.History" Title="Recently added" />
+            @if (_recentPeople.Any())
+            {
+                <MudStack Spacing="1">
+                    @foreach (var p in _recentPeople)
+                    {
+                        <div style="display:flex; align-items:center; gap:10px; padding:7px 0;
+                            border-bottom:0.5px solid var(--ft-line-border); cursor:pointer;"
+                             @onclick='() => Nav.NavigateTo($"/people/{p.Id}/edit")'>
+                            <div style="width:32px; height:32px; border-radius:50%; flex-shrink:0;
+                                background:var(--ft-green-50); color:var(--ft-green-800);
+                                display:flex; align-items:center; justify-content:center;
+                                font-size:12px; font-weight:500;">
+                                @($"{p.FirstName?.FirstOrDefault()}{p.LastName?.FirstOrDefault()}".ToUpperInvariant())
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-size:13px; font-weight:500; color:var(--ft-gray-700);
+                                    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    @p.FullName
+                                </div>
+                                <div style="font-size:11px; color:var(--ft-gray-300);">
+                                    @(p.BirthDate?.Year.ToString() ?? "no birth year")
+                                    @if (!string.IsNullOrWhiteSpace(p.BirthPlace))
+                                    {
+                                        <span> · @p.BirthPlace</span>
+                                    }
+                                </div>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Outlined.ChevronRight"
+                                     Style="font-size:16px; color:var(--ft-gray-200);" />
+                        </div>
+                    }
+                </MudStack>
+            }
+            else if (!_loading)
+            {
+                <div style="text-align:center; padding:20px 0; color:var(--ft-gray-300); font-size:13px;">
+                    No people added yet.
+                    <MudButton Variant="Variant.Text" Size="Size.Small"
+                               Style="color:var(--ft-green-600);"
+                               OnClick='() => Nav.NavigateTo("/people/add")'>
+                        Add your first person
+                    </MudButton>
+                </div>
+            }
+        </MudPaper>
+
+        @* Support & feedback *@
+        <MudStack Spacing="3">
+            <MudPaper Elevation="0" Class="pa-4"
+                      Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+                <SectionHeading Icon="@Icons.Material.Outlined.Lightbulb" Title="Request a feature" />
+                <div style="font-size:13px; color:var(--ft-gray-400); line-height:1.6; margin-bottom:12px;">
+                    Have an idea? We'd love to hear it.
+                </div>
+                <MudButton Variant="Variant.Outlined" FullWidth="true"
+                           StartIcon="@Icons.Material.Outlined.AddComment"
+                           Style="border-color:var(--ft-green-400); color:var(--ft-green-700);"
+                           OnClick="OpenRequestFeature">
+                    Submit idea
+                </MudButton>
+            </MudPaper>
+
+            <MudPaper Elevation="0" Class="pa-4"
+                      Style="background:var(--ft-brown-50); border-radius:var(--ft-radius-card);
+                border:1px solid var(--ft-brown-200);">
+                <SectionHeading Icon="@Icons.Material.Outlined.VolunteerActivism" Title="Support the project" />
+                <div style="font-size:13px; color:var(--ft-gray-500); line-height:1.6; margin-bottom:12px;">
+                    This app is free. If it's useful, a small donation keeps it running.
+                </div>
+                <MudButton Variant="Variant.Filled" FullWidth="true"
+                           Style="background:#3D95CE; color:#fff;"
+                           StartIcon="@Icons.Material.Outlined.AttachMoney"
+                           Href="https://venmo.com/u/doug-Rosenberg-2" Target="_blank">
+                    Donate via Venmo
+                </MudButton>
+            </MudPaper>
+        </MudStack>
+    </div>
+
+    @* ── Links row ────────────────────────────────────────────────────────── *@
+    <div style="display:flex; gap:16px; justify-content:center; padding-top:8px;">
+        <a href="/about" style="font-size:13px; color:var(--ft-green-600); text-decoration:none;">About this project</a>
+        <span style="color:var(--ft-gray-200);">·</span>
+        <a href="/faq" style="font-size:13px; color:var(--ft-green-600); text-decoration:none;">FAQ & security</a>
+        <span style="color:var(--ft-gray-200);">·</span>
+        <a href="/settings" style="font-size:13px; color:var(--ft-green-600); text-decoration:none;">Settings</a>
+    </div>
+
+</div>
+
+@* ── Inline sub-components ───────────────────────────────────────────────── *@
+
+@* Stat card *@
+@code {
+    [Parameter] public string? StatIcon { get; set; }
+}
+
+<style>
+    .ft-stat-card { transition: box-shadow 0.15s; }
+    .ft-stat-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important; }
+    .ft-action-row { transition: background 0.1s; border-radius: 8px; }
+    .ft-action-row:hover { background: var(--ft-green-50) !important; }
+</style>
+
+@code {
+    // ── State ─────────────────────────────────────────────────────────────
+    private bool _loading = true;
+    private int _totalPeople;
+    private int _living;
+    private int _generations;
+    private int _mediaCount;
+    private List<PersonDto> _recentPeople = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var peopleResult = await PersonService.GetAllAsync();
+        if (peopleResult.Success && peopleResult.Data is { } people)
+        {
+            _totalPeople = people.Count;
+            _living = people.Count(p => !p.IsDeceased);
+            _generations = people.Any()
+                ? (people.Max(p => p.GenerationDepth) + 1)
+                : 0;
+            _recentPeople = people
+                .OrderByDescending(p => p.Id)
+                .Take(6)
+                .ToList();
+        }
+
+        var mediaResult = await MediumService.GetAllAsync();
+        if (mediaResult.Success)
+            _mediaCount = mediaResult.Data?.Count ?? 0;
+
+        _loading = false;
+    }
+
+    private async Task OpenRequestFeature()
+    {
+        var dialog = await DialogService.ShowAsync<RequestFeatureDialog>("Request a feature");
+        await dialog.Result;
+    }
+
+    // ── Render helpers ────────────────────────────────────────────────────
+
+    private static string ActionIconStyle(bool accent) =>
+        accent ? "font-size:18px; color:var(--ft-green-600);"
+               : "font-size:18px; color:var(--ft-gray-400);";
+
+    private RenderFragment StatCard(string Icon, string Label, string Value,
+        string Accent = "var(--ft-green-800)", string? Href = null) => __builder =>
+    {
+        <div class="ft-stat-card" style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);
+            padding:20px; cursor:@(Href != null ? "pointer" : "default");"
+             @onclick="@(() => { if (Href != null) Nav.NavigateTo(Href); })">
+            <MudIcon Icon="@Icon" Style="@($"font-size:22px; color:{Accent}; margin-bottom:10px; display:block;")" />
+            <div style="font-size:26px; font-weight:700; color:var(--ft-gray-700); line-height:1;">
+                @Value
+            </div>
+            <div style="font-size:12px; color:var(--ft-gray-300); margin-top:4px; text-transform:uppercase; letter-spacing:0.05em;">
+                @Label
+            </div>
+        </div>;
+    };
+
+    private RenderFragment SectionHeading(string Icon, string Title) => __builder =>
+    {
+        <div style="display:flex; align-items:center; gap:7px; margin-bottom:14px;">
+            <MudIcon Icon="@Icon" Style="font-size:16px; color:var(--ft-green-600);" />
+            <span style="font-size:13px; font-weight:600; text-transform:uppercase;
+                letter-spacing:0.07em; color:var(--ft-gray-500);">@Title</span>
+        </div>;
+    };
+
+    private RenderFragment ActionRow(string Icon, string Label, string Sub,
+        EventCallback OnClick, bool Accent = false) => __builder =>
+    {
+        <div class="ft-action-row" style="display:flex; align-items:center; gap:12px;
+            padding:10px 8px; cursor:pointer;"
+             @onclick="OnClick">
+            <div style="width:36px; height:36px; border-radius:8px; flex-shrink:0;
+                background:@(Accent ? "var(--ft-green-50)" : "var(--ft-gray-50)");
+                display:flex; align-items:center; justify-content:center;">
+                <MudIcon Icon="@Icon"
+                         Style="@ActionIconStyle(Accent)" />
+            </div>
+            <div style="flex:1; min-width:0;">
+                <div style="font-size:13px; font-weight:500; color:var(--ft-gray-700);">@Label</div>
+                <div style="font-size:12px; color:var(--ft-gray-300);">@Sub</div>
+            </div>
+            <MudIcon Icon="@Icons.Material.Outlined.ChevronRight"
+                     Style="font-size:16px; color:var(--ft-gray-200);" />
+        </div>;
+    };
+
+    private RenderFragment ExportRow(string Label, string Sub, string Icon,
+        bool Disabled = false, string DisabledReason = "") => __builder =>
+    {
+        <div style="display:flex; align-items:center; gap:12px; padding:9px 0;
+            border-bottom:0.5px solid var(--ft-line-border);
+            opacity:@(Disabled ? "0.5" : "1");">
+            <MudIcon Icon="@Icon" Style="font-size:18px; color:var(--ft-gray-300); flex-shrink:0;" />
+            <div style="flex:1; min-width:0;">
+                <div style="font-size:13px; font-weight:500; color:var(--ft-gray-700);">@Label</div>
+                <div style="font-size:12px; color:var(--ft-gray-300);">@Sub</div>
+            </div>
+            @if (Disabled)
+            {
+                <MudChip T="string" Size="Size.Small" Disabled="true"
+                         Style="font-size:10px; height:20px;">@DisabledReason</MudChip>
+            }
+            else
+            {
+                <MudIconButton Icon="@Icons.Material.Outlined.Download"
+                               Size="Size.Small" Style="color:var(--ft-green-600);" />
+            }
+        </div>;
+    };
+}

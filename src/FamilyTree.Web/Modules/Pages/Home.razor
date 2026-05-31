@@ -57,7 +57,7 @@ else
                       FocusId="_focusPerson?.Id"
                       OnPersonSelected="HandlePersonSelected" />
 
-    <div style="position:fixed; bottom:24px; left:24px; z-index:10000;">
+    <div id="ft-toolbar" style="position:fixed; bottom:24px; left:24px; z-index:10000;">
         <CustomToolbar OnZoomIn="@(async () => { if (_canvas != null) await _canvas.ZoomIn(); })"
                        OnZoomOut="@(async () => { if (_canvas != null) await _canvas.ZoomOut(); })"
                        OnCenterTree="@(async () => { if (_canvas != null) await _canvas.CenterTree(); })" />
@@ -115,6 +115,12 @@ else
     {
         if (firstRender)
         {
+            try
+            {
+                await JS.InvokeVoidAsync("ftDrag.init", "ft-toolbar", "toolbar", null);
+            }
+            catch { /* safe to swallow on pre-render */ }
+
             await Task.Delay(10000);
             _showIntro = false;
             StateHasChanged();

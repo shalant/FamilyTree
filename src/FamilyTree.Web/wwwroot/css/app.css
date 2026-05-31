@@ -643,6 +643,56 @@ html, body {
 .media-upload-zone--active {
     box-shadow: 0 0 0 3px var(--ft-green-200);
 }
+/* ── Draggable panels ─────────────────────────────────────────────────────── */
+
+.ft-dragging {
+    opacity: 0.92;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.22) !important;
+}
+
+/* AppBar floating (detached from top) */
+.ft-appbar-floating.mud-appbar {
+    border-radius: 12px !important;
+    border: 0.5px solid rgba(255,255,255,0.3) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18) !important;
+}
+
+/* AppBar drag handle */
+.ft-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 32px;
+    cursor: grab;
+    flex-shrink: 0;
+    opacity: 0.4;
+    transition: opacity 0.15s;
+    margin-right: 4px;
+}
+
+.ft-drag-handle:hover { opacity: 0.85; }
+.ft-drag-handle:active { cursor: grabbing; }
+
+/* Toolbar drag handle */
+.ft-toolbar-grip {
+    display: flex;
+    align-items: center;
+    padding: 0 2px;
+    cursor: grab;
+    opacity: 0.35;
+    transition: opacity 0.15s;
+}
+
+.ft-toolbar-grip:hover { opacity: 0.7; }
+.ft-toolbar-grip:active { cursor: grabbing; }
+
+/* Raise MudBlazor tooltip z-index above hero-glass (z-index:5000) */
+:root {
+    --mud-zindex-tooltip: 6000;
+    --mud-zindex-popover: 6000;
+}
+
 /* ── MudBlazor palette overrides ──────────────────────────────────────────── */
 /*
    Forward our tokens into MudBlazor's own palette vars so MudBlazor

@@ -13,18 +13,34 @@
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Services
 @using MudBlazor
+@using Microsoft.JSInterop
 
 @inject IPersonService PersonService
 @inject ThemeService Theme
 @inject NavigationManager Nav
+@inject IJSRuntime JS
+
+@implements IAsyncDisposable
 
 @* ── AppBar shell ─────────────────────────────────────────────────────────── *@
-<MudAppBar Elevation="0"
+<MudAppBar id="ft-appbar"
+           Elevation="0"
            Style="background: rgba(245,245,245,0.3) !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.25);
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);">
+
+    @* ── Drag handle ────────────────────────────────────────────────────── *@
+    <div class="ft-drag-handle" data-drag-handle title="Drag to reposition">
+        <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"
+             style="color:var(--ft-gray-400);">
+            <circle cx="2" cy="2"  r="1.5"/><circle cx="8" cy="2"  r="1.5"/>
+            <circle cx="2" cy="6"  r="1.5"/><circle cx="8" cy="6"  r="1.5"/>
+            <circle cx="2" cy="10" r="1.5"/><circle cx="8" cy="10" r="1.5"/>
+            <circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/>
+        </svg>
+    </div>
 
     @* Brand wordmark *@
     <div style="display:flex; align-items:center; gap:8px; cursor:pointer;
@@ -102,21 +118,35 @@
     <MudSpacer />
 
     @* ── Quick-add person ───────────────────────────────────────────────── *@
-    <MudTooltip Text="Add person" Placement="Placement.Bottom">
+    <MudTooltip Text="Add person" Placement="Placement.Left">
         <MudIconButton Icon="@Icons.Material.Outlined.PersonAdd"
                        Style="color:var(--ft-green-600);"
                        OnClick='() => Nav.NavigateTo("/people/add")' />
     </MudTooltip>
 
     @* ── People list ────────────────────────────────────────────────────── *@
-    <MudTooltip Text="People list" Placement="Placement.Bottom">
+    <MudTooltip Text="People list" Placement="Placement.Left">
         <MudIconButton Icon="@Icons.Material.Outlined.People"
                        Style="color:var(--ft-gray-400);"
                        OnClick='() => Nav.NavigateTo("/people")' />
     </MudTooltip>
 
+    @* ── Import ─────────────────────────────────────────────────────────── *@
+    <MudTooltip Text="Import data" Placement="Placement.Left">
+        <MudIconButton Icon="@Icons.Material.Outlined.Upload"
+                       Style="color:var(--ft-gray-400);"
+                       OnClick='() => Nav.NavigateTo("/import")' />
+    </MudTooltip>
+
+    @* ── Dashboard ──────────────────────────────────────────────────────── *@
+    <MudTooltip Text="Dashboard" Placement="Placement.Left">
+        <MudIconButton Icon="@Icons.Material.Outlined.Dashboard"
+                       Style="color:var(--ft-gray-400);"
+                       OnClick='() => Nav.NavigateTo("/dashboard")' />
+    </MudTooltip>
+
     @* ── Dark-mode toggle ───────────────────────────────────────────────── *@
-    <MudTooltip Text="@(_isDark ? "Light mode" : "Dark mode")" Placement="Placement.Bottom">
+    <MudTooltip Text="@(_isDark ? "Light mode" : "Dark mode")" Placement="Placement.Left">
         <MudIconButton Icon="@(_isDark? Icons.Material.Outlined.LightMode
                                                                                                 : Icons.Material.Outlined.DarkMode)"
                        Style="color:var(--ft-gray-400);"
@@ -175,10 +205,24 @@
                     @_userEmail
                 </div>
             </div>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Dashboard"
+                         OnClick='() => Nav.NavigateTo("/dashboard")'>
+                Dashboard
+            </MudMenuItem>
             <MudMenuItem Icon="@Icons.Material.Outlined.Settings"
                          OnClick='() => Nav.NavigateTo("/settings")'>
                 Settings
             </MudMenuItem>
+            <MudDivider />
+            <MudMenuItem Icon="@Icons.Material.Outlined.Info"
+                         OnClick='() => Nav.NavigateTo("/about")'>
+                About
+            </MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.HelpOutline"
+                         OnClick='() => Nav.NavigateTo("/faq")'>
+                FAQ & security
+            </MudMenuItem>
+            <MudDivider />
             <MudMenuItem Icon="@Icons.Material.Outlined.Logout"
                          Style="color:var(--ft-gray-500);"
                          OnClick="SignOut">
@@ -251,7 +295,22 @@
 
     protected override void OnParametersSet() => _isDark = IsDark;
 
-    public void Dispose() => Theme.OnChange -= OnThemeChanged;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            await JS.InvokeVoidAsync("ftDrag.init", "ft-appbar", "appbar",
+                new { snapToTop = true });
+        }
+        catch { /* JS not ready on SSR pre-render — safe to swallow */ }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Theme.OnChange -= OnThemeChanged;
+        await ValueTask.CompletedTask;
+    }
 
     // ── Search ────────────────────────────────────────────────────────────
 

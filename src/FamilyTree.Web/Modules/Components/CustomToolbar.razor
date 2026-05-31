@@ -1,17 +1,26 @@
 @inject NavigationManager Nav
 
 <MudPaper Elevation="2"
-          Class="pa-2 "
+          Class="pa-2"
           Style="display: flex;
     align-items: center;
     gap: 4px;
-    min-width: 250px;
     background: rgba(245,245,245,0.3) !important;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255,255,255,0.135);
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.12);">
+
+    @* Drag grip — grab this to reposition the toolbar *@
+    <div class="ft-toolbar-grip" data-drag-handle title="Drag to reposition">
+        <svg width="8" height="14" viewBox="0 0 8 14" fill="currentColor"
+             style="color:var(--ft-gray-400);">
+            <circle cx="2" cy="2"  r="1.3"/><circle cx="6" cy="2"  r="1.3"/>
+            <circle cx="2" cy="7"  r="1.3"/><circle cx="6" cy="7"  r="1.3"/>
+            <circle cx="2" cy="12" r="1.3"/><circle cx="6" cy="12" r="1.3"/>
+        </svg>
+    </div>
 
     <MudButton Variant="Variant.Filled"
                Color="Color.Primary"

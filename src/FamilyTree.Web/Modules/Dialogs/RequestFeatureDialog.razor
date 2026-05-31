@@ -1,0 +1,113 @@
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <div style="font-family:var(--ft-font-body); min-width:420px; max-width:520px;">
+
+            <div style="font-size:13px; color:var(--ft-gray-400); line-height:1.6; margin-bottom:20px;">
+                Describe the feature you'd like to see. Ideas are reviewed and prioritized regularly.
+            </div>
+
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_title"
+                              Label="Feature title"
+                              Placeholder="e.g. Export to PDF, Dark mode tree, Mobile layout…"
+                              Required="true"
+                              RequiredError="Please give your idea a short title."
+                              Variant="Variant.Outlined"
+                              Counter="80"
+                              MaxLength="80" />
+
+                <MudSelect @bind-Value="_category"
+                           Label="Category"
+                           Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("UI / Visual design")">UI / Visual design</MudSelectItem>
+                    <MudSelectItem Value="@("Import & export")">Import & export</MudSelectItem>
+                    <MudSelectItem Value="@("Data & fields")">Data & fields</MudSelectItem>
+                    <MudSelectItem Value="@("Tree visualization")">Tree visualization</MudSelectItem>
+                    <MudSelectItem Value="@("Search & navigation")">Search & navigation</MudSelectItem>
+                    <MudSelectItem Value="@("Performance")">Performance</MudSelectItem>
+                    <MudSelectItem Value="@("Security & privacy")">Security & privacy</MudSelectItem>
+                    <MudSelectItem Value="@("Mobile & accessibility")">Mobile & accessibility</MudSelectItem>
+                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                </MudSelect>
+
+                <MudTextField @bind-Value="_description"
+                              Label="Description"
+                              Placeholder="Describe the problem it solves or the workflow it improves…"
+                              Lines="4"
+                              AutoGrow="true"
+                              Variant="Variant.Outlined"
+                              Counter="1000"
+                              MaxLength="1000" />
+
+                <MudSelect @bind-Value="_priority"
+                           Label="How important is this to you?"
+                           Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Nice to have")">Nice to have</MudSelectItem>
+                    <MudSelectItem Value="@("Would use regularly")">Would use regularly</MudSelectItem>
+                    <MudSelectItem Value="@("Blocking my use of the app")">Blocking my use of the app</MudSelectItem>
+                </MudSelect>
+
+                <MudTextField @bind-Value="_email"
+                              Label="Your email (optional)"
+                              Placeholder="So we can follow up with you"
+                              InputType="InputType.Email"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Outlined.Email" />
+            </MudStack>
+
+            @if (_submitted)
+            {
+                <MudAlert Severity="Severity.Success" Class="mt-4">
+                    Thanks! Your idea has been recorded. We'll review it soon.
+                </MudAlert>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text"
+                   Style="color:var(--ft-gray-400);"
+                   OnClick="Cancel">
+            Cancel
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Style="background:var(--ft-green-600); color:#fff;"
+                   Disabled="@(string.IsNullOrWhiteSpace(_title) || _submitted)"
+                   OnClick="Submit">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Submit idea
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string _title = "";
+    private string _category = "Other";
+    private string _description = "";
+    private string _priority = "Nice to have";
+    private string _email = "";
+    private bool _saving;
+    private bool _submitted;
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_title)) return;
+
+        _saving = true;
+        await Task.Delay(600); // placeholder — wire to API or email when ready
+        _saving = false;
+        _submitted = true;
+
+        await Task.Delay(1800);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

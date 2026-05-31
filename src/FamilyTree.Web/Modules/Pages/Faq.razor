@@ -1,0 +1,165 @@
+@page "/faq"
+@rendermode InteractiveServer
+
+@using MudBlazor
+
+@inject NavigationManager Nav
+
+<PageTitle>FAQ & Security — FamilyTree</PageTitle>
+
+<div style="max-width:760px; margin:0 auto; padding:40px 24px 80px;
+    font-family:var(--ft-font-body);">
+
+    @* ── Header ───────────────────────────────────────────────────────────── *@
+    <div style="margin-bottom:36px;">
+        <div style="font-size:28px; font-weight:700; font-style:italic;
+            font-family:var(--ft-font-display); color:var(--ft-green-800);
+            line-height:1.2; margin-bottom:6px;">
+            Frequently asked questions
+        </div>
+        <div style="font-size:14px; color:var(--ft-gray-400); margin-bottom:20px;">
+            Questions about using FamilyTree, your data, and how we keep it safe.
+        </div>
+        <MudTextField @bind-Value="_search"
+                      Placeholder="Search questions…"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Variant="Variant.Outlined"
+                      Immediate="true"
+                      Style="max-width:400px;" />
+    </div>
+
+    @* ── Sections ─────────────────────────────────────────────────────────── *@
+    @foreach (var section in FilteredSections)
+    {
+        if (!section.Items.Any()) continue;
+
+        <div style="margin-bottom:36px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;
+                padding-bottom:8px; border-bottom:1px solid var(--ft-line-border);">
+                <MudIcon Icon="@section.Icon"
+                         Style="font-size:18px; color:var(--ft-green-600);" />
+                <span style="font-size:13px; font-weight:700; text-transform:uppercase;
+                    letter-spacing:0.08em; color:var(--ft-gray-500);">
+                    @section.Title
+                </span>
+            </div>
+
+            <MudExpansionPanels Elevation="0">
+                @foreach (var item in section.Items)
+                {
+                    <MudExpansionPanel Style="background:var(--ft-surface-card); margin-bottom:4px;
+                        border-radius:var(--ft-radius-sm); border:0.5px solid var(--ft-line-border);">
+                        <TitleContent>
+                            <div style="font-size:14px; font-weight:500; color:var(--ft-gray-700);">
+                                @item.Q
+                            </div>
+                        </TitleContent>
+                        <ChildContent>
+                            <div style="font-size:13px; color:var(--ft-gray-500); line-height:1.75;
+                                padding:4px 0 8px;">
+                                @((MarkupString)item.A)
+                            </div>
+                        </ChildContent>
+                    </MudExpansionPanel>
+                }
+            </MudExpansionPanels>
+        </div>
+    }
+
+    @* ── Still have questions ─────────────────────────────────────────────── *@
+    <MudPaper Elevation="0" Class="pa-5"
+              Style="background:var(--ft-green-50); border-radius:var(--ft-radius-card);
+        border:1px solid var(--ft-green-100); text-align:center;">
+        <MudIcon Icon="@Icons.Material.Outlined.ChatBubbleOutline"
+                 Style="font-size:28px; color:var(--ft-green-600); margin-bottom:8px; display:block;" />
+        <div style="font-size:15px; font-weight:600; color:var(--ft-green-800); margin-bottom:6px;">
+            Still have a question?
+        </div>
+        <div style="font-size:13px; color:var(--ft-gray-500); margin-bottom:16px;">
+            Use the feature request form — it doubles as a help channel.
+        </div>
+        <MudButton Variant="Variant.Outlined"
+                   Style="border-color:var(--ft-green-600); color:var(--ft-green-700);"
+                   StartIcon="@Icons.Material.Outlined.Send"
+                   Href="/dashboard">
+            Go to dashboard
+        </MudButton>
+    </MudPaper>
+
+</div>
+
+@code {
+    private string _search = "";
+
+    private record FaqItem(string Q, string A);
+    private record FaqSection(string Title, string Icon, List<FaqItem> Items);
+
+    private readonly List<FaqSection> _sections =
+    [
+        new("Getting started", Icons.Material.Outlined.Rocket, [
+            new("What is FamilyTree?",
+                "FamilyTree is a private web app for building and browsing your family tree. You can add people, connect relationships, upload photos and documents, and visualize multiple generations in an interactive canvas."),
+            new("Do I need to create an account?",
+                "Authentication is coming soon. Right now the app is in early development — you can use it fully without logging in. When accounts launch, you'll be able to log in and keep your data private."),
+            new("Is this the same as Ancestry or MyHeritage?",
+                "No. Those are commercial platforms that own your data and require subscriptions. FamilyTree is independent, ad-free, and keeps your data private. We don't sell or share anything."),
+            new("Can I import data from Ancestry or another app?",
+                "GEDCOM import is coming soon — GEDCOM is the standard export format supported by Ancestry, MyHeritage, FamilySearch, and most genealogy apps. PDF and AI-powered document import are also in development."),
+        ]),
+
+        new("Privacy & security", Icons.Material.Outlined.Security, [
+            new("Who can see my family tree?",
+                "Currently only you (the person using the browser session). Once authentication is live, your tree is private by default — only you and people you explicitly invite can view it."),
+            new("Is my data encrypted?",
+                "Yes. Data is encrypted at rest using Azure SQL Transparent Data Encryption (TDE) and in transit using TLS 1.3. Profile photos and uploaded documents are stored in Azure Blob Storage with private access only."),
+            new("Do you share my data with third parties?",
+                "No. We do not sell, share, license, or analyze your family data for any commercial purpose. Your family history belongs to you."),
+            new("Do you use tracking or analytics?",
+                "We do not use advertising trackers or behavioral analytics on your data. Basic server-side logging (error rates, uptime) is used for operations only — never tied to your identity or content."),
+            new("Where is my data stored?",
+                "Your data is stored on Microsoft Azure infrastructure in the United States (East US region). Backups are retained for 7 days."),
+            new("What happens if the site goes down?",
+                "Your data is backed up daily. You can export a complete copy at any time using the export feature (coming soon). We are not responsible for data loss in catastrophic failure scenarios, so we recommend downloading a local backup periodically."),
+        ]),
+
+        new("Your data", Icons.Material.Outlined.Storage, [
+            new("How do I delete my account?",
+                "Account deletion is coming when authentication launches. Once available, deleting your account will permanently remove all your people, relationships, photos, and documents within 30 days."),
+            new("Can I export my family tree?",
+                "Export to GEDCOM, Excel, CSV, and PDF is on the roadmap and will be available soon. You will always be able to get a full copy of your data."),
+            new("What file formats can I upload for photos?",
+                "JPEG, PNG, WebP, and GIF are supported, up to 50 MB per file."),
+            new("Can I upload documents like birth certificates or old letters?",
+                "Yes — the Photos & Records section on each person's profile accepts PDFs and images. You can categorize them (birth certificate, marriage record, military service, etc.) and add captions."),
+            new("Is there a limit on how many people I can add?",
+                "There is no hard limit in the current version. Very large trees (thousands of people) may affect tree rendering performance — we're working on improvements for that."),
+        ]),
+
+        new("Technical questions", Icons.Material.Outlined.Code, [
+            new("What technology powers FamilyTree?",
+                "FamilyTree is built on .NET 10 with Blazor Server (C#), MudBlazor for UI components, Entity Framework Core for data access, and SQL Server / Azure SQL for storage. The tree visualization is rendered entirely in C# with SVG — no JavaScript layout library."),
+            new("Is this open source?",
+                "Not yet publicly, but it's planned. The project may be open-sourced once the codebase is in a stable enough state for external contributors."),
+            new("Why does the tree take a moment to load?",
+                "FamilyTree uses Blazor Server, which runs logic on the server and streams UI updates over a WebSocket. The first load establishes that connection. Subsequent interactions are fast."),
+            new("Does it work on mobile?",
+                "The data management pages (add/edit/list) work on mobile. The tree visualization canvas is optimized for desktop — a responsive mobile layout is on the roadmap."),
+        ]),
+    ];
+
+    private IEnumerable<FaqSection> FilteredSections
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_search)) return _sections;
+            var q = _search.Trim();
+            return _sections.Select(s => s with
+            {
+                Items = s.Items.Where(i =>
+                    i.Q.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                    i.A.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList()
+            });
+        }
+    }
+}
