@@ -1,4 +1,5 @@
 ﻿@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Shared.Enums
 @using FamilyTree.Api.Services
 @using MudBlazor
 
@@ -55,25 +56,59 @@
                 </div>
 
                 @* Vital dates *@
-                <div style="display:flex; flex-direction:column; gap:7px; margin-bottom:8px;">
+                <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;">
+                    @if (Person.Gender.HasValue && Person.Gender != Gender.Unknown)
+                    {
+                        <div style="display:flex; align-items:center; gap:9px;">
+                            <MudIcon Icon="@GenderIcon(Person.Gender)"
+                                     Style="font-size:16px; color:var(--ft-gray-300);" />
+                            <span style="font-size:13px; color:var(--ft-gray-500);">
+                                @Person.Gender
+                            </span>
+                        </div>
+                    }
                     @if (Person.BirthDate.HasValue)
+                    {
+                        <div style="display:flex; align-items:flex-start; gap:9px;">
+                            <MudIcon Icon="@Icons.Material.Outlined.Cake"
+                                     Style="font-size:16px; color:var(--ft-gray-300); margin-top:1px;" />
+                            <span style="font-size:13px; color:var(--ft-gray-700); line-height:1.5;">
+                                Born @Person.BirthDate.Value.ToString("d MMM yyyy")
+                                @if (!string.IsNullOrWhiteSpace(Person.BirthPlace))
+                                {
+                                    <br /><span style="color:var(--ft-gray-400);">@Person.BirthPlace</span>
+                                }
+                            </span>
+                        </div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(Person.BirthPlace))
                     {
                         <div style="display:flex; align-items:center; gap:9px;">
                             <MudIcon Icon="@Icons.Material.Outlined.Cake"
                                      Style="font-size:16px; color:var(--ft-gray-300);" />
-                            <span style="font-size:13px; color:var(--ft-gray-700);">
-                                Born @Person.BirthDate.Value.ToString("d MMM yyyy")
-                            </span>
+                            <span style="font-size:13px; color:var(--ft-gray-400);">@Person.BirthPlace</span>
                         </div>
                     }
                     @if (Person.DeathDate.HasValue)
                     {
+                        <div style="display:flex; align-items:flex-start; gap:9px;">
+                            <MudIcon Icon="@Icons.Material.Outlined.EventBusy"
+                                     Style="font-size:16px; color:var(--ft-gray-300); margin-top:1px;" />
+                            <span style="font-size:13px; color:var(--ft-gray-700); line-height:1.5;">
+                                Died @Person.DeathDate.Value.ToString("d MMM yyyy")
+                                @if (!string.IsNullOrWhiteSpace(Person.DeathPlace))
+                                {
+                                    <br /><span style="color:var(--ft-gray-400);">@Person.DeathPlace</span>
+                                }
+                            </span>
+                        </div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(Person.DeathPlace))
+                    {
                         <div style="display:flex; align-items:center; gap:9px;">
                             <MudIcon Icon="@Icons.Material.Outlined.EventBusy"
                                      Style="font-size:16px; color:var(--ft-gray-300);" />
-                            <span style="font-size:13px; color:var(--ft-gray-700);">
-                                Died @Person.DeathDate.Value.ToString("d MMM yyyy")
-                            </span>
+                            <span style="font-size:13px; color:var(--ft-gray-400);">@Person.DeathPlace</span>
                         </div>
                     }
                     @if (Person.Age.HasValue)
@@ -82,7 +117,7 @@
                             <MudIcon Icon="@Icons.Material.Outlined.Person"
                                      Style="font-size:16px; color:var(--ft-gray-300);" />
                             <span style="font-size:13px; color:var(--ft-gray-500);">
-                                Age @Person.Age
+                                @(Person.IsDeceased ? "Lived" : "Age") @Person.Age
                             </span>
                         </div>
                     }
@@ -272,4 +307,11 @@
     private string Initials => Person is null ? ""
         : $"{Person.FirstName?.FirstOrDefault()}{Person.LastName?.FirstOrDefault()}"
           .ToUpperInvariant();
+
+    private static string GenderIcon(Gender? gender) => gender switch
+    {
+        Gender.Male => Icons.Material.Outlined.Male,
+        Gender.Female => Icons.Material.Outlined.Female,
+        _ => Icons.Material.Outlined.Transgender
+    };
 }

@@ -3,6 +3,7 @@
 
 @using FamilyTree.Api.Services
 @using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Shared.Enums
 @using MudBlazor
 
 @inject IPersonService PersonService
@@ -15,19 +16,36 @@
 <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface);">
     <MudStack Row="true" AlignItems="AlignItems.Center"
               Justify="Justify.SpaceBetween" Class="mb-4">
-        <MudText Typo="Typo.h5"
-                 Style="font-style:italic; font-family:Georgia,serif;
-            color:var(--ft-green-800);">
-            Family members
-        </MudText>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudText Typo="Typo.h5"
+                     Style="font-style:italic; font-family:Georgia,serif;
+                color:var(--ft-green-800);">
+                Family members
+            </MudText>
+            @if (!_loading && _people.Any())
+            {
+                <MudChip T="string" Size="Size.Small"
+                         Style="background:var(--ft-green-50); color:var(--ft-green-700);">
+                    @_people.Count total
+                </MudChip>
+            }
+        </MudStack>
 
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudTextField @bind-Value="_search"
-                          Placeholder="Search..."
+                          Placeholder="Search by name or place…"
                           Adornment="Adornment.Start"
                           AdornmentIcon="@Icons.Material.Filled.Search"
                           Immediate="true"
+                          Style="min-width:220px;"
                           Class="search-field" />
+            <MudToggleGroup T="string" @bind-Value="_statusFilter"
+                            SelectionMode="SelectionMode.SingleSelection"
+                            Style="height:36px;">
+                <MudToggleItem Value="@("all")" Text="All" />
+                <MudToggleItem Value="@("living")" Text="Living" />
+                <MudToggleItem Value="@("deceased")" Text="Deceased" />
+            </MudToggleGroup>
             <MudTooltip Text="Add person" Placement="Placement.Bottom">
                 <MudIconButton Icon="@Icons.Material.Outlined.PersonAdd"
                                Color="Color.Success"
@@ -66,16 +84,41 @@
                   OnRowClick="@(e => Nav.NavigateTo($"/people/{e.Item!.Id}/edit"))"
                   Class="people-table">
             <HeaderContent>
+                <MudTh Style="width:36px;"></MudTh>
                 <MudTh><MudTableSortLabel T="PersonDto" SortBy="p => p.LastName">Name</MudTableSortLabel></MudTh>
-                <MudTh>Born</MudTh>
-                <MudTh>Died</MudTh>
-                <MudTh>Age</MudTh>
+                <MudTh><MudTableSortLabel T="PersonDto" SortBy="p => p.BirthDate">Born</MudTableSortLabel></MudTh>
+                <MudTh>Birthplace</MudTh>
+                <MudTh><MudTableSortLabel T="PersonDto" SortBy="p => p.DeathDate">Died</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel T="PersonDto" SortBy="p => p.Age">Age</MudTableSortLabel></MudTh>
                 <MudTh></MudTh>
             </HeaderContent>
 
             <RowTemplate Context="person">
-                <MudTd DataLabel="Name">@person.FullName</MudTd>
+                <MudTd>
+                    <MudTooltip Text="@(person.IsDeceased ? "Deceased" : "Living")">
+                        <div style="width:8px; height:8px; border-radius:50%;
+                            background:@(person.IsDeceased ? "var(--ft-gray-300)" : "var(--ft-green-500)");
+                            margin:auto;" />
+                    </MudTooltip>
+                </MudTd>
+                <MudTd DataLabel="Name">
+                    <span style="font-weight:500;">@person.FullName</span>
+                    @if (person.Gender.HasValue && person.Gender != Gender.Unknown)
+                    {
+                        <MudIcon Icon="@GenderIcon(person.Gender)"
+                                 Style="font-size:14px; color:var(--ft-gray-300); margin-left:5px; vertical-align:middle;" />
+                    }
+                    @if (!string.IsNullOrWhiteSpace(person.MaidenName))
+                    {
+                        <span style="font-size:12px; color:var(--ft-gray-400); margin-left:4px;">
+                            (née @person.MaidenName)
+                        </span>
+                    }
+                </MudTd>
                 <MudTd DataLabel="Born">@person.BirthDate?.ToString("d MMM yyyy")</MudTd>
+                <MudTd DataLabel="Birthplace" Style="color:var(--ft-gray-500); font-size:13px;">
+                    @person.BirthPlace
+                </MudTd>
                 <MudTd DataLabel="Died">@person.DeathDate?.ToString("d MMM yyyy")</MudTd>
                 <MudTd DataLabel="Age">@person.Age</MudTd>
                 <MudTd>
@@ -99,6 +142,7 @@
     private List<PersonDto> _people = [];
     private bool _loading = true;
     private string _search = "";
+    private string _statusFilter = "all";
 
     protected override async Task OnInitializedAsync()
     {
@@ -111,7 +155,33 @@
         _loading = false;
     }
 
-    private IEnumerable<PersonDto> FilteredPeople => string.IsNullOrWhiteSpace(_search)
-        ? _people
-        : _people.Where(p => p.FullName.Contains(_search, StringComparison.OrdinalIgnoreCase));
+    private IEnumerable<PersonDto> FilteredPeople
+    {
+        get
+        {
+            var q = _people.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_search))
+                q = q.Where(p =>
+                    p.FullName.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                    (p.BirthPlace ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                    (p.DeathPlace ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+            q = _statusFilter switch
+            {
+                "living" => q.Where(p => !p.IsDeceased),
+                "deceased" => q.Where(p => p.IsDeceased),
+                _ => q
+            };
+
+            return q;
+        }
+    }
+
+    private static string GenderIcon(Gender? gender) => gender switch
+    {
+        Gender.Male => Icons.Material.Outlined.Male,
+        Gender.Female => Icons.Material.Outlined.Female,
+        _ => Icons.Material.Outlined.Transgender
+    };
 }

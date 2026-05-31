@@ -76,12 +76,18 @@ else
         {
             FirstName = _person.FirstName,
             LastName = _person.LastName,
+            MiddleName = _person.MiddleName,
+            MaidenName = _person.MaidenName,
             BirthDate = _person.BirthDate,
+            BirthPlace = _person.BirthPlace,
             DeathDate = _person.DeathDate,
-            BiographyNotes = _person.BiographyNotes,               // was BiographyNotes — fixed
-            ProfilePhotoUrl = _person.ProfilePhotoUrl,    // TODO: add to PersonUpsertDto if not present
+            DeathPlace = _person.DeathPlace,
+            BiographyNotes = _person.BiographyNotes,
+            ProfilePhotoUrl = _person.ProfilePhotoUrl,
+            Gender = _person.Gender,
             ParentIds = _person.ParentIds ?? [],
-            SpouseIds = _person.SpouseIds ?? []
+            SpouseIds = _person.SpouseIds ?? [],
+            ChildIds = _person.ChildIds ?? []
         };
         _loading = false;
     }

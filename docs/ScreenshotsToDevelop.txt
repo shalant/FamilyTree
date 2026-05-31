@@ -1,5 +1,135 @@
 ScreenshotsToDevelop
 
+📸 ScreenshotsToDevelop
+1. Hero Screenshot — The Full Family Tree Canvas
+Purpose: Your “wow” moment.
+
+What to capture:
+
+Medium‑sized tree (6–12 people)
+
+Connectors visible (parents, spouses, children)
+
+Focused node highlighted
+
+Light mode
+
+Why it matters:  
+Instantly communicates complexity, UI polish, and uniqueness.
+
+2. Dark Mode Version of the Tree
+Purpose: Visual flex.
+
+What to capture:
+
+Same tree view as the hero
+
+Smooth theme transition if possible
+
+Why it matters:  
+Shows your design token system and theme engineering.
+
+3. Pan + Zoom Interaction (GIF or 2–3 stills)
+Purpose: Demonstrate interactivity.
+
+What to capture:
+
+Smooth zoom in/out
+
+Panning across the tree
+
+Canvas clamping (no white edges)
+
+Why it matters:  
+Highlights custom JS interop, state management, and UX engineering.
+
+4. Person Detail Drawer
+Purpose: Showcase component architecture.
+
+What to capture:
+
+Drawer open on the right
+
+Tree visible behind it
+
+Buttons for Edit / Delete / Focus
+
+Profile photo if available
+
+Why it matters:  
+Shows your modular design and interaction patterns.
+
+5. Add/Edit Person Form
+Purpose: Demonstrate form engineering.
+
+What to capture:
+
+Name fields, date pickers, relationship selectors
+
+Upload zone if present
+
+Validation messages
+
+Why it matters:  
+Shows clean, reusable form logic and MudBlazor integration.
+
+6. Media Upload Zone
+Purpose: Highlight UX polish.
+
+What to capture:
+
+Drag‑and‑drop state
+
+Hover animation
+
+File list after selection
+
+Light or dark mode
+
+Why it matters:  
+Demonstrates Azure Blob integration and visual feedback design.
+
+7. List View (People Table)
+Purpose: Show the “business app” side.
+
+What to capture:
+
+Search bar
+
+Sortable columns
+
+Profile thumbnails
+
+Action buttons (View/Edit/Delete)
+
+Why it matters:  
+Proves you can build internal tools and CRUD dashboards.
+
+⭐ Optional “Extra Credit” Screenshots
+8. Architecture Diagram
+Simple block diagram showing Web → API → SQL → Azure.
+Why: Adds professionalism and clarity.
+
+9. Mobile View
+Responsive layout on a phone or tablet.
+Why: Shows adaptability and CSS architecture.
+
+10. CI/CD Pipeline Badge or Screenshot
+GitHub Actions build/deploy badge or workflow run.
+Why: Demonstrates engineering maturity.
+
+11. Hero Overlay Expanded
+Your new glass overlay in expanded mode.
+Why: Highlights animation, theming, and component layering.
+
+12. Login Overlay / Intro Screen
+The blurred background + glass card.
+Why: Shows onboarding UX and visual storytelling.
+
+Would you like me to turn this list into a README “Screenshots Gallery” section with Markdown placeholders and captions ready for your actual images? It’ll look like a polished portfolio showcase right in your repo.
+
+
+
 
 1. Hero Screenshot — The Full Family Tree Canvas
 This is your “wow” moment.

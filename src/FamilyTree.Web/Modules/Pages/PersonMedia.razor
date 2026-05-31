@@ -565,10 +565,19 @@ else
         _pendingRecordFileName = null;
     }
 
-    private void DeleteRecord(RecordItem rec)
+    private async Task DeleteRecord(RecordItem rec)
     {
-        // TODO: DELETE /api/people/{Id}/media/{rec.Id}
-        _records.Remove(rec);
+        var result = await MediumService.DeleteAsync(rec.Id);
+        if (result.Success)
+        {
+            _records.Remove(rec);
+            Snackbar.Add("Record deleted", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add($"Failed to delete record: {result.Message}", Severity.Error);
+        }
+        StateHasChanged();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

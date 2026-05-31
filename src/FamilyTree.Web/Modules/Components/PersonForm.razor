@@ -1,4 +1,5 @@
 ﻿@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Shared.Enums
 @using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor
 
@@ -24,16 +25,52 @@
                               Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="6">
+                <MudTextField @bind-Value="_middleName"
+                              Label="Middle name"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudTextField @bind-Value="_maidenName"
+                              Label="Maiden name"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="5">
                 <MudDatePicker @bind-Date="_birthDate"
                                Label="Date of birth"
                                DateFormat="dd/MM/yyyy"
                                Variant="Variant.Outlined" />
             </MudItem>
-            <MudItem xs="6">
+            <MudItem xs="7">
+                <MudTextField @bind-Value="_birthPlace"
+                              Label="Place of birth"
+                              Placeholder="City, State / Country"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Outlined.LocationOn"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="5">
                 <MudDatePicker @bind-Date="_deathDate"
                                Label="Date of death"
                                DateFormat="dd/MM/yyyy"
                                Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="7">
+                <MudTextField @bind-Value="_deathPlace"
+                              Label="Place of death"
+                              Placeholder="City, State / Country"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Outlined.LocationOn"
+                              Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="6">
+                <MudSelect @bind-Value="_gender"
+                           Label="Gender"
+                           Variant="Variant.Outlined">
+                    <MudSelectItem Value="@((Gender?)null)">Not specified</MudSelectItem>
+                    <MudSelectItem Value="@((Gender?)Gender.Male)">Male</MudSelectItem>
+                    <MudSelectItem Value="@((Gender?)Gender.Female)">Female</MudSelectItem>
+                    <MudSelectItem Value="@((Gender?)Gender.Other)">Other</MudSelectItem>
+                </MudSelect>
             </MudItem>
         </MudGrid>
     </MudPaper>
@@ -151,6 +188,39 @@
                 </MudChipSet>
             </MudStack>
 
+            <!-- Children -->
+            <MudStack>
+                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600);">Children</MudText>
+
+                <MudAutocomplete T="PersonDto"
+                                 SearchFunc="SearchChildren"
+                                 ValueChanged="AddChild"
+                                 ToStringFunc="@(p => p?.FullName ?? "")"
+                                 Label="Search by name…"
+                                 Variant="Variant.Outlined"
+                                 Dense="true" />
+
+                <MudChipSet T="string">
+                    @foreach (var id in _childIds)
+                    {
+                        var person = AllPeople.FirstOrDefault(p => p.Id == id);
+                        if (person is not null)
+                        {
+                            <MudChip T="string" OnClose="@(() => RemoveChild(id))"
+                                     Style="background:var(--ft-green-50); color:var(--ft-green-800);">
+                                @person.FullName
+                                @if (person.BirthDate.HasValue)
+                                {
+                                    <span style="opacity:0.6; margin-left:4px;">
+                                        @person.BirthDate.Value.Year
+                                    </span>
+                                }
+                            </MudChip>
+                        }
+                    }
+                </MudChipSet>
+            </MudStack>
+
         </MudStack>
     </MudPaper>
 
@@ -198,13 +268,19 @@
     private bool _saving;
     private string _firstName = "";
     private string _lastName = "";
+    private string _middleName = "";
+    private string _maidenName = "";
     private string _notes = "";
     private string _photoUrl = "";
     private string _uploadStatus = "";
+    private string _birthPlace = "";
+    private string _deathPlace = "";
     private DateTime? _birthDate;
     private DateTime? _deathDate;
+    private Gender? _gender;
     private HashSet<Guid> _parentIds = [];
     private HashSet<Guid> _spouseIds = [];
+    private HashSet<Guid> _childIds = [];
 
     protected override void OnParametersSet()
     {
@@ -212,12 +288,18 @@
 
         _firstName = Initial.FirstName ?? "";
         _lastName = Initial.LastName ?? "";
+        _middleName = Initial.MiddleName ?? "";
+        _maidenName = Initial.MaidenName ?? "";
         _notes = Initial.BiographyNotes ?? "";
         _photoUrl = Initial.ProfilePhotoUrl ?? "";
         _birthDate = Initial.BirthDate?.ToDateTime(TimeOnly.MinValue);
         _deathDate = Initial.DeathDate?.ToDateTime(TimeOnly.MinValue);
+        _birthPlace = Initial.BirthPlace ?? "";
+        _deathPlace = Initial.DeathPlace ?? "";
+        _gender = Initial.Gender;
         _parentIds = [..Initial.ParentIds];
         _spouseIds = [..Initial.SpouseIds];
+        _childIds = [..Initial.ChildIds];
     }
 
     private Task<IEnumerable<PersonDto>> SearchParents(string value, CancellationToken _) =>
@@ -250,6 +332,21 @@
 
     private void RemoveSpouse(Guid id) => _spouseIds.Remove(id);
 
+    private Task<IEnumerable<PersonDto>> SearchChildren(string value, CancellationToken _) =>
+        Task.FromResult(AllPeople
+            .Where(p => p.Id != EditingId && !_childIds.Contains(p.Id))
+            .Where(p => string.IsNullOrWhiteSpace(value) ||
+                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(8));
+
+    private void AddChild(PersonDto? person)
+    {
+        if (person is not null)
+            _childIds.Add(person.Id);
+    }
+
+    private void RemoveChild(Guid id) => _childIds.Remove(id);
+
     private async Task OnPhotoFileSelected(InputFileChangeEventArgs e)
     {
         _uploadStatus = $"{e.File.Name} selected — upload endpoint not yet available.";
@@ -275,12 +372,18 @@
             {
                 FirstName = _firstName.Trim(),
                 LastName = _lastName.Trim(),
+                MiddleName = string.IsNullOrWhiteSpace(_middleName) ? null : _middleName.Trim(),
+                MaidenName = string.IsNullOrWhiteSpace(_maidenName) ? null : _maidenName.Trim(),
                 BirthDate = _birthDate.HasValue ? DateOnly.FromDateTime(_birthDate.Value) : null,
                 DeathDate = _deathDate.HasValue ? DateOnly.FromDateTime(_deathDate.Value) : null,
+                BirthPlace = string.IsNullOrWhiteSpace(_birthPlace) ? null : _birthPlace.Trim(),
+                DeathPlace = string.IsNullOrWhiteSpace(_deathPlace) ? null : _deathPlace.Trim(),
                 BiographyNotes = _notes.Trim(),
                 ProfilePhotoUrl = _photoUrl.Trim(),
+                Gender = _gender,
                 ParentIds = [.._parentIds],
-                SpouseIds = [.._spouseIds]
+                SpouseIds = [.._spouseIds],
+                ChildIds = [.._childIds]
             };
 
             await OnSubmit.InvokeAsync(dto);
