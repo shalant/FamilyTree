@@ -13,13 +13,9 @@
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Services
 @using MudBlazor
-@using Microsoft.JSInterop
-
 @inject IPersonService PersonService
 @inject ThemeService Theme
 @inject NavigationManager Nav
-@inject IJSRuntime JS
-
 @implements IAsyncDisposable
 
 @* ── AppBar shell ─────────────────────────────────────────────────────────── *@
@@ -295,16 +291,7 @@
 
     protected override void OnParametersSet() => _isDark = IsDark;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender) return;
-        try
-        {
-            await JS.InvokeVoidAsync("ftDrag.init", "ft-appbar", "appbar",
-                new { snapToTop = true });
-        }
-        catch { /* JS not ready on SSR pre-render — safe to swallow */ }
-    }
+    // ftDrag.js self-initialises via MutationObserver — no OnAfterRenderAsync needed
 
     public async ValueTask DisposeAsync()
     {

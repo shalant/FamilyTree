@@ -103,13 +103,27 @@ else
                     gap:12px;">
                     @foreach (var photo in _photos)
                     {
+                        var isPrimary = photo.Url == _profilePhotoUrl;
+                        var cardBorder = isPrimary ? "2px solid var(--ft-green-600)" : "0.5px solid var(--ft-line-border)";
                         <div style="position:relative; aspect-ratio:1; border-radius:8px;
                             overflow:hidden; background:var(--ft-surface-card);
-                            border:0.5px solid var(--ft-line-border);"
+                            border:@cardBorder;"
                              @onmouseenter="@(() => photo.Hovered = true)"
                              @onmouseleave="@(() => photo.Hovered = false)">
                             <img src="@photo.Url" alt="@photo.Caption"
                                  style="width:100%; height:100%; object-fit:cover;" />
+                            @* Always-visible primary badge *@
+                            @if (isPrimary)
+                            {
+                                <div style="position:absolute; top:6px; left:6px;
+                                    background:var(--ft-green-600); border-radius:4px;
+                                    padding:2px 6px; display:flex; align-items:center; gap:3px;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Star"
+                                             Style="font-size:11px; color:#fff;" />
+                                    <span style="font-size:10px; color:#fff; font-weight:600;
+                                        letter-spacing:0.04em;">PRIMARY</span>
+                                </div>
+                            }
                             @if (photo.Hovered)
                             {
                                 <div style="position:absolute; inset:0; background:rgba(0,0,0,0.45);
@@ -123,6 +137,12 @@ else
                                         </div>
                                     }
                                     <div style="display:flex; gap:6px;">
+                                        <MudTooltip Text="@(isPrimary ? "Profile photo" : "Set as profile photo")">
+                                            <MudIconButton Icon="@(isPrimary ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarOutline)"
+                                                           Size="Size.Small"
+                                                           Style="@($"color:{(isPrimary ? "gold" : "#fff")}; background:rgba(255,255,255,0.15);")"
+                                                           OnClick="@(() => SetProfilePhoto(photo))" />
+                                        </MudTooltip>
                                         <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                                        Size="Size.Small"
                                                        Style="color:#fff; background:rgba(255,255,255,0.15);"
@@ -304,6 +324,7 @@ else
 
     private List<PhotoItem> _photos = [];
     private bool _uploadingPhoto;
+    private string? _profilePhotoUrl;
 
     private class PhotoItem
     {
@@ -362,6 +383,7 @@ else
             return;
         }
         _person = result.Data!;
+        _profilePhotoUrl = _person.ProfilePhotoUrl;
 
         var mediaResult = await MediumService.GetByPersonIdAsync(Id);
         if (mediaResult.Success)
@@ -480,12 +502,73 @@ else
         }
     }
 
+    private async Task SetProfilePhoto(PhotoItem photo)
+    {
+        if (_person is null) return;
+        var dto = new PersonUpsertDto
+        {
+            FirstName = _person.FirstName,
+            LastName = _person.LastName,
+            MiddleName = _person.MiddleName,
+            MaidenName = _person.MaidenName,
+            BirthDate = _person.BirthDate,
+            BirthPlace = _person.BirthPlace,
+            DeathDate = _person.DeathDate,
+            DeathPlace = _person.DeathPlace,
+            BiographyNotes = _person.BiographyNotes,
+            Gender = _person.Gender,
+            ProfilePhotoUrl = photo.Url,
+            ParentIds = _person.ParentIds ?? [],
+            SpouseIds = _person.SpouseIds ?? [],
+            ChildIds = _person.ChildIds ?? []
+        };
+        var result = await PersonService.UpdateAsync(Id, dto);
+        if (result.Success)
+        {
+            _profilePhotoUrl = photo.Url;
+            _person = result.Data!;
+            Snackbar.Add("Profile photo updated", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add($"Failed to update profile photo: {result.Message}", Severity.Error);
+        }
+        StateHasChanged();
+    }
+
     private async Task DeletePhoto(PhotoItem photo)
     {
         var result = await MediumService.DeleteAsync(photo.Id);
         if (result.Success)
         {
             _photos.Remove(photo);
+            if (_profilePhotoUrl == photo.Url)
+            {
+                // Clear the profile photo since it no longer exists
+                var dto = new PersonUpsertDto
+                {
+                    FirstName = _person!.FirstName,
+                    LastName = _person.LastName,
+                    MiddleName = _person.MiddleName,
+                    MaidenName = _person.MaidenName,
+                    BirthDate = _person.BirthDate,
+                    BirthPlace = _person.BirthPlace,
+                    DeathDate = _person.DeathDate,
+                    DeathPlace = _person.DeathPlace,
+                    BiographyNotes = _person.BiographyNotes,
+                    Gender = _person.Gender,
+                    ProfilePhotoUrl = null,
+                    ParentIds = _person.ParentIds ?? [],
+                    SpouseIds = _person.SpouseIds ?? [],
+                    ChildIds = _person.ChildIds ?? []
+                };
+                var clearResult = await PersonService.UpdateAsync(Id, dto);
+                if (clearResult.Success)
+                {
+                    _profilePhotoUrl = null;
+                    _person = clearResult.Data!;
+                }
+            }
             Snackbar.Add("Photo deleted", Severity.Success);
         }
         else

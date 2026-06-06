@@ -115,12 +115,6 @@ else
     {
         if (firstRender)
         {
-            try
-            {
-                await JS.InvokeVoidAsync("ftDrag.init", "ft-toolbar", "toolbar", null);
-            }
-            catch { /* safe to swallow on pre-render */ }
-
             await Task.Delay(10000);
             _showIntro = false;
             StateHasChanged();
