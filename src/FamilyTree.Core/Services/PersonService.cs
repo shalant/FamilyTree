@@ -1,12 +1,12 @@
-using FamilyTree.Api.Data;
-using FamilyTree.Api.Mappers;
-using FamilyTree.Api.Models;
+﻿using FamilyTree.Core.Data;
+using FamilyTree.Core.Mappers;
+using FamilyTree.Core.Models;
 using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Person;
 using FamilyTree.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 
-namespace FamilyTree.Api.Services;
+namespace FamilyTree.Core.Services;
 
 public class PersonService(
     IDbContextFactory<AppDbContext> dbFactory,
@@ -109,9 +109,15 @@ public class PersonService(
             {
                 FirstName = dto.FirstName.Trim(),
                 LastName = dto.LastName.Trim(),
+                MiddleName = string.IsNullOrWhiteSpace(dto.MiddleName) ? null : dto.MiddleName.Trim(),
+                MaidenName = string.IsNullOrWhiteSpace(dto.MaidenName) ? null : dto.MaidenName.Trim(),
                 BirthDate = dto.BirthDate,
+                BirthPlace = string.IsNullOrWhiteSpace(dto.BirthPlace) ? null : dto.BirthPlace.Trim(),
                 DeathDate = dto.DeathDate,
+                DeathPlace = string.IsNullOrWhiteSpace(dto.DeathPlace) ? null : dto.DeathPlace.Trim(),
+                Gender = dto.Gender,
                 BiographyNotes = dto.BiographyNotes?.Trim(),
+                ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim(),
                 CreatedAt = now,
                 UpdatedAt = now
             };
@@ -170,9 +176,15 @@ public class PersonService(
 
             person.FirstName = dto.FirstName.Trim();
             person.LastName = dto.LastName.Trim();
+            person.MiddleName = string.IsNullOrWhiteSpace(dto.MiddleName) ? null : dto.MiddleName.Trim();
+            person.MaidenName = string.IsNullOrWhiteSpace(dto.MaidenName) ? null : dto.MaidenName.Trim();
             person.BirthDate = dto.BirthDate;
+            person.BirthPlace = string.IsNullOrWhiteSpace(dto.BirthPlace) ? null : dto.BirthPlace.Trim();
             person.DeathDate = dto.DeathDate;
+            person.DeathPlace = string.IsNullOrWhiteSpace(dto.DeathPlace) ? null : dto.DeathPlace.Trim();
+            person.Gender = dto.Gender;
             person.BiographyNotes = dto.BiographyNotes?.Trim();
+            person.ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim();
             person.UpdatedAt = DateTime.UtcNow;
 
             // Remove old relationships

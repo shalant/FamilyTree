@@ -1,7 +1,11 @@
-﻿@using FamilyTree.Shared.DTOs.Person
+﻿@using FamilyTree.Core.Services
+@using FamilyTree.Shared.DTOs.Medium
+@using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Shared.Enums
 @using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor
+
+@inject IMediumService MediumService
 
 <MudStack Spacing="4" MaxWidth="680px" Style="margin:auto; font-family:var(--ft-font-body);">
 
@@ -75,43 +79,128 @@
         </MudGrid>
     </MudPaper>
 
-    <!-- Profile Photo Card -->
+    <!-- Photos Card -->
     <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
-        <MudText Typo="Typo.h5" Class="mb-3">Profile photo</MudText>
+        <MudText Typo="Typo.h5" Class="mb-3">Photos</MudText>
 
-        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center">
-            <MudAvatar Size="Size.Large"
-                       Text="@Initials"
-                       Src="@_photoUrl"
-                       Style="border:2px solid var(--ft-focus-border);" />
-
-            <MudStack Spacing="2" Style="flex:1;">
-                <MudTextField @bind-Value="_photoUrl"
-                              Label="Photo URL"
-                              Placeholder="https://..."
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Outlined.Link"
-                              Variant="Variant.Outlined" />
-
-                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                    <InputFile id="photo-upload"
-                               accept="image/*"
-                               style="display:none;"
-                               OnChange="OnPhotoFileSelected" />
-                    <MudButton HtmlTag="label"
-                               for="photo-upload"
-                               Variant="Variant.Outlined"
-                               StartIcon="@Icons.Material.Outlined.UploadFile"
-                               Style="color:var(--ft-gray-600); font-size:13px;">
-                        Upload file
-                    </MudButton>
-                    @if (!string.IsNullOrWhiteSpace(_uploadStatus))
-                    {
-                        <MudText Typo="Typo.caption" Style="color:var(--ft-gray-400);">
-                            @_uploadStatus
-                        </MudText>
-                    }
+        <MudStack Spacing="3">
+            <!-- Primary avatar preview -->
+            <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center">
+                <MudAvatar Size="Size.Large"
+                           Text="@Initials"
+                           Src="@AvatarSrc"
+                           Style="border:2px solid var(--ft-focus-border); flex-shrink:0;" />
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.subtitle2">Profile photo</MudText>
+                    <MudText Typo="Typo.caption" Style="color:var(--ft-gray-400);">
+                        @if (string.IsNullOrEmpty(_photoUrl) && _pendingPreviews.Count == 0)
+                        {
+                            <span>Star a photo below to set it as primary</span>
+                        }
+                        else if (!string.IsNullOrEmpty(_photoUrl))
+                        {
+                            <span>Primary photo set</span>
+                        }
+                        else
+                        {
+                            <span>Will be set from first photo after saving</span>
+                        }
+                    </MudText>
                 </MudStack>
+            </MudStack>
+
+            <!-- Existing photos (edit mode) -->
+            @if (_existingPhotos.Count > 0)
+            {
+                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600); margin-bottom:-4px;">Uploaded photos</MudText>
+                <div style="display:flex; flex-wrap:wrap; gap:12px;">
+                    @foreach (var photo in _existingPhotos)
+                    {
+                        var isPrimary = photo.Url == _photoUrl;
+                        var starColor = isPrimary ? "var(--ft-green-600)" : "var(--ft-gray-400)";
+                        var starStyle = $"position:absolute; bottom:-8px; right:-8px; background:#fff; border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:{starColor};";
+                        <div style="position:relative; width:84px; height:84px; flex-shrink:0;">
+                            <img src="@photo.Url"
+                                 style="width:84px; height:84px; object-fit:cover; border-radius:8px;
+                                        border:@(isPrimary ? "2.5px solid var(--ft-green-600)" : "1px solid var(--ft-line-border)");"
+                                 alt="@photo.FileName" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Cancel"
+                                           Size="Size.Small"
+                                           Style="position:absolute; top:-8px; right:-8px; background:#fff; border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:var(--ft-gray-500);"
+                                           OnClick="@(() => DeletePhoto(photo))" />
+                            <MudTooltip Text="@(isPrimary ? "Primary photo" : "Set as primary")">
+                                <MudIconButton Icon="@(isPrimary ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarOutline)"
+                                               Size="Size.Small"
+                                               Style="@starStyle"
+                                               OnClick="@(() => SetPrimary(photo.Url))" />
+                            </MudTooltip>
+                        </div>
+                    }
+                </div>
+            }
+            else if (EditingId.HasValue && !_photosLoaded)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Success" Style="height:2px;" />
+            }
+
+            <!-- Pending previews (add mode) -->
+            @if (_pendingPreviews.Count > 0)
+            {
+                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600); margin-bottom:-4px;">
+                    Photos to upload (@_pendingPreviews.Count)
+                </MudText>
+                <div style="display:flex; flex-wrap:wrap; gap:12px;">
+                    @for (int i = 0; i < _pendingPreviews.Count; i++)
+                    {
+                        var idx = i;
+                        var preview = _pendingPreviews[i];
+                        var isPrimary = idx == _primaryPendingIndex;
+                        var starColor = isPrimary ? "var(--ft-green-600)" : "var(--ft-gray-400)";
+                        var starStyle = $"position:absolute; bottom:-8px; right:-8px; background:#fff; border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:{starColor};";
+                        <div style="position:relative; width:84px; height:84px; flex-shrink:0;">
+                            <img src="@preview.DataUrl"
+                                 style="width:84px; height:84px; object-fit:cover; border-radius:8px;
+                                        border:@(isPrimary ? "2.5px solid var(--ft-green-600)" : "1px solid var(--ft-line-border)");"
+                                 alt="@preview.FileName" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Cancel"
+                                           Size="Size.Small"
+                                           Style="position:absolute; top:-8px; right:-8px; background:#fff; border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:var(--ft-gray-500);"
+                                           OnClick="@(() => RemovePending(idx))" />
+                            <MudTooltip Text="@(isPrimary ? "Primary photo" : "Set as primary")">
+                                <MudIconButton Icon="@(isPrimary ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarOutline)"
+                                               Size="Size.Small"
+                                               Style="@starStyle"
+                                               OnClick="@(() => _primaryPendingIndex = idx)" />
+                            </MudTooltip>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- Upload button + error -->
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                <InputFile id="photo-upload"
+                           accept="image/*"
+                           multiple
+                           style="display:none;"
+                           OnChange="OnPhotoFileSelected" />
+                <MudButton HtmlTag="label"
+                           for="photo-upload"
+                           Variant="Variant.Outlined"
+                           StartIcon="@Icons.Material.Outlined.AddPhotoAlternate"
+                           Disabled="_uploading"
+                           Style="color:var(--ft-gray-600); font-size:13px;">
+                    @(_uploading ? "Uploading…" : "Add photos")
+                </MudButton>
+                @if (_uploading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true"
+                                         Style="color:var(--ft-green-600);" />
+                }
+                @if (!string.IsNullOrEmpty(_uploadError))
+                {
+                    <MudText Typo="Typo.caption" Style="color:var(--mud-palette-error);">@_uploadError</MudText>
+                }
             </MudStack>
         </MudStack>
     </MudPaper>
@@ -265,6 +354,7 @@
     [Parameter] public EventCallback<PersonUpsertDto> OnSubmit { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
 
+    // ── person fields ──────────────────────────────────────────────
     private bool _saving;
     private string _firstName = "";
     private string _lastName = "";
@@ -272,7 +362,6 @@
     private string _maidenName = "";
     private string _notes = "";
     private string _photoUrl = "";
-    private string _uploadStatus = "";
     private string _birthPlace = "";
     private string _deathPlace = "";
     private DateTime? _birthDate;
@@ -282,6 +371,19 @@
     private HashSet<Guid> _spouseIds = [];
     private HashSet<Guid> _childIds = [];
 
+    // ── photo state ────────────────────────────────────────────────
+    private record PendingPhoto(string FileName, string MimeType, byte[] Data, string DataUrl);
+
+    private List<MediumDto> _existingPhotos = [];
+    private List<PendingPhoto> _pendingPreviews = [];
+    private int _primaryPendingIndex = 0;
+    private bool _uploading = false;
+    private bool _photosLoaded = false;
+    private string _uploadError = "";
+
+    public bool HasPendingPhotos => _pendingPreviews.Count > 0;
+
+    // ── lifecycle ──────────────────────────────────────────────────
     protected override void OnParametersSet()
     {
         if (Initial is null) return;
@@ -302,6 +404,133 @@
         _childIds = [..Initial.ChildIds];
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && EditingId.HasValue && !_photosLoaded)
+        {
+            _photosLoaded = true;
+            var result = await MediumService.GetByPersonIdAsync(EditingId.Value);
+            if (result.Success)
+                _existingPhotos = result.Data!.Where(m => m.Type == "photo").ToList();
+            StateHasChanged();
+        }
+    }
+
+    // ── avatar ─────────────────────────────────────────────────────
+    private string? AvatarSrc
+    {
+        get
+        {
+            if (EditingId.HasValue)
+                return string.IsNullOrEmpty(_photoUrl) ? null : _photoUrl;
+            return _pendingPreviews.Count > 0 ? _pendingPreviews[_primaryPendingIndex].DataUrl : null;
+        }
+    }
+
+    // ── photo handlers ─────────────────────────────────────────────
+    private async Task OnPhotoFileSelected(InputFileChangeEventArgs e)
+    {
+        _uploadError = "";
+        _uploading = true;
+        StateHasChanged();
+
+        const long maxSize = 50L * 1024 * 1024;
+
+        try
+        {
+            foreach (var file in e.GetMultipleFiles(10))
+            {
+                if (EditingId.HasValue)
+                {
+                    await using var stream = file.OpenReadStream(maxSize);
+                    var dto = new MediumUpsertDto
+                    {
+                        PersonId = EditingId.Value,
+                        FileName = file.Name,
+                        MimeType = file.ContentType,
+                        Type = "photo"
+                    };
+                    var result = await MediumService.CreateAsync(dto, stream);
+                    if (result.Success)
+                    {
+                        _existingPhotos.Insert(0, result.Data!);
+                        if (string.IsNullOrEmpty(_photoUrl))
+                            _photoUrl = result.Data!.Url;
+                    }
+                    else
+                    {
+                        _uploadError = result.Message;
+                    }
+                }
+                else
+                {
+                    using var ms = new MemoryStream();
+                    await file.OpenReadStream(maxSize).CopyToAsync(ms);
+                    var bytes = ms.ToArray();
+                    var dataUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(bytes)}";
+                    _pendingPreviews.Add(new PendingPhoto(file.Name, file.ContentType, bytes, dataUrl));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _uploadError = $"Upload failed: {ex.Message}";
+        }
+        finally
+        {
+            _uploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeletePhoto(MediumDto photo)
+    {
+        var result = await MediumService.DeleteAsync(photo.Id);
+        if (result.Success)
+        {
+            _existingPhotos.Remove(photo);
+            if (_photoUrl == photo.Url)
+                _photoUrl = _existingPhotos.FirstOrDefault()?.Url ?? "";
+        }
+        else
+        {
+            _uploadError = result.Message;
+        }
+    }
+
+    private void SetPrimary(string url) => _photoUrl = url;
+
+    private void RemovePending(int idx)
+    {
+        _pendingPreviews.RemoveAt(idx);
+        if (_primaryPendingIndex >= _pendingPreviews.Count)
+            _primaryPendingIndex = Math.Max(0, _pendingPreviews.Count - 1);
+    }
+
+    // Called by PersonAdd after person creation to upload queued photos.
+    // Returns the URL of the primary photo, or null if none.
+    public async Task<string?> UploadPendingAsync(Guid personId)
+    {
+        string? primaryUrl = null;
+        for (int i = 0; i < _pendingPreviews.Count; i++)
+        {
+            var p = _pendingPreviews[i];
+            var dto = new MediumUpsertDto
+            {
+                PersonId = personId,
+                FileName = p.FileName,
+                MimeType = p.MimeType,
+                Type = "photo"
+            };
+            using var stream = new MemoryStream(p.Data);
+            var result = await MediumService.CreateAsync(dto, stream);
+            if (result.Success && (i == _primaryPendingIndex || primaryUrl is null))
+                primaryUrl = result.Data!.Url;
+        }
+        return primaryUrl;
+    }
+
+    // ── relationship search ────────────────────────────────────────
     private Task<IEnumerable<PersonDto>> SearchParents(string value, CancellationToken _) =>
         Task.FromResult(AllPeople
             .Where(p => p.Id != EditingId && !_parentIds.Contains(p.Id))
@@ -347,19 +576,14 @@
 
     private void RemoveChild(Guid id) => _childIds.Remove(id);
 
-    private async Task OnPhotoFileSelected(InputFileChangeEventArgs e)
-    {
-        _uploadStatus = $"{e.File.Name} selected — upload endpoint not yet available.";
-        await Task.CompletedTask;
-    }
-
+    // ── initials ───────────────────────────────────────────────────
     private string Initials =>
         $"{_firstName.FirstOrDefault()}{_lastName.FirstOrDefault()}".ToUpperInvariant().Trim();
 
+    // ── submit ─────────────────────────────────────────────────────
     private async Task Submit()
     {
-        if (string.IsNullOrWhiteSpace(_firstName) ||
-            string.IsNullOrWhiteSpace(_lastName))
+        if (string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_lastName))
         {
             StateHasChanged();
             return;
@@ -379,7 +603,7 @@
                 BirthPlace = string.IsNullOrWhiteSpace(_birthPlace) ? null : _birthPlace.Trim(),
                 DeathPlace = string.IsNullOrWhiteSpace(_deathPlace) ? null : _deathPlace.Trim(),
                 BiographyNotes = _notes.Trim(),
-                ProfilePhotoUrl = _photoUrl.Trim(),
+                ProfilePhotoUrl = string.IsNullOrWhiteSpace(_photoUrl) ? null : _photoUrl.Trim(),
                 Gender = _gender,
                 ParentIds = [.._parentIds],
                 SpouseIds = [.._spouseIds],

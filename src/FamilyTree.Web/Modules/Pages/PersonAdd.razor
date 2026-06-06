@@ -1,7 +1,7 @@
 ﻿@page "/people/add"
 @rendermode InteractiveServer
 
-@using FamilyTree.Api.Services
+@using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Modules.Components
 @using MudBlazor
@@ -25,7 +25,8 @@ else
         </div>
 
         <MudCard Class="pa-4 mb-4">
-            <PersonForm AllPeople="_allPeople"
+            <PersonForm @ref="_form"
+                        AllPeople="_allPeople"
                         SubmitLabel="Add person"
                         OnSubmit="HandleSubmit"
                         OnCancel="@(() => Nav.NavigateTo("/people"))" />
@@ -39,6 +40,7 @@ else
 }
 
 @code {
+    private PersonForm? _form;
     private List<PersonDto> _allPeople = [];
     private bool _loading = true;
     private string _error = "";
@@ -60,7 +62,7 @@ else
         }
         finally
         {
-            _loading = false;  // always unblock the UI
+            _loading = false;
         }
     }
 
@@ -70,14 +72,26 @@ else
         try
         {
             var result = await PersonService.CreateAsync(dto);
-            if (result.Success)
-            {
-                Nav.NavigateTo("/people");
-            }
-            else
+            if (!result.Success)
             {
                 _error = result.Message;
+                return;
             }
+
+            var personId = result.Data!.Id;
+
+            // Upload any photos queued in the form and back-fill ProfilePhotoUrl
+            if (_form?.HasPendingPhotos == true)
+            {
+                var primaryUrl = await _form.UploadPendingAsync(personId);
+                if (primaryUrl is not null)
+                {
+                    dto.ProfilePhotoUrl = primaryUrl;
+                    await PersonService.UpdateAsync(personId, dto);
+                }
+            }
+
+            Nav.NavigateTo("/people");
         }
         catch (Exception ex)
         {

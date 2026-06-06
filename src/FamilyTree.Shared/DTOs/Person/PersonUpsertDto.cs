@@ -33,7 +33,6 @@ public class PersonUpsertDto
     public string? BiographyNotes { get; set; }
 
     [StringLength(500, ErrorMessage = "Profile photo URL cannot exceed 500 characters.")]
-    [Url(ErrorMessage = "Profile photo URL must be a valid URL.")]
     public string? ProfilePhotoUrl { get; set; }
 
     public Gender? Gender { get; set; }

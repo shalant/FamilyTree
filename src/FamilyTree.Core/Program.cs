@@ -1,6 +1,6 @@
-using Azure.Storage.Blobs;
-using FamilyTree.Api.Data;
-using FamilyTree.Api.Services;
+﻿using Azure.Storage.Blobs;
+using FamilyTree.Core.Data;
+using FamilyTree.Core.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);

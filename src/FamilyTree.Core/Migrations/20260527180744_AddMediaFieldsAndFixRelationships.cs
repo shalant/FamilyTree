@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace FamilyTree.Api.Migrations
+namespace FamilyTree.Core.Migrations
 {
     /// <inheritdoc />
     public partial class AddMediaFieldsAndFixRelationships : Migration

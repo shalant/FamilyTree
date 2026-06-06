@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
    2
    3 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
    4
@@ -9,14 +9,14 @@
    9 dotnet build FamilyTree.sln
   10
   11 # Run (with hot-reload)
-  12 cd src/FamilyTree.Api && dotnet watch    # API → https://localhost:7001
+  12 cd src/FamilyTree.Core && dotnet watch    # API → https://localhost:7001
   13 cd src/FamilyTree.Web && dotnet watch    # Web → https://localhost:7000
   14
   15 # Tests
   16 dotnet test FamilyTree.sln
-  17 dotnet test tests/FamilyTree.Api.Tests/FamilyTree.Api.Tests.csproj
+  17 dotnet test tests/FamilyTree.Core.Tests/FamilyTree.Core.Tests.csproj
   18
-  19 # Database migrations (run from src/FamilyTree.Api)
+  19 # Database migrations (run from src/FamilyTree.Core)
   20 dotnet ef migrations add <MigrationName>
   21 dotnet ef database update
   22 ```
@@ -28,14 +28,14 @@
   28 ```
   29 FamilyTree.Web  (Blazor Server + MudBlazor)
   30     ↓ HTTP / service injection
-  31 FamilyTree.Api  (ASP.NET Core REST API + EF Core)
+  31 FamilyTree.Core  (ASP.NET Core REST API + EF Core)
   32     ↓
   33 SQL Server (local) / Azure SQL Database (prod)
   34 ```
   35
   36 **Projects:**
   37 - `FamilyTree.Shared` — DTOs and enums only; no business logic; shared by Api and Web
-  38 - `FamilyTree.Api` — REST API, service layer, EF Core data access, Swagger in dev
+  38 - `FamilyTree.Core` — REST API, service layer, EF Core data access, Swagger in dev
   39 - `FamilyTree.Web` — Blazor Server UI; calls the API; never references Api project directly
   40
   41 **CI/CD:** GitHub Actions builds, tests, and deploys both services to Azure App Service on push to main. Migrations run automatically on API startup in production.

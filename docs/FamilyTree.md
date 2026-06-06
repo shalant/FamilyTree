@@ -1,4 +1,4 @@
-# FamilyTree — project context
+﻿# FamilyTree — project context
 
 > Paste this file at the start of any AI session or hand it to a new collaborator.
 > Keep it current as decisions are made. Last updated: 2026-05.
@@ -24,7 +24,7 @@ intentionally kept simple and easy to overhaul.
 FamilyTree.Web      Blazor Server UI
       │ HTTP
       ▼
-FamilyTree.Api      ASP.NET Core REST API
+FamilyTree.Core      ASP.NET Core REST API
       │ EF Core
       ▼
 Azure SQL Database
@@ -44,7 +44,7 @@ FamilyTree/
 │   ├── FamilyTree.Shared/
 │   │   ├── DTOs/Person/            PersonDto, PersonUpsertDto
 │   │   └── Enums/                  RelationshipType, MediaType
-│   ├── FamilyTree.Api/
+│   ├── FamilyTree.Core/
 │   │   ├── Controllers/            PeopleController, RelationshipsController
 │   │   ├── Data/                   AppDbContext, EF Core migrations
 │   │   ├── DTOs/                   API-only models
@@ -56,7 +56,7 @@ FamilyTree/
 │       ├── Services/               IPersonService — typed HTTP client
 │       └── wwwroot/                Static assets
 ├── tests/
-│   ├── FamilyTree.Api.Tests/
+│   ├── FamilyTree.Core.Tests/
 │   └── FamilyTree.Web.Tests/
 ├── database/                       Seed scripts, useful queries
 ├── docs/
@@ -221,13 +221,13 @@ destructive actions across the app — not just person deletion.
 docker start familytree-db
 
 # Run API  (https://localhost:7001, Swagger at /swagger)
-cd src/FamilyTree.Api && dotnet watch
+cd src/FamilyTree.Core && dotnet watch
 
 # Run Web  (https://localhost:7000)
 cd src/FamilyTree.Web && dotnet watch
 
 # New migration
-cd src/FamilyTree.Api
+cd src/FamilyTree.Core
 dotnet ef migrations add <Name>
 dotnet ef database update
 ```

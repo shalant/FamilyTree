@@ -2,7 +2,7 @@
 using FamilyTree.Shared.DTOs;
 using FamilyTree.Shared.DTOs.Relationship;
 
-namespace FamilyTree.Api.Services;
+namespace FamilyTree.Core.Services;
 
 public interface IRelationshipService
 {

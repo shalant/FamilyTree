@@ -1,10 +1,10 @@
-using FamilyTree.Api.Data;
-using FamilyTree.Api.Models;
+﻿using FamilyTree.Core.Data;
+using FamilyTree.Core.Models;
 using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Medium;
 using Microsoft.EntityFrameworkCore;
 
-namespace FamilyTree.Api.Services;
+namespace FamilyTree.Core.Services;
 
 public class MediumService(
     IDbContextFactory<AppDbContext> dbFactory,

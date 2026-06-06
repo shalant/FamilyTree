@@ -1,4 +1,4 @@
-# 🌳 FamilyTree  
+﻿# 🌳 FamilyTree  
 
 A modern, full‑stack family tree application built with **Blazor Server (.NET 10)**, **ASP.NET Core Web API**, **SQL Server**, and **MudBlazor** — featuring a custom layout engine, smooth pan/zoom canvas, Azure‑backed media uploads, and a clean, token‑driven dark/light theme.
 
@@ -124,7 +124,7 @@ The rapid turnaround reflects my experience with .NET, Blazor, UI architecture, 
 FamilyTree.Web  (Blazor Server — Azure App Service F1)  
 │  Typed HTTP client calls  
 ▼  
-FamilyTree.Api  (ASP.NET Core Web API — Azure App Service F1)  
+FamilyTree.Core  (ASP.NET Core Web API — Azure App Service F1)  
 │  EF Core, business logic  
 ▼  
 Azure SQL Database  (free tier — 100k vCore‑sec/mo, 32 GB)
@@ -144,7 +144,7 @@ Azure SQL Database  (free tier — 100k vCore‑sec/mo, 32 GB)
 FamilyTree/
 ├── src/
 │   ├── FamilyTree.Shared/        # Shared DTOs, enums
-│   ├── FamilyTree.Api/           # REST API, EF Core, business logic
+│   ├── FamilyTree.Core/           # REST API, EF Core, business logic
 │   └── FamilyTree.Web/           # Blazor Server UI
 │       ├── Modules/
 │       │   ├── Components/       # Reusable UI components

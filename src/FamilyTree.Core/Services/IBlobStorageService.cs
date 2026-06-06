@@ -1,4 +1,4 @@
-namespace FamilyTree.Api.Services;
+﻿namespace FamilyTree.Core.Services;
 
 /// <summary>
 /// Abstraction for blob storage (Azure Blob Storage, local file system, S3, etc.).

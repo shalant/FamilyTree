@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>FamilyTree.Api</RootNamespace>
+    <RootNamespace>FamilyTree.Core</RootNamespace>
     <UserSecretsId>b0b5c858-4c7a-41d2-9022-06cfb916ac62</UserSecretsId>
   </PropertyGroup>
 

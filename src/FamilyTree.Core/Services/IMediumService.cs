@@ -1,7 +1,7 @@
-using FamilyTree.Shared;
+﻿using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Medium;
 
-namespace FamilyTree.Api.Services;
+namespace FamilyTree.Core.Services;
 
 public interface IMediumService
 {

@@ -1,6 +1,6 @@
-using FamilyTree.Shared.Enums;
+﻿using FamilyTree.Shared.Enums;
 
-namespace FamilyTree.Api.Models;
+namespace FamilyTree.Core.Models;
 
 public partial class Relationship
 {

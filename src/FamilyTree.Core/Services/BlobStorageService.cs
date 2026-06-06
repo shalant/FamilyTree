@@ -1,7 +1,7 @@
-using Azure.Storage.Blobs;
+﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 
-namespace FamilyTree.Api.Services;
+namespace FamilyTree.Core.Services;
 
 public class BlobStorageService : IBlobStorageService
 {

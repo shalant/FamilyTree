@@ -1,5 +1,5 @@
-using FamilyTree.Api.Data;
-using FamilyTree.Api.Services;
+﻿using FamilyTree.Core.Data;
+using FamilyTree.Core.Services;
 using FamilyTree.Web.App;
 using FamilyTree.Web.Services;
 using Microsoft.EntityFrameworkCore;

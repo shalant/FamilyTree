@@ -1,11 +1,11 @@
-using FamilyTree.Api.Data;
+﻿using FamilyTree.Core.Data;
 using FamilyTree.Shared.DTOs;
 using FamilyTree.Shared.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using FluentAssertions;
 
-namespace FamilyTree.Api.Tests;
+namespace FamilyTree.Core.Tests;
 
 public class PeopleControllerTests
 {

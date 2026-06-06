@@ -15,7 +15,7 @@
 
   <ItemGroup>
     <!-- Web references Shared only — never references Api directly -->
-    <ProjectReference Include="..\FamilyTree.Api\FamilyTree.Api.csproj" />
+    <ProjectReference Include="..\FamilyTree.Core\FamilyTree.Core.csproj" />
     <ProjectReference Include="..\FamilyTree.Shared\FamilyTree.Shared.csproj" />
   </ItemGroup>
 </Project>

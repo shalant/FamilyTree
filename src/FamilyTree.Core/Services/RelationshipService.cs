@@ -1,13 +1,13 @@
-using FamilyTree.Api.Data;
-using FamilyTree.Api.Mappers;
-using FamilyTree.Api.Models;
+﻿using FamilyTree.Core.Data;
+using FamilyTree.Core.Mappers;
+using FamilyTree.Core.Models;
 using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs;
 using FamilyTree.Shared.DTOs.Relationship;
 using FamilyTree.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 
-namespace FamilyTree.Api.Services;
+namespace FamilyTree.Core.Services;
 
 public class RelationshipService(
     IDbContextFactory<AppDbContext> dbFactory,

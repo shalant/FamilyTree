@@ -1,7 +1,7 @@
-using FamilyTree.Api.Models;
+﻿using FamilyTree.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace FamilyTree.Api.Data;
+namespace FamilyTree.Core.Data;
 
 public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {

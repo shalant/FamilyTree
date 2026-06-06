@@ -1,7 +1,7 @@
-using FamilyTree.Api.Models;
+﻿using FamilyTree.Core.Models;
 using FamilyTree.Shared.Enums;
 
-namespace FamilyTree.Api.Data;
+namespace FamilyTree.Core.Data;
 
 public static class DataSeeder
 {

@@ -1,8 +1,8 @@
-﻿using FamilyTree.Api.Models;
+﻿using FamilyTree.Core.Models;
 using FamilyTree.Shared.DTOs.Person;
 using FamilyTree.Shared.Enums;
 
-namespace FamilyTree.Api.Mappers;
+namespace FamilyTree.Core.Mappers;
 
 public static class PersonMapper
 {

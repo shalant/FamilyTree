@@ -1,4 +1,4 @@
-markdown# FamilyTree
+﻿markdown# FamilyTree
 
 A private family tree application built with Blazor Server (.NET 10), ASP.NET Core Web API,
 SQL Server, and MudBlazor. Hosted on Azure App Service (free tier) with Azure SQL Database.
@@ -7,7 +7,7 @@ SQL Server, and MudBlazor. Hosted on Azure App Service (free tier) with Azure SQ
 FamilyTree.Web  (Blazor Server — Azure App Service F1, free)
 │  HTTP client calls
 ▼
-FamilyTree.Api  (ASP.NET Core Web API — Azure App Service F1, free)
+FamilyTree.Core  (ASP.NET Core Web API — Azure App Service F1, free)
 │  EF Core
 ▼
 Azure SQL Database  (free tier — 100k vCore-seconds/mo, 32 GB)
@@ -21,7 +21,7 @@ Both .NET projects run natively with `dotnet watch` for hot-reload and debugger 
 | Project             | Purpose                                                        |
 |---------------------|----------------------------------------------------------------|
 | `FamilyTree.Shared` | DTOs and enums shared between Web and Api                      |
-| `FamilyTree.Api`    | REST API — EF Core, business logic, database access            |
+| `FamilyTree.Core`    | REST API — EF Core, business logic, database access            |
 | `FamilyTree.Web`    | Blazor Server UI — MudBlazor components, HTTP client services  |
 
 ## Quick start
@@ -39,14 +39,14 @@ Connect in SSMS: `localhost,1433` / `sa` / `Dev!Password123`
 ### 2. Apply migrations
 
 ```bash
-cd src/FamilyTree.Api
+cd src/FamilyTree.Core
 dotnet ef database update
 ```
 
 ### 3. Run the API
 
 ```bash
-cd src/FamilyTree.Api
+cd src/FamilyTree.Core
 dotnet watch
 # Swagger at https://localhost:7001/swagger
 ```
@@ -62,7 +62,7 @@ dotnet watch
 ## EF Core migrations
 
 ```bash
-cd src/FamilyTree.Api
+cd src/FamilyTree.Core
 
 # After changing a model
 dotnet ef migrations add <MigrationName>
@@ -86,7 +86,7 @@ FamilyTree/
 │   │   ├── DTOs/
 │   │   │   └── Person/             # PersonDto, PersonUpsertDto
 │   │   └── Enums/                  # RelationshipType, MediaType
-│   ├── FamilyTree.Api/
+│   ├── FamilyTree.Core/
 │   │   ├── Controllers/            # PeopleController, RelationshipsController
 │   │   ├── Data/                   # AppDbContext, EF Core migrations
 │   │   ├── DTOs/                   # API-only request/response models
@@ -107,7 +107,7 @@ FamilyTree/
 │       │   └── IPersonService.cs             # Typed HTTP client interface
 │       └── wwwroot/
 ├── tests/
-│   ├── FamilyTree.Api.Tests/
+│   ├── FamilyTree.Core.Tests/
 │   └── FamilyTree.Web.Tests/
 ├── database/                       # Seed scripts, useful queries
 ├── docs/

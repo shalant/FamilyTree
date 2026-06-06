@@ -1,4 +1,4 @@
-namespace FamilyTree.Api.Models;
+﻿namespace FamilyTree.Core.Models;
 
 public partial class Medium
 {

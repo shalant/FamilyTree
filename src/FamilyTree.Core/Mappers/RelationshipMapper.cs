@@ -1,7 +1,7 @@
-﻿using FamilyTree.Api.Models;
+﻿using FamilyTree.Core.Models;
 using FamilyTree.Shared.DTOs.Relationship;
 
-namespace FamilyTree.Api.Mappers;
+namespace FamilyTree.Core.Mappers;
 
 /// <summary>
 /// Maps Relationship entities to DTOs.

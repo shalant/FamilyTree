@@ -1,4 +1,4 @@
-# Deployment Guide — Azure App Service + Azure SQL (Free Tiers)
+﻿# Deployment Guide — Azure App Service + Azure SQL (Free Tiers)
 
 ## Overview
 
@@ -103,7 +103,7 @@ EF Core migrations are the single source of truth for schema.
 
 ```
 Local workflow:
-1. Change a model in FamilyTree.Api/Models/
+1. Change a model in FamilyTree.Core/Models/
 2. dotnet ef migrations add <MigrationName>   ← generates migration file
 3. dotnet ef database update                  ← applies to local SQL Server
 4. git commit + push to main

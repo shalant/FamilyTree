@@ -1,7 +1,7 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using FamilyTree.Shared;
 
-namespace FamilyTree.Api;
+namespace FamilyTree.Core;
 
 public static class ValidationHelper
 {
