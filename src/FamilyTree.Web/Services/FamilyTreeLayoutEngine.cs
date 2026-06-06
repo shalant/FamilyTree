@@ -81,7 +81,7 @@ public class FamilyTreeLayoutEngine
     private const int FocusSize = 80;       // increased from 68
     private const int Gen1Size = 70;        // increased from 56
     private const int DefaultSize = 60;     // increased from 48
-    private const double PxPerYear = 15.0;  // pixels per year on Y-axis (compact layout)
+    private const double PxPerYear = 8.0;   // pixels per year — fits 3-4 generations on a 768px viewport
 
     public FamilyTreeLayout ComputeLayout(
         List<PersonDto> people,

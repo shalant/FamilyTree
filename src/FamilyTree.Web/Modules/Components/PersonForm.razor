@@ -215,7 +215,8 @@
             <MudStack>
                 <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600);">Parents</MudText>
 
-                <MudAutocomplete T="PersonDto"
+                <MudAutocomplete @ref="_parentAc"
+                                 T="PersonDto"
                                  SearchFunc="SearchParents"
                                  ValueChanged="AddParent"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -248,7 +249,8 @@
             <MudStack>
                 <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600);">Spouses / partners</MudText>
 
-                <MudAutocomplete T="PersonDto"
+                <MudAutocomplete @ref="_spouseAc"
+                                 T="PersonDto"
                                  SearchFunc="SearchSpouses"
                                  ValueChanged="AddSpouse"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -277,11 +279,46 @@
                 </MudChipSet>
             </MudStack>
 
+            <!-- Siblings -->
+            <MudStack>
+                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600);">Siblings</MudText>
+
+                <MudAutocomplete @ref="_siblingAc"
+                                 T="PersonDto"
+                                 SearchFunc="SearchSiblings"
+                                 ValueChanged="AddSibling"
+                                 ToStringFunc="@(p => p?.FullName ?? "")"
+                                 Label="Search by name…"
+                                 Variant="Variant.Outlined"
+                                 Dense="true" />
+
+                <MudChipSet T="string">
+                    @foreach (var id in _siblingIds)
+                    {
+                        var person = AllPeople.FirstOrDefault(p => p.Id == id);
+                        if (person is not null)
+                        {
+                            <MudChip T="string" OnClose="@(() => RemoveSibling(id))"
+                                     Style="background:var(--ft-green-50); color:var(--ft-green-800);">
+                                @person.FullName
+                                @if (person.BirthDate.HasValue)
+                                {
+                                    <span style="opacity:0.6; margin-left:4px;">
+                                        @person.BirthDate.Value.Year
+                                    </span>
+                                }
+                            </MudChip>
+                        }
+                    }
+                </MudChipSet>
+            </MudStack>
+
             <!-- Children -->
             <MudStack>
                 <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600);">Children</MudText>
 
-                <MudAutocomplete T="PersonDto"
+                <MudAutocomplete @ref="_childAc"
+                                 T="PersonDto"
                                  SearchFunc="SearchChildren"
                                  ValueChanged="AddChild"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -369,7 +406,14 @@
     private Gender? _gender;
     private HashSet<Guid> _parentIds = [];
     private HashSet<Guid> _spouseIds = [];
+    private HashSet<Guid> _siblingIds = [];
     private HashSet<Guid> _childIds = [];
+
+    // autocomplete refs — needed to reset after each selection
+    private MudAutocomplete<PersonDto>? _parentAc;
+    private MudAutocomplete<PersonDto>? _spouseAc;
+    private MudAutocomplete<PersonDto>? _siblingAc;
+    private MudAutocomplete<PersonDto>? _childAc;
 
     // ── photo state ────────────────────────────────────────────────
     private record PendingPhoto(string FileName, string MimeType, byte[] Data, string DataUrl);
@@ -401,6 +445,7 @@
         _gender = Initial.Gender;
         _parentIds = [..Initial.ParentIds];
         _spouseIds = [..Initial.SpouseIds];
+        _siblingIds = [..Initial.SiblingIds];
         _childIds = [..Initial.ChildIds];
     }
 
@@ -538,10 +583,11 @@
                         p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
             .Take(8));
 
-    private void AddParent(PersonDto? person)
+    private async Task AddParent(PersonDto? person)
     {
-        if (person is not null)
-            _parentIds.Add(person.Id);
+        if (person is null) return;
+        _parentIds.Add(person.Id);
+        if (_parentAc is not null) await _parentAc.ResetAsync();
     }
 
     private void RemoveParent(Guid id) => _parentIds.Remove(id);
@@ -553,13 +599,30 @@
                         p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
             .Take(8));
 
-    private void AddSpouse(PersonDto? person)
+    private async Task AddSpouse(PersonDto? person)
     {
-        if (person is not null)
-            _spouseIds.Add(person.Id);
+        if (person is null) return;
+        _spouseIds.Add(person.Id);
+        if (_spouseAc is not null) await _spouseAc.ResetAsync();
     }
 
     private void RemoveSpouse(Guid id) => _spouseIds.Remove(id);
+
+    private Task<IEnumerable<PersonDto>> SearchSiblings(string value, CancellationToken _) =>
+        Task.FromResult(AllPeople
+            .Where(p => p.Id != EditingId && !_siblingIds.Contains(p.Id))
+            .Where(p => string.IsNullOrWhiteSpace(value) ||
+                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(8));
+
+    private async Task AddSibling(PersonDto? person)
+    {
+        if (person is null) return;
+        _siblingIds.Add(person.Id);
+        if (_siblingAc is not null) await _siblingAc.ResetAsync();
+    }
+
+    private void RemoveSibling(Guid id) => _siblingIds.Remove(id);
 
     private Task<IEnumerable<PersonDto>> SearchChildren(string value, CancellationToken _) =>
         Task.FromResult(AllPeople
@@ -568,10 +631,11 @@
                         p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
             .Take(8));
 
-    private void AddChild(PersonDto? person)
+    private async Task AddChild(PersonDto? person)
     {
-        if (person is not null)
-            _childIds.Add(person.Id);
+        if (person is null) return;
+        _childIds.Add(person.Id);
+        if (_childAc is not null) await _childAc.ResetAsync();
     }
 
     private void RemoveChild(Guid id) => _childIds.Remove(id);
@@ -607,6 +671,7 @@
                 Gender = _gender,
                 ParentIds = [.._parentIds],
                 SpouseIds = [.._spouseIds],
+                SiblingIds = [.._siblingIds],
                 ChildIds = [.._childIds]
             };
 

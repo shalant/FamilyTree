@@ -272,6 +272,43 @@ public class PersonService(
             });
         }
 
+        // Children — personId is the parent
+        foreach (var childId in dto.ChildIds)
+        {
+            ctx.Relationships.Add(new Relationship
+            {
+                PersonAId = personId,
+                PersonBId = childId,
+                Type = RelationshipType.Parent,
+                CreatedAt = now
+            });
+        }
+
+        // Siblings (canonical ordering — same as spouse dedup)
+        foreach (var siblingId in dto.SiblingIds)
+        {
+            var ordered = new[] { personId, siblingId }.OrderBy(g => g).ToArray();
+            var a = ordered[0];
+            var b = ordered[1];
+
+            var exists = await ctx.Relationships.AnyAsync(
+                r => r.PersonAId == a &&
+                     r.PersonBId == b &&
+                     r.Type == RelationshipType.Sibling,
+                ct);
+
+            if (!exists)
+            {
+                ctx.Relationships.Add(new Relationship
+                {
+                    PersonAId = a,
+                    PersonBId = b,
+                    Type = RelationshipType.Sibling,
+                    CreatedAt = now
+                });
+            }
+        }
+
         // Spouses (canonical ordering)
         foreach (var spouseId in dto.SpouseIds)
         {
