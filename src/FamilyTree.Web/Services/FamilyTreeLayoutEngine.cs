@@ -281,7 +281,7 @@ public class FamilyTreeLayoutEngine
         foreach (var person in people.Where(p => p.BirthDate.HasValue))
             years[person.Id] = person.BirthDate.Value.Year;
 
-        // Infer from children (iterate until stable)
+        // Infer from children: parent_year ≈ avg(child_years) - 25
         bool changed = true;
         while (changed)
         {
@@ -296,6 +296,29 @@ public class FamilyTreeLayoutEngine
                 if (childYears.Any())
                 {
                     years[person.Id] = (int)childYears.Average() - 25;
+                    changed = true;
+                }
+            }
+        }
+
+        // Infer from parents: child_year ≈ avg(parent_years) + 25
+        // This handles people with no birth date but known parents (e.g. a new child
+        // added without a birth year — the median fallback would place them at the
+        // wrong generation without this pass).
+        changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var person in people)
+            {
+                if (years.ContainsKey(person.Id)) continue;
+                var parentYears = (person.ParentIds ?? [])
+                    .Where(pid => years.ContainsKey(pid))
+                    .Select(pid => years[pid])
+                    .ToList();
+                if (parentYears.Any())
+                {
+                    years[person.Id] = (int)parentYears.Average() + 25;
                     changed = true;
                 }
             }
@@ -415,35 +438,61 @@ public class FamilyTreeLayoutEngine
 
             var spanY = children.Min(c => c.Y - c.Size / 2.0) - 18;
             var stem = new StemLine(midX, heartY, spanY);
-            var span = children.Count > 1
-                ? new SiblingSpan(children.Min(c => (double)c.X),
-                                  children.Max(c => (double)c.X), spanY)
+
+            // Extend span to always include midX so the stem endpoint connects to it.
+            // Without this, children positioned entirely to one side of the couple
+            // leave a horizontal gap between the stem and the first drop.
+            var spanLeft  = Math.Min(children.Min(c => (double)c.X), midX);
+            var spanRight = Math.Max(children.Max(c => (double)c.X), midX);
+            var span = Math.Abs(spanRight - spanLeft) > 1
+                ? new SiblingSpan(spanLeft, spanRight, spanY)
                 : null;
             var drops = children.Select(c => new ChildDrop(c.X, c.Y - c.Size / 2.0)).ToList();
 
             families.Add(new FamilyUnit(arc, stem, span, drops));
         }
 
-        // Process single-parent families
+        // Process single-parent families — group all children by parent so the
+        // stem→span→drops pattern matches coupled families and avoids S-curve gaps.
+        var singleParentGroups = new Dictionary<Guid, List<Guid>>();
+
         foreach (var person in people)
         {
             if (routedChildren.Contains(person.Id)) continue;
             foreach (var parentId in person.ParentIds ?? [])
             {
-                if (!nodeMap.TryGetValue(parentId, out var parent) ||
-                    !nodeMap.TryGetValue(person.Id, out var child))
-                    continue;
-
-                var parentBottomY = parent.Y + parent.Size / 2.0;
-                var childTopY = child.Y - child.Size / 2.0;
-                var midY = parentBottomY + (childTopY - parentBottomY) / 2.0;
-
-                families.Add(new FamilyUnit(
-                    null,
-                    new StemLine(parent.X, parentBottomY, midY),
-                    null,
-                    [new ChildDrop(child.X, childTopY)]));
+                if (!nodeMap.ContainsKey(parentId) || !nodeMap.ContainsKey(person.Id)) continue;
+                if (!singleParentGroups.ContainsKey(parentId))
+                    singleParentGroups[parentId] = [];
+                singleParentGroups[parentId].Add(person.Id);
             }
+        }
+
+        foreach (var (parentId, childIds) in singleParentGroups)
+        {
+            var parent = nodeMap[parentId];
+            var children = childIds
+                .Where(nodeMap.ContainsKey)
+                .Select(id => nodeMap[id])
+                .ToList();
+
+            if (!children.Any()) continue;
+
+            var parentBottomY = parent.Y + parent.Size / 2.0;
+            var spanY = children.Min(c => c.Y - c.Size / 2.0) - 18;
+
+            var stem = new StemLine(parent.X, parentBottomY, spanY);
+
+            // Extend span to include parent.X so the stem always connects to it
+            var spanLeft  = Math.Min(children.Min(c => (double)c.X), parent.X);
+            var spanRight = Math.Max(children.Max(c => (double)c.X), parent.X);
+            var span = Math.Abs(spanRight - spanLeft) > 1
+                ? new SiblingSpan(spanLeft, spanRight, spanY)
+                : null;
+
+            var drops = children.Select(c => new ChildDrop(c.X, c.Y - c.Size / 2.0)).ToList();
+
+            families.Add(new FamilyUnit(null, stem, span, drops));
         }
 
         return families;

@@ -21,7 +21,7 @@ export function init(viewportId, transformId, focusX, focusY) {
     if (!_viewport || !_transform) return;
 
     const rect = _viewport.getBoundingClientRect();
-    _zoom = 0.85;
+    _zoom = 1.0;
     _panX = rect.width  / 2 - focusX * _zoom;
     _panY = rect.height / 2 - focusY * _zoom;
     _clampPan();
@@ -123,26 +123,14 @@ function _clampPan() {
     const cw = content.offsetWidth  * _zoom;
     const ch = content.offsetHeight * _zoom;
 
-    // const minX = EDGE_MARGIN - cw;
-    // const maxX = vw - EDGE_MARGIN;
-    // _panX = minX > maxX
-    //     ? (vw - cw) / 2                          // canvas fits — center it
-    //     : Math.max(minX, Math.min(maxX, _panX));
-
-    // const minY = EDGE_MARGIN - ch;
-    // const maxY = vh - EDGE_MARGIN;
-    // _panY = minY > maxY
-    //     ? (vh - ch) / 2
-    //     : Math.max(minY, Math.min(maxY, _panY));
-
-    const minX = vw - cw;
-    const maxX = 0;
-    _panX = Math.min(maxX, Math.max(minX, _panX));
-
-    const minY = vh - ch;
-    const maxY = 0;
-    _panY = Math.min(maxY, Math.max(minY, _panY));
-
+    // Allow panning so that any point on the canvas can be centered.
+    // Range: from "rightmost canvas pixel at viewport centre"
+    //        to   "leftmost canvas pixel at viewport centre".
+    // This fixes the bug where nodes near the canvas left/top edge
+    // couldn't be centred because the old clamp (maxX=0) prevented
+    // positive panX values.
+    _panX = Math.min(vw / 2, Math.max(vw / 2 - cw, _panX));
+    _panY = Math.min(vh / 2, Math.max(vh / 2 - ch, _panY));
 }
 
 function _applyTransform() {

@@ -4,12 +4,22 @@
 - [ ] Auth — Identity/OAuth setup + token validation across API & Web
 - [x] ~~Blob~~ — Azure Blob Storage integrated for photo uploads
 - [x] ~~Validation~~ — Data validation on DTOs + business logic + file handling
-- [ ] Toolbar — Floating UI controls (zoom, reset, focus actions)
+- [x] ~~Toolbar~~ — Floating draggable toolbar + draggable header
 
 ## Completed Features
 - [x] ~~Delete photo~~
 - [x] ~~Edit photo captions~~
 - [x] ~~Load preview URLs in PersonDetailDrawer~~
+- [x] ~~Multi-photo upload with primary photo selection~~
+- [x] ~~Siblings field in person form~~
+- [x] ~~Multiple parents/spouses/children (autocomplete reset)~~
+- [x] ~~ChildIds and SiblingIds persisted in relationship sync~~
+- [x] ~~All person fields saved (birthplace, gender, maiden name, etc.)~~
+- [x] ~~Tree generation height compressed for 17" laptops~~
+
+## Relationship Enhancements
+- [ ] **Divorce** — UI to set EndDate on a Spouse relationship (infrastructure already exists: `Relationship.EndDate`). Needs: "Mark as divorced" action on spouse chips, ex-spouse label in drawer, dashed connector in tree for ended marriages. Schema: no migration needed, `RelationshipDto` needs `EndDate` + `IsActive` exposed, `PersonDto.SpouseIds` split into active/former.
+- [ ] **Focus persistence** — persist the user's default focus person to localStorage or a user preferences table so it survives page refresh
 
 ---
 
@@ -127,3 +137,14 @@ Animated connectors: subtle pulse along parent lines when focusing.
 Photo avatars: circular crops with soft shadows.
 
 Shareable view: generate a read‑only link for a specific focus person.
+
+
+
+
+
+Brainstorming on auth, 6 June 26:
+- I'd like an admin dashboard to track changes
+- admin should have the ability to turn off various features for a user. additional, i can lock out users. perhaps even cap daily CRUD totals at 10x unless they ask for permission
+- would there be a way to limit a user's visilibity to something like 3 linkages? is this too complex?
+- is there an easy way to  manually mark if they have donated via Venmo and have additionally privileges?
+- would instant messaging and knowing if other people are using concurrently be too complex?

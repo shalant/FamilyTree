@@ -100,8 +100,28 @@ else
             _people = result.Data!;
             _couples = CoupleHelper.Derive(_people);
 
-            _focusPerson = Focus.HasValue
-                ? _people.FirstOrDefault(p => p.Id == Focus.Value) ?? _people.FirstOrDefault()
+            // Priority: URL ?focus= param → localStorage → alphabetical first
+            Guid? focusId = Focus;
+
+            if (!focusId.HasValue)
+            {
+                try
+                {
+                    var saved = await JS.InvokeAsync<string?>("localStorage.getItem", "ft-focus");
+                    if (Guid.TryParse(saved, out var savedId))
+                        focusId = savedId;
+                }
+                catch { /* JS not ready during SSR pre-render */ }
+            }
+            else
+            {
+                // Persist URL-driven focus so it survives the next load
+                try { await JS.InvokeVoidAsync("localStorage.setItem", "ft-focus", focusId.Value.ToString()); }
+                catch { }
+            }
+
+            _focusPerson = focusId.HasValue
+                ? _people.FirstOrDefault(p => p.Id == focusId.Value) ?? _people.FirstOrDefault()
                 : _people.FirstOrDefault();
         }
         else
@@ -125,10 +145,12 @@ else
     private void HandlePersonSelected(PersonDto person) =>
         _detailPerson = person;
 
-    private void SetFocus(PersonDto person)
+    private async Task SetFocus(PersonDto person)
     {
         _focusPerson = person;
         _detailPerson = null;
+        try { await JS.InvokeVoidAsync("localStorage.setItem", "ft-focus", person.Id.ToString()); }
+        catch { }
     }
 
     private async Task CenterTree()
