@@ -428,7 +428,24 @@ html, body {
     ::-webkit-scrollbar-thumb:hover {
         background: var(--ft-gray-300);
     }
+
 /* ── Tree generation bands ────────────────────────────────────────────────── */
+
+.ft-viewport {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--ft-surface);
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+/*.ft-viewport {
+    background: var(--ft-green-50);
+}*/
 
 .ft-main {
     padding: 0;
@@ -437,6 +454,27 @@ html, body {
     min-height: 0;
 }
 
+/* ── Tree Canvas: Generation Bands ───────────────────────────────────────── */
+.ft-band {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    background: var(--ft-band-parents); /* or a decade-based token */
+    opacity: 0.25; /* baseline; dynamic opacity still applied inline */
+    pointer-events: none;
+}
+
+.ft-band-label {
+    position: absolute;
+    left: 24px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ft-green-700);
+    letter-spacing: 0.05em;
+    font-family: var(--ft-font-body);
+    pointer-events: none;
+    opacity: 0.7;
+}
 
 .ft-band--grandparents {
     background: var(--ft-band-grandparents);
@@ -459,10 +497,40 @@ html, body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: var(--ft-surface);
+    /*background: var(--ft-surface);*/
+    background: var(--ft-band-parents);
     overflow: auto;
     z-index: 0;
 }
+
+/* ── Tree Canvas: Transform Wrapper ───────────────────────────── */
+#ft-transform {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+}
+
+.ft-empty-message {
+    position: absolute;
+    top: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--ft-text-muted);
+    font-size: 14px;
+}
+
+/* ── Tree Canvas: SVG Layer ───────────────────────────── */
+.ft-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    overflow: visible;
+}
+
+
 /* ── Person node ──────────────────────────────────────────────────────────── */
 
 .person-node {

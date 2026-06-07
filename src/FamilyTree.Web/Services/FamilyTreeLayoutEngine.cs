@@ -1,5 +1,6 @@
 using FamilyTree.Shared.DTOs;
 using FamilyTree.Shared.DTOs.Person;
+using System.ComponentModel.Design.Serialization;
 
 namespace FamilyTree.Web.Services;
 
@@ -82,6 +83,7 @@ public class FamilyTreeLayoutEngine
     private const int Gen1Size = 70;        // increased from 56
     private const int DefaultSize = 60;     // increased from 48
     private const double PxPerYear = 8.0;   // pixels per year — fits 3-4 generations on a 768px viewport
+    private const int SpouseSpacingX = 160; // extra spacing for couples
 
     public FamilyTreeLayout ComputeLayout(
         List<PersonDto> people,
@@ -134,7 +136,21 @@ public class FamilyTreeLayoutEngine
             {
                 var members = depthGroup.ToList();
                 var count = members.Count;
-                var startX = -(count - 1) * NodeSpacingX / 2.0;
+                var spacingX = NodeSpacingX;
+
+                // NEW: widen spacing for spouses
+                if (count == 2)
+                {
+                    var p1 = members[0];
+                    var p2 = members[1];
+
+                    if((p1.SpouseIds?.Contains(p2.Id) ?? false) || (p2.SpouseIds?.Contains(p1.Id) ?? false))
+                    {
+                        spacingX = NodeSpacingX + SpouseSpacingX; // add extra space for couples
+                    }
+                }
+
+                var startX = -(count - 1) * spacingX / 2.0;
 
                 for (int i = 0; i < count; i++)
                 {
@@ -150,7 +166,8 @@ public class FamilyTreeLayoutEngine
 
                     nodeMap[person.Id] = new LayoutNode(
                         person,
-                        (int)(xOffset + componentXWidth / 2.0 + startX + i * NodeSpacingX),
+                        //(int)(xOffset + componentXWidth / 2.0 + startX + i * NodeSpacingX),
+                        (int)(xOffset + componentXWidth / 2.0 + startX + i * spacingX),
                         y,
                         depths.GetValueOrDefault(person.Id, 0),
                         isFocus,
@@ -442,8 +459,13 @@ public class FamilyTreeLayoutEngine
             // Extend span to always include midX so the stem endpoint connects to it.
             // Without this, children positioned entirely to one side of the couple
             // leave a horizontal gap between the stem and the first drop.
-            var spanLeft  = Math.Min(children.Min(c => (double)c.X), midX);
-            var spanRight = Math.Max(children.Max(c => (double)c.X), midX);
+            var parentCenterX = midX;
+            var childMinX = children.Min(c => (double)c.X);
+            var childMaxX = children.Max(c => (double)c.X);
+
+            var spanLeft = Math.Min(childMinX, parentCenterX - (children.Count * NodeSpacingX) / 2.0);
+            var spanRight = Math.Max(childMaxX, parentCenterX + (children.Count * NodeSpacingX) / 2.0);
+
             var span = Math.Abs(spanRight - spanLeft) > 1
                 ? new SiblingSpan(spanLeft, spanRight, spanY)
                 : null;
@@ -484,8 +506,13 @@ public class FamilyTreeLayoutEngine
             var stem = new StemLine(parent.X, parentBottomY, spanY);
 
             // Extend span to include parent.X so the stem always connects to it
-            var spanLeft  = Math.Min(children.Min(c => (double)c.X), parent.X);
-            var spanRight = Math.Max(children.Max(c => (double)c.X), parent.X);
+            var parentCenterX = parent.X;
+            var childMinX = children.Min(c => (double)c.X);
+            var childMaxX = children.Max(c => (double)c.X);
+
+            var spanLeft = Math.Min(childMinX, parentCenterX - (children.Count * NodeSpacingX) / 2.0);
+            var spanRight = Math.Max(childMaxX, parentCenterX + (children.Count * NodeSpacingX) / 2.0);
+
             var span = Math.Abs(spanRight - spanLeft) > 1
                 ? new SiblingSpan(spanLeft, spanRight, spanY)
                 : null;
