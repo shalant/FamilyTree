@@ -13,7 +13,7 @@
 @inject IPersonService PersonService
 @inject NavigationManager Nav
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject ToastService Toast
 
 <PageTitle>Family tree</PageTitle>
 
@@ -94,7 +94,7 @@ else
         }
         else
         {
-            Snackbar.Add(result.Message, Severity.Error);
+            Toast.Error(result.Message);
         }
 
         var ava = _people.FirstOrDefault(p => p.FirstName == "Ava");
@@ -164,7 +164,7 @@ else
         if (result is { Canceled: false })
         {
             var response = await PersonService.DeleteAsync(person.Id);
-            Snackbar.ShowResult(response, $"{person.FullName} deleted.");
+            Toast.ShowResult(response, $"{person.FullName} deleted.");
 
             if (response.Success)
             {

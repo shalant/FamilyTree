@@ -3,14 +3,15 @@
 
 @using MudBlazor
 @using FamilyTree.Web.Services
+@using FamilyTree.Web.Modules.Components
 
 @inject ThemeService Theme
 @inject NavigationManager Nav
 
 <MudThemeProvider Theme="_mudTheme" @bind-IsDarkMode="_isDark" />
 <MudDialogProvider />
-<MudSnackbarProvider />
 <MudPopoverProvider />
+<ToastContainer />
 
 <MudLayout>
     <CustomAppBar @bind-IsDark="_isDark" />
@@ -25,7 +26,7 @@
 @code {
     private bool _isDark;
 
-    // Our custom MudBlazor theme — colours come from CSS vars where possible.
+    // Our custom MudBlazor theme ï¿½ colours come from CSS vars where possible.
     // The palette here is the fallback for MudBlazor's own component coloring.
     private MudTheme _mudTheme = new()
     {

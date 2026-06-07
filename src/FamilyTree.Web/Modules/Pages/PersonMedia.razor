@@ -6,12 +6,13 @@
 @using FamilyTree.Core.Services
 @using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Modules.Dialogs
+@using FamilyTree.Web.Services
 @using MudBlazor
 
 @inject IPersonService PersonService
 @inject IMediumService MediumService
 @inject NavigationManager Nav
-@inject ISnackbar Snackbar
+@inject ToastService Toast
 @inject IDialogService DialogService
 
 <PageTitle>@(_person?.FirstName ?? "Person")'s media</PageTitle>
@@ -445,16 +446,16 @@ else
                         FileName = file.Name,
                         Caption = null
                     });
-                    Snackbar.Add($"{file.Name} uploaded successfully", Severity.Success);
+                    Toast.Success($"{file.Name} uploaded successfully");
                 }
                 else
                 {
-                    Snackbar.Add($"Failed to upload {file.Name}: {result.Message}", Severity.Error);
+                    Toast.Error($"Failed to upload {file.Name}: {result.Message}");
                 }
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Error uploading {file.Name}: {ex.Message}", Severity.Error);
+                Toast.Error($"Error uploading {file.Name}: {ex.Message}");
             }
         }
         _uploadingPhoto = false;
@@ -487,16 +488,16 @@ else
                 if (updateResult.Success)
                 {
                     photo.Caption = newCaption;
-                    Snackbar.Add("Caption updated", Severity.Success);
+                    Toast.Success("Caption updated");
                 }
                 else
                 {
-                    Snackbar.Add($"Failed to update caption: {updateResult.Message}", Severity.Error);
+                    Toast.Error($"Failed to update caption: {updateResult.Message}");
                 }
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Error updating caption: {ex.Message}", Severity.Error);
+                Toast.Error($"Error updating caption: {ex.Message}");
             }
             StateHasChanged();
         }
@@ -527,11 +528,11 @@ else
         {
             _profilePhotoUrl = photo.Url;
             _person = result.Data!;
-            Snackbar.Add("Profile photo updated", Severity.Success);
+            Toast.Success("Profile photo updated");
         }
         else
         {
-            Snackbar.Add($"Failed to update profile photo: {result.Message}", Severity.Error);
+            Toast.Error($"Failed to update profile photo: {result.Message}");
         }
         StateHasChanged();
     }
@@ -569,11 +570,11 @@ else
                     _person = clearResult.Data!;
                 }
             }
-            Snackbar.Add("Photo deleted", Severity.Success);
+            Toast.Success("Photo deleted");
         }
         else
         {
-            Snackbar.Add($"Failed to delete photo: {result.Message}", Severity.Error);
+            Toast.Error($"Failed to delete photo: {result.Message}");
         }
         StateHasChanged();
     }
@@ -620,7 +621,7 @@ else
                     Date = _newRecordDate.HasValue ? DateOnly.FromDateTime(_newRecordDate.Value) : null,
                     Url = medium.Url
                 });
-                Snackbar.Add($"{_newRecordType} saved successfully", Severity.Success);
+                Toast.Success($"{_newRecordType} saved successfully");
                 _pendingRecordFile = null;
                 _pendingRecordFileName = null;
                 _newRecordType = null;
@@ -629,7 +630,7 @@ else
             }
             else
             {
-                Snackbar.Add($"Failed to save record: {result.Message}", Severity.Error);
+                Toast.Error($"Failed to save record: {result.Message}");
             }
             ResetRecordForm();
         }
@@ -654,11 +655,11 @@ else
         if (result.Success)
         {
             _records.Remove(rec);
-            Snackbar.Add("Record deleted", Severity.Success);
+            Toast.Success("Record deleted");
         }
         else
         {
-            Snackbar.Add($"Failed to delete record: {result.Message}", Severity.Error);
+            Toast.Error($"Failed to delete record: {result.Message}");
         }
         StateHasChanged();
     }

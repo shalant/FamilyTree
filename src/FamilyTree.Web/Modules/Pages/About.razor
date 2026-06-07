@@ -1,6 +1,7 @@
 @page "/about"
 @rendermode InteractiveServer
 
+@using FamilyTree.Web.Modules.Components
 @using MudBlazor
 
 @inject NavigationManager Nav
@@ -27,7 +28,7 @@
     </div>
 
     @* ── The project ──────────────────────────────────────────────────────── *@
-    <Section Title="The project">
+    <CustomSection Title="The project">
         <p style="font-size:15px; color:var(--ft-gray-600); line-height:1.8; margin:0 0 14px;">
             FamilyTree is a personal project built to solve a real frustration: existing genealogy tools
             are either locked behind expensive subscriptions, hard to use, or require surrendering your
@@ -38,10 +39,10 @@
             a clean visual tree, simple data entry, and first-class support for importing
             from common genealogy formats.
         </p>
-    </Section>
+    </CustomSection>
 
     @* ── Tech stack ───────────────────────────────────────────────────────── *@
-    <Section Title="Built with">
+    <CustomSection Title="Built with">
         <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:4px;">
             @foreach (var (label, color) in new (string,string)[]{
                 (".NET 10", "#512bd4"), ("C# 13", "#239120"),
@@ -57,10 +58,10 @@
                 </div>
             }
         </div>
-    </Section>
+    </CustomSection>
 
     @* ── Privacy commitment ───────────────────────────────────────────────── *@
-    <Section Title="Privacy commitment">
+    <CustomSection Title="Privacy commitment">
         <div style="display:flex; flex-direction:column; gap:12px;">
             @foreach (var (icon, text) in new (string,string)[]{
                 (Icons.Material.Outlined.Lock, "Your data is yours. We do not sell, share, or mine your family information."),
@@ -77,10 +78,10 @@
                 </div>
             }
         </div>
-    </Section>
+    </CustomSection>
 
     @* ── Roadmap highlights ───────────────────────────────────────────────── *@
-    <Section Title="What's coming">
+    <CustomSection Title="What's coming">
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             @foreach (var (label, done) in new (string,bool)[]{
                 ("User accounts & authentication", false),
@@ -100,7 +101,7 @@
                 </div>
             }
         </div>
-    </Section>
+    </CustomSection>
 
     @* ── Donate ───────────────────────────────────────────────────────────── *@
     <div style="background:var(--ft-brown-50); border:1px solid var(--ft-brown-200);
@@ -153,18 +154,5 @@
 @code {
     private static string RoadmapIconStyle(bool done) =>
         done ? "font-size:16px; color:var(--ft-green-600);"
-             : "font-size:16px; color:var(--ft-gray-200);";
-
-    private RenderFragment Section(string Title, RenderFragment ChildContent) => __builder =>
-    {
-        <div style="margin-bottom:40px;">
-            <div style="font-size:11px; font-weight:700; text-transform:uppercase;
-                letter-spacing:0.1em; color:var(--ft-green-600); margin-bottom:14px;">
-                @Title
-            </div>
-            <div style="border-left:3px solid var(--ft-line-border); padding-left:18px;">
-                @ChildContent
-            </div>
-        </div>;
-    };
+             : "font-size:16px; color:var(--ft-gray-200);";    
 }

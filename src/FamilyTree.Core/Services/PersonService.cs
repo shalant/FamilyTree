@@ -147,18 +147,17 @@ public class PersonService(
     //  UPDATE
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse<PersonDto>> UpdateAsync(
-        Guid id, PersonUpsertDto dto, CancellationToken ct = default)
+    Guid id, PersonUpsertDto dto, CancellationToken ct = default)
     {
         try
         {
             var dtoValidation = ValidationHelper.ValidateDto(dto);
-            if (!dtoValidation.Success) return ServiceResponse<PersonDto>.Fail(dtoValidation.Message);
+            if (!dtoValidation.Success)
+                return ServiceResponse<PersonDto>.Fail(dtoValidation.Message);
 
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var person = await ctx.People
-                .FirstOrDefaultAsync(p => p.Id == id, ct);
-
+            var person = await ctx.People.FirstOrDefaultAsync(p => p.Id == id, ct);
             if (person is null)
                 return ServiceResponse<PersonDto>.Fail($"Person {id} not found.");
 
@@ -174,6 +173,7 @@ public class PersonService(
             var spouseError = await ValidateSpouseRelationshipsAsync(ctx, id, dto, ct);
             if (spouseError != null) return ServiceResponse<PersonDto>.Fail(spouseError);
 
+            // Update scalar fields
             person.FirstName = dto.FirstName.Trim();
             person.LastName = dto.LastName.Trim();
             person.MiddleName = string.IsNullOrWhiteSpace(dto.MiddleName) ? null : dto.MiddleName.Trim();
@@ -187,16 +187,7 @@ public class PersonService(
             person.ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim();
             person.UpdatedAt = DateTime.UtcNow;
 
-            // Remove old relationships
-            var existing = await ctx.Relationships
-                .Where(r => r.PersonAId == id || r.PersonBId == id)
-                .ToListAsync(ct);
-
-            ctx.Relationships.RemoveRange(existing);
-            await ctx.SaveChangesAsync(ct);
-
-            // Add new ones
-            await SyncRelationshipsAsync(ctx, id, dto, ct);
+            await SyncRelationshipsDiffAsync(ctx, id, dto, ct);
             await ctx.SaveChangesAsync(ct);
 
             var relationships = await ctx.Relationships
@@ -209,8 +200,7 @@ public class PersonService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Error updating person {Id}", id);
-            return ServiceResponse<PersonDto>.Fail(
-                "An error occurred updating this person.");
+            return ServiceResponse<PersonDto>.Fail("An error occurred updating this person.");
         }
     }
 
@@ -332,6 +322,151 @@ public class PersonService(
                     CreatedAt = now
                 });
             }
+        }
+    }
+
+    private static async Task SyncRelationshipsDiffAsync(
+    AppDbContext ctx,
+    Guid personId,
+    PersonUpsertDto dto,
+    CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+
+        var existing = await ctx.Relationships
+            .Where(r => r.PersonAId == personId || r.PersonBId == personId)
+            .ToListAsync(ct);
+
+        // ---------------------------
+        // PARENTS
+        // ---------------------------
+        var existingParents = existing
+            .Where(r => r.Type == RelationshipType.Parent && r.PersonBId == personId)
+            .Select(r => r.PersonAId)
+            .ToHashSet();
+
+        var toAddParents = dto.ParentIds.Except(existingParents);
+        var toRemoveParents = existingParents.Except(dto.ParentIds);
+
+        foreach (var parentId in toAddParents)
+        {
+            ctx.Relationships.Add(new Relationship
+            {
+                PersonAId = parentId,
+                PersonBId = personId,
+                Type = RelationshipType.Parent,
+                CreatedAt = now
+            });
+        }
+
+        foreach (var parentId in toRemoveParents)
+        {
+            var rel = existing.First(r =>
+                r.Type == RelationshipType.Parent &&
+                r.PersonAId == parentId &&
+                r.PersonBId == personId);
+
+            ctx.Relationships.Remove(rel);
+        }
+
+        // ---------------------------
+        // CHILDREN
+        // ---------------------------
+        var existingChildren = existing
+            .Where(r => r.Type == RelationshipType.Parent && r.PersonAId == personId)
+            .Select(r => r.PersonBId)
+            .ToHashSet();
+
+        var toAddChildren = dto.ChildIds.Except(existingChildren);
+        var toRemoveChildren = existingChildren.Except(dto.ChildIds);
+
+        foreach (var childId in toAddChildren)
+        {
+            ctx.Relationships.Add(new Relationship
+            {
+                PersonAId = personId,
+                PersonBId = childId,
+                Type = RelationshipType.Parent,
+                CreatedAt = now
+            });
+        }
+
+        foreach (var childId in toRemoveChildren)
+        {
+            var rel = existing.First(r =>
+                r.Type == RelationshipType.Parent &&
+                r.PersonAId == personId &&
+                r.PersonBId == childId);
+
+            ctx.Relationships.Remove(rel);
+        }
+
+        // ---------------------------
+        // SIBLINGS (explicit only)
+        // ---------------------------
+        var existingSiblings = existing
+            .Where(r => r.Type == RelationshipType.Sibling)
+            .Select(r => r.PersonAId == personId ? r.PersonBId : r.PersonAId)
+            .ToHashSet();
+
+        var toAddSiblings = dto.SiblingIds.Except(existingSiblings);
+        var toRemoveSiblings = existingSiblings.Except(dto.SiblingIds);
+
+        foreach (var sibId in toAddSiblings)
+        {
+            var ordered = new[] { personId, sibId }.OrderBy(x => x).ToArray();
+            ctx.Relationships.Add(new Relationship
+            {
+                PersonAId = ordered[0],
+                PersonBId = ordered[1],
+                Type = RelationshipType.Sibling,
+                CreatedAt = now
+            });
+        }
+
+        foreach (var sibId in toRemoveSiblings)
+        {
+            var ordered = new[] { personId, sibId }.OrderBy(x => x).ToArray();
+            var rel = existing.First(r =>
+                r.Type == RelationshipType.Sibling &&
+                r.PersonAId == ordered[0] &&
+                r.PersonBId == ordered[1]);
+
+            ctx.Relationships.Remove(rel);
+        }
+
+        // ---------------------------
+        // SPOUSES
+        // ---------------------------
+        var existingSpouses = existing
+            .Where(r => r.Type == RelationshipType.Spouse)
+            .Select(r => r.PersonAId == personId ? r.PersonBId : r.PersonAId)
+            .ToHashSet();
+
+        var toAddSpouses = dto.SpouseIds.Except(existingSpouses);
+        var toRemoveSpouses = existingSpouses.Except(dto.SpouseIds);
+
+        foreach (var spouseId in toAddSpouses)
+        {
+            var ordered = new[] { personId, spouseId }.OrderBy(x => x).ToArray();
+            ctx.Relationships.Add(new Relationship
+            {
+                PersonAId = ordered[0],
+                PersonBId = ordered[1],
+                Type = RelationshipType.Spouse,
+                CreatedAt = now
+            });
+        }
+
+        foreach (var spouseId in toRemoveSpouses)
+        {
+            var ordered = new[] { personId, spouseId }.OrderBy(x => x).ToArray();
+            var rel = existing.First(r =>
+                r.Type == RelationshipType.Spouse &&
+                r.PersonAId == ordered[0] &&
+                r.PersonBId == ordered[1]);
+
+            ctx.Relationships.Remove(rel);
         }
     }
 

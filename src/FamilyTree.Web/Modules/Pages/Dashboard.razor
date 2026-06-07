@@ -2,14 +2,16 @@
 @rendermode InteractiveServer
 
 @using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Modules.Dialogs
+@using FamilyTree.Web.Services
 @using MudBlazor
 
 @inject IPersonService PersonService
 @inject IMediumService MediumService
 @inject NavigationManager Nav
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject ToastService Toast
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -259,74 +261,4 @@
     private static string ActionIconStyle(bool accent) =>
         accent ? "font-size:18px; color:var(--ft-green-600);"
                : "font-size:18px; color:var(--ft-gray-400);";
-
-    private RenderFragment StatCard(string Icon, string Label, string Value,
-        string Accent = "var(--ft-green-800)", string? Href = null) => __builder =>
-    {
-        <div class="ft-stat-card" style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);
-            padding:20px; cursor:@(Href != null ? "pointer" : "default");"
-             @onclick="@(() => { if (Href != null) Nav.NavigateTo(Href); })">
-            <MudIcon Icon="@Icon" Style="@($"font-size:22px; color:{Accent}; margin-bottom:10px; display:block;")" />
-            <div style="font-size:26px; font-weight:700; color:var(--ft-gray-700); line-height:1;">
-                @Value
-            </div>
-            <div style="font-size:12px; color:var(--ft-gray-300); margin-top:4px; text-transform:uppercase; letter-spacing:0.05em;">
-                @Label
-            </div>
-        </div>;
-    };
-
-    private RenderFragment SectionHeading(string Icon, string Title) => __builder =>
-    {
-        <div style="display:flex; align-items:center; gap:7px; margin-bottom:14px;">
-            <MudIcon Icon="@Icon" Style="font-size:16px; color:var(--ft-green-600);" />
-            <span style="font-size:13px; font-weight:600; text-transform:uppercase;
-                letter-spacing:0.07em; color:var(--ft-gray-500);">@Title</span>
-        </div>;
-    };
-
-    private RenderFragment ActionRow(string Icon, string Label, string Sub,
-        EventCallback OnClick, bool Accent = false) => __builder =>
-    {
-        <div class="ft-action-row" style="display:flex; align-items:center; gap:12px;
-            padding:10px 8px; cursor:pointer;"
-             @onclick="OnClick">
-            <div style="width:36px; height:36px; border-radius:8px; flex-shrink:0;
-                background:@(Accent ? "var(--ft-green-50)" : "var(--ft-gray-50)");
-                display:flex; align-items:center; justify-content:center;">
-                <MudIcon Icon="@Icon"
-                         Style="@ActionIconStyle(Accent)" />
-            </div>
-            <div style="flex:1; min-width:0;">
-                <div style="font-size:13px; font-weight:500; color:var(--ft-gray-700);">@Label</div>
-                <div style="font-size:12px; color:var(--ft-gray-300);">@Sub</div>
-            </div>
-            <MudIcon Icon="@Icons.Material.Outlined.ChevronRight"
-                     Style="font-size:16px; color:var(--ft-gray-200);" />
-        </div>;
-    };
-
-    private RenderFragment ExportRow(string Label, string Sub, string Icon,
-        bool Disabled = false, string DisabledReason = "") => __builder =>
-    {
-        <div style="display:flex; align-items:center; gap:12px; padding:9px 0;
-            border-bottom:0.5px solid var(--ft-line-border);
-            opacity:@(Disabled ? "0.5" : "1");">
-            <MudIcon Icon="@Icon" Style="font-size:18px; color:var(--ft-gray-300); flex-shrink:0;" />
-            <div style="flex:1; min-width:0;">
-                <div style="font-size:13px; font-weight:500; color:var(--ft-gray-700);">@Label</div>
-                <div style="font-size:12px; color:var(--ft-gray-300);">@Sub</div>
-            </div>
-            @if (Disabled)
-            {
-                <MudChip T="string" Size="Size.Small" Disabled="true"
-                         Style="font-size:10px; height:20px;">@DisabledReason</MudChip>
-            }
-            else
-            {
-                <MudIconButton Icon="@Icons.Material.Outlined.Download"
-                               Size="Size.Small" Style="color:var(--ft-green-600);" />
-            }
-        </div>;
-    };
 }

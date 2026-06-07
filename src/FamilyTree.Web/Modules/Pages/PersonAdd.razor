@@ -4,11 +4,14 @@
 @using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Modules.Components
+@using FamilyTree.Web.Modules.Dialogs
+@using FamilyTree.Web.Services
 @using MudBlazor
 
 @inject IPersonService PersonService
 @inject NavigationManager Nav
-@inject ISnackbar Snackbar
+@inject ToastService Toast
+@inject IDialogService DialogService
 
 <PageTitle>Add person</PageTitle>
 
@@ -50,12 +53,12 @@ else
             if (result.Success)
                 _allPeople = result.Data!;
             else
-                Snackbar.Add(result.Message, Severity.Error);
+                Toast.Error(result.Message);
         }
         catch (Exception ex)
         {
             _error = ex.Message;
-            Snackbar.Add(ex.Message, Severity.Error);
+            Toast.Error(ex.Message);
         }
         finally
         {
@@ -65,34 +68,88 @@ else
 
     private async Task HandleSubmit(PersonUpsertDto dto)
     {
-        Console.WriteLine($"HandleSubmit fired for {dto.FirstName} {dto.LastName}");
         try
         {
             var result = await PersonService.CreateAsync(dto);
             if (!result.Success)
             {
                 _error = result.Message;
+                Toast.Error(result.Message);
                 return;
             }
 
-            var personId = result.Data!.Id;
+            var newPerson = result.Data!;
 
             // Upload any photos queued in the form and back-fill ProfilePhotoUrl
             if (_form?.HasPendingPhotos == true)
             {
-                var primaryUrl = await _form.UploadPendingAsync(personId);
+                var primaryUrl = await _form.UploadPendingAsync(newPerson.Id);
                 if (primaryUrl is not null)
                 {
                     dto.ProfilePhotoUrl = primaryUrl;
-                    await PersonService.UpdateAsync(personId, dto);
+                    await PersonService.UpdateAsync(newPerson.Id, dto);
                 }
             }
+
+            Toast.Success($"{newPerson.FullName} added.");
+
+            // Offer to link missing sibling connections
+            await OfferSiblingLinks(newPerson.Id, newPerson.FullName, dto);
 
             Nav.NavigateTo("/people");
         }
         catch (Exception ex)
         {
             _error = ex.Message;
+            Toast.Error(ex.Message);
+        }
+    }
+
+    private async Task OfferSiblingLinks(Guid newPersonId, string newPersonName, PersonUpsertDto submittedDto)
+    {
+        var linkedSiblingIds = submittedDto.SiblingIds;
+        if (linkedSiblingIds.Count == 0) return;
+
+        var suggestions  = new List<PersonDto>();
+        PersonDto? firstSibling = null;
+
+        foreach (var sibId in linkedSiblingIds)
+        {
+            var sib = _allPeople.FirstOrDefault(p => p.Id == sibId);
+            if (sib == null) continue;
+
+            var missing = (sib.SiblingIds ?? [])
+                .Where(id => id != newPersonId && !linkedSiblingIds.Contains(id))
+                .Select(id => _allPeople.FirstOrDefault(p => p.Id == id))
+                .Where(p => p != null).Select(p => p!)
+                .ToList();
+
+            if (missing.Count > 0) firstSibling ??= sib;
+
+            foreach (var m in missing)
+                if (!suggestions.Any(s => s.Id == m.Id))
+                    suggestions.Add(m);
+        }
+
+        if (suggestions.Count == 0 || firstSibling == null) return;
+
+        var parameters = new DialogParameters<SiblingInferenceDialog>
+        {
+            { d => d.NewPersonName,     newPersonName },
+            { d => d.LinkedSiblingName, firstSibling.FullName },
+            { d => d.SuggestedSiblings, suggestions }
+        };
+
+        var dialog = await DialogService.ShowAsync<SiblingInferenceDialog>(
+            "Link more siblings?", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            submittedDto.SiblingIds = [.. submittedDto.SiblingIds, .. suggestions.Select(p => p.Id)];
+            await PersonService.UpdateAsync(newPersonId, submittedDto);
+            Toast.Success($"Linked as sibling to {suggestions.Count} more.");
         }
     }
 }

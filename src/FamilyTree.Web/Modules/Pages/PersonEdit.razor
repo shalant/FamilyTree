@@ -1,15 +1,18 @@
-﻿@page "/people/{Id:guid}/edit"
+@page "/people/{Id:guid}/edit"
 @rendermode InteractiveServer
 
 @using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Modules.Components
+@using FamilyTree.Web.Modules.Dialogs
 @using FamilyTree.Web.Services
+@using FamilyTree.Web.Utils
 @using MudBlazor
 
 @inject IPersonService PersonService
 @inject NavigationManager Nav
-@inject ISnackbar Snackbar
+@inject ToastService Toast
+@inject IDialogService DialogService
 
 <PageTitle>Edit person</PageTitle>
 
@@ -48,38 +51,38 @@ else
     protected override async Task OnInitializedAsync()
     {
         var personResult = await PersonService.GetByIdAsync(Id);
-        var allResult = await PersonService.GetAllAsync();
+        var allResult    = await PersonService.GetAllAsync();
 
         if (!personResult.Success)
         {
-            Snackbar.Add(personResult.Message, Severity.Error);
+            Toast.Error(personResult.Message);
             _notFound = true;
-            _loading = false;
+            _loading  = false;
             return;
         }
 
         if (!allResult.Success)
-            Snackbar.Add(allResult.Message, Severity.Warning);
+            Toast.Warning(allResult.Message);
 
-        _person = personResult.Data!;
+        _person    = personResult.Data!;
         _allPeople = allResult.Data ?? [];
         _formModel = new PersonUpsertDto
         {
-            FirstName = _person.FirstName,
-            LastName = _person.LastName,
-            MiddleName = _person.MiddleName,
-            MaidenName = _person.MaidenName,
-            BirthDate = _person.BirthDate,
-            BirthPlace = _person.BirthPlace,
-            DeathDate = _person.DeathDate,
-            DeathPlace = _person.DeathPlace,
-            BiographyNotes = _person.BiographyNotes,
+            FirstName       = _person.FirstName,
+            LastName        = _person.LastName,
+            MiddleName      = _person.MiddleName,
+            MaidenName      = _person.MaidenName,
+            BirthDate       = _person.BirthDate,
+            BirthPlace      = _person.BirthPlace,
+            DeathDate       = _person.DeathDate,
+            DeathPlace      = _person.DeathPlace,
+            BiographyNotes  = _person.BiographyNotes,
             ProfilePhotoUrl = _person.ProfilePhotoUrl,
-            Gender = _person.Gender,
-            ParentIds = _person.ParentIds ?? [],
-            SpouseIds = _person.SpouseIds ?? [],
-            SiblingIds = _person.SiblingIds ?? [],
-            ChildIds = _person.ChildIds ?? []
+            Gender          = _person.Gender,
+            ParentIds       = _person.ParentIds  ?? [],
+            SpouseIds       = _person.SpouseIds  ?? [],
+            SiblingIds      = _person.SiblingIds ?? [],
+            ChildIds        = _person.ChildIds   ?? []
         };
         _loading = false;
     }
@@ -87,9 +90,70 @@ else
     private async Task HandleSubmit(PersonUpsertDto dto)
     {
         var result = await PersonService.UpdateAsync(Id, dto);
-        Snackbar.ShowResult(result, $"{_person!.FullName} saved.");
+        Toast.ShowResult(result, $"{_person!.FullName} saved.");
+        if (!result.Success) return;
 
-        if (result.Success)
-            Nav.NavigateTo("/");   // back to the tree
+        // Surface captured questions in biography notes
+        var questions = QuestionDetector.ExtractQuestions(dto.BiographyNotes);
+        if (questions.Count > 0)
+        {
+            var preview = string.Join(" · ", questions.Take(2));
+            var suffix  = questions.Count > 2 ? $" +{questions.Count - 2} more" : "";
+            Toast.Info($"Questions captured: {preview}{suffix}", "Biography notes");
+        }
+
+        // Offer to link missing sibling connections
+        var originalSiblingIds = _person.SiblingIds ?? [];
+        var addedIds = dto.SiblingIds.Except(originalSiblingIds).ToList();
+        await OfferSiblingLinks(dto, addedIds);
+
+        Nav.NavigateTo("/");
+    }
+
+    private async Task OfferSiblingLinks(PersonUpsertDto submittedDto, List<Guid> addedSiblingIds)
+    {
+        if (addedSiblingIds.Count == 0) return;
+
+        var suggestions  = new List<PersonDto>();
+        PersonDto? firstSibling = null;
+
+        foreach (var sibId in addedSiblingIds)
+        {
+            var sib = _allPeople.FirstOrDefault(p => p.Id == sibId);
+            if (sib == null) continue;
+
+            var missing = (sib.SiblingIds ?? [])
+                .Where(id => id != Id && !submittedDto.SiblingIds.Contains(id))
+                .Select(id => _allPeople.FirstOrDefault(p => p.Id == id))
+                .Where(p => p != null).Select(p => p!)
+                .ToList();
+
+            if (missing.Count > 0) firstSibling ??= sib;
+
+            foreach (var m in missing)
+                if (!suggestions.Any(s => s.Id == m.Id))
+                    suggestions.Add(m);
+        }
+
+        if (suggestions.Count == 0 || firstSibling == null) return;
+
+        var parameters = new DialogParameters<SiblingInferenceDialog>
+        {
+            { d => d.NewPersonName,     _person!.FullName },
+            { d => d.LinkedSiblingName, firstSibling.FullName },
+            { d => d.SuggestedSiblings, suggestions }
+        };
+
+        var dialog = await DialogService.ShowAsync<SiblingInferenceDialog>(
+            "Link more siblings?", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        var dialogResult = await dialog.Result;
+        if (dialogResult is { Canceled: false })
+        {
+            submittedDto.SiblingIds = [.. submittedDto.SiblingIds, .. suggestions.Select(p => p.Id)];
+            await PersonService.UpdateAsync(Id, submittedDto);
+            Toast.Success($"Linked as sibling to {suggestions.Count} more.");
+        }
     }
 }

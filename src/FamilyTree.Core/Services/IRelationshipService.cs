@@ -14,6 +14,10 @@ public interface IRelationshipService
 
     Task<ServiceResponse<RelationshipDto>> CreateAsync(
         RelationshipUpsertDto dto, CancellationToken ct = default);
+    Task<ServiceResponse<RelationshipDto>> UpdateAsync(
+        Guid id,
+        RelationshipUpsertDto request,
+        CancellationToken ct = default);
 
     Task<ServiceResponse> DeleteAsync(
         Guid id, CancellationToken ct = default);

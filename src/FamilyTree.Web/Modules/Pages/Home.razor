@@ -13,7 +13,7 @@
 @inject IPersonService PersonService
 @inject NavigationManager Nav
 @inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject ToastService Toast
 @inject IJSRuntime JS
 
 <PageTitle>Family Tree</PageTitle>
@@ -126,7 +126,7 @@ else
         }
         else
         {
-            Snackbar.Add(result.Message, Severity.Error);
+            Toast.Error(result.Message);
         }
         _loading = false;
     }
@@ -163,7 +163,7 @@ else
     {
         var url = Nav.ToAbsoluteUri($"/?focus={_focusPerson?.Id}");
         await JS.InvokeVoidAsync("copyText", url.ToString());
-        Snackbar.Add("Link copied to clipboard", Severity.Success);
+        Toast.Success("Link copied to clipboard");
     }
 
     private async Task PromptDelete(PersonDto person)
@@ -180,7 +180,7 @@ else
         if (result is { Canceled: false })
         {
             var response = await PersonService.DeleteAsync(person.Id);
-            Snackbar.ShowResult(response, $"{person.FullName} deleted.");
+            Toast.ShowResult(response, $"{person.FullName} deleted.");
 
             if (response.Success)
             {

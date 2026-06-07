@@ -10,21 +10,29 @@ public static class PersonMapper
     {
         var rels = relationships.ToList();
 
-        // Parents (A = parent, B = child)
+        // ─────────────────────────────────────────────────────────────
+        // PARENTS (A = parent, B = child)
+        // ─────────────────────────────────────────────────────────────
         var parentIds = rels
-            .Where(r => r.Type == RelationshipType.Parent && r.PersonBId == person.Id)
+            .Where(r => r.Type == RelationshipType.Parent &&
+                        r.PersonBId == person.Id)
             .Select(r => r.PersonAId)
             .Distinct()
             .ToList();
 
-        // Children (A = parent, B = child)
+        // ─────────────────────────────────────────────────────────────
+        // CHILDREN (A = parent, B = child)
+        // ─────────────────────────────────────────────────────────────
         var childIds = rels
-            .Where(r => r.Type == RelationshipType.Parent && r.PersonAId == person.Id)
+            .Where(r => r.Type == RelationshipType.Parent &&
+                        r.PersonAId == person.Id)
             .Select(r => r.PersonBId)
             .Distinct()
             .ToList();
 
-        // Spouses (canonical)
+        // ─────────────────────────────────────────────────────────────
+        // SPOUSES (canonical ordering)
+        // ─────────────────────────────────────────────────────────────
         var spouseIds = rels
             .Where(r => r.Type == RelationshipType.Spouse &&
                        (r.PersonAId == person.Id || r.PersonBId == person.Id))
@@ -32,15 +40,39 @@ public static class PersonMapper
             .Distinct()
             .ToList();
 
-        // Siblings = children of the same parents, excluding self
-        var siblingIds = parentIds
+        // ─────────────────────────────────────────────────────────────
+        // SIBLINGS — EXPLICIT (RelationshipType.Sibling)
+        // ─────────────────────────────────────────────────────────────
+        var directSiblingIds = rels
+            .Where(r => r.Type == RelationshipType.Sibling &&
+                       (r.PersonAId == person.Id || r.PersonBId == person.Id))
+            .Select(r => r.PersonAId == person.Id ? r.PersonBId : r.PersonAId)
+            .Distinct()
+            .ToList();
+
+        // ─────────────────────────────────────────────────────────────
+        // SIBLINGS — INFERRED (children of the same parents)
+        // ─────────────────────────────────────────────────────────────
+        var inferredSiblingIds = parentIds
             .SelectMany(pid =>
-                rels.Where(r => r.Type == RelationshipType.Parent && r.PersonAId == pid)
+                rels.Where(r => r.Type == RelationshipType.Parent &&
+                                r.PersonAId == pid)
                     .Select(r => r.PersonBId))
             .Where(id => id != person.Id)
             .Distinct()
             .ToList();
 
+        // ─────────────────────────────────────────────────────────────
+        // MERGE EXPLICIT + INFERRED
+        // ─────────────────────────────────────────────────────────────
+        var siblingIds = directSiblingIds
+            .Concat(inferredSiblingIds)
+            .Distinct()
+            .ToList();
+
+        // ─────────────────────────────────────────────────────────────
+        // BUILD DTO
+        // ─────────────────────────────────────────────────────────────
         return new PersonDto
         {
             Id = person.Id,

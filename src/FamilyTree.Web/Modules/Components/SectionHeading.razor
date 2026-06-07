@@ -1,0 +1,28 @@
+﻿@namespace FamilyTree.Web.Modules.Components
+
+<div style="margin:32px 0 16px;">
+    <div style="
+        font-size:11px;
+        font-weight:700;
+        text-transform:uppercase;
+        letter-spacing:0.1em;
+        color:var(--ft-green-600);
+        margin-bottom:6px;">
+        @Title
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Subtitle))
+    {
+        <div style="
+            font-size:13px;
+            color:var(--ft-gray-500);
+            line-height:1.5;">
+            @Subtitle
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Subtitle { get; set; }
+}

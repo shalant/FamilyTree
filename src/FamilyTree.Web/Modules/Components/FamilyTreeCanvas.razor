@@ -205,6 +205,10 @@
             await _jsModule.InvokeVoidAsync("dispose");
             await _jsModule.DisposeAsync();
         }
+        catch (TaskCanceledException)
+        {
+            // Expected when circuit shuts down — safe to ignore
+        }
         catch (JSDisconnectedException)
         {
             // Circuit already disposed — ignore

@@ -113,120 +113,162 @@ public class FamilyTreeLayoutEngine
         var components = IdentifyConnectedComponents(people);
 
         // ─────────────────────────────────────────────────────────────────────
-        // PHASE 4: Position all nodes (X, Y coordinates)
+        // PHASE 4: Nuclear-family bottom-up / top-down X layout
         // ─────────────────────────────────────────────────────────────────────
         //
-        // For each component:
-        //   • Group people by depth
-        //   • Center each depth row horizontally within the component
-        //   • Apply dynamic spacing (wider for couples)
-        //   • Map birth years → Y positions
-        //
-        // The result is a stable, balanced layout that respects both time and
-        // generational structure.
-        // Couple lookup from CoupleDto for reliable spouse detection (SpouseIds may be
-        // incomplete while incrementally building the tree).
-        var couplePairs = new HashSet<(Guid, Guid)>(
-            couples.Select(c => c.PersonAId < c.PersonBId
-                ? (c.PersonAId, c.PersonBId)
-                : (c.PersonBId, c.PersonAId)));
-
+        // Each couple (or single parent) + their children forms a NuclearGroup.
+        // Subtree widths are computed bottom-up so every group knows how much
+        // horizontal space its entire sub-tree needs. A single top-down pass
+        // then places every node — parents centred over their children, siblings
+        // spread evenly under the midpoint of their parents.
+        var personById = people.ToDictionary(p => p.Id);
+        var nuclearGroups = BuildNuclearGroups(people, couples);
         var nodeMap = new Dictionary<Guid, LayoutNode>();
         var xOffset = PaddingX;
 
         foreach (var component in components)
         {
-            // Group by depth within this component and sort oldest (highest depth) at the top.
-            var componentByDepth = component
-                .GroupBy(p => depths.GetValueOrDefault(p.Id, 0))
-                .OrderByDescending(g => g.Key)
+            var compIds = component.Select(p => p.Id).ToHashSet();
+
+            var compGroups = nuclearGroups
+                .Where(g =>
+                    (g.ParentAId.HasValue && compIds.Contains(g.ParentAId.Value)) ||
+                    (g.ParentBId.HasValue && compIds.Contains(g.ParentBId.Value)))
                 .ToList();
 
-            // Pre-compute couple-aware row data so we can size the component correctly.
-            var rows = componentByDepth
-                .Select(g => SortSpousesAdjacent(g.ToList(), couplePairs))
-                .Select(sorted => (sorted, offsets: ComputeRowOffsets(sorted, couplePairs)))
-                .ToList();
+            var childrenInGroups = compGroups.SelectMany(g => g.ChildIds).ToHashSet();
+            var parentsInGroups  = compGroups
+                .SelectMany(g => new[] { g.ParentAId, g.ParentBId })
+                .Where(id => id.HasValue).Select(id => id!.Value)
+                .ToHashSet();
 
-            var maxRowWidth = rows.Max(r => r.offsets.Length > 0 ? r.offsets[^1] : 0.0);
-            var componentXWidth = Math.Max((int)maxRowWidth + PaddingX * 2, NodeSpacingX + PaddingX * 2);
-
-            foreach (var (sortedMembers, xOffsets) in rows)
+            // Map each person to the one group they head as a parent.
+            // Couple groups are preferred over single-parent groups.
+            var primaryGroup = new Dictionary<Guid, NuclearGroup>();
+            foreach (var g in compGroups.OrderByDescending(g => g.ParentBId.HasValue ? 1 : 0))
             {
-                var rowWidth = xOffsets.Length > 1 ? xOffsets[^1] : 0.0;
-                var startX = -rowWidth / 2.0;
+                if (g.ParentAId.HasValue) primaryGroup.TryAdd(g.ParentAId.Value, g);
+                if (g.ParentBId.HasValue) primaryGroup.TryAdd(g.ParentBId.Value, g);
+            }
 
-                for (int i = 0; i < sortedMembers.Count; i++)
+            // Root groups: parents that are not children of any group (tree tops).
+            var rootGroups = compGroups.Where(g =>
+                (!g.ParentAId.HasValue || !childrenInGroups.Contains(g.ParentAId.Value)) &&
+                (!g.ParentBId.HasValue || !childrenInGroups.Contains(g.ParentBId.Value)))
+                .ToList();
+
+            // Root individuals: people in no group at all (unlinked singletons).
+            var rootIndividuals = component.Where(p =>
+                !childrenInGroups.Contains(p.Id) &&
+                !parentsInGroups.Contains(p.Id))
+                .ToList();
+
+            // ── Memoised bottom-up width measurement ─────────────────────────
+            var widthCache = new Dictionary<NuclearGroup, double>();
+
+            double MeasureGroup(NuclearGroup g)
+            {
+                if (widthCache.TryGetValue(g, out var cached)) return cached;
+
+                double selfW = g.ParentBId.HasValue
+                    ? NodeSpacingX + SpouseSpacingX
+                    : NodeSpacingX;
+
+                double childrenW = g.ChildIds.Count == 0
+                    ? 0
+                    : g.ChildIds.Sum(cid =>
+                        primaryGroup.TryGetValue(cid, out var cg)
+                            ? MeasureGroup(cg)
+                            : (double)NodeSpacingX);
+
+                var w = g.ChildIds.Count == 0 ? selfW : Math.Max(selfW, childrenW);
+                widthCache[g] = w;
+                return w;
+            }
+
+            // ── Node creation ─────────────────────────────────────────────────
+            void SetNode(Guid id, double x)
+            {
+                var person   = personById[id];
+                var isFocus  = id == focusPersonId;
+                var depth    = depths.GetValueOrDefault(id, 0);
+                var relDepth = depth - focusDepth;
+                var size     = isFocus ? FocusSize
+                             : Math.Abs(relDepth) <= 1 ? Gen1Size
+                             : DefaultSize;
+                var year = birthYears.GetValueOrDefault(id, minYear);
+                var y    = PaddingY + (int)((year - minYear) * PxPerYear);
+                nodeMap[id] = new LayoutNode(person, (int)Math.Round(x), y, depth, isFocus, size);
+            }
+
+            // ── Top-down placement ────────────────────────────────────────────
+            void PlaceGroup(NuclearGroup g, double anchorX)
+            {
+                if (g.ParentAId.HasValue && g.ParentBId.HasValue)
                 {
-                    var person = sortedMembers[i];
-                    var isFocus = person.Id == focusPersonId;
-                    var relDepth = depths.GetValueOrDefault(person.Id, 0);
+                    SetNode(g.ParentAId.Value, anchorX - SpouseSpacingX / 2.0);
+                    SetNode(g.ParentBId.Value, anchorX + SpouseSpacingX / 2.0);
+                }
+                else if (g.ParentAId.HasValue)
+                {
+                    SetNode(g.ParentAId.Value, anchorX);
+                }
 
-                    // Size encodes semantic importance:
-                    //   • Focus person: largest
-                    //   • Immediate relatives (±1 depth): medium
-                    //   • Others: default
-                    var size = isFocus
-                        ? FocusSize
-                        : Math.Abs(relDepth) <= 1
-                            ? Gen1Size
-                            : DefaultSize;
+                if (g.ChildIds.Count == 0) return;
 
-                    var yearOffset = birthYears.GetValueOrDefault(person.Id, minYear);
-                    var y = PaddingY + (int)((yearOffset - minYear) * PxPerYear);
+                var cWidths = g.ChildIds
+                    .Select(cid => primaryGroup.TryGetValue(cid, out var cg)
+                        ? MeasureGroup(cg)
+                        : (double)NodeSpacingX)
+                    .ToList();
 
-                    nodeMap[person.Id] = new LayoutNode(
-                        person,
-                        (int)(xOffset + componentXWidth / 2.0 + startX + xOffsets[i]),
-                        y,
-                        relDepth,
-                        isFocus,
-                        size);
+                double totalW = cWidths.Sum();
+                double startX = anchorX - totalW / 2.0;
+
+                for (int i = 0; i < g.ChildIds.Count; i++)
+                {
+                    var childId    = g.ChildIds[i];
+                    double childAnchor = startX + cWidths[i] / 2.0;
+
+                    if (primaryGroup.TryGetValue(childId, out var childGroup))
+                        PlaceGroup(childGroup, childAnchor);
+                    else
+                        SetNode(childId, childAnchor);
+
+                    startX += cWidths[i];
                 }
             }
 
-            // Move the X offset to the right for the next component.
-            xOffset += componentXWidth;
-        }
+            // ── Place roots left to right ─────────────────────────────────────
+            double curX = xOffset;
 
-        var canvasWidth = xOffset + PaddingX;
-
-        // ─────────────────────────────────────────────────────────────────────
-        // PHASE 4.5: Center lone ancestors over their children
-        // ─────────────────────────────────────────────────────────────────────
-        //
-        // When a depth row contains exactly one person (e.g. a single known
-        // grandfather), the generic loop places them at the component's horizontal
-        // midpoint — which looks correct for a balanced tree but feels wrong when
-        // the component's widest row is a couple (so the midpoint falls between
-        // the two partners, not above the actual child).
-        //
-        // Fix: after all positions are computed, slide any single-person depth row
-        // so it sits above the average X of its direct children. Process bottom-up
-        // (low depth → high depth) so that parent adjustments cascade correctly.
-        {
-            var byDepth = nodeMap.Values
-                .GroupBy(n => n.Depth)
-                .OrderBy(g => g.Key)   // ascending → descendants processed before ancestors
-                .ToList();
-
-            foreach (var depthGroup in byDepth)
+            foreach (var rg in rootGroups)
             {
-                var nodes = depthGroup.ToList();
-                if (nodes.Count != 1) continue;
-
-                var node = nodes[0];
-                var childNodes = (node.Person.ChildIds ?? [])
-                    .Where(nodeMap.ContainsKey)
-                    .Select(id => nodeMap[id])
-                    .ToList();
-
-                if (!childNodes.Any()) continue;
-
-                var targetX = (int)childNodes.Average(c => (double)c.X);
-                nodeMap[node.Person.Id] = node with { X = targetX };
+                var w = MeasureGroup(rg);
+                PlaceGroup(rg, curX + w / 2.0);
+                curX += w;
             }
+
+            foreach (var person in rootIndividuals)
+            {
+                SetNode(person.Id, curX + NodeSpacingX / 2.0);
+                curX += NodeSpacingX;
+            }
+
+            // Safety net: place any person still unpositioned at the right edge.
+            foreach (var person in component)
+            {
+                if (!nodeMap.ContainsKey(person.Id))
+                {
+                    SetNode(person.Id, curX + NodeSpacingX / 2.0);
+                    curX += NodeSpacingX;
+                }
+            }
+
+            xOffset = (int)Math.Ceiling(curX) + PaddingX;
         }
+
+        var canvasWidth = xOffset;
 
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 5: Create visual bands (decade markers with time gradient)
@@ -500,6 +542,46 @@ public class FamilyTreeLayoutEngine
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // NUCLEAR GROUP BUILDING
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private List<NuclearGroup> BuildNuclearGroups(List<PersonDto> people, List<CoupleDto> couples)
+    {
+        var groups    = new List<NuclearGroup>();
+        var personIds = people.Select(p => p.Id).ToHashSet();
+        var claimed   = new HashSet<Guid>();
+
+        // Couple families: children claimed here are not assigned to single parents.
+        foreach (var couple in couples)
+        {
+            if (!personIds.Contains(couple.PersonAId) || !personIds.Contains(couple.PersonBId))
+                continue;
+
+            var children = couple.ChildIds.Where(personIds.Contains).ToList();
+            foreach (var c in children) claimed.Add(c);
+            groups.Add(new NuclearGroup(couple.PersonAId, couple.PersonBId, children));
+        }
+
+        // Single-parent families for children not already claimed by a couple.
+        var singleChildren = new Dictionary<Guid, List<Guid>>();
+        foreach (var person in people)
+        {
+            if (claimed.Contains(person.Id)) continue;
+            foreach (var parentId in person.ParentIds ?? [])
+            {
+                if (!personIds.Contains(parentId)) continue;
+                if (!singleChildren.TryGetValue(parentId, out var list))
+                    singleChildren[parentId] = list = [];
+                list.Add(person.Id);
+            }
+        }
+        foreach (var (parentId, children) in singleChildren)
+            groups.Add(new NuclearGroup(parentId, null, children));
+
+        return groups;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // CONNECTOR BUILDING
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -718,52 +800,6 @@ public class FamilyTreeLayoutEngine
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ROW LAYOUT HELPERS
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private static List<PersonDto> SortSpousesAdjacent(List<PersonDto> members, HashSet<(Guid, Guid)> couplePairs)
-    {
-        var sorted = new List<PersonDto>(members.Count);
-        var remaining = new List<PersonDto>(members);
-
-        while (remaining.Count > 0)
-        {
-            var person = remaining[0];
-            remaining.RemoveAt(0);
-            sorted.Add(person);
-
-            var spouse = remaining.FirstOrDefault(p => IsCouple(person, p, couplePairs));
-
-            if (spouse != null)
-            {
-                remaining.Remove(spouse);
-                sorted.Add(spouse);
-            }
-        }
-
-        return sorted;
-    }
-
-    private static double[] ComputeRowOffsets(List<PersonDto> members, HashSet<(Guid, Guid)> couplePairs)
-    {
-        var offsets = new double[members.Count];
-        for (int i = 1; i < members.Count; i++)
-        {
-            var areSpouses = IsCouple(members[i - 1], members[i], couplePairs);
-            offsets[i] = offsets[i - 1] + (areSpouses ? NodeSpacingX + SpouseSpacingX : NodeSpacingX);
-        }
-        return offsets;
-    }
-
-    private static bool IsCouple(PersonDto a, PersonDto b, HashSet<(Guid, Guid)> couplePairs)
-    {
-        var lo = a.Id < b.Id ? a.Id : b.Id;
-        var hi = a.Id < b.Id ? b.Id : a.Id;
-        if (couplePairs.Contains((lo, hi))) return true;
-        return (a.SpouseIds?.Contains(b.Id) ?? false) || (b.SpouseIds?.Contains(a.Id) ?? false);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
     // RECORDS (data structures for layout output)
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -812,6 +848,12 @@ public class FamilyTreeLayoutEngine
     /// A vertical drop from a sibling span to a child node.
     /// </summary>
     public record ChildDrop(double CenterX, double BotY);
+
+    /// <summary>
+    /// A nuclear family group used internally during X-axis layout.
+    /// Distinct from <see cref="FamilyUnit"/>, which is the SVG connector output.
+    /// </summary>
+    private record NuclearGroup(Guid? ParentAId, Guid? ParentBId, List<Guid> ChildIds);
 
     /// <summary>
     /// A complete visual family unit: couple (optional), stem, span (optional), and drops.

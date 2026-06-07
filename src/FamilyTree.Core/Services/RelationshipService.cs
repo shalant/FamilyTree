@@ -128,6 +128,64 @@ public class RelationshipService(
         }
     }
 
+    public async Task<ServiceResponse<RelationshipDto>> UpdateAsync(
+    Guid id,
+    RelationshipUpsertDto request,
+    CancellationToken ct = default)
+    {
+        try
+        {
+            var dtoValidation = ValidationHelper.ValidateDtoNonGeneric(request);
+            if (!dtoValidation.Success)
+                return ServiceResponse<RelationshipDto>.Fail(dtoValidation.Message);
+
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var rel = await ctx.Relationships.FirstOrDefaultAsync(r => r.Id == id, ct);
+            if (rel is null)
+                return ServiceResponse<RelationshipDto>.Fail($"Relationship {id} not found.");
+
+            // Canonical ordering
+            var (a, b) = request.PersonAId < request.PersonBId
+                ? (request.PersonAId, request.PersonBId)
+                : (request.PersonBId, request.PersonAId);
+
+            // Validate updated relationship
+            var ruleError = await ValidateNewRelationshipAsync(ctx, request, ct);
+            if (ruleError != null)
+                return ServiceResponse<RelationshipDto>.Fail(ruleError);
+
+            // Apply updates
+            rel.PersonAId = a;
+            rel.PersonBId = b;
+            rel.Type = request.Type;
+            rel.StartDate = request.StartDate;
+            rel.EndDate = request.EndDate;
+            rel.Notes = request.Notes?.Trim();
+            rel.UpdatedAt = DateTime.UtcNow;
+
+            await ctx.SaveChangesAsync(ct);
+
+            return ServiceResponse<RelationshipDto>.Ok(RelationshipMapper.MapRelationshipToDto(rel));
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            logger.LogWarning(ex, "Concurrency conflict updating relationship {Id}", id);
+            return ServiceResponse<RelationshipDto>.Fail(
+                "This record was modified by someone else. Please reload and try again.");
+        }
+        catch (OperationCanceledException)
+        {
+            return ServiceResponse<RelationshipDto>.Fail("Request was cancelled.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error updating relationship {Id}", id);
+            return ServiceResponse<RelationshipDto>.Fail(
+                "An error occurred updating this relationship.");
+        }
+    }
+
     public async Task<ServiceResponse> DeleteAsync(
         Guid id, CancellationToken ct = default)
     {

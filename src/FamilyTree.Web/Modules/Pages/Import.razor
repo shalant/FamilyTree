@@ -3,11 +3,12 @@
 
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Modules.Components
+@using FamilyTree.Web.Services
 @using MudBlazor
 @using Microsoft.AspNetCore.Components.Forms
 
 @inject NavigationManager Nav
-@inject ISnackbar Snackbar
+@inject ToastService Toast
 
 <PageTitle>Import data</PageTitle>
 
@@ -321,7 +322,7 @@
     private void PreviewImport()
     {
         _showPreview = true;
-        Snackbar.Add("File received — preview pipeline coming soon.", Severity.Info);
+        Toast.Info("File received — preview pipeline coming soon.");
     }
 
     private static string FormatSize(long bytes) => bytes switch

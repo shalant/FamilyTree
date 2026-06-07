@@ -1,0 +1,33 @@
+﻿@namespace FamilyTree.Web.Modules.Components
+
+<div style="
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 0;
+    border-bottom:1px solid var(--ft-line-border);">
+
+    <div style="display:flex; align-items:center; gap:10px;">
+        <MudIcon Icon="@Icon"
+                 Style="font-size:18px; color:var(--ft-brown-500);" />
+
+        <span style="font-size:14px; color:var(--ft-gray-700);">
+            @Label
+        </span>
+    </div>
+
+    <MudButton Variant="Variant.Outlined"
+               Color="Color.Primary"
+               Href="@Href"
+               Target="_blank"
+               StartIcon="@Icons.Material.Outlined.Download">
+        @ButtonText
+    </MudButton>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Icon { get; set; } = Icons.Material.Outlined.Download;
+    [Parameter] public string Href { get; set; } = "#";
+    [Parameter] public string ButtonText { get; set; } = "Download";
+}
