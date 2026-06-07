@@ -13,7 +13,7 @@ let _dragging = false;
 let _lastX = 0;
 let _lastY = 0;
 
-export function init(viewportId, transformId, focusX, focusY) {
+export function init(viewportId, transformId, focusX, focusY, genTopY, genBotY) {
     dispose();
 
     _viewport = document.getElementById(viewportId);
@@ -21,10 +21,22 @@ export function init(viewportId, transformId, focusX, focusY) {
     if (!_viewport || !_transform) return;
 
     const rect = _viewport.getBoundingClientRect();
-    // _zoom = 1.0;
-    _zoom = 0.8; // start slightly zoomed out
-    _panX = rect.width  / 2 - focusX * _zoom;
-    _panY = rect.height / 2 - focusY * _zoom;
+
+    if (genTopY != null && genBotY != null && genBotY > genTopY) {
+        // Fit ±1 generation in the viewport (parents row → children row).
+        const genHeight = genBotY - genTopY;
+        const padding = 80;
+        _zoom = Math.min(rect.height / (genHeight + padding * 2), 2.5);
+        _zoom = Math.max(_zoom, 0.3);
+        const midY = (genTopY + genBotY) / 2;
+        _panX = rect.width  / 2 - focusX * _zoom;
+        _panY = rect.height / 2 - midY    * _zoom;
+    } else {
+        _zoom = 0.8;
+        _panX = rect.width  / 2 - focusX * _zoom;
+        _panY = rect.height / 2 - focusY * _zoom;
+    }
+
     _clampPan();
     _applyTransform();
 

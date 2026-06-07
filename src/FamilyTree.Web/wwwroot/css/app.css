@@ -643,6 +643,27 @@ html, body {
     -webkit-backdrop-filter: blur(24px);
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
 }
+/* ── Form pages (Add / Edit person) ──────────────────────────────────────────── */
+
+.ft-form-page {
+    min-height: 100vh;
+    background: linear-gradient(180deg, var(--ft-green-50) 0%, var(--ft-surface) 80%);
+    padding-bottom: 60px;
+}
+
+.ft-field-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ft-text-secondary);
+    margin-bottom: 4px;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+}
+
+.ft-required {
+    color: var(--mud-palette-error, #f44336);
+}
+
 /* ── Person List Page ───────────────────────────────────────────────────────────── */
 
 .people-table .mud-table-row:hover {

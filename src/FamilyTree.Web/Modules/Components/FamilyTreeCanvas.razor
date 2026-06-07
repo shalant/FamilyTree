@@ -24,9 +24,10 @@
             }
 
             @* Generation band backgrounds *@
+            @{ int _bandIdx = 0; }
             @foreach (var band in _layout.Bands)
             {
-                var opacity = GetBandOpacityByYear(band.Depth);
+                var opacity = _bandIdx++ % 2 == 0 ? "0.06" : "0.13";
                 <div class="ft-band"
                      style="top:@(band.Top)px; height:@(band.Height)px; opacity:@opacity;">
                 </div>
@@ -145,7 +146,26 @@
             var focusNode = _layout.Nodes.FirstOrDefault(n => n.IsFocus);
             var fx = focusNode?.X ?? _layout.CanvasWidth / 2.0;
             var fy = focusNode?.Y ?? _layout.CanvasHeight / 2.0;
-            await _jsModule.InvokeVoidAsync("init", "ft-viewport", "ft-transform", fx, fy);
+
+            // Compute the Y range of ±1 generation so JS can zoom to show just parents
+            // and children on first load (rather than the entire tree).
+            var fd = _layout.FocusDepth;
+            var parentNodes = _layout.Nodes.Where(n => n.Depth == fd + 1).ToList();
+            var childNodes  = _layout.Nodes.Where(n => n.Depth == fd - 1).ToList();
+
+            double? genTopY = null;
+            double? genBotY = null;
+            if (parentNodes.Count > 0)
+                genTopY = parentNodes.Min(n => (double)n.Y - n.Size / 2.0) - 30;
+            else if (focusNode != null)
+                genTopY = focusNode.Y - focusNode.Size / 2.0 - 30;
+
+            if (childNodes.Count > 0)
+                genBotY = childNodes.Max(n => (double)n.Y + n.Size / 2.0) + 30;
+            else if (focusNode != null)
+                genBotY = focusNode.Y + focusNode.Size / 2.0 + 30;
+
+            await _jsModule.InvokeVoidAsync("init", "ft-viewport", "ft-transform", fx, fy, genTopY, genBotY);
             _prevFocusId = FocusId;
         }
         else if (FocusId != _prevFocusId && _jsModule != null)
@@ -196,14 +216,4 @@
     }
 
     private static string F(double v) => v.ToString("F1");
-
-    private double GetBandOpacityByYear(int year)
-    {
-        var allYears = _layout.Nodes.Select(n => n.Person.BirthDate?.Year ?? DateTime.Now.Year).Distinct().ToList();
-        if (!allYears.Any()) return 0.08;
-        var minY = allYears.Min();
-        var maxY = allYears.Max();
-        var normalized = maxY == minY ? 0.5 : (double)(year - minY) / (maxY - minY);
-        return 0.15 - (normalized * 0.12);
-    }
 }

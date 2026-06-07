@@ -23,26 +23,17 @@ else if (_notFound)
 }
 else
 {
-    @* <div style="padding:32px 24px; max-width:720px;"> *@
-        @* <div style="font-size:22px; font-weight:500; font-style:italic;
-            font-family:var(--ft-font-display); color:var(--ft-green-800);
-            margin-bottom:28px;">
-            Edit @_person!.FullName
-        </div> *@
-    <MudContainer MaxWidth="MaxWidth.Medium" Class="pb-8" Style="margin:auto;">
-        <div class="page-header">
-            Edit @_person!.FullName
-        </div>
-            <MudCard Class="pa-4 mb-4">
-                <PersonForm Initial="_formModel"
-                            EditingId="@Id"
-                            AllPeople="_allPeople"
-                            SubmitLabel="Save changes"
-                            OnSubmit="HandleSubmit"
-                            OnCancel="@(() => Nav.NavigateTo("/"))" />
-            </MudCard>
+    <div class="ft-form-page">
+        <MudContainer MaxWidth="MaxWidth.Medium">
+            <div class="page-header">Edit @_person!.FullName</div>
+            <PersonForm Initial="_formModel"
+                        EditingId="@Id"
+                        AllPeople="_allPeople"
+                        SubmitLabel="Save changes"
+                        OnSubmit="HandleSubmit"
+                        OnCancel="@(() => Nav.NavigateTo("/"))" />
         </MudContainer>
-    @* </div> *@
+    </div>
 }
 
 @code {

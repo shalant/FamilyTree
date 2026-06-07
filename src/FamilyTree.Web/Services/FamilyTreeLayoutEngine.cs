@@ -97,8 +97,9 @@ public class FamilyTreeLayoutEngine
         //
         // This produces a smooth temporal axis even with sparse data.
         var birthYears = ComputeBirthYears(people);
-        var minYear = birthYears.Values.Min();
-        var maxYear = birthYears.Values.Max();
+        // Snap to decade boundaries so band labels land on round numbers (1910, 1920 …)
+        var minYear = (birthYears.Values.Min() / 10) * 10;
+        var maxYear = ((birthYears.Values.Max() + 9) / 10) * 10;
         var yearRange = maxYear - minYear + 1;
         var canvasHeight = (int)(yearRange * PxPerYear + PaddingY * 2);
 
@@ -123,6 +124,13 @@ public class FamilyTreeLayoutEngine
         //
         // The result is a stable, balanced layout that respects both time and
         // generational structure.
+        // Couple lookup from CoupleDto for reliable spouse detection (SpouseIds may be
+        // incomplete while incrementally building the tree).
+        var couplePairs = new HashSet<(Guid, Guid)>(
+            couples.Select(c => c.PersonAId < c.PersonBId
+                ? (c.PersonAId, c.PersonBId)
+                : (c.PersonBId, c.PersonAId)));
+
         var nodeMap = new Dictionary<Guid, LayoutNode>();
         var xOffset = PaddingX;
 
@@ -136,8 +144,8 @@ public class FamilyTreeLayoutEngine
 
             // Pre-compute couple-aware row data so we can size the component correctly.
             var rows = componentByDepth
-                .Select(g => SortSpousesAdjacent(g.ToList()))
-                .Select(sorted => (sorted, offsets: ComputeRowOffsets(sorted)))
+                .Select(g => SortSpousesAdjacent(g.ToList(), couplePairs))
+                .Select(sorted => (sorted, offsets: ComputeRowOffsets(sorted, couplePairs)))
                 .ToList();
 
             var maxRowWidth = rows.Max(r => r.offsets.Length > 0 ? r.offsets[^1] : 0.0);
@@ -182,6 +190,43 @@ public class FamilyTreeLayoutEngine
         }
 
         var canvasWidth = xOffset + PaddingX;
+
+        // ─────────────────────────────────────────────────────────────────────
+        // PHASE 4.5: Center lone ancestors over their children
+        // ─────────────────────────────────────────────────────────────────────
+        //
+        // When a depth row contains exactly one person (e.g. a single known
+        // grandfather), the generic loop places them at the component's horizontal
+        // midpoint — which looks correct for a balanced tree but feels wrong when
+        // the component's widest row is a couple (so the midpoint falls between
+        // the two partners, not above the actual child).
+        //
+        // Fix: after all positions are computed, slide any single-person depth row
+        // so it sits above the average X of its direct children. Process bottom-up
+        // (low depth → high depth) so that parent adjustments cascade correctly.
+        {
+            var byDepth = nodeMap.Values
+                .GroupBy(n => n.Depth)
+                .OrderBy(g => g.Key)   // ascending → descendants processed before ancestors
+                .ToList();
+
+            foreach (var depthGroup in byDepth)
+            {
+                var nodes = depthGroup.ToList();
+                if (nodes.Count != 1) continue;
+
+                var node = nodes[0];
+                var childNodes = (node.Person.ChildIds ?? [])
+                    .Where(nodeMap.ContainsKey)
+                    .Select(id => nodeMap[id])
+                    .ToList();
+
+                if (!childNodes.Any()) continue;
+
+                var targetX = (int)childNodes.Average(c => (double)c.X);
+                nodeMap[node.Person.Id] = node with { X = targetX };
+            }
+        }
 
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 5: Create visual bands (decade markers with time gradient)
@@ -651,16 +696,9 @@ public class FamilyTreeLayoutEngine
     /// <summary>
     /// Builds a sibling span that always includes the parent's center X.
     ///
-    /// Without this, if all children are positioned to one side of the parent,
-    /// the vertical stem would not visually connect to the span, leaving a gap.
-    ///
-    /// By forcing the span to include parentCenterX, we guarantee a clean T‑shape:
-    ///
-    ///        (parent)
-    ///           |
-    ///       -----------  ← span
-    ///        |   |   |
-    ///      child child child
+    /// The span covers exactly the range [childMinX, childMaxX] extended to also
+    /// include parentCenterX. This guarantees the vertical stem connects to the span
+    /// without artificially widening it beyond the actual children positions.
     /// </summary>
     private SiblingSpan? BuildSiblingSpanIncludingParentCenter(
         double parentCenterX,
@@ -670,8 +708,8 @@ public class FamilyTreeLayoutEngine
         var childMinX = children.Min(c => (double)c.X);
         var childMaxX = children.Max(c => (double)c.X);
 
-        var spanLeft = Math.Min(childMinX, parentCenterX - (children.Count * NodeSpacingX) / 2.0);
-        var spanRight = Math.Max(childMaxX, parentCenterX + (children.Count * NodeSpacingX) / 2.0);
+        var spanLeft  = Math.Min(childMinX, parentCenterX);
+        var spanRight = Math.Max(childMaxX, parentCenterX);
 
         if (Math.Abs(spanRight - spanLeft) <= 1)
             return null;
@@ -683,7 +721,7 @@ public class FamilyTreeLayoutEngine
     // ROW LAYOUT HELPERS
     // ─────────────────────────────────────────────────────────────────────────
 
-    private static List<PersonDto> SortSpousesAdjacent(List<PersonDto> members)
+    private static List<PersonDto> SortSpousesAdjacent(List<PersonDto> members, HashSet<(Guid, Guid)> couplePairs)
     {
         var sorted = new List<PersonDto>(members.Count);
         var remaining = new List<PersonDto>(members);
@@ -694,9 +732,7 @@ public class FamilyTreeLayoutEngine
             remaining.RemoveAt(0);
             sorted.Add(person);
 
-            var spouse = remaining.FirstOrDefault(p =>
-                (person.SpouseIds?.Contains(p.Id) ?? false) ||
-                (p.SpouseIds?.Contains(person.Id) ?? false));
+            var spouse = remaining.FirstOrDefault(p => IsCouple(person, p, couplePairs));
 
             if (spouse != null)
             {
@@ -708,18 +744,23 @@ public class FamilyTreeLayoutEngine
         return sorted;
     }
 
-    private static double[] ComputeRowOffsets(List<PersonDto> members)
+    private static double[] ComputeRowOffsets(List<PersonDto> members, HashSet<(Guid, Guid)> couplePairs)
     {
         var offsets = new double[members.Count];
         for (int i = 1; i < members.Count; i++)
         {
-            var prev = members[i - 1];
-            var curr = members[i];
-            var areSpouses = (prev.SpouseIds?.Contains(curr.Id) ?? false) ||
-                             (curr.SpouseIds?.Contains(prev.Id) ?? false);
+            var areSpouses = IsCouple(members[i - 1], members[i], couplePairs);
             offsets[i] = offsets[i - 1] + (areSpouses ? NodeSpacingX + SpouseSpacingX : NodeSpacingX);
         }
         return offsets;
+    }
+
+    private static bool IsCouple(PersonDto a, PersonDto b, HashSet<(Guid, Guid)> couplePairs)
+    {
+        var lo = a.Id < b.Id ? a.Id : b.Id;
+        var hi = a.Id < b.Id ? b.Id : a.Id;
+        if (couplePairs.Contains((lo, hi))) return true;
+        return (a.SpouseIds?.Contains(b.Id) ?? false) || (b.SpouseIds?.Contains(a.Id) ?? false);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

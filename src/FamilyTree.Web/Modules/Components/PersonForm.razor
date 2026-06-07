@@ -10,66 +10,71 @@
 <MudStack Spacing="4" MaxWidth="680px" Style="margin:auto; font-family:var(--ft-font-body);">
 
     <!-- Identity Card -->
-    <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
-        <MudText Typo="Typo.h5" Class="mb-3">Identity</MudText>
+    <MudPaper Elevation="0" Class="pa-5" Style="background:var(--ft-surface-card); border-radius:12px;">
+        <MudText Typo="Typo.h5" Class="mb-4" Style="font-family:var(--ft-font-display); color:var(--ft-green-800);">Identity</MudText>
 
         <MudGrid Spacing="3">
             <MudItem xs="6">
+                <div class="ft-field-label">First name <span class="ft-required">*</span></div>
                 <MudTextField @bind-Value="_firstName"
-                              Label="First name"
+                              Placeholder="e.g. Margaret"
                               Required="true"
                               RequiredError="First name is required."
                               Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="6">
+                <div class="ft-field-label">Last name <span class="ft-required">*</span></div>
                 <MudTextField @bind-Value="_lastName"
-                              Label="Last name"
+                              Placeholder="e.g. Rosenberg"
                               Required="true"
                               RequiredError="Last name is required."
                               Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="6">
+                <div class="ft-field-label">Middle name</div>
                 <MudTextField @bind-Value="_middleName"
-                              Label="Middle name"
+                              Placeholder="Middle name"
                               Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="6">
+                <div class="ft-field-label">Maiden name</div>
                 <MudTextField @bind-Value="_maidenName"
-                              Label="Maiden name"
+                              Placeholder="Birth surname"
                               Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="5">
+                <div class="ft-field-label">Date of birth</div>
                 <MudDatePicker @bind-Date="_birthDate"
-                               Label="Date of birth"
+                               Placeholder="dd/mm/yyyy"
                                DateFormat="dd/MM/yyyy"
                                Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="7">
+                <div class="ft-field-label">Place of birth</div>
                 <MudTextField @bind-Value="_birthPlace"
-                              Label="Place of birth"
                               Placeholder="City, State / Country"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Outlined.LocationOn"
                               Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="5">
+                <div class="ft-field-label">Date of death</div>
                 <MudDatePicker @bind-Date="_deathDate"
-                               Label="Date of death"
+                               Placeholder="dd/mm/yyyy"
                                DateFormat="dd/MM/yyyy"
                                Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="7">
+                <div class="ft-field-label">Place of death</div>
                 <MudTextField @bind-Value="_deathPlace"
-                              Label="Place of death"
                               Placeholder="City, State / Country"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Outlined.LocationOn"
                               Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="6">
-                <MudSelect @bind-Value="_gender"
-                           Label="Gender"
-                           Variant="Variant.Outlined">
+                <div class="ft-field-label">Gender</div>
+                <MudSelect @bind-Value="_gender" Variant="Variant.Outlined">
                     <MudSelectItem Value="@((Gender?)null)">Not specified</MudSelectItem>
                     <MudSelectItem Value="@((Gender?)Gender.Male)">Male</MudSelectItem>
                     <MudSelectItem Value="@((Gender?)Gender.Female)">Female</MudSelectItem>
@@ -80,8 +85,8 @@
     </MudPaper>
 
     <!-- Photos Card -->
-    <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
-        <MudText Typo="Typo.h5" Class="mb-3">Photos</MudText>
+    <MudPaper Elevation="0" Class="pa-5" Style="background:var(--ft-surface-card); border-radius:12px;">
+        <MudText Typo="Typo.h5" Class="mb-4" Style="font-family:var(--ft-font-display); color:var(--ft-green-800);">Photos</MudText>
 
         <MudStack Spacing="3">
             <!-- Primary avatar preview -->
@@ -206,21 +211,21 @@
     </MudPaper>
 
     <!-- Relationships Card -->
-    <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
-        <MudText Typo="Typo.h5" Class="mb-3">Relationships</MudText>
+    <MudPaper Elevation="0" Class="pa-5" Style="background:var(--ft-surface-card); border-radius:12px;">
+        <MudText Typo="Typo.h5" Class="mb-4" Style="font-family:var(--ft-font-display); color:var(--ft-green-800);">Relationships</MudText>
 
         <MudStack Spacing="3">
 
             <!-- Parents -->
             <MudStack>
-                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600);">Parents</MudText>
+                <div class="ft-field-label">Parents</div>
 
                 <MudAutocomplete @ref="_parentAc"
                                  T="PersonDto"
                                  SearchFunc="SearchParents"
                                  ValueChanged="AddParent"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
-                                 Label="Search by name…"
+                                 Placeholder="Search by name…"
                                  Variant="Variant.Outlined"
                                  Dense="true" />
 
@@ -247,14 +252,14 @@
 
             <!-- Spouses -->
             <MudStack>
-                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600);">Spouses / partners</MudText>
+                <div class="ft-field-label">Spouses / partners</div>
 
                 <MudAutocomplete @ref="_spouseAc"
                                  T="PersonDto"
                                  SearchFunc="SearchSpouses"
                                  ValueChanged="AddSpouse"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
-                                 Label="Search by name…"
+                                 Placeholder="Search by name…"
                                  Variant="Variant.Outlined"
                                  Dense="true" />
 
@@ -281,14 +286,14 @@
 
             <!-- Siblings -->
             <MudStack>
-                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600);">Siblings</MudText>
+                <div class="ft-field-label">Siblings</div>
 
                 <MudAutocomplete @ref="_siblingAc"
                                  T="PersonDto"
                                  SearchFunc="SearchSiblings"
                                  ValueChanged="AddSibling"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
-                                 Label="Search by name…"
+                                 Placeholder="Search by name…"
                                  Variant="Variant.Outlined"
                                  Dense="true" />
 
@@ -315,14 +320,14 @@
 
             <!-- Children -->
             <MudStack>
-                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600);">Children</MudText>
+                <div class="ft-field-label">Children</div>
 
                 <MudAutocomplete @ref="_childAc"
                                  T="PersonDto"
                                  SearchFunc="SearchChildren"
                                  ValueChanged="AddChild"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
-                                 Label="Search by name…"
+                                 Placeholder="Search by name…"
                                  Variant="Variant.Outlined"
                                  Dense="true" />
 
@@ -351,11 +356,12 @@
     </MudPaper>
 
     <!-- Notes Card -->
-    <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
-        <MudText Typo="Typo.h5" Class="mb-3">Notes</MudText>
+    <MudPaper Elevation="0" Class="pa-5" Style="background:var(--ft-surface-card); border-radius:12px;">
+        <MudText Typo="Typo.h5" Class="mb-4" Style="font-family:var(--ft-font-display); color:var(--ft-green-800);">Notes</MudText>
 
+        <div class="ft-field-label">Biography, stories, context</div>
         <MudTextField @bind-Value="_notes"
-                      Label="Biography, stories, context…"
+                      Placeholder="Write anything memorable about this person…"
                       Lines="4"
                       AutoGrow="true"
                       Variant="Variant.Outlined" />

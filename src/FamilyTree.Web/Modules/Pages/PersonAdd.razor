@@ -15,23 +15,20 @@
 
 @if (_loading)
 {
-    <MudProgressLinear Indeterminate="true" />
+    <MudProgressLinear Indeterminate="true" Color="Color.Success" />
 }
 else
 {
-    <MudContainer MaxWidth="MaxWidth.Medium" Class="pb-8" Style="margin:auto;">
-        <div class="page-header">
-            Add person
-        </div>
-
-        <MudCard Class="pa-4 mb-4">
+    <div class="ft-form-page">
+        <MudContainer MaxWidth="MaxWidth.Medium">
+            <div class="page-header">Add person</div>
             <PersonForm @ref="_form"
                         AllPeople="_allPeople"
                         SubmitLabel="Add person"
                         OnSubmit="HandleSubmit"
                         OnCancel="@(() => Nav.NavigateTo("/people"))" />
-        </MudCard>
-    </MudContainer>
+        </MudContainer>
+    </div>
 }
 
 @if (!string.IsNullOrEmpty(_error))
