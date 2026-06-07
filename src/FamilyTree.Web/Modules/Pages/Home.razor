@@ -1,6 +1,7 @@
 ﻿@page "/"
 @layout TreeLayout
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 
 @using Microsoft.JSInterop
 @using FamilyTree.Core.Services
@@ -57,7 +58,7 @@ else
                       FocusId="_focusPerson?.Id"
                       OnPersonSelected="HandlePersonSelected" />
 
-    <div id="ft-toolbar" style="position:fixed; bottom:24px; left:24px; z-index:10000;">
+    <div id="ft-toolbar" style="@_toolbarStyle">
         <CustomToolbar OnZoomIn="@(async () => { if (_canvas != null) await _canvas.ZoomIn(); })"
                        OnZoomOut="@(async () => { if (_canvas != null) await _canvas.ZoomOut(); })"
                        OnCenterTree="@(async () => { if (_canvas != null) await _canvas.CenterTree(); })" />
@@ -68,7 +69,9 @@ else
                           CoupleCount="_couples.Count"
                           OnCenterTree="CenterTree"
                           OnShare="ShareView"
-                          Visible="(_detailPerson == null)" />
+                          Visible="(_detailPerson == null)"
+                          DragLeft="_heroPos?.Left"
+                          DragTop="_heroPos?.Top" />
 }
 
 <PersonDetailDrawer Person="_detailPerson"
@@ -91,6 +94,16 @@ else
     private PersonDto? _detailPerson;
     private bool _loading = true;
     private FamilyTreeCanvas? _canvas;
+
+    // ── Drag state ────────────────────────────────────────────────────────────
+    private IJSObjectReference? _dragModule;
+    private DotNetObjectReference<Home>? _dotNetRef;
+    private (double Left, double Top)? _toolbarPos;
+    private (double Left, double Top)? _heroPos;
+
+    private string _toolbarStyle => _toolbarPos.HasValue
+        ? $"position:fixed; left:{(int)_toolbarPos.Value.Left}px; top:{(int)_toolbarPos.Value.Top}px; z-index:10000;"
+        : "position:fixed; bottom:24px; left:24px; z-index:10000;";
 
     protected override async Task OnInitializedAsync()
     {
@@ -135,10 +148,45 @@ else
     {
         if (firstRender)
         {
-            await Task.Delay(10000);
-            _showIntro = false;
-            StateHasChanged();
+            // Fire-and-forget so intro timer doesn't block drag initialisation
+            _ = Task.Delay(10000).ContinueWith(_ =>
+                InvokeAsync(() => { _showIntro = false; StateHasChanged(); }));
         }
+
+        // Load the drag module once; call init on every render so that
+        // elements appearing after initial load (toolbar/hero) get wired up.
+        if (_dragModule == null)
+        {
+            _dragModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/ftDrag.js");
+            _dotNetRef  = DotNetObjectReference.Create(this);
+
+            var tb = await _dragModule.InvokeAsync<double[]?>("loadPos", "toolbar");
+            var h  = await _dragModule.InvokeAsync<double[]?>("loadPos", "hero");
+            if (tb != null) _toolbarPos = (tb[0], tb[1]);
+            if (h  != null) _heroPos    = (h[0],  h[1]);
+
+            if (tb != null || h != null)
+            {
+                StateHasChanged(); // re-render with restored positions; init runs on next cycle
+                return;
+            }
+        }
+
+        await _dragModule.InvokeVoidAsync("init", _dotNetRef);
+    }
+
+    [JSInvokable]
+    public void OnDragEnd(string key, double left, double top)
+    {
+        if (key == "toolbar") _toolbarPos = (left, top);
+        if (key == "hero")    _heroPos    = (left, top);
+        StateHasChanged(); // Blazor re-renders with new position — no more JS/Blazor conflict
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_dragModule != null) await _dragModule.DisposeAsync();
+        _dotNetRef?.Dispose();
     }
 
 

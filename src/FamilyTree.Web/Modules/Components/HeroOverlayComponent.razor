@@ -2,8 +2,16 @@
 
 @if (Visible)
 {
-    <div class="hero-overlay">
+    <div id="ft-hero" class="hero-overlay" style="@_posStyle">
         <div class="hero-glass @(Expanded ? "expanded" : "")">
+
+            <div class="hero-drag-handle" data-drag-handle title="Drag to move">
+                <svg width="20" height="8" viewBox="0 0 20 8" fill="currentColor"
+                     style="color:var(--ft-gray-300); display:block;">
+                    <circle cx="4"  cy="2" r="1.5"/><circle cx="10" cy="2" r="1.5"/><circle cx="16" cy="2" r="1.5"/>
+                    <circle cx="4"  cy="6" r="1.5"/><circle cx="10" cy="6" r="1.5"/><circle cx="16" cy="6" r="1.5"/>
+                </svg>
+            </div>
 
             <div class="hero-header">
                 <div class="hero-title">@FocusPerson?.FirstName's Family Tree</div>
@@ -71,6 +79,12 @@
     [Parameter] public EventCallback OnCenterTree { get; set; }
     [Parameter] public EventCallback OnShare { get; set; }
     [Parameter] public bool Visible { get; set; }
+    [Parameter] public double? DragLeft { get; set; }
+    [Parameter] public double? DragTop  { get; set; }
+
+    private string _posStyle => (DragLeft.HasValue && DragTop.HasValue)
+        ? $"left:{(int)DragLeft}px; top:{(int)DragTop}px; right:auto; bottom:auto;"
+        : "";
 
     private bool Expanded { get; set; }
 
