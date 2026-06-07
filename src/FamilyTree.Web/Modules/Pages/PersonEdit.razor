@@ -79,10 +79,11 @@ else
             BiographyNotes  = _person.BiographyNotes,
             ProfilePhotoUrl = _person.ProfilePhotoUrl,
             Gender          = _person.Gender,
-            ParentIds       = _person.ParentIds  ?? [],
-            SpouseIds       = _person.SpouseIds  ?? [],
-            SiblingIds      = _person.SiblingIds ?? [],
-            ChildIds        = _person.ChildIds   ?? []
+            ParentIds       = _person.ParentIds       ?? [],
+            SpouseIds       = _person.SpouseIds       ?? [],
+            FormerSpouseIds = _person.FormerSpouseIds ?? [],
+            SiblingIds      = _person.SiblingIds      ?? [],
+            ChildIds        = _person.ChildIds        ?? []
         };
         _loading = false;
     }

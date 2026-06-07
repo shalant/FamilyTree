@@ -40,6 +40,7 @@ public class PersonDto
     public List<Guid>? ParentIds { get; set; }
     public List<Guid>? ChildIds { get; set; }
     public List<Guid>? SpouseIds { get; set; }
+    public List<Guid>? FormerSpouseIds { get; set; }
     public List<Guid>? SiblingIds { get; set; }
 
     // Set at render time by FamilyTreeCanvas — not persisted

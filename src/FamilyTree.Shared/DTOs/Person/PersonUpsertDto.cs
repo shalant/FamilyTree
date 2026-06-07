@@ -39,6 +39,7 @@ public class PersonUpsertDto
 
     public List<Guid> ParentIds { get; set; } = new();
     public List<Guid> SpouseIds { get; set; } = new();
+    public List<Guid> FormerSpouseIds { get; set; } = new();
     public List<Guid> ChildIds { get; set; } = new();
     public List<Guid> SiblingIds { get; set; } = new();
 }

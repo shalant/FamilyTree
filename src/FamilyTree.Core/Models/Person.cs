@@ -20,6 +20,9 @@ public partial class Person
     public string? ProfilePhotoUrl { get; set; }
     public Gender? Gender { get; set; }
 
+    public Guid? FamilyId { get; set; }
+    public virtual Family? Family { get; set; }
+
     public DateTime? CreatedAt { get; set; }
     public Guid? CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }

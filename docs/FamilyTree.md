@@ -1,38 +1,39 @@
-﻿# FamilyTree — project context
+# FamilyTree — project context
 
 > Paste this file at the start of any AI session or hand it to a new collaborator.
-> Keep it current as decisions are made. Last updated: 2026-05.
+> Keep it current as decisions are made. Last updated: 2026-06.
 
 ---
 
 ## What this is
 
 A private family tree web application. The primary goal is a beautiful, organic
-tree visualisation where each family member's account "focuses" on their branch.
-Design input is expected from artist collaborators in the family — the UI is
-intentionally kept simple and easy to overhaul.
+tree visualisation where each family member can browse their branch. Design input
+is expected from artist collaborators in the family — the UI is intentionally kept
+simple and easy to overhaul.
 
 **Repo:** https://github.com/shalant/FamilyTree  
 **Hosting:** Azure App Service (free tier F1) + Azure SQL Database (free tier)  
-**Stack:** .NET 10, Blazor Server, ASP.NET Core Web API, EF Core, MudBlazor, SQL Server
+**Stack:** .NET 10, C# 13, Blazor Server, EF Core, MudBlazor, SQL Server
 
 ---
 
 ## Architecture
 
+There is **no HTTP boundary** between the UI and the service layer:
+
 ```
 FamilyTree.Web      Blazor Server UI
-      │ HTTP
+      │ direct service injection
       ▼
-FamilyTree.Core      ASP.NET Core REST API
+FamilyTree.Core     Service layer + EF Core (no REST controllers)
       │ EF Core
       ▼
-Azure SQL Database
+SQL Server / Azure SQL Database
 ```
 
-Local development uses a SQL Server Docker container (`localhost,1433`).
-Both projects run with `dotnet watch`. No JavaScript interop — layout is
-computed in C#.
+Local development uses SQL Server Express (`localhost\sqlexpress`) or a Docker
+container. Both projects run with `dotnet watch`.
 
 ---
 
@@ -42,28 +43,29 @@ computed in C#.
 FamilyTree/
 ├── src/
 │   ├── FamilyTree.Shared/
-│   │   ├── DTOs/Person/            PersonDto, PersonUpsertDto
-│   │   └── Enums/                  RelationshipType, MediaType
+│   │   ├── DTOs/Person/       PersonDto, PersonUpsertDto
+│   │   ├── DTOs/              CoupleDto
+│   │   └── Enums/             RelationshipType, MediaType, Gender
 │   ├── FamilyTree.Core/
-│   │   ├── Controllers/            PeopleController, RelationshipsController
-│   │   ├── Data/                   AppDbContext, EF Core migrations
-│   │   ├── DTOs/                   API-only models
-│   │   └── Services/               Business logic
+│   │   ├── Data/              AppDbContext, DataSeeder, EF Core migrations
+│   │   ├── Mappers/           PersonMapper, RelationshipMapper
+│   │   ├── Models/            Person, Relationship, Medium, Family
+│   │   └── Services/          IPersonService, PersonService, BlobStorageService, …
 │   └── FamilyTree.Web/
 │       ├── Modules/
-│       │   ├── Components/         Reusable UI components (see below)
-│       │   └── Pages/              Routable pages (see below)
-│       ├── Services/               IPersonService — typed HTTP client
-│       └── wwwroot/                Static assets
+│       │   ├── Components/    Reusable UI components (see below)
+│       │   ├── Dialogs/       ConfirmDialog, SiblingInferenceDialog
+│       │   └── Pages/         Home, PersonAdd, PersonEdit
+│       ├── Services/          FamilyTreeLayoutEngine, CoupleHelper, ToastService, …
+│       └── wwwroot/           css/, js/ (canvas-interaction.js, ftDrag.js)
 ├── tests/
-│   ├── FamilyTree.Core.Tests/
-│   └── FamilyTree.Web.Tests/
-├── database/                       Seed scripts, useful queries
+│   └── FamilyTree.Core.Tests/
 ├── docs/
+│   ├── FamilyTree.md          ← this file
+│   ├── todolist.md
 │   ├── deployment.md
-│   ├── ui-components.md
-│   └── architecture-decisions/     ADRs
-└── .github/workflows/              CI/CD → Azure App Service
+│   └── architecture-decisions/  ADRs
+└── .github/workflows/         CI/CD → Azure App Service
 ```
 
 ---
@@ -72,11 +74,15 @@ FamilyTree/
 
 | File | Purpose |
 |------|---------|
-| `FamilyTreeCanvas.razor` | SVG tree. Computes layout in C#, no JS. Emits `OnPersonSelected`. Knows nothing about navigation or drawers. |
-| `PersonNode.razor` | Single circle node — initials, name, year. Purely presentational. Receives pre-computed `X`/`Y`/`Size`. |
-| `PersonDetailDrawer.razor` | Read-only side drawer. Shows vital dates, relationships, notes. Emits `OnEdit`, `OnDelete`, `OnFocusPerson`. |
-| `PersonForm.razor` | All form fields for add and edit. Shared by both pages. Single responsibility: field rendering + validation. |
-| `ConfirmDialog.razor` | Reusable MudBlazor dialog for any destructive action. Takes `Message` and `ConfirmLabel` parameters. |
+| `FamilyTreeCanvas.razor` | Calls `FamilyTreeLayoutEngine`, renders SVG T-bar connectors + person nodes. Emits `OnPersonSelected`. No navigation knowledge. |
+| `PersonNode.razor` | Single circle node — initials, name, years. Purely presentational. Receives pre-computed X/Y/Size. |
+| `PersonDetailDrawer.razor` | Read-only side drawer. Vital dates, relationships, biography, photos. Emits `OnEdit`, `OnDelete`, `OnFocusPerson`. |
+| `PersonForm.razor` | All form fields for add and edit. Shared by `PersonAdd` and `PersonEdit`. Handles autocomplete for parents, spouses, former spouses, siblings, children. |
+| `HeroOverlayComponent.razor` | Floating card showing focus person stats and tree counts. Draggable. |
+| `CustomToolbar.razor` | Floating zoom / center / reset toolbar. Draggable. |
+| `LoginOverlay.razor` | Intro splash with "Continue as guest" — placeholder for future auth. |
+| `ConfirmDialog.razor` | Generic MudBlazor dialog for destructive actions. Takes `Message` and `ConfirmLabel`. |
+| `SiblingInferenceDialog.razor` | Appears after adding a sibling — offers to link that sibling's existing siblings too. |
 
 ---
 
@@ -84,67 +90,91 @@ FamilyTree/
 
 | Route | File | Purpose |
 |-------|------|---------|
-| `/people` | `People.razor` | Orchestrator. Owns view toggle (tree/list), search, dialog invocation, and navigation decisions. Delegates all display. |
-| `/people/add` | `PersonAdd.razor` | Loads all people for relationship pickers, renders `PersonForm`, calls `CreateAsync`. |
-| `/people/{id}/edit` | `PersonEdit.razor` | Loads person by id + all people, maps to `PersonUpsertDto`, renders `PersonForm`, calls `UpdateAsync`. |
+| `/` | `Home.razor` | Orchestrator. Owns all state: people list, couples, focus person, detail person, drag positions. Renders canvas + overlays. |
+| `/people/add` | `PersonAdd.razor` | Loads all people for pickers, renders `PersonForm`, calls `CreateAsync`. |
+| `/people/{id}/edit` | `PersonEdit.razor` | Loads person + all people, maps to `PersonUpsertDto`, renders `PersonForm`, calls `UpdateAsync`. Runs sibling-inference dialog post-save. |
 
 ---
 
 ## Data model
 
+### Entities (`FamilyTree.Core/Models/`)
+```
+Family          Id, Name, CreatedAt
+Person          Id, FamilyId (FK→Family, nullable), FirstName, MiddleName, LastName,
+                MaidenName, BirthDate, BirthPlace, DeathDate, DeathPlace,
+                BiographyNotes, ProfilePhotoUrl, Gender, audit fields, RowVersion
+Relationship    Id, PersonAId, PersonBId, Type, StartDate, EndDate, Notes,
+                audit fields, RowVersion
+                — unique constraint on (PersonAId, PersonBId, Type)
+                — PersonAId < PersonBId always enforced (canonical pair)
+                — EndDate set = former/divorced; EndDate null = active
+Medium          Id, PersonId (FK→Person, cascade delete), Url, FileName, Caption,
+                Type, MimeType, audit fields, RowVersion
+```
+
 ### `PersonDto` (read)
 ```csharp
-int       Id
-string    FirstName
-string    LastName
-string    FullName          // computed
-DateTime? BirthDate
-DateTime? DeathDate
-int?      Age
-string?   Notes
-List<int>? ParentIds        // populated by API — drives tree layout
-List<int>? ChildIds         // populated by API
-List<int>? SpouseIds        // populated by API
-int       GenerationDepth   // set at render time, never persisted
+Guid        Id
+Guid?       FamilyId
+string      FirstName, MiddleName?, LastName, MaidenName?
+string      FullName            // computed
+DateOnly?   BirthDate, DeathDate
+string?     BirthPlace, DeathPlace
+int?        Age                 // computed
+bool        IsDeceased          // computed
+string?     BiographyNotes, ProfilePhotoUrl
+Gender?     Gender
+List<Guid>  ParentIds, ChildIds, SpouseIds, FormerSpouseIds, SiblingIds
 ```
 
 ### `PersonUpsertDto` (write)
 ```csharp
-string    FirstName
-string    LastName
-DateTime? BirthDate
-DateTime? DeathDate
-string?   Notes
-List<int> ParentIds
-List<int> SpouseIds
+string      FirstName, MiddleName?, LastName, MaidenName?
+DateOnly?   BirthDate, DeathDate
+string?     BirthPlace, DeathPlace, BiographyNotes, ProfilePhotoUrl
+Gender?     Gender
+List<Guid>  ParentIds, SpouseIds, FormerSpouseIds, SiblingIds, ChildIds
 ```
 
-### `IPersonService`
-```csharp
-Task<List<PersonDto>>  GetAllAsync()
-Task<PersonDto?>       GetByIdAsync(int id)
-Task<PersonDto>        CreateAsync(PersonUpsertDto dto)
-Task<PersonDto>        UpdateAsync(int id, PersonUpsertDto dto)
-Task                   DeleteAsync(int id)
-```
+### `CoupleDto` (render-time only, never persisted)
+Derived by `CoupleHelper.Derive(people)` from shared children + explicit spouse/formerSpouse IDs.
+Carries `PersonAId`, `PersonBId`, `ChildIds`, `IsFormer`.
 
 ---
 
 ## Tree layout
 
-The tree is rendered without JavaScript. Key facts for anyone modifying it:
+All node positions computed in C# by `FamilyTreeLayoutEngine` before render. Key facts:
 
-- `ComputeDepths()` runs BFS from the focus node up through `ParentIds`, then
-  a second pass downward to assign negative depths to children.
-- Nodes are grouped by depth, sorted oldest-first (highest depth at top).
-- Each generation is centered horizontally. Node `X`/`Y` are plain integers.
-- SVG bezier curves are built from the same coordinates — no DOM measurement.
-- Layout constants in `FamilyTreeCanvas.razor` (all easy to tune):
-  - `NodeSpacingX` = 100px — horizontal gap between node centers
-  - `GenerationH` = 110px — vertical gap between rows
-  - `PaddingX` / `PaddingY` = 60px — canvas edge padding
-  - `FocusSize` = 64px — focused node diameter
-  - `DefaultSize` = 44px — all other nodes
+- **Y axis** is a real birth-year timeline (`PxPerYear = 6.5`). No fixed row heights.
+- **X axis** uses bottom-up subtree width measurement (`MeasureGroup`) + top-down placement (`PlaceGroup`). Couples sit `SpouseSpacingX = 200px` apart. Children are spread evenly below the couple midpoint.
+- **Cross-root couples** (a child of family A marries a child of family B): detected before placement, each partner placed as a leaf under their own family, children placed at the couple midpoint in a post-pass. Prevents connector tangles.
+- **Connectors** are classic pedigree T-bars: straight horizontal couple lines, vertical stems, horizontal T-bars, vertical drops. Former couples use dashed grey 💔; active couples use solid green ❤.
+- **Canvas pan/zoom** lives in JS (`canvas-interaction.js`). Blazor never touches `ft-transform` style directly.
+- **Widget drag** (toolbar, hero card): Blazor owns the stored position; JS calls `[JSInvokable] OnDragEnd(key, left, top)` on mouseup.
+
+Layout constants in `FamilyTreeLayoutEngine.cs`:
+- `NodeSpacingX = 120` — horizontal gap between node centers
+- `SpouseSpacingX = 200` — gap between couple nodes
+- `FocusSize = 80` / `Gen1Size = 70` / `DefaultSize = 60` — node diameters
+- `PaddingX = 90` / `PaddingY = 10` — canvas edge padding
+
+---
+
+## Service patterns
+
+- All service methods return `ServiceResponse<T>` — always check `.Success` before `.Data`
+- Static factories: `ServiceResponse.Ok(data)` / `ServiceResponse.Fail(message)`
+- `IDbContextFactory<AppDbContext>` — scoped contexts, never singleton DbContext
+- `PersonMapper.MapToDto(person, rels, allPeople)` — enriches read model with derived ID lists
+- `PersonService.SyncRelationshipsDiffAsync` — diffs existing rels against the new DTO and creates/updates/deletes accordingly; handles spouse ↔ former-spouse transitions via `EndDate`
+
+---
+
+## Multi-tenant preparation
+
+A `Family` table exists as a tenant container. `Person.FamilyId` (nullable) links each person to a family. The seeder creates one "My Family" row and assigns all seeded people to it. Service-layer filtering by `FamilyId` will be added when ASP.NET Core Identity is wired in.
 
 ---
 
@@ -152,82 +182,25 @@ The tree is rendered without JavaScript. Key facts for anyone modifying it:
 
 | Action | Pattern | Reason |
 |--------|---------|--------|
-| View person details | Drawer (end anchor) | Keeps tree visible in context |
-| Add person | Full page `/people/add` | Needs focus, no context needed |
+| View person details | Side drawer | Keeps tree visible in context |
+| Add person | Full page `/people/add` | Needs focus, relationship pickers |
 | Edit person | Full page `/people/{id}/edit` | Shares `PersonForm` with add |
-| Delete confirm | `ConfirmDialog` | Destructive — requires explicit confirmation |
-| Focus tree on person | In-place state (`_focusId`) | No navigation, just re-renders canvas |
-
----
-
-## Key decisions made
-
-**No JavaScript in the tree component (ADR 001)**  
-Layout is computed in C# before render. Nodes use `position:absolute` with
-pre-calculated coordinates. Eliminates `IJSRuntime` dependency and
-`OnAfterRenderAsync` timing issues. Tradeoff: text overflow must be handled
-manually with fixed label widths.
-
-**`PersonForm` shared between add and edit**  
-Both pages pass an `Initial` model and a submit callback. The form owns only
-field rendering and validation — it has no knowledge of create vs. update.
-Adding a new field means touching one file.
-
-**`FamilyTreeCanvas` knows nothing about navigation**  
-It emits `OnPersonSelected(PersonDto)` and stops. The parent page decides
-whether to open a drawer, navigate, or do something else. Makes the canvas
-reusable (e.g., embeddable in a dashboard widget).
-
-**Drawer for detail, pages for edit/add**  
-Detail view and edit form have different jobs and will diverge over time.
-Collapsing them would couple read and write concerns prematurely.
-
-**`ConfirmDialog` is generic**  
-Takes `Message` and `ConfirmLabel` as parameters. One component covers all
-destructive actions across the app — not just person deletion.
-
----
-
-## What's working
-
-- [x] Blazor Server + API + SQL Server running locally
-- [x] `PeopleController` — GET all, GET by id, POST, PUT, DELETE
-- [x] People list view with search, sort, pagination
-- [x] Tree view — generation layout, SVG bezier connectors, focus node
-- [x] View toggle (tree ↔ list)
-- [x] `PersonDetailDrawer` — vital dates, relationships, notes
-- [x] `PersonForm` shared by add and edit
-- [x] `PersonAdd` page
-- [x] `PersonEdit` page
-- [x] `ConfirmDialog` for delete
-- [x] CI/CD → Azure via GitHub Actions
-
-## What's next / not yet done
-
-- [ ] `ParentIds` / `ChildIds` / `SpouseIds` populated by API (tree connectors depend on this)
-- [ ] Authentication — who is the "focus" user
-- [ ] Photo / avatar upload
-- [ ] Timeline view
-- [ ] Search across tree (not just list)
-- [ ] Mobile layout for tree canvas
-- [ ] Relationship management UI (add/remove parents, spouses)
+| Delete confirm | `ConfirmDialog` | Destructive — explicit confirmation required |
+| Focus tree on person | In-place state `_focusPerson` | No navigation, re-renders canvas |
+| Share view | Copy URL with `?focus=<id>` to clipboard | Stateless shareable link |
 
 ---
 
 ## Local dev commands
 
 ```bash
-# Start SQL Server
-docker start familytree-db
-
-# Run API  (https://localhost:7001, Swagger at /swagger)
+# Run Core (services)
 cd src/FamilyTree.Core && dotnet watch
 
-# Run Web  (https://localhost:7000)
+# Run Web UI
 cd src/FamilyTree.Web && dotnet watch
 
-# New migration
-cd src/FamilyTree.Core
+# New migration (run from src/FamilyTree.Core)
 dotnet ef migrations add <Name>
 dotnet ef database update
 ```
@@ -237,6 +210,4 @@ dotnet ef database update
 ## How to use this document
 
 At the start of a new AI session, paste this file and say what you want to work on.
-The assistant will have full context without needing to re-derive the architecture
-from scratch. Update the "What's working" checklist and "Key decisions made" section
-as the project evolves.
+Update the file as decisions are made — especially the data model and layout sections.

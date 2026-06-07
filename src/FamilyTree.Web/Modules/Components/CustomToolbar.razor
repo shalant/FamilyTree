@@ -50,10 +50,19 @@
                        OnClick="OnCenterTree" />
     </MudTooltip>
 
+    <MudDivider Vertical="true" FlexItem="true" Style="height:28px; margin:0 4px;" />
+
+    <MudTooltip Text="Reset view and widget positions">
+        <MudIconButton Icon="@Icons.Material.Outlined.RestartAlt"
+                       Size="Size.Small"
+                       OnClick="OnReset" />
+    </MudTooltip>
+
 </MudPaper>
 
 @code {
     [Parameter] public EventCallback OnZoomIn { get; set; }
     [Parameter] public EventCallback OnZoomOut { get; set; }
     [Parameter] public EventCallback OnCenterTree { get; set; }
+    [Parameter] public EventCallback OnReset { get; set; }
 }

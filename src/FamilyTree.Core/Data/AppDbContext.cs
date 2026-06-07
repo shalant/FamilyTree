@@ -5,6 +5,7 @@ namespace FamilyTree.Core.Data;
 
 public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    public DbSet<Family> Families => Set<Family>();
     public DbSet<Person> People => Set<Person>();
     public DbSet<Relationship> Relationships => Set<Relationship>();
     public DbSet<Medium> Media => Set<Medium>();
@@ -12,6 +13,15 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbCo
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // FAMILY
+        modelBuilder.Entity<Family>(e =>
+        {
+            e.HasKey(f => f.Id);
+            e.Property(f => f.Id).HasDefaultValueSql("newsequentialid()");
+            e.Property(f => f.Name).HasMaxLength(200).IsRequired();
+            e.Property(f => f.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+        });
 
         // PERSON
         modelBuilder.Entity<Person>(e =>
@@ -35,6 +45,11 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbCo
 
             e.Property(p => p.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             e.Property(p => p.RowVersion).IsRowVersion();
+
+            e.HasOne(p => p.Family)
+                .WithMany(f => f.People)
+                .HasForeignKey(p => p.FamilyId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // RELATIONSHIP

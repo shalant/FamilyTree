@@ -39,59 +39,46 @@
 
                 @foreach (var family in _layout.Connectors)
                 {
+                    @* Horizontal couple connector *@
                     @if (family.Couple is { } arc)
                     {
-                        <path d="M @F(arc.PartnerAX) @F(arc.PartnerAY)
-                        C @F(arc.PartnerAX) @F(arc.PeakY),
-                        @F(arc.PartnerBX) @F(arc.PeakY),
-                        @F(arc.PartnerBX) @F(arc.PartnerBY)"
+                        var arcStroke = arc.IsFormer ? "var(--ft-gray-400)" : "var(--ft-line-couple)";
+                        var arcDash   = arc.IsFormer ? "4 3" : null;
+                        <path d="M @F(arc.PartnerAX) @F(arc.PartnerAY) L @F(arc.PartnerBX) @F(arc.PartnerBY)"
                               fill="none"
-                              stroke="var(--ft-line-couple)"
-                              stroke-width="0.8"
-                              stroke-linecap="round" />
-                        <circle cx="@F(arc.MidX)" cy="@F(arc.HeartY)"
-                                r="2.5" fill="var(--ft-line-couple)" />
-                        <svg:text x="@F(arc.MidX - 4)" y="@F(arc.HeartY - 6)"
-                                  font-size="10" fill="var(--ft-green-600)">❤</svg:text>
+                              stroke="@arcStroke"
+                              stroke-width="1.2"
+                              stroke-dasharray="@arcDash" />
+                        <svg:text x="@F(arc.MidX)" y="@F(arc.HeartY - 4)"
+                                  font-size="9" fill="@arcStroke"
+                                  text-anchor="middle">@(arc.IsFormer ? "💔" : "❤")</svg:text>
                     }
 
+                    @* Vertical stem from couple/parent down to T‑bar *@
                     @if (family.Stem.TopY < family.Stem.BotY)
                     {
-                        <path d="M @F(family.Stem.X) @F(family.Stem.TopY)
-                        C @F(family.Stem.X) @F(family.Stem.TopY + 28),
-                        @F(family.Stem.X) @F(family.Stem.BotY - 28),
-                        @F(family.Stem.X) @F(family.Stem.BotY)"
+                        <path d="M @F(family.Stem.X) @F(family.Stem.TopY) L @F(family.Stem.X) @F(family.Stem.BotY)"
                               fill="none"
                               stroke="var(--ft-line-parent)"
-                              stroke-width="1.2"
-                              stroke-linecap="round" />
+                              stroke-width="1.2" />
                     }
 
+                    @* Horizontal T‑bar across children *@
                     @if (family.Span is { } span)
                     {
-                        var bowY = span.Y + 8.0;
-                        <path d="M @F(span.LeftX)  @F(span.Y)
-                        C @F(span.LeftX)  @F(bowY),
-                        @F(span.RightX) @F(bowY),
-                        @F(span.RightX) @F(span.Y)"
+                        <path d="M @F(span.LeftX) @F(span.Y) L @F(span.RightX) @F(span.Y)"
                               fill="none"
                               stroke="var(--ft-line-parent)"
-                              stroke-width="1.2"
-                              stroke-linecap="round" />
+                              stroke-width="1.2" />
                     }
 
+                    @* Vertical drops from T‑bar to each child *@
                     @foreach (var drop in family.Drops)
                     {
-                        var lean = (drop.CenterX - family.Stem.X) * 0.18;
-                        var fromY = family.Stem.BotY;
-                        <path d="M @F(drop.CenterX)        @F(fromY)
-                        C @F(drop.CenterX + lean) @F(fromY + 16),
-                        @F(drop.CenterX - lean) @F(drop.BotY - 16),
-                        @F(drop.CenterX)        @F(drop.BotY)"
+                        <path d="M @F(drop.CenterX) @F(family.Stem.BotY) L @F(drop.CenterX) @F(drop.BotY)"
                               fill="none"
                               stroke="var(--ft-line-parent)"
-                              stroke-width="1.2"
-                              stroke-linecap="round" />
+                              stroke-width="1.2" />
                     }
                 }
             </svg>

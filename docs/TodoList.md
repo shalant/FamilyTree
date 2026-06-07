@@ -1,150 +1,104 @@
-# Family App Todo
-
-## Quick Wins (In Progress)
-- [ ] Auth — Identity/OAuth setup + token validation across API & Web
-- [x] ~~Blob~~ — Azure Blob Storage integrated for photo uploads
-- [x] ~~Validation~~ — Data validation on DTOs + business logic + file handling
-- [x] ~~Toolbar~~ — Floating draggable toolbar + draggable header
-
-## Completed Features
-- [x] ~~Delete photo~~
-- [x] ~~Edit photo captions~~
-- [x] ~~Load preview URLs in PersonDetailDrawer~~
-- [x] ~~Multi-photo upload with primary photo selection~~
-- [x] ~~Siblings field in person form~~
-- [x] ~~Multiple parents/spouses/children (autocomplete reset)~~
-- [x] ~~ChildIds and SiblingIds persisted in relationship sync~~
-- [x] ~~All person fields saved (birthplace, gender, maiden name, etc.)~~
-- [x] ~~Tree generation height compressed for 17" laptops~~
-
-## Relationship Enhancements
-- [ ] **Divorce** — UI to set EndDate on a Spouse relationship (infrastructure already exists: `Relationship.EndDate`). Needs: "Mark as divorced" action on spouse chips, ex-spouse label in drawer, dashed connector in tree for ended marriages. Schema: no migration needed, `RelationshipDto` needs `EndDate` + `IsActive` exposed, `PersonDto.SpouseIds` split into active/former.
-- [ ] **Focus persistence** — persist the user's default focus person to localStorage or a user preferences table so it survives page refresh
+# Family App — Todo List
 
 ---
 
-# Vision: A Family Tree App That Tells Stories
+## In Progress / Up Next
 
-## 🧭 Phase 1 — Core foundation (MVP)
-**Goal:** make it usable and trustworthy for everyday people.
-
-### ✅ Essential features
-| Area | Features |
-|------|----------|
-| Accounts | Simple sign in (Google, Microsoft, Apple, email/password) |
-| Data model | Person, relationships (parent, spouse, child), notes, photos |
-| CRUD UI | Add/edit/delete people with clean forms |
-| Tree view | Interactive visualization (zoom, pan, focus on person) |
-| Theme | Light/dark mode toggle |
-| Hosting & storage | Azure App Service + Blob Storage for photos |
-| Privacy | Private tree by default; shareable link later |
-
-**Outcome:** Users can sign in, build their own tree, and see it beautifully rendered.
+- [ ] **Auth** — ASP.NET Core Identity + Google social login; Admin and Viewer roles; resolve `FamilyId` from claims and filter all service queries by it
+- [ ] **Photo upload** — replace `ProfilePhotoUrl` plain-string with actual file upload to Azure Blob Storage (infrastructure already exists: `BlobStorageService`)
 
 ---
 
-## 🌿 Phase 2 — Personalization & storytelling
-**Goal:** make it emotionally engaging.
+## Recently Completed
 
-### ✨ Features
-| Area | Features |
-|------|----------|
-| Profile cards | Add biography, photos, and life events |
-| Timeline view | Chronological life events per person |
-| Media upload | ~~Photos~~ (done), documents, voice clips |
-| Design polish | Generational color bands, smooth transitions |
-| Search & filter | Quick search by name, year, or relation |
-| Responsive layout | Mobile friendly tree and forms |
-
-**Outcome:** Users feel like they're telling their family's story, not just entering data.
+- [x] `FamilyId` schema migration — `Family` table added; `Person.FamilyId` (nullable FK); seeder creates "My Family" and assigns all seeded people to it
+- [x] Cross-root couple layout fix — children of two sibling-in-law families (e.g. Rose/Ray and Bud/Florence) no longer tangle horizontally; each partner placed as leaf under own parent group, children centered at couple midpoint
+- [x] Former/divorced spouse support — `Relationship.EndDate` distinguishes active (null) from former (set); `PersonDto.FormerSpouseIds` added; dashed grey 💔 connector vs. solid green ❤ in canvas; full UI in `PersonForm`
+- [x] Classic pedigree T-bar connectors — replaced bezier arcs with straight horizontal couple lines, vertical stems, T-bars, and vertical drops
+- [x] Draggable toolbar and hero overlay — Blazor owns position state; JS calls `OnDragEnd` on mouseup; positions persisted to `localStorage`
+- [x] Reset button on toolbar — clears drag positions, removes `localStorage` entries, centers tree
+- [x] Focus persistence — `localStorage` saves the focused person's Id; survives page refresh; URL `?focus=<id>` overrides and re-saves
+- [x] Shareable link — "Share" button copies `/?focus=<id>` URL to clipboard
+- [x] Sibling inference dialog — after adding a sibling, offers to link that sibling's existing siblings
+- [x] `QuestionDetector` — extracts questions from biography notes and surfaces them as toasts post-save
+- [x] Blob storage — Azure Blob Storage integrated for photo uploads via `BlobStorageService`
+- [x] Multi-photo upload with primary photo selection
+- [x] All person fields saved (birthplace, gender, maiden name, biography, etc.)
+- [x] `ChildIds` and `SiblingIds` persisted in relationship sync
+- [x] Dark/light mode toggle with `localStorage` persistence
 
 ---
 
-## 🧩 Phase 3 — Collaboration & sharing
-**Goal:** make it social and communal.
+## Vision: A Family Tree App That Tells Stories
 
-### 🤝 Features
+### Phase 1 — Core foundation ✅ (largely complete)
+| Area | Status |
+|------|--------|
+| Data model — Person, relationships, notes, photos | ✅ done |
+| CRUD UI — add/edit/delete with clean forms | ✅ done |
+| Tree view — zoom, pan, focus, T-bar connectors | ✅ done |
+| Theme — light/dark mode | ✅ done |
+| Hosting — Azure App Service + Blob Storage | ✅ done |
+| Accounts — sign in (Google, role-based) | 🔲 next |
+| Privacy — private tree by default | 🔲 with auth |
+
+---
+
+### Phase 2 — Personalization & storytelling
 | Area | Features |
 |------|----------|
-| Invites | Share tree with family members (viewer/editor roles) |
-| Change history | "Recently added" or "updated" feed |
-| Comments | Add notes or memories collaboratively |
+| Profile cards | Biography, photos, life events |
+| Timeline view | Chronological events per person |
+| Media | Documents, voice clips (photos already done) |
+| Design polish | Smooth transitions |
+| Search & filter | By name, year, or relation |
+| Responsive layout | Mobile-friendly tree and forms |
+
+---
+
+### Phase 3 — Collaboration & sharing
+| Area | Features |
+|------|----------|
+| Invites | Share tree with family (viewer/editor roles) |
+| Change history | "Recently added/updated" feed |
+| Comments | Collaborative memories on person profiles |
 | Notifications | Birthday reminders, new photo alerts |
 | Public view | Optional public tree with privacy controls |
+| Real-time presence | See who else is browsing concurrently |
 
-**Outcome:** Families can co-create and preserve their history together.
+**Admin dashboard ideas (from 2026-06-06 brainstorm):**
+- Track all changes with audit log
+- Admin can disable features per user or lock out users
+- Optional daily CRUD cap (e.g. 10 ops/day) with ability to request more
+- Manual "donor" flag (e.g. Venmo confirmed) unlocking additional privileges
+- Visibility limit by relationship depth (e.g. only see people within 3 links) — complex but possible via BFS on the graph
 
 ---
 
-## 🧠 Phase 4 — Intelligence & insights
-**Goal:** make it smart and helpful.
-
-### 🧬 Features
+### Phase 4 — Intelligence & insights
 | Area | Features |
 |------|----------|
-| Relationship inference | Auto detect missing links ("Linda is likely James's spouse") |
+| Relationship inference | Auto-detect likely missing links |
 | Duplicate detection | Merge similar people |
-| Age & generation analytics | Oldest ancestor, youngest member, average lifespan |
+| Age & generation analytics | Oldest ancestor, average lifespan, etc. |
 | AI suggestions | "Would you like to add Mary as Emma's grandmother?" |
-| Export/import | GEDCOM, PDF, or CSV export for genealogy enthusiasts |
-
-**Outcome:** The app feels intelligent — it helps users build and understand their tree.
+| Export/import | GEDCOM, PDF, CSV |
 
 ---
 
-## 🌍 Phase 5 — Growth & polish
-**Goal:** make it delightful and scalable.
-
-### 🚀 Features
+### Phase 5 — Growth & polish
 | Area | Features |
 |------|----------|
-| Themes & customization | Family crest, color palette, fonts |
-| Performance optimization | Lazy loading for large trees |
+| Themes | Family crest, color palette, custom fonts |
+| Performance | Lazy loading for large trees |
 | Localization | Multi-language support |
-| Marketing site | Showcase demo trees, testimonials |
-| Analytics | Track engagement and growth |
-
-**Outcome:** A polished, scalable product ready for public launch.
+| Mobile layout | Improved canvas and form experience on phone |
 
 ---
 
-## 🧭 Suggested build order
-1. MVP (Phase 1) — 6–8 weeks
-2. Storytelling (Phase 2) — 4–6 weeks
-3. Collaboration (Phase 3) — 6–8 weeks
-4. Intelligence (Phase 4) — ongoing enhancements
-5. Polish (Phase 5) — continuous refinement
-
-
-
-GEDCOM import/export
-
-Collaboration mode
-
-Timeline view
-
-AI‑assisted relationship suggestions
-
-Mobile layout improvements
-
-
-🌈 Optional “wow” features
-
-Timeline slider: drag to filter visible generations by year range.
-
-Animated connectors: subtle pulse along parent lines when focusing.
-
-Photo avatars: circular crops with soft shadows.
-
-Shareable view: generate a read‑only link for a specific focus person.
-
-
-
-
-
-Brainstorming on auth, 6 June 26:
-- I'd like an admin dashboard to track changes
-- admin should have the ability to turn off various features for a user. additional, i can lock out users. perhaps even cap daily CRUD totals at 10x unless they ask for permission
-- would there be a way to limit a user's visilibity to something like 3 linkages? is this too complex?
-- is there an easy way to  manually mark if they have donated via Venmo and have additionally privileges?
-- would instant messaging and knowing if other people are using concurrently be too complex?
+## Optional "wow" features
+- **Timeline slider** — drag to filter visible generations by year range
+- **Animated connectors** — subtle pulse along parent lines when focusing
+- **Photo avatars** — circular crops with soft shadows replacing initials
+- **GEDCOM import/export** — interoperability with standard genealogy tools
+- **AI-assisted suggestions** — relationship completion from biography text

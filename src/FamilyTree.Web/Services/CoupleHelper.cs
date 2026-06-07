@@ -37,13 +37,44 @@ public static class CoupleHelper
                 if (!coupleMap.ContainsKey(key))
                     coupleMap[key] = [];
             }
+            foreach (var formerSpouseId in person.FormerSpouseIds ?? [])
+            {
+                if (!personIds.Contains(formerSpouseId)) continue;
+                var key = person.Id.CompareTo(formerSpouseId) < 0
+                    ? (person.Id, formerSpouseId)
+                    : (formerSpouseId, person.Id);
+                if (!coupleMap.ContainsKey(key))
+                    coupleMap[key] = [];
+            }
         }
 
-        return coupleMap.Select(kvp => new CoupleDto
+        // Build a lookup of active spouse pairs for IsFormer determination
+        var activeSpousePairs = new HashSet<(Guid, Guid)>();
+        foreach (var person in people)
         {
-            PersonAId = kvp.Key.Item1,
-            PersonBId = kvp.Key.Item2,
-            ChildIds = kvp.Value
+            foreach (var spouseId in person.SpouseIds ?? [])
+            {
+                var key = person.Id.CompareTo(spouseId) < 0
+                    ? (person.Id, spouseId)
+                    : (spouseId, person.Id);
+                activeSpousePairs.Add(key);
+            }
+        }
+
+        return coupleMap.Select(kvp =>
+        {
+            var isFormer = !activeSpousePairs.Contains(kvp.Key) &&
+                           people.Any(p =>
+                               (p.Id == kvp.Key.Item1 && (p.FormerSpouseIds?.Contains(kvp.Key.Item2) == true)) ||
+                               (p.Id == kvp.Key.Item2 && (p.FormerSpouseIds?.Contains(kvp.Key.Item1) == true)));
+
+            return new CoupleDto
+            {
+                PersonAId = kvp.Key.Item1,
+                PersonBId = kvp.Key.Item2,
+                ChildIds = kvp.Value,
+                IsFormer = isFormer
+            };
         }).ToList();
     }
 }

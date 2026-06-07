@@ -11,6 +11,10 @@ public static class DataSeeder
 
         var now = DateTime.UtcNow;
 
+        var defaultFamily = new Family { Name = "My Family", CreatedAt = now };
+        db.Families.Add(defaultFamily);
+        db.SaveChanges();
+
         // ─────────────────────────────────────────────
         //  Generation 1 (Great-grandparents)
         // ─────────────────────────────────────────────
@@ -69,6 +73,9 @@ public static class DataSeeder
             linda, michael, emma, david, jennifer, sarah, thomas, andrew, jessica,
             olivia, ethan, ava, liam, sophia
         };
+
+        foreach (var p in allPeople)
+            p.FamilyId = defaultFamily.Id;
 
         db.People.AddRange(allPeople);
         db.SaveChanges();

@@ -10,4 +10,5 @@ public class CoupleDto
     public Guid PersonAId { get; set; }
     public Guid PersonBId { get; set; }
     public List<Guid> ChildIds { get; set; } = [];
+    public bool IsFormer { get; set; }
 }

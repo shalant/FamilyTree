@@ -61,7 +61,8 @@ else
     <div id="ft-toolbar" style="@_toolbarStyle">
         <CustomToolbar OnZoomIn="@(async () => { if (_canvas != null) await _canvas.ZoomIn(); })"
                        OnZoomOut="@(async () => { if (_canvas != null) await _canvas.ZoomOut(); })"
-                       OnCenterTree="@(async () => { if (_canvas != null) await _canvas.CenterTree(); })" />
+                       OnCenterTree="@(async () => { if (_canvas != null) await _canvas.CenterTree(); })"
+                       OnReset="HandleReset" />
     </div>
 
     <HeroOverlayComponent FocusPerson="_focusPerson"
@@ -205,6 +206,20 @@ else
     {
         if (_canvas != null)
             await _canvas.CenterTree();
+    }
+
+    private async Task HandleReset()
+    {
+        _toolbarPos = null;
+        _heroPos = null;
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", "ftdrag:toolbar");
+            await JS.InvokeVoidAsync("localStorage.removeItem", "ftdrag:hero");
+        }
+        catch { }
+        if (_canvas != null) await _canvas.CenterTree();
+        StateHasChanged();
     }
 
     private async Task ShareView()

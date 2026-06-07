@@ -284,6 +284,40 @@
                 </MudChipSet>
             </MudStack>
 
+            <!-- Former partners -->
+            <MudStack>
+                <div class="ft-field-label">Former partners</div>
+
+                <MudAutocomplete @ref="_formerSpouseAc"
+                                 T="PersonDto"
+                                 SearchFunc="SearchFormerSpouses"
+                                 ValueChanged="AddFormerSpouse"
+                                 ToStringFunc="@(p => p?.FullName ?? "")"
+                                 Placeholder="Search by name…"
+                                 Variant="Variant.Outlined"
+                                 Dense="true" />
+
+                <MudChipSet T="string">
+                    @foreach (var id in _formerSpouseIds)
+                    {
+                        var person = AllPeople.FirstOrDefault(p => p.Id == id);
+                        if (person is not null)
+                        {
+                            <MudChip T="string" OnClose="@(() => RemoveFormerSpouse(id))"
+                                     Style="background:var(--ft-gray-100); color:var(--ft-gray-600);">
+                                @person.FullName
+                                @if (person.BirthDate.HasValue)
+                                {
+                                    <span style="opacity:0.6; margin-left:4px;">
+                                        @person.BirthDate.Value.Year
+                                    </span>
+                                }
+                            </MudChip>
+                        }
+                    }
+                </MudChipSet>
+            </MudStack>
+
             <!-- Siblings -->
             <MudStack>
                 <div class="ft-field-label">Siblings</div>
@@ -412,12 +446,14 @@
     private Gender? _gender;
     private HashSet<Guid> _parentIds = [];
     private HashSet<Guid> _spouseIds = [];
+    private HashSet<Guid> _formerSpouseIds = [];
     private HashSet<Guid> _siblingIds = [];
     private HashSet<Guid> _childIds = [];
 
     // autocomplete refs — needed to reset after each selection
     private MudAutocomplete<PersonDto>? _parentAc;
     private MudAutocomplete<PersonDto>? _spouseAc;
+    private MudAutocomplete<PersonDto>? _formerSpouseAc;
     private MudAutocomplete<PersonDto>? _siblingAc;
     private MudAutocomplete<PersonDto>? _childAc;
 
@@ -451,6 +487,7 @@
         _gender = Initial.Gender;
         _parentIds = [..Initial.ParentIds];
         _spouseIds = [..Initial.SpouseIds];
+        _formerSpouseIds = [..Initial.FormerSpouseIds];
         _siblingIds = [..Initial.SiblingIds];
         _childIds = [..Initial.ChildIds];
     }
@@ -614,6 +651,22 @@
 
     private void RemoveSpouse(Guid id) => _spouseIds.Remove(id);
 
+    private Task<IEnumerable<PersonDto>> SearchFormerSpouses(string value, CancellationToken _) =>
+        Task.FromResult(AllPeople
+            .Where(p => p.Id != EditingId && !_formerSpouseIds.Contains(p.Id) && !_spouseIds.Contains(p.Id))
+            .Where(p => string.IsNullOrWhiteSpace(value) ||
+                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(8));
+
+    private async Task AddFormerSpouse(PersonDto? person)
+    {
+        if (person is null) return;
+        _formerSpouseIds.Add(person.Id);
+        if (_formerSpouseAc is not null) await _formerSpouseAc.ResetAsync();
+    }
+
+    private void RemoveFormerSpouse(Guid id) => _formerSpouseIds.Remove(id);
+
     private Task<IEnumerable<PersonDto>> SearchSiblings(string value, CancellationToken _) =>
         Task.FromResult(AllPeople
             .Where(p => p.Id != EditingId && !_siblingIds.Contains(p.Id))
@@ -677,6 +730,7 @@
                 Gender = _gender,
                 ParentIds = [.._parentIds],
                 SpouseIds = [.._spouseIds],
+                FormerSpouseIds = [.._formerSpouseIds],
                 SiblingIds = [.._siblingIds],
                 ChildIds = [.._childIds]
             };

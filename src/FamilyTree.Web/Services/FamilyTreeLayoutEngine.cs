@@ -163,6 +163,70 @@ public class FamilyTreeLayoutEngine
                 !parentsInGroups.Contains(p.Id))
                 .ToList();
 
+            // ── Cross-root couple detection ───────────────────────────────────
+            // When a child of root group A marries a child of root group B,
+            // PlaceGroup would recurse into their NuclearGroup from both sides,
+            // writing conflicting X positions (tangle). Fix:
+            //   1. Remove the couple from primaryGroup → each partner becomes
+            //      a leaf placed under their own parent group.
+            //   2. Sort root groups so the two bridged groups are adjacent and
+            //      ParentA's group is to the left.
+            //   3. Sort children so cross-root partners land at the inner edges,
+            //      producing a natural couple connector that spans between families.
+            // After all root groups are placed, PlaceGroup is called once more
+            // for each cross-root couple to position their children at the midpoint.
+
+            var directChildOfRoot = new Dictionary<Guid, NuclearGroup>();
+            foreach (var rg in rootGroups)
+                foreach (var cid in rg.ChildIds)
+                    directChildOfRoot.TryAdd(cid, rg);
+
+            var crossRootInfo = new List<(NuclearGroup couple, NuclearGroup rootA, NuclearGroup rootB)>();
+            foreach (var g in compGroups)
+            {
+                if (!g.ParentAId.HasValue || !g.ParentBId.HasValue) continue;
+                if (!directChildOfRoot.TryGetValue(g.ParentAId.Value, out var rgA)) continue;
+                if (!directChildOfRoot.TryGetValue(g.ParentBId.Value, out var rgB)) continue;
+                if (rgA == rgB) continue;
+                crossRootInfo.Add((g, rgA, rgB));
+            }
+
+            if (crossRootInfo.Count > 0)
+            {
+                // 1. Remove from primaryGroup so partners are placed as simple leaves.
+                foreach (var (cg, _, _) in crossRootInfo)
+                {
+                    if (cg.ParentAId.HasValue && primaryGroup.TryGetValue(cg.ParentAId.Value, out var pA) && pA == cg)
+                        primaryGroup.Remove(cg.ParentAId.Value);
+                    if (cg.ParentBId.HasValue && primaryGroup.TryGetValue(cg.ParentBId.Value, out var pB) && pB == cg)
+                        primaryGroup.Remove(cg.ParentBId.Value);
+                }
+
+                // 2. Sort root groups: rootA (ParentA's group) left of rootB.
+                var rootGroupScore = rootGroups.ToDictionary(rg => rg, _ => 0);
+                foreach (var (_, rgA, rgB) in crossRootInfo)
+                {
+                    rootGroupScore[rgA] -= 1;
+                    rootGroupScore[rgB] += 1;
+                }
+                rootGroups = [.. rootGroups.OrderBy(rg => rootGroupScore[rg])];
+
+                // 3. Sort children: cross-root ParentA → rightmost, ParentB → leftmost.
+                var crossEdge = new Dictionary<Guid, bool>(); // true = isParentA (right edge)
+                foreach (var (cg, _, _) in crossRootInfo)
+                {
+                    if (cg.ParentAId.HasValue) crossEdge[cg.ParentAId.Value] = true;
+                    if (cg.ParentBId.HasValue) crossEdge[cg.ParentBId.Value] = false;
+                }
+                rootGroups = rootGroups
+                    .Select(rg => rg with
+                    {
+                        ChildIds = [.. rg.ChildIds.OrderBy(cid =>
+                            crossEdge.TryGetValue(cid, out var isA) ? (isA ? 2 : 0) : 1)]
+                    })
+                    .ToList();
+            }
+
             // ── Memoised bottom-up width measurement ─────────────────────────
             var widthCache = new Dictionary<NuclearGroup, double>();
 
@@ -189,6 +253,7 @@ public class FamilyTreeLayoutEngine
             // ── Node creation ─────────────────────────────────────────────────
             void SetNode(Guid id, double x)
             {
+                if (nodeMap.ContainsKey(id)) return; // cross-root couples: don't overwrite
                 var person   = personById[id];
                 var isFocus  = id == focusPersonId;
                 var depth    = depths.GetValueOrDefault(id, 0);
@@ -247,6 +312,17 @@ public class FamilyTreeLayoutEngine
                 var w = MeasureGroup(rg);
                 PlaceGroup(rg, curX + w / 2.0);
                 curX += w;
+            }
+
+            // ── Place children of cross-root couples ──────────────────────────
+            // Both partners are already placed as leaves; SetNode's guard skips
+            // them and only the children get positioned at the couple's midpoint.
+            foreach (var (cg, _, _) in crossRootInfo)
+            {
+                if (!cg.ParentAId.HasValue || !cg.ParentBId.HasValue) continue;
+                if (!nodeMap.TryGetValue(cg.ParentAId.Value, out var nA) ||
+                    !nodeMap.TryGetValue(cg.ParentBId.Value, out var nB)) continue;
+                PlaceGroup(cg, (nA.X + nB.X) / 2.0);
             }
 
             foreach (var person in rootIndividuals)
@@ -620,7 +696,7 @@ public class FamilyTreeLayoutEngine
             foreach (var c in children)
                 routedChildren.Add(c.Person.Id);
 
-            var coupleUnits = BuildCoupleFamilyUnits(a, b, children);
+            var coupleUnits = BuildCoupleFamilyUnits(a, b, children, couple.IsFormer);
             families.AddRange(coupleUnits);
         }
 
@@ -665,14 +741,15 @@ public class FamilyTreeLayoutEngine
     /// Builds one or more FamilyUnit connectors for a couple and their children.
     ///
     /// Handles:
-    ///   • No children → just a U‑arc with a short stem
-    ///   • One child   → U‑arc + stem + single drop
-    ///   • Many        → U‑arc + stem + sibling span + drops
+    ///   • No children → horizontal couple line, no stem
+    ///   • One child   → horizontal line + vertical stem + T‑bar + drop
+    ///   • Many        → horizontal line + vertical stem + T‑bar + drops
     /// </summary>
     private IEnumerable<FamilyUnit> BuildCoupleFamilyUnits(
         LayoutNode partnerA,
         LayoutNode partnerB,
-        List<LayoutNode> children)
+        List<LayoutNode> children,
+        bool isFormer = false)
     {
         var families = new List<FamilyUnit>();
 
@@ -680,42 +757,30 @@ public class FamilyTreeLayoutEngine
         var aBottomY = sharedY + partnerA.Size / 2.0;
         var bBottomY = sharedY + partnerB.Size / 2.0;
         var midX = (partnerA.X + partnerB.X) / 2.0;
-        var peakY = Math.Min(aBottomY, bBottomY) - 22;
-        var heartY = peakY + 3;
+        // Horizontal connector at the bottom of the lower node
+        var lineY = Math.Max(aBottomY, bBottomY);
 
         var arc = new CoupleArc(
-            partnerA.X, aBottomY,
-            partnerB.X, bBottomY,
-            peakY,
+            partnerA.X, lineY,
+            partnerB.X, lineY,
+            lineY,  // PeakY kept for record compat — equals lineY (no curve)
             midX,
-            heartY);
+            lineY,  // HeartY at the connector level
+            isFormer);
 
         if (!children.Any())
         {
-            // Couple with no children: simple U‑arc + short stem.
-            var stem = new StemLine(midX, heartY, heartY);
+            // Couple with no children: just the horizontal line.
+            var stem = new StemLine(midX, lineY, lineY);
             families.Add(new FamilyUnit(arc, stem, null, Array.Empty<ChildDrop>()));
             return families;
         }
 
-        // Compute the Y position of the sibling span (just above the topmost child).
+        // Compute the Y position of the T‑bar (just above the topmost child).
         var spanY = children.Min(c => c.Y - c.Size / 2.0) - 18;
-        var stemLine = new StemLine(midX, heartY, spanY);
+        var stemLine = new StemLine(midX, lineY, spanY);
 
-        if (children.Count == 1)
-        {
-            // Single child: no horizontal span needed, just a drop.
-            var c = children[0];
-            var drops = new List<ChildDrop>
-            {
-                new ChildDrop(c.X, c.Y - c.Size / 2.0)
-            };
-
-            families.Add(new FamilyUnit(arc, stemLine, null, drops));
-            return families;
-        }
-
-        // Multiple children: build a horizontal span and drops.
+        // Always include a T‑bar so drops connect cleanly even for single children.
         var span = BuildSiblingSpanIncludingParentCenter(
             parentCenterX: midX,
             children: children,
@@ -748,20 +813,7 @@ public class FamilyTreeLayoutEngine
 
         var stem = new StemLine(parent.X, parentBottomY, spanY);
 
-        if (children.Count == 1)
-        {
-            // Single child: no span needed, just a drop.
-            var c = children[0];
-            var drops = new List<ChildDrop>
-            {
-                new ChildDrop(c.X, c.Y - c.Size / 2.0)
-            };
-
-            families.Add(new FamilyUnit(null, stem, null, drops));
-            return families;
-        }
-
-        // Multiple children: build a span that includes the parent center.
+        // Always include a T‑bar so drops connect cleanly even for single children.
         var span = BuildSiblingSpanIncludingParentCenter(
             parentCenterX: parent.X,
             children: children,
@@ -832,7 +884,8 @@ public class FamilyTreeLayoutEngine
         double PartnerBY,
         double PeakY,
         double MidX,
-        double HeartY);
+        double HeartY,
+        bool IsFormer = false);
 
     /// <summary>
     /// A vertical line from a couple/parent down toward children.

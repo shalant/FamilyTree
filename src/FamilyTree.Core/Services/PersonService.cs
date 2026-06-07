@@ -299,26 +299,44 @@ public class PersonService(
             }
         }
 
-        // Spouses (canonical ordering)
+        // Active spouses (canonical ordering)
         foreach (var spouseId in dto.SpouseIds)
         {
             var ordered = new[] { personId, spouseId }.OrderBy(g => g).ToArray();
-            var a = ordered[0];
-            var b = ordered[1];
+            var a = ordered[0]; var b = ordered[1];
 
             var exists = await ctx.Relationships.AnyAsync(
-                r => r.PersonAId == a &&
-                     r.PersonBId == b &&
-                     r.Type == RelationshipType.Spouse,
-                ct);
+                r => r.PersonAId == a && r.PersonBId == b && r.Type == RelationshipType.Spouse, ct);
 
             if (!exists)
             {
                 ctx.Relationships.Add(new Relationship
                 {
-                    PersonAId = a,
-                    PersonBId = b,
+                    PersonAId = a, PersonBId = b,
                     Type = RelationshipType.Spouse,
+                    EndDate = null,
+                    CreatedAt = now
+                });
+            }
+        }
+
+        // Former spouses (Spouse rel with EndDate set)
+        foreach (var formerSpouseId in dto.FormerSpouseIds)
+        {
+            if (dto.SpouseIds.Contains(formerSpouseId)) continue;
+            var ordered = new[] { personId, formerSpouseId }.OrderBy(g => g).ToArray();
+            var a = ordered[0]; var b = ordered[1];
+
+            var exists = await ctx.Relationships.AnyAsync(
+                r => r.PersonAId == a && r.PersonBId == b && r.Type == RelationshipType.Spouse, ct);
+
+            if (!exists)
+            {
+                ctx.Relationships.Add(new Relationship
+                {
+                    PersonAId = a, PersonBId = b,
+                    Type = RelationshipType.Spouse,
+                    EndDate = DateOnly.FromDateTime(DateTime.Today),
                     CreatedAt = now
                 });
             }
@@ -436,37 +454,57 @@ public class PersonService(
         }
 
         // ---------------------------
-        // SPOUSES
+        // SPOUSES (active + former)
         // ---------------------------
-        var existingSpouses = existing
-            .Where(r => r.Type == RelationshipType.Spouse)
-            .Select(r => r.PersonAId == personId ? r.PersonBId : r.PersonAId)
-            .ToHashSet();
+        var existingSpouseRels = existing.Where(r => r.Type == RelationshipType.Spouse).ToList();
 
-        var toAddSpouses = dto.SpouseIds.Except(existingSpouses);
-        var toRemoveSpouses = existingSpouses.Except(dto.SpouseIds);
+        var existingByPartner = existingSpouseRels.ToDictionary(
+            r => r.PersonAId == personId ? r.PersonBId : r.PersonAId,
+            r => r);
 
-        foreach (var spouseId in toAddSpouses)
+        var allDesiredPartnerIds = dto.SpouseIds.Concat(dto.FormerSpouseIds).ToHashSet();
+
+        // Delete rels no longer desired
+        foreach (var partnerId in existingByPartner.Keys.Except(allDesiredPartnerIds).ToList())
+            ctx.Relationships.Remove(existingByPartner[partnerId]);
+
+        // Upsert active spouses (EndDate = null)
+        foreach (var spouseId in dto.SpouseIds)
         {
-            var ordered = new[] { personId, spouseId }.OrderBy(x => x).ToArray();
-            ctx.Relationships.Add(new Relationship
+            if (existingByPartner.TryGetValue(spouseId, out var rel))
             {
-                PersonAId = ordered[0],
-                PersonBId = ordered[1],
-                Type = RelationshipType.Spouse,
-                CreatedAt = now
-            });
+                if (rel.EndDate != null) { rel.EndDate = null; rel.UpdatedAt = now; }
+            }
+            else
+            {
+                var ordered = new[] { personId, spouseId }.OrderBy(x => x).ToArray();
+                ctx.Relationships.Add(new Relationship
+                {
+                    PersonAId = ordered[0], PersonBId = ordered[1],
+                    Type = RelationshipType.Spouse, EndDate = null, CreatedAt = now
+                });
+            }
         }
 
-        foreach (var spouseId in toRemoveSpouses)
+        // Upsert former spouses (EndDate set)
+        foreach (var formerSpouseId in dto.FormerSpouseIds)
         {
-            var ordered = new[] { personId, spouseId }.OrderBy(x => x).ToArray();
-            var rel = existing.First(r =>
-                r.Type == RelationshipType.Spouse &&
-                r.PersonAId == ordered[0] &&
-                r.PersonBId == ordered[1]);
-
-            ctx.Relationships.Remove(rel);
+            if (dto.SpouseIds.Contains(formerSpouseId)) continue;
+            if (existingByPartner.TryGetValue(formerSpouseId, out var rel))
+            {
+                if (rel.EndDate == null) { rel.EndDate = DateOnly.FromDateTime(DateTime.Today); rel.UpdatedAt = now; }
+            }
+            else
+            {
+                var ordered = new[] { personId, formerSpouseId }.OrderBy(x => x).ToArray();
+                ctx.Relationships.Add(new Relationship
+                {
+                    PersonAId = ordered[0], PersonBId = ordered[1],
+                    Type = RelationshipType.Spouse,
+                    EndDate = DateOnly.FromDateTime(DateTime.Today),
+                    CreatedAt = now
+                });
+            }
         }
     }
 

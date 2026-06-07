@@ -31,11 +31,20 @@ public static class PersonMapper
             .ToList();
 
         // ─────────────────────────────────────────────────────────────
-        // SPOUSES (canonical ordering)
+        // SPOUSES — active (EndDate = null) and former (EndDate set)
         // ─────────────────────────────────────────────────────────────
-        var spouseIds = rels
+        var spouseRels = rels
             .Where(r => r.Type == RelationshipType.Spouse &&
-                       (r.PersonAId == person.Id || r.PersonBId == person.Id))
+                       (r.PersonAId == person.Id || r.PersonBId == person.Id));
+
+        var spouseIds = spouseRels
+            .Where(r => r.EndDate == null)
+            .Select(r => r.PersonAId == person.Id ? r.PersonBId : r.PersonAId)
+            .Distinct()
+            .ToList();
+
+        var formerSpouseIds = spouseRels
+            .Where(r => r.EndDate != null)
             .Select(r => r.PersonAId == person.Id ? r.PersonBId : r.PersonAId)
             .Distinct()
             .ToList();
@@ -95,6 +104,7 @@ public static class PersonMapper
             ParentIds = parentIds,
             ChildIds = childIds,
             SpouseIds = spouseIds,
+            FormerSpouseIds = formerSpouseIds,
             SiblingIds = siblingIds
         };
     }
