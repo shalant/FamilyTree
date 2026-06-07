@@ -32,14 +32,6 @@
                 </div>
             }
 
-            @* Generation band labels *@
-            @foreach (var band in _layout.Bands)
-            {
-                <div class="ft-band-label" style="top:@(band.Top + 12)px;">
-                    @band.Depth
-                </div>
-            }
-
             @* SVG connectors *@
             <svg class="ft-svg"
                  style="width:@(_layout.CanvasWidth)px; height:@(_layout.CanvasHeight)px;">
@@ -115,6 +107,16 @@
                             OnClick="OnPersonSelected" />
             }
         </div>
+    </div>
+
+    @* Timeline overlay — outside the pan/zoom transform so labels stay locked to the left *@
+    <div id="ft-timeline">
+        @foreach (var band in _layout.Bands)
+        {
+            <div class="ft-band-label" data-canvas-y="@(band.Top + 12)">
+                @band.Depth
+            </div>
+        }
     </div>
 </div>
 

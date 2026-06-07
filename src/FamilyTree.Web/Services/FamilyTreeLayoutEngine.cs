@@ -1,90 +1,62 @@
 using FamilyTree.Shared.DTOs;
 using FamilyTree.Shared.DTOs.Person;
-using System.ComponentModel.Design.Serialization;
 
 namespace FamilyTree.Web.Services;
 
 /// <summary>
 /// Computes complete 2D layout for a family tree visualization.
 ///
-/// ALGORITHM OVERVIEW:
+/// HIGH‑LEVEL MODEL
 /// ─────────────────────────────────────────────────────────────────────────────
+/// The layout engine separates concerns into three conceptual axes:
 ///
-/// The layout system uses two independent axes:
+///   • Data axis: people + relationships (parents, children, spouses)
+///   • Time axis (Y): birth years → vertical placement
+///   • Structure axis (X): connected components + relative depth → horizontal placement
 ///
-/// Y-AXIS (Birth Year Timeline):
-///   - Absolute positioning based on person's birth year
-///   - Creates a temporal axis where time flows top→bottom
-///   - Older ancestors at top, younger descendants at bottom
-///   - People born in same year appear at same Y position
-///   - Missing birth dates inferred from children/spouses
-///
-/// X-AXIS (Family Components & Relative Depth):
-///   - Separate unconnected family trees horizontally (left→right)
-///   - Within each tree, position by relative generational depth
-///   - Parents positioned above children
-///   - Spouses positioned adjacent to each other
-///   - Allows for graceful tree merging when relationships discovered
-///
-/// COMPUTATION PHASES:
-/// ─────────────────────────────────────────────────────────────────────────────
-///
-/// Phase 1: Compute Generational Depths
-///   - BFS upward through parent relationships
-///   - BFS downward through child relationships
-///   - Propagate sideways through spouse relationships
-///   - Result: Every person has a relative depth (parent=+1, child=-1, etc.)
-///
-/// Phase 2: Compute Birth Years
-///   - Extract from PersonDto.BirthDate if available
-///   - Infer from children: parent_year ≈ child_year - 25
-///   - Infer from spouses: share same year
-///   - Default to current year if still unknown
-///
-/// Phase 3: Identify Connected Components
-///   - BFS through all relationships (parent, child, spouse)
-///   - Group people into separate family trees
-///   - When new relationship added, trees automatically regroup
-///
-/// Phase 4: Position All Nodes
-///   - For each connected component:
-///     * Group by relative depth (generational distance)
-///     * Calculate X positions centered within component
-///     * Assign Y positions from birth years
-///     * Components separated horizontally on canvas
-///
-/// Phase 5: Create Visual Bands
-///   - Decade-based bands (10-year intervals)
-///   - Opacity gradient: older (darker) → newer (lighter)
-///   - Helps user understand temporal distribution
-///
-/// Phase 6: Build Connectors
-///   - SVG paths between parents and children
-///   - U-arc brackets for couples
-///   - Stem lines for parent→child flow
-///
-/// ROBUSTNESS:
-/// ─────────────────────────────────────────────────────────────────────────────
-///
-/// Handles incomplete data gracefully:
-///   - Orphans (no parents): treated as tree roots
-///   - Missing birth dates: inferred from relationships
-///   - Disconnected trees: rendered side-by-side
-///   - Tree merging: automatic when relationship discovered
-///   - Concurrency: depth calculation is stable (idempotent)
+/// The goal is a layout that is:
+///   • Stable as data changes
+///   • Tolerant of missing / partial data
+///   • Easy to extend with new relationship types
+///   • Easy to reason about when debugging
 /// </summary>
 public class FamilyTreeLayoutEngine
 {
-    // Layout constants
-    private const int NodeSpacingX = 120;
-    private const int PaddingX = 90;
-    private const int PaddingY = 10;
-    private const int FocusSize = 80;       // increased from 68
-    private const int Gen1Size = 70;        // increased from 56
-    private const int DefaultSize = 60;     // increased from 48
-    private const double PxPerYear = 8.0;   // pixels per year — fits 3-4 generations on a 768px viewport
-    private const int SpouseSpacingX = 160; // extra spacing for couples
+    // ─────────────────────────────────────────────────────────────────────────
+    // LAYOUT CONSTANTS
+    // These are the primary knobs for visual tuning. They are intentionally
+    // centralized so designers can tweak spacing without touching logic.
+    // ─────────────────────────────────────────────────────────────────────────
 
+    private const int NodeSpacingX = 120;   // base horizontal gap between node centers
+    private const int PaddingX = 90;        // left/right canvas padding
+    private const int PaddingY = 10;        // top/bottom canvas padding
+
+    private const int FocusSize = 80;       // diameter for the focused person
+    private const int Gen1Size = 70;        // diameter for immediate relatives (±1 depth)
+    private const int DefaultSize = 60;     // diameter for everyone else
+
+    // pixels per year — controls vertical compression of the timeline
+    private const double PxPerYear = 6.5;
+
+    // extra spacing for couples so the U‑arc has room to breathe
+    //private const int SpouseSpacingX = 160;
+    private const int SpouseSpacingX = 200;
+
+    /// <summary>
+    /// Entry point: computes a complete layout for all people and relationships.
+    ///
+    /// This method orchestrates the full pipeline:
+    ///   1. Compute relative generational depths
+    ///   2. Compute birth years (with inference)
+    ///   3. Identify connected components (separate trees)
+    ///   4. Position all nodes (X/Y, size, focus)
+    ///   5. Build decade bands
+    ///   6. Build connectors (couples + parents + siblings)
+    ///
+    /// NOTE: The public API is intentionally simple. Internally, the engine is
+    /// modular so we can evolve the relationship model over time.
+    /// </summary>
     public FamilyTreeLayout ComputeLayout(
         List<PersonDto> people,
         List<CoupleDto> couples,
@@ -96,14 +68,34 @@ public class FamilyTreeLayoutEngine
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 1: Compute generational depths (relative family positions)
         // ─────────────────────────────────────────────────────────────────────
+        //
+        // Depths are relative, not absolute generations. We pick an arbitrary
+        // focus person and walk the graph:
+        //
+        //   • Parents: depth + 1
+        //   • Children: depth - 1
+        //   • Spouses: same depth
+        //
+        // Then we normalize so the oldest ancestor becomes depth 0. This keeps
+        // the tree visually stable even as new people are added.
         var depths = ComputeDepths(people);
-        var focusDepth = focusPersonId.HasValue && depths.TryGetValue(focusPersonId.Value, out var fd)
+
+        var focusDepth = focusPersonId.HasValue &&
+                         depths.TryGetValue(focusPersonId.Value, out var fd)
             ? fd
             : 0;
 
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 2: Compute birth years (absolute timeline positions)
         // ─────────────────────────────────────────────────────────────────────
+        //
+        // We build a robust birth‑year map that:
+        //   • Uses explicit BirthDate when present
+        //   • Infers parents from children (parent ≈ child - 25)
+        //   • Infers children from parents (child ≈ parent + 25)
+        //   • Defaults remaining unknowns to the median year
+        //
+        // This produces a smooth temporal axis even with sparse data.
         var birthYears = ComputeBirthYears(people);
         var minYear = birthYears.Values.Min();
         var maxYear = birthYears.Values.Max();
@@ -113,69 +105,79 @@ public class FamilyTreeLayoutEngine
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 3: Identify connected components (separate family trees)
         // ─────────────────────────────────────────────────────────────────────
+        //
+        // A connected component is a maximal set of people connected through
+        // parent/child/spouse relationships. Each component is rendered as an
+        // independent tree, laid out side‑by‑side horizontally.
         var components = IdentifyConnectedComponents(people);
 
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 4: Position all nodes (X, Y coordinates)
         // ─────────────────────────────────────────────────────────────────────
+        //
+        // For each component:
+        //   • Group people by depth
+        //   • Center each depth row horizontally within the component
+        //   • Apply dynamic spacing (wider for couples)
+        //   • Map birth years → Y positions
+        //
+        // The result is a stable, balanced layout that respects both time and
+        // generational structure.
         var nodeMap = new Dictionary<Guid, LayoutNode>();
         var xOffset = PaddingX;
 
         foreach (var component in components)
         {
-            // Group by depth within this component
+            // Group by depth within this component and sort oldest (highest depth) at the top.
             var componentByDepth = component
                 .GroupBy(p => depths.GetValueOrDefault(p.Id, 0))
                 .OrderByDescending(g => g.Key)
                 .ToList();
 
-            var maxInRow = componentByDepth.Max(g => g.Count());
-            var componentXWidth = maxInRow * NodeSpacingX + PaddingX * 2;
+            // Pre-compute couple-aware row data so we can size the component correctly.
+            var rows = componentByDepth
+                .Select(g => SortSpousesAdjacent(g.ToList()))
+                .Select(sorted => (sorted, offsets: ComputeRowOffsets(sorted)))
+                .ToList();
 
-            foreach (var depthGroup in componentByDepth)
+            var maxRowWidth = rows.Max(r => r.offsets.Length > 0 ? r.offsets[^1] : 0.0);
+            var componentXWidth = Math.Max((int)maxRowWidth + PaddingX * 2, NodeSpacingX + PaddingX * 2);
+
+            foreach (var (sortedMembers, xOffsets) in rows)
             {
-                var members = depthGroup.ToList();
-                var count = members.Count;
-                var spacingX = NodeSpacingX;
+                var rowWidth = xOffsets.Length > 1 ? xOffsets[^1] : 0.0;
+                var startX = -rowWidth / 2.0;
 
-                // NEW: widen spacing for spouses
-                if (count == 2)
+                for (int i = 0; i < sortedMembers.Count; i++)
                 {
-                    var p1 = members[0];
-                    var p2 = members[1];
-
-                    if((p1.SpouseIds?.Contains(p2.Id) ?? false) || (p2.SpouseIds?.Contains(p1.Id) ?? false))
-                    {
-                        spacingX = NodeSpacingX + SpouseSpacingX; // add extra space for couples
-                    }
-                }
-
-                var startX = -(count - 1) * spacingX / 2.0;
-
-                for (int i = 0; i < count; i++)
-                {
-                    var person = members[i];
+                    var person = sortedMembers[i];
                     var isFocus = person.Id == focusPersonId;
-                    var relDep = depths.GetValueOrDefault(person.Id, 0);
-                    var size = isFocus ? FocusSize
-                              : Math.Abs(relDep) <= 1 ? Gen1Size
-                              : DefaultSize;
+                    var relDepth = depths.GetValueOrDefault(person.Id, 0);
+
+                    // Size encodes semantic importance:
+                    //   • Focus person: largest
+                    //   • Immediate relatives (±1 depth): medium
+                    //   • Others: default
+                    var size = isFocus
+                        ? FocusSize
+                        : Math.Abs(relDepth) <= 1
+                            ? Gen1Size
+                            : DefaultSize;
 
                     var yearOffset = birthYears.GetValueOrDefault(person.Id, minYear);
                     var y = PaddingY + (int)((yearOffset - minYear) * PxPerYear);
 
                     nodeMap[person.Id] = new LayoutNode(
                         person,
-                        //(int)(xOffset + componentXWidth / 2.0 + startX + i * NodeSpacingX),
-                        (int)(xOffset + componentXWidth / 2.0 + startX + i * spacingX),
+                        (int)(xOffset + componentXWidth / 2.0 + startX + xOffsets[i]),
                         y,
-                        depths.GetValueOrDefault(person.Id, 0),
+                        relDepth,
                         isFocus,
-                        size
-                    );
+                        size);
                 }
             }
 
+            // Move the X offset to the right for the next component.
             xOffset += componentXWidth;
         }
 
@@ -184,6 +186,9 @@ public class FamilyTreeLayoutEngine
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 5: Create visual bands (decade markers with time gradient)
         // ─────────────────────────────────────────────────────────────────────
+        //
+        // Bands are decade‑sized horizontal strips that help the eye read the
+        // temporal distribution of the tree at a glance.
         var bandHeight = (int)(PxPerYear * 10);  // one band per decade
         if (bandHeight < 80) bandHeight = 80;
 
@@ -197,6 +202,15 @@ public class FamilyTreeLayoutEngine
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 6: Build connectors (SVG paths between relationships)
         // ─────────────────────────────────────────────────────────────────────
+        //
+        // Connectors encode family structure visually:
+        //   • Couple U‑arcs between partners
+        //   • Vertical stems from couple/parent to a sibling span
+        //   • Horizontal spans across siblings
+        //   • Drops from span to each child node
+        //
+        // The connector builder is modular so we can evolve relationship
+        // semantics without rewriting the layout engine.
         var connectors = BuildConnectors(people, couples, nodeMap);
 
         return new FamilyTreeLayout(
@@ -208,13 +222,22 @@ public class FamilyTreeLayoutEngine
             focusDepth);
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // DEPTH CALCULATION
+    // ─────────────────────────────────────────────────────────────────────────
+
     /// <summary>
     /// Computes relative generational depth for each person.
     ///
-    /// Pass 1: BFS upward through parents (ancestors get positive depth)
-    /// Pass 2: BFS downward through children (descendants get negative depth)
-    /// Pass 3: Propagate through spouses (same depth as partner)
-    /// Final: Normalize so oldest ancestor = depth 0
+    /// Strategy:
+    ///   1. Pick an arbitrary focus person (first in list)
+    ///   2. BFS upward through parents (ancestors get positive depth)
+    ///   3. Push depths downward through children (descendants get negative depth)
+    ///   4. Propagate through spouses (same depth as partner)
+    ///   5. Normalize so the oldest ancestor has depth 0
+    ///
+    /// This produces a stable relative depth map that works even when birth
+    /// years are missing or inconsistent.
     /// </summary>
     private Dictionary<Guid, int> ComputeDepths(List<PersonDto> people)
     {
@@ -224,12 +247,14 @@ public class FamilyTreeLayoutEngine
 
         depths[focus.Id] = 0;
 
-        // Pass 1: Walk upward through parents
+        // Pass 1: Walk upward through parents (BFS).
         var queue = new Queue<PersonDto>();
         queue.Enqueue(focus);
+
         while (queue.Count > 0)
         {
             var current = queue.Dequeue();
+
             foreach (var parentId in current.ParentIds ?? [])
             {
                 var parent = people.FirstOrDefault(p => p.Id == parentId);
@@ -241,24 +266,30 @@ public class FamilyTreeLayoutEngine
             }
         }
 
-        // Pass 2: Push depths downward through children
+        // Pass 2: Push depths downward through children.
         foreach (var person in people)
         {
             foreach (var parentId in person.ParentIds ?? [])
             {
-                if (depths.TryGetValue(parentId, out var pd) && !depths.ContainsKey(person.Id))
+                if (depths.TryGetValue(parentId, out var pd) &&
+                    !depths.ContainsKey(person.Id))
+                {
                     depths[person.Id] = pd - 1;
+                }
             }
         }
 
-        // Pass 3: Propagate through spouses (iterate until stable)
+        // Pass 3: Propagate through spouses (iterate until stable).
         bool changed = true;
         while (changed)
         {
             changed = false;
+
             foreach (var person in people)
             {
-                if (!depths.TryGetValue(person.Id, out var personDepth)) continue;
+                if (!depths.TryGetValue(person.Id, out var personDepth))
+                    continue;
+
                 foreach (var spouseId in person.SpouseIds ?? [])
                 {
                     if (!depths.ContainsKey(spouseId))
@@ -270,7 +301,7 @@ public class FamilyTreeLayoutEngine
             }
         }
 
-        // Normalize: shift so min depth = 0
+        // Normalize: shift so min depth = 0.
         if (depths.Any())
         {
             var minDepth = depths.Values.Min();
@@ -281,35 +312,46 @@ public class FamilyTreeLayoutEngine
         return depths;
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // BIRTH YEAR INFERENCE
+    // ─────────────────────────────────────────────────────────────────────────
+
     /// <summary>
-    /// Assigns birth year to each person.
+    /// Assigns a birth year to each person, inferring missing values from
+    /// relationships where possible.
     ///
     /// Strategy:
-    /// 1. Use PersonDto.BirthDate if available
-    /// 2. Infer from children: parent ≈ child - 25 years
-    /// 3. Infer from spouses: use spouse's year
-    /// 4. Default to current year if still unknown
+    ///   1. Use PersonDto.BirthDate if available
+    ///   2. Infer from children: parent_year ≈ avg(child_years) - 25
+    ///   3. Infer from parents: child_year ≈ avg(parent_years) + 25
+    ///   4. Default remaining unknowns to the median year
+    ///
+    /// This multi‑pass approach converges on a consistent temporal model even
+    /// when data is incomplete.
     /// </summary>
     private Dictionary<Guid, int> ComputeBirthYears(List<PersonDto> people)
     {
         var years = new Dictionary<Guid, int>();
 
-        // Assign from known birth dates
+        // Pass 0: Assign from known birth dates.
         foreach (var person in people.Where(p => p.BirthDate.HasValue))
             years[person.Id] = person.BirthDate.Value.Year;
 
-        // Infer from children: parent_year ≈ avg(child_years) - 25
+        // Pass 1: Infer parents from children.
         bool changed = true;
         while (changed)
         {
             changed = false;
+
             foreach (var person in people)
             {
                 if (years.ContainsKey(person.Id)) continue;
+
                 var childYears = (person.ChildIds ?? [])
                     .Where(cid => years.ContainsKey(cid))
                     .Select(cid => years[cid])
                     .ToList();
+
                 if (childYears.Any())
                 {
                     years[person.Id] = (int)childYears.Average() - 25;
@@ -318,21 +360,21 @@ public class FamilyTreeLayoutEngine
             }
         }
 
-        // Infer from parents: child_year ≈ avg(parent_years) + 25
-        // This handles people with no birth date but known parents (e.g. a new child
-        // added without a birth year — the median fallback would place them at the
-        // wrong generation without this pass).
+        // Pass 2: Infer children from parents.
         changed = true;
         while (changed)
         {
             changed = false;
+
             foreach (var person in people)
             {
                 if (years.ContainsKey(person.Id)) continue;
+
                 var parentYears = (person.ParentIds ?? [])
                     .Where(pid => years.ContainsKey(pid))
                     .Select(pid => years[pid])
                     .ToList();
+
                 if (parentYears.Any())
                 {
                     years[person.Id] = (int)parentYears.Average() + 25;
@@ -341,11 +383,12 @@ public class FamilyTreeLayoutEngine
             }
         }
 
-        // Default unknown people to the median year (more stable than current year)
+        // Pass 3: Default unknown people to the median year (more stable than current year).
         if (years.Any())
         {
             var sortedYears = years.Values.OrderBy(y => y).ToList();
             var defaultYear = sortedYears[sortedYears.Count / 2];
+
             foreach (var person in people.Where(p => !years.ContainsKey(p.Id)))
                 years[person.Id] = defaultYear;
         }
@@ -359,11 +402,16 @@ public class FamilyTreeLayoutEngine
         return years;
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // CONNECTED COMPONENTS
+    // ─────────────────────────────────────────────────────────────────────────
+
     /// <summary>
     /// Groups people into separate connected components using BFS.
     ///
     /// A connected component is a maximal set of people connected through
-    /// parent/child/spouse relationships. Multiple components = orphaned trees.
+    /// parent/child/spouse relationships. Multiple components represent
+    /// orphaned trees that are rendered side‑by‑side.
     /// </summary>
     private List<List<PersonDto>> IdentifyConnectedComponents(List<PersonDto> people)
     {
@@ -386,7 +434,7 @@ public class FamilyTreeLayoutEngine
                 visited.Add(current.Id);
                 component.Add(current);
 
-                // Enqueue all related people
+                // Enqueue all related people.
                 var relatedIds = new HashSet<Guid>();
                 relatedIds.UnionWith(current.ParentIds ?? []);
                 relatedIds.UnionWith(current.ChildIds ?? []);
@@ -406,14 +454,21 @@ public class FamilyTreeLayoutEngine
         return components;
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // CONNECTOR BUILDING
+    // ─────────────────────────────────────────────────────────────────────────
+
     /// <summary>
     /// Builds SVG connectors (family relationship paths).
     ///
     /// Creates:
-    /// - Couple U-arcs (curved bracket between partners)
-    /// - Stem lines (vertical parent→child flow)
-    /// - Sibling spans (horizontal bow across children)
-    /// - Child drops (bezier curves from span to child nodes)
+    ///   • Couple U‑arcs (curved bracket between partners)
+    ///   • Stem lines (vertical parent→child flow)
+    ///   • Sibling spans (horizontal bow across children)
+    ///   • Child drops (bezier curves from span to child nodes)
+    ///
+    /// The logic is structured to avoid duplication between coupled and
+    /// single‑parent families while keeping the visual grammar consistent.
     /// </summary>
     private List<FamilyUnit> BuildConnectors(
         List<PersonDto> people,
@@ -423,21 +478,12 @@ public class FamilyTreeLayoutEngine
         var families = new List<FamilyUnit>();
         var routedChildren = new HashSet<Guid>();
 
-        // Process coupled families
+        // 1. Process coupled families.
         foreach (var couple in couples)
         {
             if (!nodeMap.TryGetValue(couple.PersonAId, out var a) ||
                 !nodeMap.TryGetValue(couple.PersonBId, out var b))
                 continue;
-
-            var sharedY = Math.Max(a.Y, b.Y);
-            var aBottomY = sharedY + a.Size / 2.0;
-            var bBottomY = sharedY + b.Size / 2.0;
-            var midX = (a.X + b.X) / 2.0;
-            var peakY = Math.Min(aBottomY, bBottomY) - 22;
-            var heartY = peakY + 3;
-
-            var arc = new CoupleArc(a.X, aBottomY, b.X, bBottomY, peakY, midX, heartY);
 
             var children = couple.ChildIds
                 .Where(nodeMap.ContainsKey)
@@ -447,45 +493,26 @@ public class FamilyTreeLayoutEngine
             foreach (var c in children)
                 routedChildren.Add(c.Person.Id);
 
-            if (!children.Any())
-            {
-                families.Add(new FamilyUnit(arc, new StemLine(midX, heartY, heartY), null, []));
-                continue;
-            }
-
-            var spanY = children.Min(c => c.Y - c.Size / 2.0) - 18;
-            var stem = new StemLine(midX, heartY, spanY);
-
-            // Extend span to always include midX so the stem endpoint connects to it.
-            // Without this, children positioned entirely to one side of the couple
-            // leave a horizontal gap between the stem and the first drop.
-            var parentCenterX = midX;
-            var childMinX = children.Min(c => (double)c.X);
-            var childMaxX = children.Max(c => (double)c.X);
-
-            var spanLeft = Math.Min(childMinX, parentCenterX - (children.Count * NodeSpacingX) / 2.0);
-            var spanRight = Math.Max(childMaxX, parentCenterX + (children.Count * NodeSpacingX) / 2.0);
-
-            var span = Math.Abs(spanRight - spanLeft) > 1
-                ? new SiblingSpan(spanLeft, spanRight, spanY)
-                : null;
-            var drops = children.Select(c => new ChildDrop(c.X, c.Y - c.Size / 2.0)).ToList();
-
-            families.Add(new FamilyUnit(arc, stem, span, drops));
+            var coupleUnits = BuildCoupleFamilyUnits(a, b, children);
+            families.AddRange(coupleUnits);
         }
 
-        // Process single-parent families — group all children by parent so the
-        // stem→span→drops pattern matches coupled families and avoids S-curve gaps.
+        // 2. Process single‑parent families — group all children by parent so the
+        //    stem→span→drops pattern matches coupled families and avoids S‑curve gaps.
         var singleParentGroups = new Dictionary<Guid, List<Guid>>();
 
         foreach (var person in people)
         {
             if (routedChildren.Contains(person.Id)) continue;
+
             foreach (var parentId in person.ParentIds ?? [])
             {
-                if (!nodeMap.ContainsKey(parentId) || !nodeMap.ContainsKey(person.Id)) continue;
+                if (!nodeMap.ContainsKey(parentId) || !nodeMap.ContainsKey(person.Id))
+                    continue;
+
                 if (!singleParentGroups.ContainsKey(parentId))
                     singleParentGroups[parentId] = [];
+
                 singleParentGroups[parentId].Add(person.Id);
             }
         }
@@ -500,35 +527,208 @@ public class FamilyTreeLayoutEngine
 
             if (!children.Any()) continue;
 
-            var parentBottomY = parent.Y + parent.Size / 2.0;
-            var spanY = children.Min(c => c.Y - c.Size / 2.0) - 18;
-
-            var stem = new StemLine(parent.X, parentBottomY, spanY);
-
-            // Extend span to include parent.X so the stem always connects to it
-            var parentCenterX = parent.X;
-            var childMinX = children.Min(c => (double)c.X);
-            var childMaxX = children.Max(c => (double)c.X);
-
-            var spanLeft = Math.Min(childMinX, parentCenterX - (children.Count * NodeSpacingX) / 2.0);
-            var spanRight = Math.Max(childMaxX, parentCenterX + (children.Count * NodeSpacingX) / 2.0);
-
-            var span = Math.Abs(spanRight - spanLeft) > 1
-                ? new SiblingSpan(spanLeft, spanRight, spanY)
-                : null;
-
-            var drops = children.Select(c => new ChildDrop(c.X, c.Y - c.Size / 2.0)).ToList();
-
-            families.Add(new FamilyUnit(null, stem, span, drops));
+            var singleUnits = BuildSingleParentFamilyUnits(parent, children);
+            families.AddRange(singleUnits);
         }
 
         return families;
+    }
+
+    /// <summary>
+    /// Builds one or more FamilyUnit connectors for a couple and their children.
+    ///
+    /// Handles:
+    ///   • No children → just a U‑arc with a short stem
+    ///   • One child   → U‑arc + stem + single drop
+    ///   • Many        → U‑arc + stem + sibling span + drops
+    /// </summary>
+    private IEnumerable<FamilyUnit> BuildCoupleFamilyUnits(
+        LayoutNode partnerA,
+        LayoutNode partnerB,
+        List<LayoutNode> children)
+    {
+        var families = new List<FamilyUnit>();
+
+        var sharedY = Math.Max(partnerA.Y, partnerB.Y);
+        var aBottomY = sharedY + partnerA.Size / 2.0;
+        var bBottomY = sharedY + partnerB.Size / 2.0;
+        var midX = (partnerA.X + partnerB.X) / 2.0;
+        var peakY = Math.Min(aBottomY, bBottomY) - 22;
+        var heartY = peakY + 3;
+
+        var arc = new CoupleArc(
+            partnerA.X, aBottomY,
+            partnerB.X, bBottomY,
+            peakY,
+            midX,
+            heartY);
+
+        if (!children.Any())
+        {
+            // Couple with no children: simple U‑arc + short stem.
+            var stem = new StemLine(midX, heartY, heartY);
+            families.Add(new FamilyUnit(arc, stem, null, Array.Empty<ChildDrop>()));
+            return families;
+        }
+
+        // Compute the Y position of the sibling span (just above the topmost child).
+        var spanY = children.Min(c => c.Y - c.Size / 2.0) - 18;
+        var stemLine = new StemLine(midX, heartY, spanY);
+
+        if (children.Count == 1)
+        {
+            // Single child: no horizontal span needed, just a drop.
+            var c = children[0];
+            var drops = new List<ChildDrop>
+            {
+                new ChildDrop(c.X, c.Y - c.Size / 2.0)
+            };
+
+            families.Add(new FamilyUnit(arc, stemLine, null, drops));
+            return families;
+        }
+
+        // Multiple children: build a horizontal span and drops.
+        var span = BuildSiblingSpanIncludingParentCenter(
+            parentCenterX: midX,
+            children: children,
+            spanY: spanY);
+
+        var childDrops = children
+            .Select(c => new ChildDrop(c.X, c.Y - c.Size / 2.0))
+            .ToList();
+
+        families.Add(new FamilyUnit(arc, stemLine, span, childDrops));
+        return families;
+    }
+
+    /// <summary>
+    /// Builds one or more FamilyUnit connectors for a single parent and their children.
+    ///
+    /// Mirrors the visual grammar of couples:
+    ///   • Vertical stem from parent
+    ///   • Optional horizontal span across children
+    ///   • Drops from span (or stem) to each child
+    /// </summary>
+    private IEnumerable<FamilyUnit> BuildSingleParentFamilyUnits(
+        LayoutNode parent,
+        List<LayoutNode> children)
+    {
+        var families = new List<FamilyUnit>();
+
+        var parentBottomY = parent.Y + parent.Size / 2.0;
+        var spanY = children.Min(c => c.Y - c.Size / 2.0) - 18;
+
+        var stem = new StemLine(parent.X, parentBottomY, spanY);
+
+        if (children.Count == 1)
+        {
+            // Single child: no span needed, just a drop.
+            var c = children[0];
+            var drops = new List<ChildDrop>
+            {
+                new ChildDrop(c.X, c.Y - c.Size / 2.0)
+            };
+
+            families.Add(new FamilyUnit(null, stem, null, drops));
+            return families;
+        }
+
+        // Multiple children: build a span that includes the parent center.
+        var span = BuildSiblingSpanIncludingParentCenter(
+            parentCenterX: parent.X,
+            children: children,
+            spanY: spanY);
+
+        var childDrops = children
+            .Select(c => new ChildDrop(c.X, c.Y - c.Size / 2.0))
+            .ToList();
+
+        families.Add(new FamilyUnit(null, stem, span, childDrops));
+        return families;
+    }
+
+    /// <summary>
+    /// Builds a sibling span that always includes the parent's center X.
+    ///
+    /// Without this, if all children are positioned to one side of the parent,
+    /// the vertical stem would not visually connect to the span, leaving a gap.
+    ///
+    /// By forcing the span to include parentCenterX, we guarantee a clean T‑shape:
+    ///
+    ///        (parent)
+    ///           |
+    ///       -----------  ← span
+    ///        |   |   |
+    ///      child child child
+    /// </summary>
+    private SiblingSpan? BuildSiblingSpanIncludingParentCenter(
+        double parentCenterX,
+        List<LayoutNode> children,
+        double spanY)
+    {
+        var childMinX = children.Min(c => (double)c.X);
+        var childMaxX = children.Max(c => (double)c.X);
+
+        var spanLeft = Math.Min(childMinX, parentCenterX - (children.Count * NodeSpacingX) / 2.0);
+        var spanRight = Math.Max(childMaxX, parentCenterX + (children.Count * NodeSpacingX) / 2.0);
+
+        if (Math.Abs(spanRight - spanLeft) <= 1)
+            return null;
+
+        return new SiblingSpan(spanLeft, spanRight, spanY);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ROW LAYOUT HELPERS
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static List<PersonDto> SortSpousesAdjacent(List<PersonDto> members)
+    {
+        var sorted = new List<PersonDto>(members.Count);
+        var remaining = new List<PersonDto>(members);
+
+        while (remaining.Count > 0)
+        {
+            var person = remaining[0];
+            remaining.RemoveAt(0);
+            sorted.Add(person);
+
+            var spouse = remaining.FirstOrDefault(p =>
+                (person.SpouseIds?.Contains(p.Id) ?? false) ||
+                (p.SpouseIds?.Contains(person.Id) ?? false));
+
+            if (spouse != null)
+            {
+                remaining.Remove(spouse);
+                sorted.Add(spouse);
+            }
+        }
+
+        return sorted;
+    }
+
+    private static double[] ComputeRowOffsets(List<PersonDto> members)
+    {
+        var offsets = new double[members.Count];
+        for (int i = 1; i < members.Count; i++)
+        {
+            var prev = members[i - 1];
+            var curr = members[i];
+            var areSpouses = (prev.SpouseIds?.Contains(curr.Id) ?? false) ||
+                             (curr.SpouseIds?.Contains(prev.Id) ?? false);
+            offsets[i] = offsets[i - 1] + (areSpouses ? NodeSpacingX + SpouseSpacingX : NodeSpacingX);
+        }
+        return offsets;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // RECORDS (data structures for layout output)
     // ─────────────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// A positioned person node ready for rendering.
+    /// </summary>
     public record LayoutNode(
         PersonDto Person,
         int X,
@@ -537,11 +737,17 @@ public class FamilyTreeLayoutEngine
         bool IsFocus,
         int Size);
 
+    /// <summary>
+    /// A horizontal band representing a decade on the timeline.
+    /// </summary>
     public record GenerationBand(
         int Depth,
         int Top,
         int Height);
 
+    /// <summary>
+    /// A U‑shaped arc connecting two partners, with a heart at the peak.
+    /// </summary>
     public record CoupleArc(
         double PartnerAX,
         double PartnerAY,
@@ -551,10 +757,24 @@ public class FamilyTreeLayoutEngine
         double MidX,
         double HeartY);
 
+    /// <summary>
+    /// A vertical line from a couple/parent down toward children.
+    /// </summary>
     public record StemLine(double X, double TopY, double BotY);
+
+    /// <summary>
+    /// A horizontal line across siblings.
+    /// </summary>
     public record SiblingSpan(double LeftX, double RightX, double Y);
+
+    /// <summary>
+    /// A vertical drop from a sibling span to a child node.
+    /// </summary>
     public record ChildDrop(double CenterX, double BotY);
 
+    /// <summary>
+    /// A complete visual family unit: couple (optional), stem, span (optional), and drops.
+    /// </summary>
     public record FamilyUnit(
         CoupleArc? Couple,
         StemLine Stem,

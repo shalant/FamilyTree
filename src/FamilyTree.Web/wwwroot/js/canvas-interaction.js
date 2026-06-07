@@ -21,11 +21,14 @@ export function init(viewportId, transformId, focusX, focusY) {
     if (!_viewport || !_transform) return;
 
     const rect = _viewport.getBoundingClientRect();
-    _zoom = 1.0;
+    // _zoom = 1.0;
+    _zoom = 0.8; // start slightly zoomed out
     _panX = rect.width  / 2 - focusX * _zoom;
     _panY = rect.height / 2 - focusY * _zoom;
     _clampPan();
     _applyTransform();
+
+    _syncTimeline();
 
     // Reveal after the correct position is applied — prevents the SSR-position flash
     _viewport.style.opacity = '1';
@@ -136,4 +139,18 @@ function _clampPan() {
 function _applyTransform() {
     if (!_transform) return;
     _transform.style.transform = `translate(${_panX}px, ${_panY}px) scale(${_zoom})`;
+    _syncTimeline();
+}
+
+function _syncTimeline() {
+    const timeline = document.getElementById('ft-timeline');
+    if (!timeline) return;
+    const vh = _viewport ? _viewport.clientHeight : window.innerHeight;
+    const labels = timeline.querySelectorAll('[data-canvas-y]');
+    labels.forEach(el => {
+        const canvasY = parseFloat(el.dataset.canvasY);
+        const screenY = canvasY * _zoom + _panY;
+        el.style.top = screenY + 'px';
+        el.style.visibility = (screenY < -20 || screenY > vh + 20) ? 'hidden' : 'visible';
+    });
 }
