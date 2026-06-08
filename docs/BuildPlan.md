@@ -35,26 +35,53 @@ Structured roadmap organized by phase. Items marked ✅ are complete; 🔲 are p
 - ✅ `PersonService.RestoreAsync` + `GetDeletedAsync` added
 - ✅ EF migration `PreAuthIteration` applied to DB
 - ✅ `/admin` page — Dashboard (stat cards + recent activity), Deleted people + Restore, Audit log with filters, Users, Activity
-- ✅ `AdminEnabled` config flag — `false` in production appsettings, `true` in Development; gates nav link and page
+- ✅ `AdminEnabled` config flag — replaced by real `AuthorizeView` roles once Identity is wired
 
-### 2b — Authentication Flow ← **Next**
-- 🔲 ASP.NET Core Identity — cookie auth (not JWT; Blazor Server pattern)
-- 🔲 Google OAuth primary + email/password fallback
-- 🔲 Register / Login / Logout pages
-- 🔲 Auth middleware; protect routes with `[Authorize]`
-- 🔲 Replace `AdminEnabled` flag with `<AuthorizeView Roles="Admin,SuperUser">` in NavMenu and `@attribute [Authorize(Roles="Admin,SuperUser")]` on Admin.razor
-- 🔲 Replace `CustomAppBar` stubs with real claims (name, email, initials)
+### 2b — Identity schema ✅ (complete, pending migration)
+- ✅ `Microsoft.AspNetCore.Identity.EntityFrameworkCore` added to Core
+- ✅ `AppUser` extends `IdentityUser<Guid>` — Identity owns Email, UserName, PasswordHash, etc.
+- ✅ `AppDbContext` extends `IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>`
+- ✅ `DevAuthHandler` — dev-only auto-auth scheme; `DevAuth:Enabled` in appsettings.Development.json
+- ✅ `AdminEnabled` flag replaced with `<AuthorizeView Roles="Admin,SuperUser">` + `@attribute [Authorize]`
+- ✅ `AddCascadingAuthenticationState()` + `AuthorizeRouteView` wired in Routes.razor
+- ✅ `Family.IsPublic` (bool) — opt-in public discoverability
+- ✅ `Family.RequireApproval` (bool, default true) — admin must approve new member claims
+- ✅ `AppUser.PersonClaimStatus` enum (None/Pending/Approved) — tracks node claim state
+- ✅ `Person.IsMinorOverride` (bool?) — null=derive from BirthDate, true=force minor, false=force adult
+- ✅ Unique filtered index on `AppUser.PersonId` — one person node per user account
+- 🔲 **Run migration: `dotnet ef migrations add AddIdentity` → `dotnet ef database update`**
+
+### 2c — Authentication flow ← **Next**
+- 🔲 Google OAuth + email/password (`AddAuthentication().AddGoogle().AddCookie()`)
+- 🔲 Open registration page — anyone can create an account
+- 🔲 Login / Logout pages
+- 🔲 Email verification on registration
+- 🔲 Forgot password / reset password (+ SendGrid email)
+- 🔲 Seed super-user on startup (Development only)
+- 🔲 Replace `DevAuthHandler` scheme with real auth in `Program.cs`
+- 🔲 Replace `CustomAppBar` stubs with real claims (name, email, initials, avatar)
 - 🔲 Wire `LoginOverlay` component (currently non-functional)
-- 🔲 Seed super-user account on startup
-- 🔲 MFA required for Super-user and Admin roles
+- 🔲 MFA required for Super-user and Admin roles (ASP.NET Identity TOTP)
 
-### 2c — Post-auth wiring
+### 2d — Post-registration flows
+- 🔲 Onboarding page (post-registration): "Create a family" or "I have an invite code"
+- 🔲 Public family search / "find my node" wizard:
+  - Unauthenticated search by name on public families (`Family.IsPublic = true`)
+  - Living adults: name only shown publicly; minors: hidden entirely
+  - "This is me" → register/login → `PersonClaimStatus = Pending`
+  - Admin approves/rejects in `/admin → Users` tab
+- 🔲 Invite flow: admin sends invite → email with token → `/join?token=...` → creates UserFamily row
+- 🔲 Super-admin user deletion — `UserManager.DeleteAsync` in `/admin → Users` tab
+
+### 2e — Post-auth wiring
 - 🔲 `ICurrentUserService` — returns current AppUser from ClaimsPrincipal
 - 🔲 Populate `CreatedBy` / `UpdatedBy` / `DeletedBy` / `AuditLog.UserId` from current user
 - 🔲 Populate `UserActivity` daily action counts on every write
 - 🔲 Scoped data access — filter all service queries by `FamilyId` from claims
-- 🔲 "Claim your person" UX — post-login prompt to link AppUser.PersonId to their tree node
-- 🔲 Invite flow — send email via SendGrid, accept token, create UserFamily row
+- 🔲 Data visibility tiers enforced in service layer:
+  - Public: deceased full data; living adults name-only; minors hidden
+  - Member: full data for non-minors; minors first name + position only
+  - Admin/SuperUser: full data including minors
 
 ---
 
@@ -160,9 +187,11 @@ Consider whether fields belong on `Person` (scalar, one per person) or a child t
 - ✅ User activity table schema (`UserActivity`) — awaiting UserId from auth
 - ✅ Invite table schema (`UserInvite`) — awaiting email send and accept flow
 - ✅ `UserFamily` role model schema — Admin/Member/Viewer scoped per family
+- ✅ `Family.IsPublic` — opt-in public discoverability
+- ✅ `Family.RequireApproval` — admin approval gate for new member claims
 - 🔲 Invite flow: send email (SendGrid), accept token endpoint, create `UserFamily` row
 - 🔲 Permission enforcement: gate write operations behind Member+ role check
-- 🔲 "Share view" link: opt-in read-only public URL (URL already works: `/?focus=<id>`)
+- 🔲 Public family search and "find my node" wizard (see Phase 2d)
 - 🔲 Activity feed: recent edits visible to collaborators
 - 🔲 Optimistic concurrency conflict resolution (RowVersion already on entities)
 

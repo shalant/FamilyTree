@@ -1,70 +1,88 @@
 # Security — Arborkin
 
-> Practical security guidance for a private family tree application.
-> The goal is protecting real people's personal data and preventing accidental
-> exposure — not enterprise-grade compliance. Updated: 2026-06-07.
+> Practical security guidance for a public family tree application.
+> The goal is protecting real people's personal data — especially living people and
+> minors — while keeping the app discoverable and useful. Updated: 2026-06-08.
 
 ---
 
-## Threat model (be honest about what this is)
+## Threat model
 
-**What Arborkin is:** a private, invite-only web app shared among roughly a family's worth of people (10–50 users). The data is personal but not financial or medical.
+**What Arborkin is:** a publicly accessible family tree app. Anyone can register
+and search public trees. Family data is gated behind membership; public visitors
+get a limited read-only view.
 
 **What we're protecting against:**
-- A non-invited person viewing or editing family data
-- A logged-in user accidentally (or deliberately) deleting records
-- A former member retaining access after they should have lost it
-- A curious family member stumbling into the admin area
-- Standard web vulnerabilities (XSS, injection, CSRF) that could affect any user
+- Unauthenticated access to private family data (membership required for full access)
+- Living minors' data appearing in public search results or being indexed
+- A registered user accessing another family's data
+- A former member retaining access after removal
+- Unauthorized users claiming a person node without approval
+- Account takeover (stolen credentials, session hijack)
+- Standard web vulnerabilities: XSS, injection, CSRF
 
-**What we are NOT protecting against (and that's fine):**
+**What we are NOT protecting against:**
 - Nation-state actors
-- Sophisticated targeted attacks on our infrastructure
 - Compliance regimes (HIPAA, SOC 2, PCI) — none apply here
 - Zero-day exploits in the .NET or Azure runtime
 
-Calibrate effort accordingly. A brute-force lockout policy matters. A formal pen-test probably doesn't.
-
 ---
 
-## Data sensitivity
+## Data sensitivity & visibility tiers
 
+### Sensitivity
 | Data | Sensitivity | Notes |
 |------|-------------|-------|
-| Living people: name, birth year, photo | **Medium** | Personally identifiable; treat carefully |
+| Living minors: any data | **High** | Hidden from all public views; limited even to Members |
+| Living adults: name, birth year, photo | **Medium** | PII; public view shows name only |
 | Deceased people: full dates, places | **Low** | Historical; public genealogy norm |
 | Biography notes | **Medium–High** | May contain health, immigration, relationship details |
-| User email addresses | **Medium** | Standard PII |
-| Audit log | **Low–Medium** | Internal operational data |
-| Profile photos of living people | **Medium** | Stored in Azure Blob Storage |
+| User email addresses | **Medium** | Standard PII; never exposed in public views |
+| Audit log | **Low–Medium** | Admin-only |
 
-**Key rule:** living people's data is more sensitive than historical records. When in doubt, treat a person as living unless `DeathDate` is set.
+### Visibility tiers (enforced in service/mapper layer)
+
+| Tier | Who | Deceased | Living adult | Minor |
+|------|-----|----------|-------------|-------|
+| Public | Unauthenticated / Viewer | Full record | Name only | Hidden ("Private") |
+| Member | Authenticated family member | Full record | Full record | First name + position only |
+| Admin / SuperUser | Admin or SuperUser | Full record | Full record | Full record |
+
+**Minor detection:** `Person.DeathDate == null && BirthDate >= today − 18 years`.
+`Person.IsMinorOverride` can force or override this when BirthDate is unknown.
 
 ---
 
-## Authentication (when wired)
+## Authentication
 
 ### Approach
-- **Cookie auth, not JWT** — Blazor Server runs on a persistent SignalR connection; stateless JWT is wrong here
-- **Google OAuth primary** — least friction for family members, no password to forget
-- **Email/password fallback** — for non-Google users; use ASP.NET Core Identity's built-in hashing (bcrypt/PBKDF2 — do not roll your own)
-- **No open registration** — invite-only; `UserInvite` table + token flow
+- **Cookie auth, not JWT** — Blazor Server runs on a persistent SignalR connection
+- **Google OAuth primary** — least friction; no password to forget
+- **Email/password fallback** — ASP.NET Core Identity's built-in bcrypt/PBKDF2 hashing
+- **Open registration** — anyone can create an account; family membership is separate
+
+### Account states
+- **Registered, no family** — can log in, sees onboarding page only
+- **Pending claim** — has a person node claimed (`PersonClaimStatus = Pending`); awaiting admin approval
+- **Member** — claim approved (`PersonClaimStatus = Approved`); `UserFamily` row exists; full family access
+- **Admin** — `UserFamily.Role = "Admin"`; can manage members, restore records, view audit log
+- **SuperUser** — `AppUser.IsSuperUser = true`; global access across all families
 
 ### Session hygiene
-- Sessions expire on browser close by default; offer "remember me" as opt-in only
+- Sessions expire on browser close by default; "remember me" is opt-in
 - Logout invalidates the server-side session, not just the cookie
-- Super-user and Admin roles require MFA (ASP.NET Core Identity supports TOTP authenticator apps out of the box)
+- Super-user and Admin roles require MFA (ASP.NET Identity TOTP)
 
-### Invite tokens
-- Generated with `RandomNumberGenerator.GetBytes(32)` → Base64 URL-safe encoding
-- Stored as the raw token (or a hash — prefer hashing if the DB is ever compromised)
-- Expire after 7 days; one-time use (`AcceptedAt` set on acceptance, checked before honoring)
-- Cancelled immediately if the admin revokes the invite
+### Password rules (email/password path)
+- Minimum 10 characters — length over complexity
+- Check against HaveIBeenPwned API on registration
+- No forced periodic rotation
+- Password reset: `UserManager.GeneratePasswordResetTokenAsync` → email link → `ResetPasswordAsync`
+- Google-only users have no password; show "sign in with Google" on the reset page
 
-### Password rules (if email/password is enabled)
-- Minimum 10 characters — length beats complexity
-- Check against `HaveIBeenPwned` API on registration (ASP.NET Identity has a NuGet for this)
-- No forced periodic rotation — it just trains users to pick `Password1!`, `Password2!`
+### Email verification
+- New accounts: `EmailConfirmed = false`; confirmed via link in registration email
+- Unconfirmed accounts can log in but cannot access family data
 
 ---
 
@@ -72,22 +90,37 @@ Calibrate effort accordingly. A brute-force lockout policy matters. A formal pen
 
 ### Role model
 ```
-Super-user   IsSuperUser = true on AppUser; global; all permissions
-Admin        UserFamily.Role = "Admin"; scoped per family; manage members, restore records, audit log
-Member       UserFamily.Role = "Member"; full CRUD on people and relationships
-Viewer       UserFamily.Role = "Viewer"; read-only (deferred)
+SuperUser   IsSuperUser = true on AppUser; global; all permissions; can delete any user
+Admin       UserFamily.Role = "Admin"; scoped per family; manages members, approvals, restore
+Member      UserFamily.Role = "Member"; full CRUD on people and relationships in their family
+Viewer      Unauthenticated public access to public families; read-only, visibility-tiered
 ```
 
 ### Enforcement layers
 1. **Nav link hidden** — `<AuthorizeView Roles="Admin,SuperUser">` prevents casual discovery
-2. **Page-level attribute** — `@attribute [Authorize(Roles="Admin,SuperUser")]` redirects to login on direct URL access
-3. **Service-level check** (add for destructive ops) — confirm the caller's role before executing; don't rely on UI alone
-4. **Family scoping** — all queries filtered by `FamilyId` derived from the authenticated user's `UserFamily` rows; a user cannot access another family's data even with a valid session
+2. **Page-level attribute** — `@attribute [Authorize(Roles="Admin,SuperUser")]` redirects on direct URL access
+3. **Service-level visibility tier** — enforced in mapper/service, not just UI; public vs member vs admin data shape
+4. **Family scoping** — all queries filtered by `FamilyId` from current user's `UserFamily` rows
+5. **Claim approval gate** — `PersonClaimStatus = Pending` blocks family access until admin approves
 
 ### Principle of least privilege
-- Members cannot see audit logs or deleted records — those are Admin-only
-- Admins cannot create other Admins — only the Super-user can promote
-- No self-promotion; no auto-elevation on invite acceptance (role is set by the inviter)
+- Members cannot see audit logs, deleted records, or pending claims — Admin-only
+- Admins cannot promote other users to Admin — only SuperUser can
+- `Family.IsPublic` can only be set by a family Admin or SuperUser
+- `Family.RequireApproval` defaults to `true`; Admin can disable it per family
+
+---
+
+## Minor protection
+
+- Minors never appear in public search results or unauthenticated views
+- The "find my node" wizard hides minors at the query level — not just the UI
+- Even Members see only first name and family position for minors; no dates or places
+- Admins and SuperUsers see full data (needed for record management)
+- `Person.IsMinorOverride` allows manual override when BirthDate is unknown:
+  - `null` = derive from BirthDate (default)
+  - `true` = force treat as minor regardless of dates
+  - `false` = force treat as adult (e.g., adopted adult with unknown birthdate)
 
 ---
 
@@ -100,82 +133,60 @@ Viewer       UserFamily.Role = "Viewer"; read-only (deferred)
 - Antiforgery is enabled (`app.UseAntiforgery()`) — do not disable it
 
 ### Input validation
-- All service methods validate DTOs before touching the database (`ValidationHelper.ValidateDto`)
+- All service methods validate DTOs before touching the database
 - `PersonService` has 70+ business rules (date bounds, age gaps, spouse conflicts)
 - Never trust client-supplied IDs for authorization — always re-check ownership server-side
 
 ### SQL injection
-- EF Core parameterizes all queries — do not use raw SQL strings with user input
-- If raw SQL is ever needed, use `FromSqlRaw` with `@p0`-style parameters, never string interpolation
+- EF Core parameterizes all queries — no raw SQL strings with user input
+- If raw SQL is ever needed, use `FromSqlRaw` with `@p0`-style parameters only
 
 ### XSS
 - Blazor renders all string values HTML-encoded by default — `@variable` is safe
-- Only `@((MarkupString)html)` bypasses encoding; never use it with user-supplied content
-- MudBlazor components follow the same encoding rules
-
-### CSRF
-- Blazor's antiforgery token covers form submissions; SignalR channel is inherently session-bound
-- No additional CSRF mitigation needed for normal Blazor Server patterns
+- `@((MarkupString)html)` bypasses encoding — never use it with user-supplied content
 
 ### Secrets
-- Connection strings and API keys live in **User Secrets** in development (`dotnet user-secrets`)
-- In production, use **Azure Key Vault** or App Service environment variables — never commit secrets to git
-- The `.gitignore` excludes `appsettings.*.json` user secrets files; keep it that way
+- Connection strings and API keys: **User Secrets** in development
+- Production: **Azure Key Vault** or App Service environment variables — never commit secrets
 
 ---
 
 ## Infrastructure (Azure)
 
-### App Service
-- Run on at least the **Basic B1** tier in production (Free/Shared tiers don't support custom domains or TLS)
-- Force HTTPS: `app.UseHttpsRedirection()` is already wired; also set "HTTPS Only" in App Service settings
-- Set `ASPNETCORE_ENVIRONMENT=Production` — this suppresses detailed error pages and Swagger UI
-
-### Azure SQL
-- Use the **connection string in App Service Configuration** (not hardcoded)
-- Enable **Azure Defender for SQL** — detects anomalous queries for free on Basic tier
-- Enable **automatic backups** (on by default for Azure SQL); set 7-day retention
-- The app user's DB login should have only `db_datareader` + `db_datawriter` + `EXECUTE` — not `db_owner`
-
-### Blob Storage (photos)
-- Container access level: **Private** — all blob URLs must be served through the app, not public CDN URLs
-- If you generate direct blob URLs for photos, use **SAS tokens** with short expiry (1 hour) rather than permanent public URLs
-- Enable **soft delete on blobs** (Azure portal: Data protection → Blob soft delete, 7 days)
-
-### TLS / domain
-- Azure App Service provides a free managed TLS certificate for custom domains
-- Use TLS 1.2 minimum (Azure default); disable TLS 1.0/1.1 in App Service TLS/SSL settings
+- **App Service**: force HTTPS; set `ASPNETCORE_ENVIRONMENT=Production`
+- **Azure SQL**: connection string in App Service Configuration; Azure Defender enabled; 7-day backup retention; app user has `db_datareader + db_datawriter + EXECUTE` only
+- **Blob Storage**: private container; SAS tokens with short expiry for photo URLs; blob soft delete enabled (7 days)
+- **TLS**: managed certificate; TLS 1.2 minimum
 
 ---
 
 ## Soft delete & data retention
 
-- All Person, Relationship, and Medium records are **soft-deleted** — `DeletedAt` is set, the row remains
-- The admin can **restore** within the retention window
-- Hard delete is not currently exposed in the UI — deliberate
-- Consider a **90-day hard-purge policy** for soft-deleted records: a background job or manual admin action to permanently remove rows older than 90 days. Not yet implemented.
-- Audit log rows are **never deleted** — they are the paper trail
+- Person, Relationship, Medium: soft-deleted (`DeletedAt` set); Admin can restore within retention window
+- Hard delete not exposed in UI — deliberate
+- **90-day hard-purge policy** (not yet implemented): background job removes soft-deleted rows older than 90 days
+- Audit log rows are never deleted
 
 ---
 
-## What we're explicitly not doing (and why)
+## What we're explicitly not doing
 
 | Not doing | Why it's OK |
 |-----------|-------------|
-| Formal pen-test | 10–50 family users, not a public SaaS |
-| WAF / DDoS protection | Azure App Service has basic rate limiting; family app isn't a target |
-| Encrypted columns in SQL | Data-at-rest encryption is on by default in Azure SQL (TDE) |
-| End-to-end encryption of biography text | Overkill for a family app; TDE covers the at-rest case |
-| IP allowlisting | Family members travel; fixed IPs don't work |
-| Per-request audit logging (reads) | Log writes and deletes only; logging every GET is noise |
-| GDPR Data Protection Officer | Not required below 250 employees and without systematic processing |
+| Formal pen-test | Small user base, not a financial/medical SaaS |
+| WAF / DDoS protection | Azure App Service basic rate limiting is sufficient |
+| Encrypted columns | Azure SQL TDE covers at-rest encryption |
+| IP allowlisting | Users travel; fixed IPs don't work |
+| Per-request read audit logging | Log writes and deletes only; read logging is noise |
+| GDPR Data Protection Officer | Not required for this scale |
 
 ---
 
-## Incident checklist (if something goes wrong)
+## Incident checklist
 
-1. **Unauthorized access detected** → revoke the user's `UserFamily` row immediately; rotate any shared secrets; check audit log for what they accessed
-2. **Data accidentally deleted** → restore from soft-delete via `/admin → Deleted tab`; if hard-deleted (unlikely), restore from Azure SQL backup
-3. **Credential compromise** → force logout all sessions (invalidate the security stamp in Identity); require password reset; check `AuditLog` for actions taken
-4. **Blob storage exposed** → regenerate storage account SAS key; audit blob access logs in Azure portal
-5. **Secrets committed to git** → rotate immediately (connection string, storage key, OAuth client secret); use `git filter-repo` to remove from history; assume the secret is compromised from the moment of the commit
+1. **Unauthorized access** → revoke `UserFamily` row; check audit log; rotate secrets if needed
+2. **Data accidentally deleted** → restore from soft-delete in `/admin → Deleted`; if hard-deleted, restore from Azure SQL backup
+3. **Credential compromise** → invalidate security stamp in Identity (forces re-login for all sessions); check `AuditLog`
+4. **Minor data exposed publicly** → check `Person.IsMinorOverride` and `BirthDate`; audit `PersonService` visibility tier logic
+5. **Blob storage exposed** → regenerate storage SAS key; audit Azure blob access logs
+6. **Secrets committed to git** → rotate immediately; use `git filter-repo` to remove from history; assume compromised

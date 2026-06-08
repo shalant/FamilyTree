@@ -2,7 +2,7 @@ name: Deploy Web
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
     paths:
       - 'src/FamilyTree.Web/**'
       - 'src/FamilyTree.Shared/**'

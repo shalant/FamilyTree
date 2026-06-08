@@ -185,7 +185,7 @@ html, body {
     position: fixed;
     top: 72px;
     right: 24px;
-    z-index: 5000;
+    z-index: 1250;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -366,22 +366,23 @@ html, body {
     position: fixed;
     inset: 0;
     backdrop-filter: blur(12px);
-    background: rgba(0,0,0,0.25);
+    background: rgba(0,0,0,0.35);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 9999;
+    z-index: 10001; /* above toolbar (10000) and hero (1250) */
     animation: introFadeIn 0.4s ease-out;
+    padding: 16px;
+    overflow-y: auto;
 }
 
 .intro-glass {
-    background: rgba(255,255,255,0.45);
-    backdrop-filter: blur(20px);
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     border-radius: 20px;
-    padding: 40px 48px;
-    text-align: center;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-    max-width: 400px;
+    padding: 40px 36px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
     animation: introSlideUp 0.5s ease-out;
 }
 
@@ -396,12 +397,155 @@ html, body {
 .intro-subtitle {
     font-size: 14px;
     color: var(--ft-gray-500);
-    margin-bottom: 24px;
 }
 
 .intro-btn {
     width: 100%;
     margin-top: 12px;
+}
+
+/* ── Auth card ────────────────────────────────────────────────────────────── */
+.auth-card {
+    width: 100%;
+    max-width: 380px;
+    text-align: left;
+}
+
+.auth-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.auth-brand-name {
+    font-family: var(--ft-font-display);
+    font-style: italic;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--ft-green-800);
+    letter-spacing: -0.01em;
+}
+
+.auth-google-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 11px 16px;
+    border: 1.5px solid #dadce0;
+    border-radius: 8px;
+    background: #fff;
+    color: #3c4043;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
+    font-family: inherit;
+}
+
+.auth-google-btn:hover:not(:disabled) {
+    background: #f8f9fa;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+
+.auth-google-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.auth-or-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0 16px;
+    color: var(--ft-gray-400);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.auth-or-divider::before,
+.auth-or-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--ft-line-border);
+}
+
+.auth-error {
+    background: rgba(163,45,45,0.08);
+    border: 1px solid rgba(163,45,45,0.2);
+    color: #a32d2d;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+.auth-forgot {
+    text-align: right;
+    margin-top: 6px;
+}
+
+.auth-forgot a {
+    font-size: 12px;
+    color: var(--ft-green-600);
+    text-decoration: none;
+}
+
+.auth-forgot a:hover { text-decoration: underline; }
+
+.auth-register-link {
+    text-align: center;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--ft-gray-500);
+}
+
+.auth-register-link a {
+    color: var(--ft-green-600);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.auth-register-link a:hover { text-decoration: underline; }
+
+.auth-browse {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--ft-line-border);
+    text-align: center;
+}
+
+.auth-browse button {
+    background: none;
+    border: none;
+    font-size: 12px;
+    color: var(--ft-gray-400);
+    cursor: pointer;
+    padding: 0;
+    font-family: inherit;
+    transition: color 0.15s;
+}
+
+.auth-browse button:hover { color: var(--ft-green-600); }
+
+[data-theme="dark"] .intro-glass {
+    background: rgba(26,29,33,0.82);
+}
+
+[data-theme="dark"] .auth-brand-name { color: var(--ft-green-400, #4faa78); }
+
+[data-theme="dark"] .auth-google-btn {
+    background: var(--ft-surface-card);
+    border-color: var(--ft-line-border);
+    color: var(--ft-text-primary);
+}
+
+[data-theme="dark"] .auth-google-btn:hover:not(:disabled) {
+    background: var(--ft-surface);
 }
 /* ── Blazor error UI ──────────────────────────────────────────────────────── */
 
@@ -654,12 +798,48 @@ html, body {
     -webkit-backdrop-filter: blur(24px);
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
 }
+/* ── Auth pages (Register, Login, Forgot password) ───────────────────────────── */
+
+.ft-auth-page {
+    min-height: calc(100vh - 64px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+    background: linear-gradient(180deg, var(--ft-green-50) 0%, var(--ft-surface) 80%);
+}
+
+.auth-password-hint {
+    font-size: 11px;
+    color: var(--ft-gray-400);
+    margin-top: 4px;
+    margin-left: 2px;
+}
+
+.auth-terms {
+    font-size: 11px;
+    color: var(--ft-gray-400);
+    text-align: center;
+    margin-top: 12px;
+    line-height: 1.5;
+}
+
+.auth-terms a {
+    color: var(--ft-green-600);
+    text-decoration: none;
+}
+
+.auth-terms a:hover { text-decoration: underline; }
+
 /* ── Form pages (Add / Edit person) ──────────────────────────────────────────── */
 
 .ft-form-page {
     min-height: 100vh;
     background: linear-gradient(180deg, var(--ft-green-50) 0%, var(--ft-surface) 80%);
     padding-bottom: 60px;
+    /* pull up to cover the MudMainContent appbar-padding gap */
+    margin-top: -64px;
+    padding-top: 64px;
 }
 
 .ft-field-label {
@@ -798,11 +978,7 @@ html.ft-no-select * {
 .ft-toolbar-grip:hover { opacity: 0.7; }
 .ft-toolbar-grip:active { cursor: grabbing; }
 
-/* Raise MudBlazor tooltip z-index above hero-glass (z-index:5000) */
-:root {
-    --mud-zindex-tooltip: 6000;
-    --mud-zindex-popover: 6000;
-}
+/* MudBlazor default popover/tooltip z-index (~1300+) naturally sits above hero-overlay (1250) */
 
 /* ── MudBlazor palette overrides ──────────────────────────────────────────── */
 /*

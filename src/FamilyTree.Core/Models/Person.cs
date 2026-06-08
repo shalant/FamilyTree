@@ -31,6 +31,9 @@ public partial class Person
     public Guid? DeletedBy { get; set; }
     public byte[]? RowVersion { get; set; }
 
+    // null = derive from BirthDate; true = force minor; false = force adult
+    public bool? IsMinorOverride { get; set; }
+
     // CORRECT: One-to-many
     public virtual ICollection<Medium> Media { get; set; } = new List<Medium>();
 

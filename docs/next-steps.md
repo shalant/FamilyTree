@@ -1,107 +1,118 @@
 # Next Steps — Arborkin
 
-> Opinionated sequence. Each item unblocks the next. Updated: 2026-06-07.
+> Opinionated sequence. Each item unblocks the next. Updated: 2026-06-08.
 
 ---
 
 ## Right now (immediate)
 
-**Hard-restart the app after component changes.**
-Hot reload doesn't pick up new `[Parameter]` declarations. Any time you add a parameter
-to a Blazor component, stop IIS Express (Shift+F5) and relaunch (F5) to force a full
-recompile. The `ActionRow`, `SectionHeading`, and `ExportRow` fixes are already in the
-files — they just need a rebuild to take effect.
+**Run the Identity migration.**
+Stop IIS Express (Shift+F5), then from `src/FamilyTree.Core`:
+
+```
+dotnet ef migrations add AddIdentity
+dotnet ef database update
+```
+
+This drops the old `AppUsers` table and creates `AspNetUsers` + all Identity tables
+(`AspNetRoles`, `AspNetUserRoles`, `AspNetUserClaims`, etc.) plus the new columns:
+`Family.IsPublic`, `Family.RequireApproval`, `AppUser.PersonClaimStatus`,
+`Person.IsMinorOverride`, and the unique filtered index on `AppUser.PersonId`.
+
+After migration, restart the app (F5). DevAuth is already wired — you'll be
+auto-logged-in as Admin in development, no credentials needed.
 
 ---
 
-## Next: Auth (the big one)
+## Next: Auth flow
 
-Everything below depends on knowing who the current user is. Do it in this order —
-each sub-step is shippable on its own.
+### 1. Google OAuth + email/password
+- `builder.Services.AddAuthentication().AddGoogle(...).AddCookie()` in `Program.cs`
+- Google Client ID/Secret → `dotnet user-secrets set`
+- Email/password uses ASP.NET Identity's built-in hashing — nothing extra needed
 
-### 1. Add ASP.NET Core Identity
-- Install `Microsoft.AspNetCore.Identity.EntityFrameworkCore` NuGet in `FamilyTree.Core`
-- Change `AppDbContext` to extend `IdentityDbContext<IdentityUser>` (or a custom
-  `ArborkinUser : IdentityUser` that adds `PersonId`, `IsSuperUser`, `FeatureFlags`)
-- Run `dotnet ef migrations add AddIdentity` from `src/FamilyTree.Core`
-- The `AppUser` placeholder table we created will be superseded by Identity's
-  `AspNetUsers` — migrate the columns across or start fresh (no real data in it yet)
+### 2. Register / Login / Logout pages
+- Open registration — anyone can sign up (email + password OR Google)
+- `UserName = Email` on `UserManager.CreateAsync` — Identity requires it
+- Set `CreatedAt = DateTime.UtcNow` on create
+- Login page handles both cookie auth schemes (Google redirect + local password)
+- Logout: `SignOutAsync` both cookie and Google schemes
 
-### 2. Wire cookie auth + Google OAuth
-- `builder.Services.AddAuthentication().AddGoogle(...)` in `Web/Program.cs`
-- Client ID and secret go in User Secrets (`dotnet user-secrets set ...`)
-- Add Login / Logout pages (scaffold with Identity UI or hand-roll — hand-rolling is
-  cleaner for a custom look)
-- `app.UseAuthentication(); app.UseAuthorization();` already slots in before
-  `app.MapRazorComponents`
+### 3. Email verification
+- `UserManager.GenerateEmailConfirmationTokenAsync` → send via SendGrid
+- Unverified accounts can log in but see a banner; gate family access behind `EmailConfirmed`
+- In development: log the token URL to console instead of sending email
 
-### 3. Seed the super-user
-- On startup in Development, check if `AspNetUsers` is empty — if so, create one user
-  with a known email and `IsSuperUser = true`
-- This gives you admin access immediately without a full invite flow
+### 4. Forgot / reset password
+- Two pages: "Forgot password" (enter email) and "Reset password" (token + new password)
+- `UserManager.GeneratePasswordResetTokenAsync` → email link
+- `UserManager.ResetPasswordAsync` on submit
+- Google-only users don't have a password; show "sign in with Google" instead
 
-### 4. Replace the `AdminEnabled` flag with real role checks
-- `NavMenu.razor`: swap `@if (Config.GetValue<bool>("AdminEnabled"))` →
-  `<AuthorizeView Roles="Admin,SuperUser">`
-- `Admin.razor`: swap the redirect block → `@attribute [Authorize(Roles="Admin,SuperUser")]`
-- Delete the `AdminEnabled` lines from both `appsettings` files
+### 5. Seed super-user on startup
+- Development only: if `AspNetUsers` is empty, create one user from config with `IsSuperUser = true`
+- Assign the "SuperUser" Identity role so `[Authorize(Roles="SuperUser")]` works
 
-### 5. Populate audit fields from the current user
-- Create `ICurrentUserService` — returns the logged-in user's `Guid` from
-  `IHttpContextAccessor` or `AuthenticationStateProvider`
-- Inject it into `PersonService` and set `CreatedBy`, `UpdatedBy`, `DeletedBy`,
-  and `AuditLog.UserId` on every write
-- Until this is done, those fields stay `null` — that's fine
-
-### 6. Wire the invite flow
-- The `UserInvite` table and schema already exist
-- Add `InviteService.CreateInviteAsync(email, familyId, role)` → generates a
-  `RandomNumberGenerator` token, saves the row
-- Add a `/join?token=...` page that validates the token, creates the user (or links
-  an existing one), creates the `UserFamily` row, marks `AcceptedAt`
-- Wire email sending last (SendGrid) — the invite still works without it if you
-  copy-paste the link manually during development
+### 6. Replace DevAuthHandler
+- Once login works, flip `DevAuth:Enabled` to `false` in `appsettings.Development.json`
+- The real auth scheme takes over; `DevAuthHandler` stays in the codebase for future use
 
 ---
 
-## After auth: photo upload (isolated, can be done any time)
+## After login: onboarding flow
 
-`ProfilePhotoUrl` is currently a plain string. The real flow:
-- `MediaUploadZone` → `IBlobStorageService.UploadAsync` → returns a URL → saved to
-  `Person.ProfilePhotoUrl`
-- The infrastructure (`BlobStorageService`, Azure Blob container) already exists
-- This is self-contained — no auth dependency — so it can be done before or after auth
+New users who just registered land on an onboarding page. Two paths:
+
+**Create a family** → names their family, creates a `Family` row, gets Admin role via `UserFamily`
+
+**Find my node (public search wizard)**
+1. User searches by name on families where `Family.IsPublic = true`
+2. Results show deceased people fully; living adults by name only; minors hidden
+3. "This is me" → sets `AppUser.PersonId` + `PersonClaimStatus = Pending`
+4. Family admin sees the claim in `/admin → Users` tab and approves/rejects
+5. On approval: `PersonClaimStatus = Approved`, `UserFamily` row created with Member role
+6. `Family.RequireApproval = false` skips step 4–5 and auto-approves
+
+**Enter invite code** → validates token, creates `UserFamily` row, skips approval
 
 ---
 
-## After auth: family scoping
+## After onboarding: post-auth wiring
 
-Once you know which family a user belongs to (from `UserFamily`):
-- Add `Guid? FamilyId` to service method signatures (or resolve it from
-  `ICurrentUserService`)
-- Add `.Where(p => p.FamilyId == currentFamilyId)` to `PersonService.GetAllAsync`
-- This is the multi-tenant payoff — users only see their own family's tree
+Once you know who the user is and which family they belong to:
+
+- `ICurrentUserService` — resolves current `AppUser` from `ClaimsPrincipal`
+- Populate `CreatedBy` / `UpdatedBy` / `DeletedBy` / `AuditLog.UserId` on every write
+- `UserActivity` daily count incremented on every mutation
+- Family scoping: add `.Where(p => p.FamilyId == currentFamilyId)` to `PersonService.GetAllAsync`
+- Data visibility tier applied at service/mapper layer (public vs member vs admin)
+
+---
+
+## Admin: user management
+
+Super-admin user deletion in `/admin → Users` tab:
+- `UserManager.DeleteAsync(user)` — cascades to `UserFamily`, nulls FKs in audit/activity
+- Approve/reject pending claims: set `PersonClaimStatus`, create/skip `UserFamily` row
 
 ---
 
 ## Deferred (don't start yet)
 
-These are real but not urgent — starting them now would be premature:
-
 | Item | Why deferred |
 |------|-------------|
-| GEDCOM import/export | Nice to have; no user demand yet |
-| AI document import | Depends on stable data model |
-| Timeline view | Phase 2 polish |
-| Real-time presence | Phase 3 complexity |
-| Mobile layout | Do after tree is feature-complete |
+| GEDCOM import/export | Depends on stable data model |
+| AI document import | Phase 4 |
+| Timeline view | Phase 6 polish |
+| Real-time presence | Phase 3+ complexity |
+| Mobile layout | After feature-complete |
 | Performance / virtual rendering | Only matters at 200+ nodes |
+| Photo upload (real blob) | Self-contained, any time after auth |
 
 ---
 
 ## Decision still open
 
-**Is Viewer a real role or just unauthenticated access?**
-If all family members will edit, Viewer adds complexity for no benefit right now.
-Recommendation: skip Viewer in the first auth pass — add it only when someone
-actually needs read-only access.
+**Who can set `Family.IsPublic`?**
+Recommend: family Admin or Super-user only. A member shouldn't be able to make the
+family discoverable by strangers without the admin's consent.

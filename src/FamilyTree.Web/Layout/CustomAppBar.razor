@@ -13,9 +13,11 @@
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Services
 @using MudBlazor
+@using System.Security.Claims
 @inject IPersonService PersonService
 @inject ThemeService Theme
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
 @implements IAsyncDisposable
 
 @* ── AppBar shell ─────────────────────────────────────────────────────────── *@
@@ -28,16 +30,18 @@
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);">
 
     @* Brand wordmark *@
-    <div style="display:flex; align-items:center; gap:8px; cursor:pointer;
-        flex-shrink:0; margin-right:20px;"
+    @* <div style="background:#fff; border-radius:8px; padding:3px 10px;
+                margin-right:16px; flex-shrink:0; cursor:pointer; user-select:none;"
          @onclick='() => Nav.NavigateTo("/")'>
-        <MudIcon Icon="@Icons.Material.Outlined.Park"
-                 Style="color:var(--ft-green-600); font-size:22px;" />
-        <span style="font-family:var(--ft-font-display); font-style:italic;
-            font-size:18px; font-weight:600; color:var(--ft-green-800);
-            letter-spacing:-0.01em; white-space:nowrap;">
-            FamilyTree
-        </span>
+        <img src="/images/arborkin-logo__transparent.png" alt="ArborKin"
+             style="height:30px; display:block;" />
+    </div> *@
+    <div style="margin-left:-8px; margin-right:16px; padding:0 8px 0 0;
+                flex-shrink:0; cursor:pointer; user-select:none;
+                display:flex; align-items:center;justify-content:center"
+         @onclick='() => Nav.NavigateTo("/")'>
+        <img src="/images/arborkin-logo__transparent.png" alt="ArborKin"
+             style="height:170px;" />
     </div>
 
     @* ── People search ──────────────────────────────────────────────────── *@
@@ -103,40 +107,50 @@
     <MudSpacer />
 
     @* ── Quick-add person ───────────────────────────────────────────────── *@
-    <MudTooltip Text="Add person" Placement="Placement.Left">
+    <MudTooltip Text="Add person" Placement="Placement.Bottom">
         <MudIconButton Icon="@Icons.Material.Outlined.PersonAdd"
                        Style="color:var(--ft-green-600);"
                        OnClick='() => Nav.NavigateTo("/people/add")' />
     </MudTooltip>
 
     @* ── People list ────────────────────────────────────────────────────── *@
-    <MudTooltip Text="People list" Placement="Placement.Left">
+    <MudTooltip Text="People list" Placement="Placement.Bottom">
         <MudIconButton Icon="@Icons.Material.Outlined.People"
                        Style="color:var(--ft-gray-400);"
                        OnClick='() => Nav.NavigateTo("/people")' />
     </MudTooltip>
 
     @* ── Import ─────────────────────────────────────────────────────────── *@
-    <MudTooltip Text="Import data" Placement="Placement.Left">
+    <MudTooltip Text="Import data" Placement="Placement.Bottom">
         <MudIconButton Icon="@Icons.Material.Outlined.Upload"
                        Style="color:var(--ft-gray-400);"
                        OnClick='() => Nav.NavigateTo("/import")' />
     </MudTooltip>
 
     @* ── Dashboard ──────────────────────────────────────────────────────── *@
-    <MudTooltip Text="Dashboard" Placement="Placement.Left">
+    <MudTooltip Text="Dashboard" Placement="Placement.Bottom">
         <MudIconButton Icon="@Icons.Material.Outlined.Dashboard"
                        Style="color:var(--ft-gray-400);"
                        OnClick='() => Nav.NavigateTo("/dashboard")' />
     </MudTooltip>
 
     @* ── Dark-mode toggle ───────────────────────────────────────────────── *@
-    <MudTooltip Text="@(_isDark ? "Light mode" : "Dark mode")" Placement="Placement.Left">
+    <MudTooltip Text="@(_isDark ? "Light mode" : "Dark mode")" Placement="Placement.Bottom">
         <MudIconButton Icon="@(_isDark? Icons.Material.Outlined.LightMode
                                                                                                 : Icons.Material.Outlined.DarkMode)"
                        Style="color:var(--ft-gray-400);"
                        OnClick="ToggleTheme" />
     </MudTooltip>
+
+    @* ── Auth level chip ────────────────────────────────────────────────── *@
+    @if (_authChipLabel is not null)
+    {
+        <MudChip T="string" Size="Size.Small" Color="_authChipColor"
+                 Style="margin-right:2px; cursor:default; font-size:11px; height:22px;"
+                 DisableRipple="true">
+            @_authChipLabel
+        </MudChip>
+    }
 
     @* ── User avatar ────────────────────────────────────────────────────── *@
     <MudMenu AnchorOrigin="Origin.BottomRight"
@@ -183,8 +197,18 @@
             @* User identity header *@
             <div style="padding:12px 16px 10px; border-bottom:0.5px solid var(--ft-line-border);
                 min-width:180px;">
-                <div style="font-size:13px; font-weight:500; color:var(--ft-text-primary);">
-                    @_userName
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span style="font-size:13px; font-weight:500; color:var(--ft-text-primary);">
+                        @_userName
+                    </span>
+                    @if (_authChipLabel is "Admin" or "Super-user")
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="_authChipColor"
+                                 Style="height:18px; font-size:10px; cursor:default;"
+                                 DisableRipple="true">
+                            @_authChipLabel
+                        </MudChip>
+                    }
                 </div>
                 <div style="font-size:11px; color:var(--ft-text-muted); margin-top:2px;">
                     @_userEmail
@@ -198,6 +222,13 @@
                          OnClick='() => Nav.NavigateTo("/settings")'>
                 Settings
             </MudMenuItem>
+            @if (_authChipLabel is "Admin" or "Super-user")
+            {
+                <MudMenuItem Icon="@Icons.Material.Outlined.AdminPanelSettings"
+                             OnClick='() => Nav.NavigateTo("/admin")'>
+                    Admin
+                </MudMenuItem>
+            }
             <MudDivider />
             <MudMenuItem Icon="@Icons.Material.Outlined.Info"
                          OnClick='() => Nav.NavigateTo("/about")'>
@@ -259,22 +290,68 @@
     private List<PersonDto> _allPeople = [];
     private bool _isDark;
 
-    // TODO: replace with real auth claims when auth is wired
-    private string _userName = "Doug";
-    private string _userEmail = "";
-    private string _userInitials = "D";
+    private string _userName     = "";
+    private string _userEmail    = "";
+    private string _userInitials = "";
     private string _userPhotoUrl = "";
+    private string? _authChipLabel;
+    private Color   _authChipColor = Color.Default;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     protected override async Task OnInitializedAsync()
     {
-        var result = await PersonService.GetAllAsync();
+        var peopleTask = PersonService.GetAllAsync();
+        var authState  = await AuthStateProvider.GetAuthenticationStateAsync();
+        var result     = await peopleTask;
+
         if (result.Success)
             _allPeople = result.Data ?? [];
 
         _isDark = Theme.IsDark;
         Theme.OnChange += OnThemeChanged;
+
+        LoadUserInfoAsync(authState.User);
+    }
+
+    private Task LoadUserInfoAsync(ClaimsPrincipal principal)
+    {
+        if (principal.Identity?.IsAuthenticated != true) return Task.CompletedTask;
+
+        var isDevAuth = principal.Identity.AuthenticationType == "DevAuth";
+
+        _userName  = principal.FindFirst("DisplayName")?.Value
+                  ?? principal.FindFirst(ClaimTypes.Name)?.Value
+                  ?? "—";
+        _userEmail = principal.FindFirst(ClaimTypes.Email)?.Value ?? "";
+
+        if (isDevAuth)
+        {
+            _authChipLabel = "Dev";
+            _authChipColor = Color.Info;
+        }
+        else if (principal.IsInRole("SuperUser"))
+        {
+            _authChipLabel = "Super-user";
+            _authChipColor = Color.Default;
+        }
+        else if (principal.IsInRole("Admin"))
+        {
+            _authChipLabel = "Admin";
+            _authChipColor = Color.Default;
+        }
+        else
+        {
+            _authChipLabel = "Member";
+            _authChipColor = Color.Success;
+        }
+
+        var parts = _userName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        _userInitials = parts.Length >= 2
+            ? $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant()
+            : _userName.Length > 0 ? _userName[0].ToString().ToUpperInvariant() : "?";
+
+        return Task.CompletedTask;
     }
 
     protected override void OnParametersSet() => _isDark = IsDark;
@@ -333,8 +410,5 @@
         $"{p.FirstName?.FirstOrDefault()}{p.LastName?.FirstOrDefault()}"
         .ToUpperInvariant().Trim();
 
-    private void SignOut()
-    {
-        // TODO: hook into your auth provider (e.g. Nav.NavigateTo("/logout", forceLoad:true))
-    }
+    private void SignOut() => Nav.NavigateTo("/auth/logout", forceLoad: true);
 }

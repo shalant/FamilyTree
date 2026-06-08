@@ -1,15 +1,19 @@
 using FamilyTree.Core.Models;
+using FamilyTree.Shared.Enums;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace FamilyTree.Core.Data;
 
-public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public partial class AppDbContext(DbContextOptions<AppDbContext> options)
+    : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<Family> Families => Set<Family>();
     public DbSet<Person> People => Set<Person>();
     public DbSet<Relationship> Relationships => Set<Relationship>();
     public DbSet<Medium> Media => Set<Medium>();
-    public DbSet<AppUser> AppUsers => Set<AppUser>();
+    public DbSet<AppUser> AppUsers => Users;   // alias — code that uses ctx.AppUsers still works
     public DbSet<UserFamily> UserFamilies => Set<UserFamily>();
     public DbSet<UserInvite> UserInvites => Set<UserInvite>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -30,6 +34,8 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbCo
             e.HasKey(f => f.Id);
             e.Property(f => f.Id).HasDefaultValueSql("newsequentialid()");
             e.Property(f => f.Name).HasMaxLength(200).IsRequired();
+            e.Property(f => f.IsPublic).HasDefaultValue(false);
+            e.Property(f => f.RequireApproval).HasDefaultValue(true);
             e.Property(f => f.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
         });
 
@@ -113,15 +119,21 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbCo
         });
 
         // ── APP USER ──────────────────────────────────────────────────────────
+        // Identity manages: Id, Email (unique index), UserName, PasswordHash, etc.
         modelBuilder.Entity<AppUser>(e =>
         {
-            e.HasKey(u => u.Id);
-            e.Property(u => u.Id).HasDefaultValueSql("newsequentialid()");
-            e.Property(u => u.Email).HasMaxLength(256).IsRequired();
             e.Property(u => u.DisplayName).HasMaxLength(200);
             e.Property(u => u.FeatureFlags).HasColumnType("nvarchar(max)");
             e.Property(u => u.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
-            e.HasIndex(u => u.Email).IsUnique();
+            e.Property(u => u.PersonClaimStatus)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(PersonClaimStatus.None);
+
+            // One person node can only be claimed by one user
+            e.HasIndex(u => u.PersonId)
+                .IsUnique()
+                .HasFilter("[PersonId] IS NOT NULL");
 
             e.HasOne(u => u.Person)
                 .WithMany()

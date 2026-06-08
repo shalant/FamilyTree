@@ -18,14 +18,18 @@
 @inject ToastService Toast
 @inject IJSRuntime JS
 
-<PageTitle>Family Tree</PageTitle>
+<PageTitle>ArborKin</PageTitle>
 
-@if (_showIntro)
-{
-    <LoginOverlay OnGuest="HideIntro" />
-}
+<AuthorizeView>
+    <NotAuthorized>
+        @if (_showIntro)
+        {
+            <LoginOverlay OnGuest="HideIntro" ErrorMessage="@LoginError" />
+        }
+    </NotAuthorized>
+</AuthorizeView>
 
-@if (_loading)
+@if (_loading || !_ready)
 {
     <div style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:10;">
         <MudProgressCircular Indeterminate="true" Color="Color.Success" />
@@ -90,12 +94,14 @@ else
     private void HideIntro() => _showIntro = false;
 
     [SupplyParameterFromQuery] public Guid? Focus { get; set; }
+    [SupplyParameterFromQuery] public string? LoginError { get; set; }
 
     private List<PersonDto> _people = [];
     private List<CoupleDto> _couples = [];
     private PersonDto? _focusPerson;
     private PersonDto? _detailPerson;
     private bool _loading = true;
+    private bool _ready   = false;  // true once JS-dependent focus init is done
     private FamilyTreeCanvas? _canvas;
 
     // ── Drag state ────────────────────────────────────────────────────────────
@@ -116,44 +122,46 @@ else
             _people = result.Data!;
             _couples = CoupleHelper.Derive(_people);
 
-            // Priority: URL ?focus= param → localStorage → alphabetical first
-            Guid? focusId = Focus;
-
-            if (!focusId.HasValue)
+            if (!_people.Any())
             {
-                try
-                {
-                    var saved = await JS.InvokeAsync<string?>("localStorage.getItem", "ft-focus");
-                    if (Guid.TryParse(saved, out var savedId))
-                        focusId = savedId;
-                }
-                catch { /* JS not ready during SSR pre-render */ }
+                // No people — empty-state doesn't need a focus; skip JS init
+                _ready = true;
             }
-            else
+            else if (Focus.HasValue)
             {
-                // Persist URL-driven focus so it survives the next load
-                try { await JS.InvokeVoidAsync("localStorage.setItem", "ft-focus", focusId.Value.ToString()); }
+                // URL param is available during SSR — use it directly, no JS needed
+                _focusPerson = _people.FirstOrDefault(p => p.Id == Focus.Value)
+                            ?? _people.FirstOrDefault();
+                try { await JS.InvokeVoidAsync("localStorage.setItem", "ft-focus", Focus.Value.ToString()); }
                 catch { }
+                _ready = true;
             }
-
-            _focusPerson = focusId.HasValue
-                ? _people.FirstOrDefault(p => p.Id == focusId.Value) ?? _people.FirstOrDefault()
-                : _people.FirstOrDefault();
+            // else: _ready stays false — OnAfterRenderAsync reads localStorage
         }
         else
         {
             Toast.Error(result.Message);
+            _ready = true; // error path — don't block on JS
         }
         _loading = false;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        // Read localStorage for focus once JS is available (only when not set by URL param)
+        if (!_ready && _people.Count > 0)
         {
-            // Fire-and-forget so intro timer doesn't block drag initialisation
-            _ = Task.Delay(10000).ContinueWith(_ =>
-                InvokeAsync(() => { _showIntro = false; StateHasChanged(); }));
+            try
+            {
+                var saved = await JS.InvokeAsync<string?>("localStorage.getItem", "ft-focus");
+                _focusPerson = Guid.TryParse(saved, out var savedId)
+                    ? _people.FirstOrDefault(p => p.Id == savedId) ?? _people.FirstOrDefault()
+                    : _people.FirstOrDefault();
+            }
+            catch { _focusPerson = _people.FirstOrDefault(); }
+
+            _ready = true;
+            StateHasChanged(); // triggers one clean render with the correct person
         }
 
         // Load the drag module once; call init on every render so that

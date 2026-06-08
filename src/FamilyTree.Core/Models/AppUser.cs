@@ -1,11 +1,14 @@
+using FamilyTree.Shared.Enums;
+using Microsoft.AspNetCore.Identity;
+
 namespace FamilyTree.Core.Models;
 
-public class AppUser
+public class AppUser : IdentityUser<Guid>
 {
-    public Guid Id { get; set; }
-    public string Email { get; set; } = null!;
+    // Id, Email, UserName, PasswordHash, SecurityStamp, etc. inherited from IdentityUser<Guid>
     public string? DisplayName { get; set; }
     public Guid? PersonId { get; set; }
+    public PersonClaimStatus PersonClaimStatus { get; set; } = PersonClaimStatus.None;
     public bool IsSuperUser { get; set; }
     public string? FeatureFlags { get; set; } // JSON: canEdit, isLocked, dailyCrudCap, isDonor
     public DateTime? CreatedAt { get; set; }

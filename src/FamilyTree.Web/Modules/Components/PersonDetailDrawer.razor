@@ -133,7 +133,7 @@
                                 <div style="font-size:10px; letter-spacing:0.08em;
                                     text-transform:uppercase; color:var(--ft-gray-300);
                                     margin-bottom:5px;">
-                                    @group.Key@(group.Count() > 1 ? "s" : "")
+                                    @Pluralize(group.Key, group.Count())
                                 </div>
                                 @foreach (var rel in group)
                                 {
@@ -307,6 +307,9 @@
     private string Initials => Person is null ? ""
         : $"{Person.FirstName?.FirstOrDefault()}{Person.LastName?.FirstOrDefault()}"
           .ToUpperInvariant();
+
+    private static string Pluralize(string word, int count) =>
+        count <= 1 ? word : word == "Child" ? "Children" : word + "s";
 
     private static string GenderIcon(Gender? gender) => gender switch
     {

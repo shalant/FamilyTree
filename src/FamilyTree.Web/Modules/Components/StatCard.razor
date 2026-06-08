@@ -1,11 +1,41 @@
-﻿@namespace FamilyTree.Web.Modules.Components
+@namespace FamilyTree.Web.Modules.Components
+@using MudBlazor
+@inject NavigationManager Nav
 
-<div class="stat-card" style="padding:16px; border-radius:8px; background:var(--ft-surface-card);">
-    <div style="font-size:12px; color:var(--ft-gray-400);">@Label</div>
-    <div style="font-size:22px; font-weight:600; color:var(--ft-green-800);">@Value</div>
+<div class="stat-card"
+     style="padding:18px 20px; border-radius:10px; background:var(--ft-surface-card);
+            cursor:@(Href != null ? "pointer" : "default"); transition:box-shadow 0.15s;"
+     @onclick="Navigate">
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            <MudIcon Icon="@Icon"
+                     Style="@($"font-size:18px; color:{Accent ?? "var(--ft-green-600)"};")" />
+        }
+        <span style="font-size:11px; color:var(--ft-gray-400); text-transform:uppercase; letter-spacing:.06em;">
+            @Label
+        </span>
+    </div>
+    <div style="font-size:28px; font-weight:700; color:var(--ft-green-800); line-height:1;">
+        @Value
+    </div>
+    @if (!string.IsNullOrEmpty(Subtitle))
+    {
+        <div style="font-size:11px; color:var(--ft-gray-300); margin-top:4px;">@Subtitle</div>
+    }
 </div>
 
 @code {
-    [Parameter] public string Label { get; set; } = "";
-    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string  Label    { get; set; } = "";
+    [Parameter] public string  Value    { get; set; } = "";
+    [Parameter] public string? Icon     { get; set; }
+    [Parameter] public string? Accent   { get; set; }
+    [Parameter] public string? Href     { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
+
+    private void Navigate()
+    {
+        if (!string.IsNullOrEmpty(Href))
+            Nav.NavigateTo(Href);
+    }
 }

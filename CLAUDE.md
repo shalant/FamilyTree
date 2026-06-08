@@ -7,18 +7,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Build
 dotnet build FamilyTree.sln
+dotnet build FamilyTree.sln -c Release   # verify production build
 
-# Run (with hot-reload)
-cd src/FamilyTree.Core && dotnet watch    # Core services → https://localhost:7001
-cd src/FamilyTree.Web && dotnet watch     # Web UI       → https://localhost:7000
+# Run (Web only — no separate Core API)
+cd src/FamilyTree.Web && dotnet watch    # Web UI → https://localhost:44381
 
 # Tests
 dotnet test FamilyTree.sln
 dotnet test tests/FamilyTree.Core.Tests/FamilyTree.Core.Tests.csproj
 
 # Database migrations (run from src/FamilyTree.Core)
-dotnet ef migrations add <MigrationName>
-dotnet ef database update
+dotnet ef migrations add <MigrationName> --startup-project ../FamilyTree.Web
+dotnet ef database update               --startup-project ../FamilyTree.Web
+
+# User secrets (keep credentials out of appsettings.json)
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<connstr>" --project src/FamilyTree.Web
+dotnet user-secrets set "SuperUser:Email"      "<email>"  --project src/FamilyTree.Web
+dotnet user-secrets set "Google:ClientId"      "<id>"     --project src/FamilyTree.Web
+dotnet user-secrets set "Google:ClientSecret"  "<secret>" --project src/FamilyTree.Web
 ```
 
 ## Architecture Overview
@@ -38,7 +44,7 @@ SQL Server (local) / Azure SQL Database (prod)
 - `FamilyTree.Core` — Service layer, EF Core data access, blob storage abstraction; referenced directly by Web
 - `FamilyTree.Web` — Blazor Server UI; injects `IPersonService` etc. directly; no HTTP client
 
-**CI/CD:** GitHub Actions builds, tests, and deploys to Azure App Service on push to main. Migrations run automatically on Core startup in production.
+**CI/CD:** GitHub Actions (`.github/workflows/deploy-web.yml`) builds and deploys to Azure App Service on push to `master` or `main`. Requires `AZURE_WEB_APP_NAME` and `AZURE_WEB_PUBLISH_PROFILE` secrets in the GitHub repo. EF migrations run automatically on Web startup via `ctx.Database.MigrateAsync()` in production.
 
 ## Key Architectural Decisions
 
@@ -63,6 +69,9 @@ For bidirectional relationship types (Spouse, Sibling), `PersonAId < PersonBId` 
 ### Cross-Root Couple Layout
 When a child of one root group marries a child of another (e.g. siblings-in-law), `FamilyTreeLayoutEngine` detects the cross-root couple, removes it from the recursive placement loop, places each partner as a leaf under their own parent group (at the inner edges), then positions their children at the couple's midpoint in a post-placement pass. Prevents connector tangles.
 
+### SSR Flash Prevention
+`Home.razor` uses a `_ready` flag to suppress tree rendering until after `OnAfterRenderAsync` reads `localStorage`. During SSR (no JS), the flag stays false and a spinner shows. After SignalR connects, `OnAfterRenderAsync` reads `ft-focus` from localStorage, sets the correct focus person, flips `_ready = true`, and calls `StateHasChanged()`. This prevents the brief flash of an alphabetically-first person before the user's saved focus loads.
+
 ### Blazor Component Responsibilities
 | Component | Role |
 |-----------|------|
@@ -75,6 +84,10 @@ When a child of one root group marries a child of another (e.g. siblings-in-law)
 | `CustomToolbar` | Floating toolbar (zoom, center, reset); draggable |
 | `ConfirmDialog` | Generic destructive-action confirmation dialog |
 | `SiblingInferenceDialog` | Offers to link additional siblings when a new sibling is added |
+| `LoginOverlay` | Full-page auth card; handles email/password POST and Google OAuth redirect |
+| `Register.razor` | Invite-aware registration page; reads `?invite=<token>` query param |
+| `Admin.razor` | Admin panel: dashboard stats, deleted persons, user management, audit log, activity |
+| `StatCard` | Dashboard stat tile; accepts `Icon`, `Accent`, `Href`, `Subtitle` parameters |
 
 ## Domain Model
 
@@ -98,11 +111,41 @@ When a child of one root group marries a child of another (e.g. siblings-in-law)
 - `PersonMapper` enriches `PersonDto` with derived relationship ID lists — not persisted
 - `PersonService.SyncRelationshipsDiffAsync` handles create/update/delete of all relationship types including spouse ↔ former-spouse transitions
 
+## Auth & Security
+
+### Identity Stack
+ASP.NET Core Identity (`AppUser : IdentityUser<Guid>`) with cookie auth (`IdentityConstants.ApplicationScheme`). `AppUserClaimsPrincipalFactory` injects `DisplayName`, `PersonId`, and role claims into the cookie.
+
+### Registration Modes
+Controlled by `Auth:RegistrationMode` in config:
+- `Open` — anyone can register (used in `appsettings.Development.json`)
+- `InviteOnly` — requires a valid `UserInvite` token in the registration URL (production default)
+- `Closed` — registration disabled entirely
+
+### Invite Flow
+`IAuthService.CreateInviteAsync(email)` generates a URL-safe base64 token, stores it in `UserInvites`, and returns it. Admin constructs `/register?invite=<token>`. Token TTL is `Auth:InviteTtlDays` (default 7). `CreateInviteAsync` auto-creates a `Family` row if none exists.
+
+### Rate Limiting & Lockout
+- `/auth/do-login` is protected by a fixed-window rate limiter: 5 requests per 15 min per IP (`RequireRateLimiting("login")`)
+- Identity lockout: 5 failed attempts → 15-minute account lock (`lockoutOnFailure: true`)
+- Error codes passed via `?loginError=` query param: `invalid`, `missing`, `locked`, `toomany`, `noinvite`, `closed`, `google_error`, `google_unavailable`
+
+### Google OAuth
+Registered conditionally — only when both `Google:ClientId` and `Google:ClientSecret` are non-empty (prevents startup errors in environments without credentials). Flow: `/auth/google` → Google → `/auth/google-callback`. Callback handles three cases: existing external login, existing email account needing link, new account (mode-checked). Add credentials via user secrets locally; via App Service config in Azure.
+
+### Super-user Bootstrap
+On startup, if `SuperUser:Email` config is set, that `AppUser` is promoted to `IsSuperUser = true` idempotently. Super-users cannot have their role changed via the Admin UI.
+
+### Dev Auth Bypass
+`DevAuth:Enabled = true` in `appsettings.Development.json` activates a fake auth handler that signs in a synthetic admin user without a password. Disable before deploying.
+
 ## Configuration
 
-- **Local DB**: `Server=localhost\sqlexpress;Database=FamilyTreeDb` or Docker (`Dev!Password123`)
-- **Dev seeding**: `DataSeeder.Seed()` runs on startup in development — creates a "My Family" row and a sample five-generation tree assigned to it
-- **Blob storage**: `BlobStorageService` / `IBlobStorageService` abstracted; configured via `appsettings.json`
+- **Local DB**: `Server=localhost\SQLEXPRESS;Database=FamilyTreeDb;Trusted_Connection=True;TrustServerCertificate=True` — stored in user secrets, not `appsettings.json`
+- **User secrets**: All credentials (DB connection string, SuperUser email, Google OAuth, Azure Storage) are stored via `dotnet user-secrets` for local dev. See Build commands above.
+- **Dev seeding**: `DataSeeder.Seed()` runs on startup in development — creates a "My Family" row and a sample five-generation tree
+- **Blob storage**: `BlobStorageService` / `IBlobStorageService` abstracted; falls back to `UseDevelopmentStorage=true` (Azurite) if `AzureStorage:ConnectionString` is not set
+- **Azure App Service config keys**: Use double-underscore for nested keys — e.g. `ConnectionStrings__DefaultConnection`, `Google__ClientId`
 
 ## Theme System
 

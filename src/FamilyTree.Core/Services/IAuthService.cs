@@ -1,0 +1,18 @@
+using FamilyTree.Core.Models;
+
+namespace FamilyTree.Core.Services;
+
+public interface IAuthService
+{
+    Task<AuthResult> RegisterAsync(string firstName, string lastName, string email, string password, string? inviteToken = null);
+    Task<AuthResult> LinkPersonAsync(Guid userId, Guid? personId);
+
+    Task<InviteResult>      CreateInviteAsync(string email);
+    Task<List<UserInvite>>  GetPendingInvitesAsync();
+    Task<AuthResult>        CancelInviteAsync(Guid inviteId);
+    Task<UserInvite?>       ValidateInviteTokenAsync(string token);
+    string                  GetRegistrationMode();
+}
+
+public record AuthResult(bool Success, string? Error = null, Guid? UserId = null);
+public record InviteResult(bool Success, string? Error = null, string? Token = null);

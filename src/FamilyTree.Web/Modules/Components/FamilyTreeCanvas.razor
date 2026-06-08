@@ -42,16 +42,27 @@
                     @* Horizontal couple connector *@
                     @if (family.Couple is { } arc)
                     {
-                        var arcStroke = arc.IsFormer ? "var(--ft-gray-400)" : "var(--ft-line-couple)";
-                        var arcDash   = arc.IsFormer ? "4 3" : null;
-                        <path d="M @F(arc.PartnerAX) @F(arc.PartnerAY) L @F(arc.PartnerBX) @F(arc.PartnerBY)"
-                              fill="none"
-                              stroke="@arcStroke"
-                              stroke-width="1.2"
-                              stroke-dasharray="@arcDash" />
-                        <svg:text x="@F(arc.MidX)" y="@F(arc.HeartY - 4)"
-                                  font-size="9" fill="@arcStroke"
-                                  text-anchor="middle">@(arc.IsFormer ? "💔" : "❤")</svg:text>
+                        @if (arc.IsFormer)
+                        {
+                            <g>
+                                <title>Former spouse</title>
+                                <path d="M @F(arc.PartnerAX) @F(arc.PartnerAY) L @F(arc.PartnerBX) @F(arc.PartnerBY)"
+                                      fill="none"
+                                      stroke="var(--ft-gray-400)"
+                                      stroke-width="1.2"
+                                      stroke-dasharray="4 3" />
+                            </g>
+                        }
+                        else
+                        {
+                            <path d="M @F(arc.PartnerAX) @F(arc.PartnerAY) L @F(arc.PartnerBX) @F(arc.PartnerBY)"
+                                  fill="none"
+                                  stroke="var(--ft-line-couple)"
+                                  stroke-width="1.2" />
+                            <svg:text x="@F(arc.MidX)" y="@F(arc.HeartY - 4)"
+                                      font-size="9" fill="var(--ft-line-couple)"
+                                      text-anchor="middle">❤</svg:text>
+                        }
                     }
 
                     @* Vertical stem from couple/parent down to T‑bar *@
