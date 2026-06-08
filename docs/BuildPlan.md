@@ -21,31 +21,46 @@ Structured roadmap organized by phase. Items marked ✅ are complete; 🔲 are p
 
 ---
 
-## Phase 2 — Auth & Identity  ← **Tonight**
+## Phase 2 — Auth & Identity
 
-### 2a — AppUser Model
-- 🔲 Create `AppUser` entity: Id, Email, PasswordHash, CreatedAt, LastLoginAt
-- 🔲 Add `LinkedPersonId` (nullable FK → Person) — allows user to "claim" their node in the tree
-- 🔲 Keep `Person` and `AppUser` as completely separate tables — never confuse the two
-- 🔲 `ICurrentUserService` abstraction (returns AppUser from HttpContext / ClaimsPrincipal)
-- 🔲 EF Core migration for AppUser table
+### 2a — Pre-auth iteration ✅ (complete)
+- ✅ `AppUser` entity: Id, Email, DisplayName, PersonId (nullable FK→Person), IsSuperUser, FeatureFlags (JSON), CreatedAt, LastLoginAt
+- ✅ `UserFamily` join table: UserId, FamilyId, Role (Admin/Member/Viewer), JoinedAt
+- ✅ `UserInvite` table: Id, Email, FamilyId, RoleToGrant, Token (unique), ExpiresAt, AcceptedAt, CancelledAt, CreatedBy, CreatedAt
+- ✅ `AuditLog` table: Id, UserId?, Action, EntityType, EntityId?, Timestamp (indexed), IpAddress?, OldValue (JSON), NewValue (JSON)
+- ✅ `UserActivity` table: Id, UserId?, Date, ActionCount — unique on (UserId, Date)
+- ✅ Soft delete on Person, Relationship, Medium — `DeletedAt`/`DeletedBy` + EF Global Query Filters
+- ✅ `IAuditLogService` / `AuditLogService` — fire-and-forget; swallows exceptions so audit never breaks main ops
+- ✅ `PersonService.DeleteAsync` converted to soft delete
+- ✅ `PersonService.RestoreAsync` + `GetDeletedAsync` added
+- ✅ EF migration `PreAuthIteration` applied to DB
+- ✅ `/admin` page — Dashboard (stat cards + recent activity), Deleted people + Restore, Audit log with filters, Users, Activity
+- ✅ `AdminEnabled` config flag — `false` in production appsettings, `true` in Development; gates nav link and page
 
-### 2b — Authentication Flow
-- 🔲 Decide approach: ASP.NET Core Identity vs. custom JWT vs. third-party (Auth0, Supabase)
-- 🔲 Register / Login / Logout pages or API endpoints
-- 🔲 Auth middleware, protect data routes behind `[Authorize]`
-- 🔲 Replace `CustomAppBar` TODO stubs with real claims (name, email, initials)
-- 🔲 Wire `LoginOverlay` component (currently shows but is non-functional)
-- 🔲 "Claim your person" UX — post-login prompt to link AppUser to their Person node
+### 2b — Authentication Flow ← **Next**
+- 🔲 ASP.NET Core Identity — cookie auth (not JWT; Blazor Server pattern)
+- 🔲 Google OAuth primary + email/password fallback
+- 🔲 Register / Login / Logout pages
+- 🔲 Auth middleware; protect routes with `[Authorize]`
+- 🔲 Replace `AdminEnabled` flag with `<AuthorizeView Roles="Admin,SuperUser">` in NavMenu and `@attribute [Authorize(Roles="Admin,SuperUser")]` on Admin.razor
+- 🔲 Replace `CustomAppBar` stubs with real claims (name, email, initials)
+- 🔲 Wire `LoginOverlay` component (currently non-functional)
+- 🔲 Seed super-user account on startup
+- 🔲 MFA required for Super-user and Admin roles
 
-### 2c — Session & Audit
-- 🔲 Populate `CreatedBy` / `UpdatedBy` audit fields from `ICurrentUserService`
-- 🔲 Scoped data access — each user only sees their own tree (multi-tenant groundwork)
+### 2c — Post-auth wiring
+- 🔲 `ICurrentUserService` — returns current AppUser from ClaimsPrincipal
+- 🔲 Populate `CreatedBy` / `UpdatedBy` / `DeletedBy` / `AuditLog.UserId` from current user
+- 🔲 Populate `UserActivity` daily action counts on every write
+- 🔲 Scoped data access — filter all service queries by `FamilyId` from claims
+- 🔲 "Claim your person" UX — post-login prompt to link AppUser.PersonId to their tree node
+- 🔲 Invite flow — send email via SendGrid, accept token, create UserFamily row
 
 ---
 
 ## Phase 3 — Dashboard & Navigation (UI Complete, backends pending)
 
+- ✅ `/admin` — Dashboard tab (stats + recent audit), Deleted + Restore, Audit log, Users, Activity; `AdminEnabled` config gate
 - ✅ `/dashboard` — stat cards, quick actions, recent additions, export stubs, donate, request feature
 - ✅ `/import` — tabbed UI for GEDCOM, PDF/Document, Excel/CSV, paste text
 - ✅ `/about` — project description, tech stack, privacy commitment, roadmap, Venmo donate
@@ -141,11 +156,14 @@ Consider whether fields belong on `Person` (scalar, one per person) or a child t
 
 ## Phase 8 — Sharing & Multi-User
 
-- 🔲 Invite system: owner sends invite link → invited user joins with Viewer/Editor role
-- 🔲 Permission model: Owner, Editor, Viewer per tree
-- 🔲 "Share view" link: opt-in read-only public URL
+- ✅ Audit log table schema (`AuditLog`) — wired to Person CRUD; awaiting UserId from auth
+- ✅ User activity table schema (`UserActivity`) — awaiting UserId from auth
+- ✅ Invite table schema (`UserInvite`) — awaiting email send and accept flow
+- ✅ `UserFamily` role model schema — Admin/Member/Viewer scoped per family
+- 🔲 Invite flow: send email (SendGrid), accept token endpoint, create `UserFamily` row
+- 🔲 Permission enforcement: gate write operations behind Member+ role check
+- 🔲 "Share view" link: opt-in read-only public URL (URL already works: `/?focus=<id>`)
 - 🔲 Activity feed: recent edits visible to collaborators
-- 🔲 Per-person change history / audit log
 - 🔲 Optimistic concurrency conflict resolution (RowVersion already on entities)
 
 ---
@@ -185,4 +203,4 @@ Consider whether fields belong on `Person` (scalar, one per person) or a child t
 
 ---
 
-*Last updated: 2026-05-31*
+*Last updated: 2026-06-07*

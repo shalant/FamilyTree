@@ -47,6 +47,7 @@ public class PersonDto
     [JsonIgnore]
     public int GenerationDepth { get; set; }
     public byte[]? RowVersion { get; set; }
+    public DateTime? DeletedAt { get; set; }
 
     private static int CalculateAge(DateOnly birth, DateOnly? death)
     {

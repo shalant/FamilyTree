@@ -4,13 +4,15 @@
 
 ## In Progress / Up Next
 
-- [ ] **Auth** — ASP.NET Core Identity + Google social login; Admin and Viewer roles; resolve `FamilyId` from claims and filter all service queries by it
+- [ ] **Auth** — ASP.NET Core Identity + Google social login; replace `AdminEnabled` config flag with `<AuthorizeView Roles="Admin,SuperUser">`; resolve `FamilyId` from claims and filter all service queries by it; wire invite flow (schema + `UserInvite` table already exist)
 - [ ] **Photo upload** — replace `ProfilePhotoUrl` plain-string with actual file upload to Azure Blob Storage (infrastructure already exists: `BlobStorageService`)
 
 ---
 
 ## Recently Completed
 
+- [x] **Pre-auth iteration** — soft delete on Person/Relationship/Medium (`DeletedAt`/`DeletedBy` + EF Global Query Filters); `AuditLog`, `UserActivity`, `AppUser`, `UserFamily`, `UserInvite` tables created (migration `PreAuthIteration` applied); `IAuditLogService` writes on Create/Update/Delete/Restore; `PersonService.DeleteAsync` is now a soft delete; `PersonService.RestoreAsync` + `GetDeletedAsync` added; `/admin` page with Dashboard, Deleted people + restore, Audit log, Users, Activity tabs; `AdminEnabled` config flag gates nav link and page redirect
+- [x] **Export dialog** — toolbar FileDownload button opens `ExportDialog` with scope (all/immediate/ancestors/descendants) and format (JSON/CSV); downloads via `ftDownloadFile` JS; RFC 4180-compliant CSV
 - [x] `FamilyId` schema migration — `Family` table added; `Person.FamilyId` (nullable FK); seeder creates "My Family" and assigns all seeded people to it
 - [x] Cross-root couple layout fix — children of two sibling-in-law families (e.g. Rose/Ray and Bud/Florence) no longer tangle horizontally; each partner placed as leaf under own parent group, children centered at couple midpoint
 - [x] Former/divorced spouse support — `Relationship.EndDate` distinguishes active (null) from former (set); `PersonDto.FormerSpouseIds` added; dashed grey 💔 connector vs. solid green ❤ in canvas; full UI in `PersonForm`

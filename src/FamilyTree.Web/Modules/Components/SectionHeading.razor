@@ -1,22 +1,21 @@
-﻿@namespace FamilyTree.Web.Modules.Components
+@namespace FamilyTree.Web.Modules.Components
+@using MudBlazor
 
 <div style="margin:32px 0 16px;">
-    <div style="
-        font-size:11px;
-        font-weight:700;
-        text-transform:uppercase;
-        letter-spacing:0.1em;
-        color:var(--ft-green-600);
-        margin-bottom:6px;">
-        @Title
+    <div style="display:flex; align-items:center; gap:6px;">
+        @if (!string.IsNullOrWhiteSpace(Icon))
+        {
+            <MudIcon Icon="@Icon" Style="font-size:16px; color:var(--ft-green-600);" />
+        }
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+            letter-spacing:0.1em; color:var(--ft-green-600);">
+            @Title
+        </div>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(Subtitle))
     {
-        <div style="
-            font-size:13px;
-            color:var(--ft-gray-500);
-            line-height:1.5;">
+        <div style="font-size:13px; color:var(--ft-gray-500); line-height:1.5; margin-top:4px;">
             @Subtitle
         </div>
     }
@@ -25,4 +24,5 @@
 @code {
     [Parameter] public string Title { get; set; } = "";
     [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? Icon { get; set; }
 }

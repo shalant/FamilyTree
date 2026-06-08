@@ -1,7 +1,7 @@
 # FamilyTree — project context
 
 > Paste this file at the start of any AI session or hand it to a new collaborator.
-> Keep it current as decisions are made. Last updated: 2026-06.
+> Keep it current as decisions are made. Last updated: 2026-06-07.
 
 ---
 
@@ -49,15 +49,17 @@ FamilyTree/
 │   ├── FamilyTree.Core/
 │   │   ├── Data/              AppDbContext, DataSeeder, EF Core migrations
 │   │   ├── Mappers/           PersonMapper, RelationshipMapper
-│   │   ├── Models/            Person, Relationship, Medium, Family
-│   │   └── Services/          IPersonService, PersonService, BlobStorageService, …
+│   │   ├── Models/            Person, Relationship, Medium, Family,
+│   │   │                      AppUser, UserFamily, UserInvite, AuditLog, UserActivity
+│   │   └── Services/          IPersonService, PersonService, IAuditLogService,
+│   │                          AuditLogService, BlobStorageService, …
 │   └── FamilyTree.Web/
 │       ├── Modules/
 │       │   ├── Components/    Reusable UI components (see below)
-│       │   ├── Dialogs/       ConfirmDialog, SiblingInferenceDialog
-│       │   └── Pages/         Home, PersonAdd, PersonEdit
+│       │   ├── Dialogs/       ConfirmDialog, ExportDialog, SiblingInferenceDialog
+│       │   └── Pages/         Home, PersonAdd, PersonEdit, Admin, Dashboard, …
 │       ├── Services/          FamilyTreeLayoutEngine, CoupleHelper, ToastService, …
-│       └── wwwroot/           css/, js/ (canvas-interaction.js, ftDrag.js)
+│       └── wwwroot/           css/, js/ (canvas-interaction.js, ftDrag.js, ftUtils.js)
 ├── tests/
 │   └── FamilyTree.Core.Tests/
 ├── docs/
@@ -83,6 +85,7 @@ FamilyTree/
 | `LoginOverlay.razor` | Intro splash with "Continue as guest" — placeholder for future auth. |
 | `ConfirmDialog.razor` | Generic MudBlazor dialog for destructive actions. Takes `Message` and `ConfirmLabel`. |
 | `SiblingInferenceDialog.razor` | Appears after adding a sibling — offers to link that sibling's existing siblings too. |
+| `ExportDialog.razor` | Export scope (all / immediate / ancestors / descendants) + format (JSON / CSV). Downloads via `ftDownloadFile` JS. |
 
 ---
 
@@ -93,24 +96,70 @@ FamilyTree/
 | `/` | `Home.razor` | Orchestrator. Owns all state: people list, couples, focus person, detail person, drag positions. Renders canvas + overlays. |
 | `/people/add` | `PersonAdd.razor` | Loads all people for pickers, renders `PersonForm`, calls `CreateAsync`. |
 | `/people/{id}/edit` | `PersonEdit.razor` | Loads person + all people, maps to `PersonUpsertDto`, renders `PersonForm`, calls `UpdateAsync`. Runs sibling-inference dialog post-save. |
+| `/dashboard` | `Dashboard.razor` | Family stats (total people, living, generations, photos), quick actions, recent additions. |
+| `/admin` | `Admin.razor` | Admin dashboard — stats, soft-deleted people + restore, audit log with filters, user list, daily activity. Gated by `AdminEnabled` config flag (see below). |
 
 ---
 
 ## Data model
 
 ### Entities (`FamilyTree.Core/Models/`)
+
+**Core tree entities** — all three carry soft-delete fields (`DeletedAt DateTime?`, `DeletedBy Guid?`) and are covered by EF Core Global Query Filters that exclude deleted rows from all normal queries. Use `.IgnoreQueryFilters()` to access deleted records (e.g. admin restore).
+
 ```
 Family          Id, Name, CreatedAt
-Person          Id, FamilyId (FK→Family, nullable), FirstName, MiddleName, LastName,
-                MaidenName, BirthDate, BirthPlace, DeathDate, DeathPlace,
-                BiographyNotes, ProfilePhotoUrl, Gender, audit fields, RowVersion
+
+Person          Id, FamilyId (FK→Family, nullable),
+                FirstName, MiddleName, LastName, MaidenName,
+                BirthDate, BirthPlace, DeathDate, DeathPlace,
+                BiographyNotes, ProfilePhotoUrl, Gender,
+                CreatedAt, CreatedBy, UpdatedAt, UpdatedBy,
+                DeletedAt, DeletedBy,    ← soft delete
+                RowVersion
+
 Relationship    Id, PersonAId, PersonBId, Type, StartDate, EndDate, Notes,
-                audit fields, RowVersion
+                CreatedAt, CreatedBy, UpdatedAt, UpdatedBy,
+                DeletedAt, DeletedBy,    ← soft delete
+                RowVersion
                 — unique constraint on (PersonAId, PersonBId, Type)
                 — PersonAId < PersonBId always enforced (canonical pair)
                 — EndDate set = former/divorced; EndDate null = active
+                — NOT cascade-soft-deleted when a Person is deleted;
+                  hidden automatically because the Person query filter excludes
+                  deleted people, and GetAllAsync filters rels in-memory
+
 Medium          Id, PersonId (FK→Person, cascade delete), Url, FileName, Caption,
-                Type, MimeType, audit fields, RowVersion
+                Type, MimeType,
+                CreatedAt, CreatedBy, UpdatedAt, UpdatedBy,
+                DeletedAt, DeletedBy,    ← soft delete
+                RowVersion
+```
+
+**Pre-auth user/invite entities** — schema is live; data fills in when ASP.NET Core Identity is wired.
+
+```
+AppUser         Id, Email (unique), DisplayName, PersonId (FK→Person, nullable),
+                IsSuperUser, FeatureFlags (nvarchar(max) JSON),
+                CreatedAt, LastLoginAt
+                — FeatureFlags JSON shape: { canEdit, isLocked, dailyCrudCap, isDonor }
+
+UserFamily      UserId (FK→AppUser), FamilyId (FK→Family)   ← composite PK
+                Role (Admin / Member / Viewer), JoinedAt
+
+UserInvite      Id, Email, FamilyId (FK→Family), RoleToGrant,
+                Token (unique), ExpiresAt, AcceptedAt, CancelledAt,
+                CreatedBy (FK→AppUser, nullable), CreatedAt
+
+AuditLog        Id, UserId (FK→AppUser, nullable),
+                Action (Create/Update/Delete/Restore/Login/RoleChange),
+                EntityType (Person/Relationship/Medium/User),
+                EntityId?, Timestamp (indexed), IpAddress?,
+                OldValue (JSON?), NewValue (JSON?)
+
+UserActivity    Id, UserId (FK→AppUser, nullable),
+                Date, ActionCount
+                — unique constraint on (UserId, Date)
 ```
 
 ### `PersonDto` (read)
@@ -125,6 +174,7 @@ int?        Age                 // computed
 bool        IsDeceased          // computed
 string?     BiographyNotes, ProfilePhotoUrl
 Gender?     Gender
+DateTime?   DeletedAt           // null for live records; set by admin restore UI
 List<Guid>  ParentIds, ChildIds, SpouseIds, FormerSpouseIds, SiblingIds
 ```
 
@@ -167,8 +217,12 @@ Layout constants in `FamilyTreeLayoutEngine.cs`:
 - All service methods return `ServiceResponse<T>` — always check `.Success` before `.Data`
 - Static factories: `ServiceResponse.Ok(data)` / `ServiceResponse.Fail(message)`
 - `IDbContextFactory<AppDbContext>` — scoped contexts, never singleton DbContext
-- `PersonMapper.MapToDto(person, rels, allPeople)` — enriches read model with derived ID lists
+- `PersonMapper.MapToDto(person, rels)` — enriches read model with derived ID lists
 - `PersonService.SyncRelationshipsDiffAsync` — diffs existing rels against the new DTO and creates/updates/deletes accordingly; handles spouse ↔ former-spouse transitions via `EndDate`
+- `PersonService.DeleteAsync` — **soft delete**: sets `DeletedAt = UtcNow`, does not remove the row or its relationships
+- `PersonService.RestoreAsync` — clears `DeletedAt` / `DeletedBy` using `IgnoreQueryFilters()` to find the deleted row
+- `PersonService.GetDeletedAsync` — returns all soft-deleted people for the admin UI (also uses `IgnoreQueryFilters()`)
+- `IAuditLogService.LogAsync` — fire-and-forget audit entry writer; exceptions are swallowed so audit failures never break the main operation; called from PersonService on Create / Update / Delete / Restore
 
 ---
 
@@ -188,6 +242,50 @@ A `Family` table exists as a tenant container. `Person.FamilyId` (nullable) link
 | Delete confirm | `ConfirmDialog` | Destructive — explicit confirmation required |
 | Focus tree on person | In-place state `_focusPerson` | No navigation, re-renders canvas |
 | Share view | Copy URL with `?focus=<id>` to clipboard | Stateless shareable link |
+
+---
+
+## Admin UI & access gating
+
+The `/admin` route provides:
+- **Dashboard tab** — stat cards (people, deleted count, audit entries today, users, families), recent audit activity feed, quick-nav to other tabs
+- **Deleted tab** — soft-deleted people with Restore button; restored rows re-appear in the tree immediately
+- **Users tab** — `AppUser` table (empty until auth is wired)
+- **Audit log tab** — filterable by action type and entity type; capped at 500 rows; timestamps shown in local time
+- **Activity tab** — `UserActivity` daily action counts (empty until auth is wired)
+
+### `AdminEnabled` config flag
+
+Controls both the nav link and the page itself:
+
+```
+appsettings.json                → "AdminEnabled": false   (production default — page redirects to /)
+appsettings.Development.json    → "AdminEnabled": true    (local dev — fully accessible)
+```
+
+`NavMenu.razor` reads this flag via `IConfiguration` and omits the Admin link when false.
+`Admin.razor` redirects to `/` immediately if the flag is false, even if someone knows the URL.
+
+**When auth lands:** replace the flag check with `<AuthorizeView Roles="Admin,SuperUser">` in NavMenu and `@attribute [Authorize(Roles = "Admin,SuperUser")]` on the page — no other structural changes needed.
+
+### Role-aware navigation (post-auth pattern)
+
+```razor
+@* NavMenu.razor — after auth is wired *@
+<AuthorizeView Roles="Admin,SuperUser">
+    <MudNavLink Href="/admin" Icon="@Icons.Material.Outlined.AdminPanelSettings">
+        Admin
+    </MudNavLink>
+</AuthorizeView>
+```
+
+Role hierarchy:
+```
+Super-user   cross-family; all permissions; seeds admins; global flag on AppUser.IsSuperUser
+Admin        per-family (UserFamily.Role = "Admin"); restore deleted, view audit log, manage users
+Member       full CRUD on people and relationships
+Viewer       read-only (deferred — may just be unauthenticated access)
+```
 
 ---
 

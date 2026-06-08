@@ -1,4 +1,4 @@
-﻿using FamilyTree.Shared;
+using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Person;
 
 namespace FamilyTree.Core.Services;
@@ -10,4 +10,6 @@ public interface IPersonService
     Task<ServiceResponse<PersonDto>> CreateAsync(PersonUpsertDto dto, CancellationToken ct = default);
     Task<ServiceResponse<PersonDto>> UpdateAsync(Guid id, PersonUpsertDto dto, CancellationToken ct = default);
     Task<ServiceResponse> DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<ServiceResponse> RestoreAsync(Guid id, CancellationToken ct = default);
+    Task<ServiceResponse<List<PersonDto>>> GetDeletedAsync(CancellationToken ct = default);
 }

@@ -100,6 +100,7 @@ public static class PersonMapper
 
             Gender = person.Gender,
             RowVersion = person.RowVersion,
+            DeletedAt = person.DeletedAt,
 
             ParentIds = parentIds,
             ChildIds = childIds,

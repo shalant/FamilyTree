@@ -47,6 +47,7 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
 builder.Services.AddScoped<IPersonService, PersonService>();
 builder.Services.AddScoped<IRelationshipService, RelationshipService>();
 builder.Services.AddScoped<IMediumService, MediumService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ToastService>();
@@ -57,6 +58,28 @@ builder.Services.AddSingleton(_ =>
     return new Azure.Storage.Blobs.BlobServiceClient(connectionString);
 });
 
+// ── Auth ──────────────────────────────────────────────────────
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddAuthorization();
+
+if (builder.Configuration.GetValue<bool>("DevAuth:Enabled"))
+{
+    var dev = builder.Configuration.GetSection("DevAuth");
+    builder.Services.AddAuthentication("DevAuth")
+        .AddScheme<DevAuthOptions, DevAuthHandler>("DevAuth", opts =>
+        {
+            opts.Email       = dev["Email"]       ?? "dev@arborkin.local";
+            opts.DisplayName = dev["DisplayName"] ?? "Dev User";
+            opts.UserId      = dev["UserId"]      ?? "00000000-0000-0000-0000-000000000001";
+            opts.Roles       = dev.GetSection("Roles").Get<List<string>>() ?? ["Admin", "Member"];
+        });
+}
+else
+{
+    // Placeholder — replaced with Identity + Google OAuth in auth iteration
+    builder.Services.AddAuthentication();
+}
 
 // ── Pipeline ──────────────────────────────────────────────────
 var app = builder.Build();
@@ -69,6 +92,8 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()

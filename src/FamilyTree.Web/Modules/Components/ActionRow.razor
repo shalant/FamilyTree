@@ -1,34 +1,46 @@
-﻿@namespace FamilyTree.Web.Modules.Components
+@namespace FamilyTree.Web.Modules.Components
+@using MudBlazor
 
-<div style="
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:12px 0;
-    border-bottom:1px solid var(--ft-line-border);">
+<div class="ft-action-row"
+     style="display:flex; align-items:center; justify-content:space-between;
+            padding:10px 8px; border-bottom:1px solid var(--ft-line-border);
+            cursor:@(OnClick.HasDelegate ? "pointer" : "default");"
+     @onclick="OnClick">
 
     <div style="display:flex; align-items:center; gap:10px;">
         @if (!string.IsNullOrWhiteSpace(Icon))
         {
             <MudIcon Icon="@Icon"
-                     Style="font-size:20px; color:var(--ft-green-600);" />
+                     Style="@($"font-size:20px; color:{(Accent ? "var(--ft-green-600)" : "var(--ft-gray-400)")}")" />
         }
 
-        <span style="font-size:14px; color:var(--ft-gray-700);">
-            @Label
-        </span>
+        <div>
+            <div style="font-size:14px; color:var(--ft-gray-700);">@Label</div>
+            @if (!string.IsNullOrWhiteSpace(Sub))
+            {
+                <div style="font-size:12px; color:var(--ft-gray-300); margin-top:1px;">@Sub</div>
+            }
+        </div>
     </div>
 
-    @if (ChildContent is not null)
-    {
-        <div>
+    <div style="display:flex; align-items:center; gap:8px;">
+        @if (ChildContent is not null)
+        {
             @ChildContent
-        </div>
-    }
+        }
+        @if (OnClick.HasDelegate)
+        {
+            <MudIcon Icon="@Icons.Material.Outlined.ChevronRight"
+                     Style="font-size:18px; color:var(--ft-gray-200);" />
+        }
+    </div>
 </div>
 
 @code {
     [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string? Sub { get; set; }
     [Parameter] public string? Icon { get; set; }
+    [Parameter] public bool Accent { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
 }

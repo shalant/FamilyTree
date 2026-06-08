@@ -21,4 +21,14 @@
                 Icon="@Icons.Material.Filled.PersonAdd">
         Add Person
     </MudNavLink>
+    <AuthorizeView Roles="Admin,SuperUser">
+        <MudDivider Class="my-2" />
+        <MudText Typo="Typo.overline" Class="px-4 mt-2 mb-1 mud-text-secondary">
+            System
+        </MudText>
+        <MudNavLink Href="/admin"
+                    Icon="@Icons.Material.Outlined.AdminPanelSettings">
+            Admin
+        </MudNavLink>
+    </AuthorizeView>
 </MudNavMenu>

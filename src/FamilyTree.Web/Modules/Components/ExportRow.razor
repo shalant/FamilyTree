@@ -1,33 +1,46 @@
-﻿@namespace FamilyTree.Web.Modules.Components
+@namespace FamilyTree.Web.Modules.Components
+@using MudBlazor
 
-<div style="
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:10px 0;
-    border-bottom:1px solid var(--ft-line-border);">
+<div style="display:flex; align-items:center; justify-content:space-between;
+            padding:10px 0; border-bottom:1px solid var(--ft-line-border);">
 
     <div style="display:flex; align-items:center; gap:10px;">
         <MudIcon Icon="@Icon"
-                 Style="font-size:18px; color:var(--ft-brown-500);" />
-
-        <span style="font-size:14px; color:var(--ft-gray-700);">
-            @Label
-        </span>
+                 Style="@($"font-size:18px; color:{(Disabled ? "var(--ft-gray-200)" : "var(--ft-brown-500)")}")" />
+        <div>
+            <div style="font-size:14px; color:@(Disabled ? "var(--ft-gray-300)" : "var(--ft-gray-700)");">
+                @Label
+            </div>
+            @if (!string.IsNullOrWhiteSpace(Sub))
+            {
+                <div style="font-size:12px; color:var(--ft-gray-300); margin-top:1px;">@Sub</div>
+            }
+        </div>
     </div>
 
-    <MudButton Variant="Variant.Outlined"
-               Color="Color.Primary"
-               Href="@Href"
-               Target="_blank"
-               StartIcon="@Icons.Material.Outlined.Download">
-        @ButtonText
-    </MudButton>
+    @if (Disabled)
+    {
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                 Style="color:var(--ft-gray-300); border-color:var(--ft-gray-200); font-size:11px;">
+            @(string.IsNullOrWhiteSpace(DisabledReason) ? "Coming soon" : DisabledReason)
+        </MudChip>
+    }
+    else
+    {
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   Href="@Href" Target="_blank"
+                   StartIcon="@Icons.Material.Outlined.Download">
+            @ButtonText
+        </MudButton>
+    }
 </div>
 
 @code {
     [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string? Sub { get; set; }
     [Parameter] public string Icon { get; set; } = Icons.Material.Outlined.Download;
     [Parameter] public string Href { get; set; } = "#";
     [Parameter] public string ButtonText { get; set; } = "Download";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? DisabledReason { get; set; }
 }

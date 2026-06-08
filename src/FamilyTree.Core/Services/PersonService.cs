@@ -10,7 +10,8 @@ namespace FamilyTree.Core.Services;
 
 public class PersonService(
     IDbContextFactory<AppDbContext> dbFactory,
-    ILogger<PersonService> logger) : IPersonService
+    ILogger<PersonService> logger,
+    IAuditLogService auditLog) : IPersonService
 {
     // ─────────────────────────────────────────────────────────────
     //  GET ALL
@@ -28,9 +29,16 @@ public class PersonService(
                 .ThenBy(p => p.FirstName)
                 .ToListAsync(ct);
 
+            var peopleIds = people.Select(p => p.Id).ToHashSet();
+
             var relationships = await ctx.Relationships
                 .AsNoTracking()
                 .ToListAsync(ct);
+
+            // Exclude relationships where either party is soft-deleted
+            relationships = relationships
+                .Where(r => peopleIds.Contains(r.PersonAId) && peopleIds.Contains(r.PersonBId))
+                .ToList();
 
             var dtos = people
                 .Select(p => PersonMapper.MapPersonToDto(p, relationships))
@@ -128,6 +136,8 @@ public class PersonService(
             await SyncRelationshipsAsync(ctx, person.Id, dto, ct);
             await ctx.SaveChangesAsync(ct);
 
+            _ = auditLog.LogAsync("Create", "Person", person.Id);
+
             var relationships = await ctx.Relationships
                 .AsNoTracking()
                 .Where(r => r.PersonAId == person.Id || r.PersonBId == person.Id)
@@ -190,6 +200,8 @@ public class PersonService(
             await SyncRelationshipsDiffAsync(ctx, id, dto, ct);
             await ctx.SaveChangesAsync(ct);
 
+            _ = auditLog.LogAsync("Update", "Person", id);
+
             var relationships = await ctx.Relationships
                 .AsNoTracking()
                 .Where(r => r.PersonAId == id || r.PersonBId == id)
@@ -205,7 +217,7 @@ public class PersonService(
     }
 
     // ─────────────────────────────────────────────────────────────
-    //  DELETE
+    //  DELETE (soft)
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse> DeleteAsync(
         Guid id, CancellationToken ct = default)
@@ -220,14 +232,10 @@ public class PersonService(
             if (person is null)
                 return ServiceResponse.Fail($"Person {id} not found.");
 
-            var relationships = await ctx.Relationships
-                .Where(r => r.PersonAId == id || r.PersonBId == id)
-                .ToListAsync(ct);
-
-            ctx.Relationships.RemoveRange(relationships);
-            ctx.People.Remove(person);
-
+            person.DeletedAt = DateTime.UtcNow;
             await ctx.SaveChangesAsync(ct);
+
+            _ = auditLog.LogAsync("Delete", "Person", id);
 
             return ServiceResponse.Ok();
         }
@@ -236,6 +244,71 @@ public class PersonService(
             logger.LogError(ex, "Error deleting person {Id}", id);
             return ServiceResponse.Fail(
                 "An error occurred deleting this person.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  RESTORE
+    // ─────────────────────────────────────────────────────────────
+    public async Task<ServiceResponse> RestoreAsync(
+        Guid id, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var person = await ctx.People
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(p => p.Id == id, ct);
+
+            if (person is null)
+                return ServiceResponse.Fail($"Person {id} not found.");
+
+            if (person.DeletedAt is null)
+                return ServiceResponse.Fail("Person is not deleted.");
+
+            person.DeletedAt = null;
+            person.DeletedBy = null;
+            await ctx.SaveChangesAsync(ct);
+
+            _ = auditLog.LogAsync("Restore", "Person", id);
+
+            return ServiceResponse.Ok();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error restoring person {Id}", id);
+            return ServiceResponse.Fail("An error occurred restoring this person.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  GET DELETED
+    // ─────────────────────────────────────────────────────────────
+    public async Task<ServiceResponse<List<PersonDto>>> GetDeletedAsync(
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var people = await ctx.People
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(p => p.DeletedAt != null)
+                .OrderByDescending(p => p.DeletedAt)
+                .ToListAsync(ct);
+
+            var dtos = people
+                .Select(p => PersonMapper.MapPersonToDto(p, []))
+                .ToList();
+
+            return ServiceResponse<List<PersonDto>>.Ok(dtos);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading deleted people");
+            return ServiceResponse<List<PersonDto>>.Fail("An error occurred loading deleted people.");
         }
     }
 

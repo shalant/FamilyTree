@@ -1,4 +1,4 @@
-﻿using FamilyTree.Core.Models;
+using FamilyTree.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace FamilyTree.Core.Data;
@@ -9,12 +9,22 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbCo
     public DbSet<Person> People => Set<Person>();
     public DbSet<Relationship> Relationships => Set<Relationship>();
     public DbSet<Medium> Media => Set<Medium>();
+    public DbSet<AppUser> AppUsers => Set<AppUser>();
+    public DbSet<UserFamily> UserFamilies => Set<UserFamily>();
+    public DbSet<UserInvite> UserInvites => Set<UserInvite>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<UserActivity> UserActivities => Set<UserActivity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // FAMILY
+        // ── Global Query Filters (soft delete) ────────────────────────────────
+        modelBuilder.Entity<Person>().HasQueryFilter(p => p.DeletedAt == null);
+        modelBuilder.Entity<Relationship>().HasQueryFilter(r => r.DeletedAt == null);
+        modelBuilder.Entity<Medium>().HasQueryFilter(m => m.DeletedAt == null);
+
+        // ── FAMILY ────────────────────────────────────────────────────────────
         modelBuilder.Entity<Family>(e =>
         {
             e.HasKey(f => f.Id);
@@ -23,7 +33,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbCo
             e.Property(f => f.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
         });
 
-        // PERSON
+        // ── PERSON ────────────────────────────────────────────────────────────
         modelBuilder.Entity<Person>(e =>
         {
             e.HasKey(p => p.Id);
@@ -38,7 +48,6 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbCo
             e.Property(p => p.BiographyNotes).HasMaxLength(5000);
             e.Property(p => p.ProfilePhotoUrl).HasMaxLength(500);
 
-            // IMPORTANT: store Gender enum as string
             e.Property(p => p.Gender)
                 .HasConversion<string>()
                 .HasMaxLength(20);
@@ -52,20 +61,17 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbCo
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
-        // RELATIONSHIP
+        // ── RELATIONSHIP ──────────────────────────────────────────────────────
         modelBuilder.Entity<Relationship>(e =>
         {
             e.HasKey(r => r.Id);
             e.Property(r => r.Id).HasDefaultValueSql("newsequentialid()");
 
-            // IMPORTANT: store RelationshipType enum as string
             e.Property(r => r.Type)
                 .HasConversion<string>()
                 .HasMaxLength(20);
 
             e.Property(r => r.Notes).HasMaxLength(1000);
-
-            // StartDate / EndDate are fine with no config
             e.Property(r => r.StartDate);
             e.Property(r => r.EndDate);
 
@@ -85,7 +91,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbCo
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // MEDIUM
+        // ── MEDIUM ────────────────────────────────────────────────────────────
         modelBuilder.Entity<Medium>(e =>
         {
             e.HasKey(m => m.Id);
@@ -104,6 +110,95 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbCo
                 .WithMany(p => p.Media)
                 .HasForeignKey(m => m.PersonId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── APP USER ──────────────────────────────────────────────────────────
+        modelBuilder.Entity<AppUser>(e =>
+        {
+            e.HasKey(u => u.Id);
+            e.Property(u => u.Id).HasDefaultValueSql("newsequentialid()");
+            e.Property(u => u.Email).HasMaxLength(256).IsRequired();
+            e.Property(u => u.DisplayName).HasMaxLength(200);
+            e.Property(u => u.FeatureFlags).HasColumnType("nvarchar(max)");
+            e.Property(u => u.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            e.HasIndex(u => u.Email).IsUnique();
+
+            e.HasOne(u => u.Person)
+                .WithMany()
+                .HasForeignKey(u => u.PersonId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── USER FAMILY ───────────────────────────────────────────────────────
+        modelBuilder.Entity<UserFamily>(e =>
+        {
+            e.HasKey(uf => new { uf.UserId, uf.FamilyId });
+            e.Property(uf => uf.Role).HasMaxLength(20).IsRequired();
+            e.Property(uf => uf.JoinedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            e.HasOne(uf => uf.User)
+                .WithMany(u => u.UserFamilies)
+                .HasForeignKey(uf => uf.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(uf => uf.Family)
+                .WithMany()
+                .HasForeignKey(uf => uf.FamilyId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── USER INVITE ───────────────────────────────────────────────────────
+        modelBuilder.Entity<UserInvite>(e =>
+        {
+            e.HasKey(i => i.Id);
+            e.Property(i => i.Id).HasDefaultValueSql("newsequentialid()");
+            e.Property(i => i.Email).HasMaxLength(256).IsRequired();
+            e.Property(i => i.RoleToGrant).HasMaxLength(20).IsRequired();
+            e.Property(i => i.Token).HasMaxLength(128).IsRequired();
+            e.Property(i => i.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            e.HasIndex(i => i.Token).IsUnique();
+
+            e.HasOne(i => i.Family)
+                .WithMany()
+                .HasForeignKey(i => i.FamilyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(i => i.CreatedByUser)
+                .WithMany(u => u.SentInvites)
+                .HasForeignKey(i => i.CreatedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── AUDIT LOG ─────────────────────────────────────────────────────────
+        modelBuilder.Entity<AuditLog>(e =>
+        {
+            e.HasKey(a => a.Id);
+            e.Property(a => a.Id).HasDefaultValueSql("newsequentialid()");
+            e.Property(a => a.Action).HasMaxLength(50).IsRequired();
+            e.Property(a => a.EntityType).HasMaxLength(50).IsRequired();
+            e.Property(a => a.IpAddress).HasMaxLength(45);
+            e.Property(a => a.OldValue).HasColumnType("nvarchar(max)");
+            e.Property(a => a.NewValue).HasColumnType("nvarchar(max)");
+            e.Property(a => a.Timestamp).HasDefaultValueSql("GETUTCDATE()");
+            e.HasIndex(a => a.Timestamp);
+
+            e.HasOne(a => a.User)
+                .WithMany(u => u.AuditLogs)
+                .HasForeignKey(a => a.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── USER ACTIVITY ─────────────────────────────────────────────────────
+        modelBuilder.Entity<UserActivity>(e =>
+        {
+            e.HasKey(ua => ua.Id);
+            e.Property(ua => ua.Id).HasDefaultValueSql("newsequentialid()");
+            e.HasIndex(ua => new { ua.UserId, ua.Date }).IsUnique();
+
+            e.HasOne(ua => ua.User)
+                .WithMany(u => u.Activities)
+                .HasForeignKey(ua => ua.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

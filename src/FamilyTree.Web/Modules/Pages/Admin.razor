@@ -1,0 +1,694 @@
+@page "/admin"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin,SuperUser")]
+
+@using FamilyTree.Core.Data
+@using FamilyTree.Core.Models
+@using FamilyTree.Core.Services
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Services
+@using Microsoft.EntityFrameworkCore
+@using MudBlazor
+
+@inject IPersonService PersonService
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject ToastService Toast
+
+<PageTitle>Admin</PageTitle>
+
+<style>
+    .ft-admin-stat { transition: box-shadow 0.15s; cursor: default; }
+    .ft-admin-stat:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important; }
+    .ft-admin-nav-row { transition: background 0.1s; border-radius: 8px; cursor: pointer; }
+    .ft-admin-nav-row:hover { background: var(--ft-green-50) !important; }
+</style>
+
+<div style="padding:24px; max-width:1100px; margin:auto;">
+
+    <div style="margin-bottom:24px;">
+        <div style="font-size:22px; font-weight:600; font-style:italic;
+            font-family:var(--ft-font-display); color:var(--ft-green-800); line-height:1.2;">
+            Admin
+        </div>
+        <div style="font-size:13px; color:var(--ft-gray-400); margin-top:2px;">
+            Arborkin system management
+        </div>
+    </div>
+
+    <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="true"
+             PanelClass="pt-4" @bind-ActivePanelIndex="_activeTab">
+
+        @* ═══════════════════════════════════════════════════════════════════
+            TAB 0 — DASHBOARD
+           ═══════════════════════════════════════════════════════════════════ *@
+        <MudTabPanel Text="Dashboard" Icon="@Icons.Material.Outlined.SpaceDashboard">
+
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Success" Class="mb-4" />
+            }
+            else
+            {
+                @* ── Stat cards ────────────────────────────────────────────── *@
+                <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px;">
+
+                    <div class="ft-admin-stat" style="padding:18px 20px; border-radius:10px;
+                        background:var(--ft-surface-card);" @onclick='() => GoToTab(1)'>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                            <MudIcon Icon="@Icons.Material.Outlined.People"
+                                     Style="font-size:18px; color:var(--ft-green-600);" />
+                            <span style="font-size:11px; color:var(--ft-gray-400); text-transform:uppercase; letter-spacing:.06em;">
+                                People
+                            </span>
+                        </div>
+                        <div style="font-size:28px; font-weight:700; color:var(--ft-green-800); line-height:1;">
+                            @_totalPeople
+                        </div>
+                        @if (_deletedCount > 0)
+                        {
+                            <div style="font-size:11px; color:var(--mud-palette-warning); margin-top:4px;">
+                                @_deletedCount deleted
+                            </div>
+                        }
+                        else
+                        {
+                            <div style="font-size:11px; color:var(--ft-gray-300); margin-top:4px;">
+                                none deleted
+                            </div>
+                        }
+                    </div>
+
+                    <div class="ft-admin-stat" style="padding:18px 20px; border-radius:10px;
+                        background:var(--ft-surface-card);" @onclick='() => GoToTab(3)'>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                            <MudIcon Icon="@Icons.Material.Outlined.History"
+                                     Style="font-size:18px; color:var(--ft-green-600);" />
+                            <span style="font-size:11px; color:var(--ft-gray-400); text-transform:uppercase; letter-spacing:.06em;">
+                                Audit entries
+                            </span>
+                        </div>
+                        <div style="font-size:28px; font-weight:700; color:var(--ft-green-800); line-height:1;">
+                            @_totalAuditEntries
+                        </div>
+                        <div style="font-size:11px; color:var(--ft-gray-300); margin-top:4px;">
+                            @_auditEntriesToday today
+                        </div>
+                    </div>
+
+                    <div class="ft-admin-stat" style="padding:18px 20px; border-radius:10px;
+                        background:var(--ft-surface-card);" @onclick='() => GoToTab(2)'>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                            <MudIcon Icon="@Icons.Material.Outlined.Group"
+                                     Style="font-size:18px; color:var(--ft-green-600);" />
+                            <span style="font-size:11px; color:var(--ft-gray-400); text-transform:uppercase; letter-spacing:.06em;">
+                                Users
+                            </span>
+                        </div>
+                        <div style="font-size:28px; font-weight:700; color:var(--ft-green-800); line-height:1;">
+                            @_userCount
+                        </div>
+                        <div style="font-size:11px; color:var(--ft-gray-300); margin-top:4px;">
+                            @_pendingInvites pending invite@(_pendingInvites == 1 ? "" : "s")
+                        </div>
+                    </div>
+
+                    <div class="ft-admin-stat" style="padding:18px 20px; border-radius:10px;
+                        background:var(--ft-surface-card);">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                            <MudIcon Icon="@Icons.Material.Outlined.FamilyRestroom"
+                                     Style="font-size:18px; color:var(--ft-green-600);" />
+                            <span style="font-size:11px; color:var(--ft-gray-400); text-transform:uppercase; letter-spacing:.06em;">
+                                Families
+                            </span>
+                        </div>
+                        <div style="font-size:28px; font-weight:700; color:var(--ft-green-800); line-height:1;">
+                            @_familyCount
+                        </div>
+                        <div style="font-size:11px; color:var(--ft-gray-300); margin-top:4px;">
+                            @_totalRelationships relationships
+                        </div>
+                    </div>
+
+                </div>
+
+                @* ── Two-column body ───────────────────────────────────────── *@
+                <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px;">
+
+                    @* Recent activity *@
+                    <MudPaper Elevation="0" Class="pa-4"
+                              Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                            <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+                                letter-spacing:.1em; color:var(--ft-green-600);">
+                                Recent activity
+                            </div>
+                            <MudButton Variant="Variant.Text" Size="Size.Small"
+                                       Style="color:var(--ft-green-600); font-size:12px;"
+                                       OnClick='() => GoToTab(3)'>
+                                View all
+                            </MudButton>
+                        </div>
+
+                        @if (_recentAudit.Count == 0)
+                        {
+                            <div style="text-align:center; padding:24px 0;
+                                font-size:13px; color:var(--ft-gray-300);">
+                                No activity yet.
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var entry in _recentAudit)
+                            {
+                                <div style="display:flex; align-items:center; gap:10px;
+                                    padding:8px 0; border-bottom:.5px solid var(--ft-line-border);">
+                                    <div style="width:28px; height:28px; border-radius:50%; flex-shrink:0;
+                                        background:@AuditChipBg(entry.Action);
+                                        display:flex; align-items:center; justify-content:center;">
+                                        <MudIcon Icon="@AuditIcon(entry.Action)"
+                                                 Style="@($"font-size:14px; color:{AuditIconColor(entry.Action)};")" />
+                                    </div>
+                                    <div style="flex:1; min-width:0;">
+                                        <div style="font-size:13px; color:var(--ft-gray-700);">
+                                            <strong>@entry.Action</strong>
+                                            <span style="color:var(--ft-gray-400);"> · </span>
+                                            @entry.EntityType
+                                        </div>
+                                        <div style="font-size:11px; color:var(--ft-gray-300);">
+                                            @entry.Timestamp.ToLocalTime().ToString("MMM d, h:mm tt")
+                                        </div>
+                                    </div>
+                                    <div style="font-size:11px; font-family:monospace; color:var(--ft-gray-300);">
+                                        @(entry.EntityId.HasValue ? entry.EntityId.Value.ToString()[..6] : "—")
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </MudPaper>
+
+                    @* Quick navigation *@
+                    <MudPaper Elevation="0" Class="pa-4"
+                              Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+                        <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+                            letter-spacing:.1em; color:var(--ft-green-600); margin-bottom:16px;">
+                            Manage
+                        </div>
+
+                        <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                            padding:10px 8px;" @onclick='() => GoToTab(1)'>
+                            <MudIcon Icon="@Icons.Material.Outlined.DeleteSweep"
+                                     Style="font-size:20px; color:var(--ft-gray-400);" />
+                            <div>
+                                <div style="font-size:13px; color:var(--ft-gray-700);">Deleted people</div>
+                                <div style="font-size:11px; color:var(--ft-gray-300);">
+                                    @(_deletedCount > 0 ? $"{_deletedCount} awaiting review" : "Nothing deleted")
+                                </div>
+                            </div>
+                            @if (_deletedCount > 0)
+                            {
+                                <MudBadge Content="@_deletedCount" Color="Color.Warning"
+                                          Style="margin-left:auto;" />
+                            }
+                        </div>
+
+                        <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                            padding:10px 8px;" @onclick='() => GoToTab(2)'>
+                            <MudIcon Icon="@Icons.Material.Outlined.Group"
+                                     Style="font-size:20px; color:var(--ft-gray-400);" />
+                            <div>
+                                <div style="font-size:13px; color:var(--ft-gray-700);">Users</div>
+                                <div style="font-size:11px; color:var(--ft-gray-300);">
+                                    @(_userCount == 0 ? "Ready for auth" : $"{_userCount} registered")
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                            padding:10px 8px;" @onclick='() => GoToTab(3)'>
+                            <MudIcon Icon="@Icons.Material.Outlined.History"
+                                     Style="font-size:20px; color:var(--ft-gray-400);" />
+                            <div>
+                                <div style="font-size:13px; color:var(--ft-gray-700);">Audit log</div>
+                                <div style="font-size:11px; color:var(--ft-gray-300);">
+                                    @_totalAuditEntries entries total
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                            padding:10px 8px;" @onclick='() => GoToTab(4)'>
+                            <MudIcon Icon="@Icons.Material.Outlined.BarChart"
+                                     Style="font-size:20px; color:var(--ft-gray-400);" />
+                            <div>
+                                <div style="font-size:13px; color:var(--ft-gray-700);">Activity</div>
+                                <div style="font-size:11px; color:var(--ft-gray-300);">Daily action counts</div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:20px; padding-top:16px;
+                            border-top:.5px solid var(--ft-line-border);">
+                            <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+                                letter-spacing:.1em; color:var(--ft-green-600); margin-bottom:12px;">
+                                Navigate
+                            </div>
+                            <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                                padding:10px 8px;" @onclick='() => NavManager.NavigateTo("/")'>
+                                <MudIcon Icon="@Icons.Material.Outlined.AccountTree"
+                                         Style="font-size:20px; color:var(--ft-gray-400);" />
+                                <div style="font-size:13px; color:var(--ft-gray-700);">Back to tree</div>
+                            </div>
+                            <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                                padding:10px 8px;" @onclick='() => NavManager.NavigateTo("/dashboard")'>
+                                <MudIcon Icon="@Icons.Material.Outlined.SpaceDashboard"
+                                         Style="font-size:20px; color:var(--ft-gray-400);" />
+                                <div style="font-size:13px; color:var(--ft-gray-700);">Family dashboard</div>
+                            </div>
+                        </div>
+                    </MudPaper>
+
+                </div>
+            }
+        </MudTabPanel>
+
+        @* ═══════════════════════════════════════════════════════════════════
+            TAB 1 — DELETED PEOPLE
+           ═══════════════════════════════════════════════════════════════════ *@
+        <MudTabPanel Text="Deleted" Icon="@Icons.Material.Outlined.DeleteSweep"
+                     BadgeData="@(_deletedCount > 0 ? _deletedCount : null)"
+                     BadgeColor="Color.Warning">
+
+            @if (_loadingDeleted)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_deleted.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    No deleted people. Soft-deleted records will appear here for review and restore.
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable Items="_deleted" Hover="true" Dense="true"
+                          Style="background:var(--ft-surface-card);">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh>
+                        <MudTh>Deleted</MudTh>
+                        <MudTh>Born</MudTh>
+                        <MudTh></MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.FullName</MudTd>
+                        <MudTd>
+                            <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                                @context.DeletedAt?.ToString("MMM d, yyyy h:mm tt")
+                            </MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudText Typo="Typo.caption">
+                                @(context.BirthDate?.ToString("yyyy") ?? "—")
+                            </MudText>
+                        </MudTd>
+                        <MudTd Style="text-align:right;">
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Success"
+                                       Size="Size.Small"
+                                       StartIcon="@Icons.Material.Outlined.RestoreFromTrash"
+                                       OnClick="@(() => RestorePersonAsync(context))">
+                                Restore
+                            </MudButton>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+
+        @* ═══════════════════════════════════════════════════════════════════
+            TAB 2 — USERS
+           ═══════════════════════════════════════════════════════════════════ *@
+        <MudTabPanel Text="Users" Icon="@Icons.Material.Outlined.Group">
+
+            @if (_loadingUsers)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_users.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    No users yet. User accounts will appear here once authentication is enabled.
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable Items="_users" Hover="true" Dense="true"
+                          Style="background:var(--ft-surface-card);">
+                    <HeaderContent>
+                        <MudTh>Email</MudTh>
+                        <MudTh>Display name</MudTh>
+                        <MudTh>Role</MudTh>
+                        <MudTh>Linked person</MudTh>
+                        <MudTh>Last login</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Email</MudTd>
+                        <MudTd>@(context.DisplayName ?? "—")</MudTd>
+                        <MudTd>
+                            @if (context.IsSuperUser)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error">Super-user</MudChip>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2">Member</MudText>
+                            }
+                        </MudTd>
+                        <MudTd>
+                            <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                                @(context.PersonId.HasValue ? context.PersonId.Value.ToString()[..8] + "…" : "—")
+                            </MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                                @(context.LastLoginAt?.ToString("MMM d, yyyy") ?? "—")
+                            </MudText>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+
+        @* ═══════════════════════════════════════════════════════════════════
+            TAB 3 — AUDIT LOG
+           ═══════════════════════════════════════════════════════════════════ *@
+        <MudTabPanel Text="Audit log" Icon="@Icons.Material.Outlined.History">
+
+            @if (_loadingAudit)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_auditLogs.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    No audit log entries yet. Create, update, and delete actions will be recorded here.
+                </MudAlert>
+            }
+            else
+            {
+                <div style="display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; align-items:center;">
+                    <MudSelect T="string" Label="Action" @bind-Value="_auditActionFilter"
+                               Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                               Style="max-width:160px;" Clearable="true">
+                        <MudSelectItem Value="@("Create")">Create</MudSelectItem>
+                        <MudSelectItem Value="@("Update")">Update</MudSelectItem>
+                        <MudSelectItem Value="@("Delete")">Delete</MudSelectItem>
+                        <MudSelectItem Value="@("Restore")">Restore</MudSelectItem>
+                        <MudSelectItem Value="@("Login")">Login</MudSelectItem>
+                        <MudSelectItem Value="@("RoleChange")">Role change</MudSelectItem>
+                    </MudSelect>
+                    <MudSelect T="string" Label="Entity" @bind-Value="_auditEntityFilter"
+                               Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                               Style="max-width:160px;" Clearable="true">
+                        <MudSelectItem Value="@("Person")">Person</MudSelectItem>
+                        <MudSelectItem Value="@("Relationship")">Relationship</MudSelectItem>
+                        <MudSelectItem Value="@("Medium")">Medium</MudSelectItem>
+                        <MudSelectItem Value="@("User")">User</MudSelectItem>
+                    </MudSelect>
+                    <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted); margin-left:auto;">
+                        @FilteredAuditLogs.Count of @_auditLogs.Count entries
+                    </MudText>
+                </div>
+
+                <MudTable Items="FilteredAuditLogs" Hover="true" Dense="true"
+                          Style="background:var(--ft-surface-card);">
+                    <HeaderContent>
+                        <MudTh>Timestamp</MudTh>
+                        <MudTh>Action</MudTh>
+                        <MudTh>Entity</MudTh>
+                        <MudTh>Entity ID</MudTh>
+                        <MudTh>User</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <MudText Typo="Typo.caption">
+                                @context.Timestamp.ToLocalTime().ToString("MMM d, yyyy h:mm tt")
+                            </MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small" Color="@AuditChipColor(context.Action)">
+                                @context.Action
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>@context.EntityType</MudTd>
+                        <MudTd>
+                            <MudText Typo="Typo.caption" Style="font-family:monospace;">
+                                @(context.EntityId.HasValue ? context.EntityId.Value.ToString()[..8] + "…" : "—")
+                            </MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                                @(context.UserId.HasValue ? context.UserId.Value.ToString()[..8] + "…" : "—")
+                            </MudText>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+
+        @* ═══════════════════════════════════════════════════════════════════
+            TAB 4 — ACTIVITY
+           ═══════════════════════════════════════════════════════════════════ *@
+        <MudTabPanel Text="Activity" Icon="@Icons.Material.Outlined.BarChart">
+
+            @if (_loadingActivity)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_activity.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    No activity recorded yet. Daily action counts per user will appear here once users are active.
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable Items="_activity" Hover="true" Dense="true"
+                          Style="background:var(--ft-surface-card);">
+                    <HeaderContent>
+                        <MudTh>Date</MudTh>
+                        <MudTh>User</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Date.ToString("MMM d, yyyy")</MudTd>
+                        <MudTd>
+                            <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                                @(context.UserId.HasValue ? context.UserId.Value.ToString()[..8] + "…" : "—")
+                            </MudText>
+                        </MudTd>
+                        <MudTd>@context.ActionCount</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+
+    </MudTabs>
+</div>
+
+@code {
+    // ── Tab state ────────────────────────────────────────────────────────────
+    private int _activeTab;
+
+    private void GoToTab(int index) => _activeTab = index;
+
+    // ── Loading flags ────────────────────────────────────────────────────────
+    private bool _loading        = true;
+    private bool _loadingDeleted = true;
+    private bool _loadingAudit   = true;
+    private bool _loadingUsers   = true;
+    private bool _loadingActivity = true;
+
+    // ── Dashboard stats ──────────────────────────────────────────────────────
+    private int _totalPeople;
+    private int _deletedCount;
+    private int _totalRelationships;
+    private int _familyCount;
+    private int _userCount;
+    private int _pendingInvites;
+    private int _totalAuditEntries;
+    private int _auditEntriesToday;
+    private List<AuditLog> _recentAudit = [];
+
+    // ── Tab data ─────────────────────────────────────────────────────────────
+    private List<DeletedPersonRow> _deleted   = [];
+    private List<AuditLog>         _auditLogs = [];
+    private List<AppUser>          _users     = [];
+    private List<UserActivity>     _activity  = [];
+
+    // ── Audit filter ─────────────────────────────────────────────────────────
+    private string? _auditActionFilter;
+    private string? _auditEntityFilter;
+
+    private List<AuditLog> FilteredAuditLogs => _auditLogs
+        .Where(a => string.IsNullOrEmpty(_auditActionFilter) || a.Action == _auditActionFilter)
+        .Where(a => string.IsNullOrEmpty(_auditEntityFilter) || a.EntityType == _auditEntityFilter)
+        .ToList();
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(
+            LoadDashboardAsync(),
+            LoadDeletedAsync(),
+            LoadAuditAsync(),
+            LoadUsersAsync(),
+            LoadActivityAsync());
+    }
+
+    private async Task LoadDashboardAsync()
+    {
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            var today = DateTime.UtcNow.Date;
+
+            _totalPeople        = await ctx.People.CountAsync();
+            _deletedCount       = await ctx.People.IgnoreQueryFilters().CountAsync(p => p.DeletedAt != null);
+            _totalRelationships = await ctx.Relationships.CountAsync();
+            _familyCount        = await ctx.Families.CountAsync();
+            _userCount          = await ctx.AppUsers.CountAsync();
+            _pendingInvites     = await ctx.UserInvites
+                .CountAsync(i => i.AcceptedAt == null && i.CancelledAt == null && i.ExpiresAt > DateTime.UtcNow);
+            _totalAuditEntries  = await ctx.AuditLogs.CountAsync();
+            _auditEntriesToday  = await ctx.AuditLogs.CountAsync(a => a.Timestamp >= today);
+
+            _recentAudit = await ctx.AuditLogs
+                .AsNoTracking()
+                .OrderByDescending(a => a.Timestamp)
+                .Take(10)
+                .ToListAsync();
+        }
+        catch { }
+        _loading = false;
+    }
+
+    private async Task LoadDeletedAsync()
+    {
+        var result = await PersonService.GetDeletedAsync();
+        if (result.Success)
+            _deleted = result.Data!.Select(d => new DeletedPersonRow(d)).ToList();
+        _loadingDeleted = false;
+    }
+
+    private async Task LoadAuditAsync()
+    {
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            _auditLogs = await ctx.AuditLogs
+                .AsNoTracking()
+                .OrderByDescending(a => a.Timestamp)
+                .Take(500)
+                .ToListAsync();
+        }
+        catch { }
+        _loadingAudit = false;
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            _users = await ctx.AppUsers
+                .AsNoTracking()
+                .OrderBy(u => u.Email)
+                .ToListAsync();
+        }
+        catch { }
+        _loadingUsers = false;
+    }
+
+    private async Task LoadActivityAsync()
+    {
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            _activity = await ctx.UserActivities
+                .AsNoTracking()
+                .OrderByDescending(a => a.Date)
+                .Take(200)
+                .ToListAsync();
+        }
+        catch { }
+        _loadingActivity = false;
+    }
+
+    // ── Actions ──────────────────────────────────────────────────────────────
+
+    private async Task RestorePersonAsync(DeletedPersonRow row)
+    {
+        var result = await PersonService.RestoreAsync(row.Id);
+        if (result.Success)
+        {
+            _deleted.Remove(row);
+            _deletedCount = Math.Max(0, _deletedCount - 1);
+            Toast.Success($"{row.FullName} restored.");
+            await LoadAuditAsync();
+            _recentAudit = _auditLogs.Take(10).ToList();
+        }
+        else
+        {
+            Toast.Error(result.Message);
+        }
+    }
+
+    // ── Styling helpers ───────────────────────────────────────────────────────
+
+    private static Color AuditChipColor(string action) => action switch
+    {
+        "Create"  => Color.Success,
+        "Update"  => Color.Info,
+        "Delete"  => Color.Error,
+        "Restore" => Color.Warning,
+        _         => Color.Default
+    };
+
+    private static string AuditIcon(string action) => action switch
+    {
+        "Create"  => Icons.Material.Outlined.Add,
+        "Update"  => Icons.Material.Outlined.Edit,
+        "Delete"  => Icons.Material.Outlined.Delete,
+        "Restore" => Icons.Material.Outlined.RestoreFromTrash,
+        "Login"   => Icons.Material.Outlined.Login,
+        _         => Icons.Material.Outlined.Circle
+    };
+
+    private static string AuditChipBg(string action) => action switch
+    {
+        "Create"  => "rgba(76,175,80,0.12)",
+        "Update"  => "rgba(33,150,243,0.12)",
+        "Delete"  => "rgba(244,67,54,0.12)",
+        "Restore" => "rgba(255,152,0,0.12)",
+        _         => "var(--ft-green-50)"
+    };
+
+    private static string AuditIconColor(string action) => action switch
+    {
+        "Create"  => "#4caf50",
+        "Update"  => "#2196f3",
+        "Delete"  => "#f44336",
+        "Restore" => "#ff9800",
+        _         => "var(--ft-gray-400)"
+    };
+
+    // ── View model ────────────────────────────────────────────────────────────
+
+    private sealed class DeletedPersonRow(PersonDto dto)
+    {
+        public Guid      Id        { get; } = dto.Id;
+        public string    FullName  { get; } = dto.FullName;
+        public DateTime? DeletedAt { get; } = dto.DeletedAt;
+        public DateOnly? BirthDate { get; } = dto.BirthDate;
+    }
+}

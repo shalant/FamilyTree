@@ -24,6 +24,7 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
 
 builder.Services.AddScoped<IPersonService, PersonService>();
 builder.Services.AddScoped<IRelationshipService, RelationshipService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 // CORS — allow the Blazor web app to call this API
 builder.Services.AddCors(options =>

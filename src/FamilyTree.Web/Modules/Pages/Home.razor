@@ -188,7 +188,12 @@ else
 
     public async ValueTask DisposeAsync()
     {
-        if (_dragModule != null) await _dragModule.DisposeAsync();
+        try
+        {
+            if (_dragModule != null) await _dragModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
         _dotNetRef?.Dispose();
     }
 
