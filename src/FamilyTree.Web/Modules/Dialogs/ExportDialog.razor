@@ -1,0 +1,200 @@
+@using FamilyTree.Shared.DTOs.Person
+@using Microsoft.JSInterop
+@using MudBlazor
+@using System.Text
+@using System.Text.Json
+@using System.Text.Json.Serialization
+
+@inject IJSRuntime JS
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:600">Export family data</MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <div style="display:flex; flex-direction:column; gap:24px; padding-top:4px;">
+
+            @* ── Scope ── *@
+            <div>
+                <MudSelect T="string" Label="Scope" @bind-Value="_scope"
+                           Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("all")">
+                        Full tree — @People.Count @(People.Count == 1 ? "person" : "people")
+                    </MudSelectItem>
+                    <MudSelectItem Value="@("immediate")" Disabled="@(FocusPerson == null)">
+                        @(FocusPerson != null ? $"{FocusPerson.FirstName}'s immediate family" : "Immediate family (no focus set)")
+                    </MudSelectItem>
+                    <MudSelectItem Value="@("ancestors")" Disabled="@(FocusPerson == null)">
+                        @(FocusPerson != null ? $"Ancestors of {FocusPerson.FirstName}" : "Ancestors (no focus set)")
+                    </MudSelectItem>
+                    <MudSelectItem Value="@("descendants")" Disabled="@(FocusPerson == null)">
+                        @(FocusPerson != null ? $"Descendants of {FocusPerson.FirstName}" : "Descendants (no focus set)")
+                    </MudSelectItem>
+                </MudSelect>
+                <MudText Typo="Typo.caption" Style="color:var(--ft-text-secondary); margin-top:6px; display:block;">
+                    @{ var count = ScopedCount; }
+                    @count @(count == 1 ? "person" : "people") will be included
+                </MudText>
+            </div>
+
+            @* ── Format ── *@
+            <div>
+                <MudSelect T="string" Label="Format" @bind-Value="_format"
+                           Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                           HelperText="PDF, SVG, and GEDCOM coming soon">
+                    <MudSelectItem Value="@("json")">JSON — structured data, all fields</MudSelectItem>
+                    <MudSelectItem Value="@("csv")">CSV — spreadsheet-friendly, key fields</MudSelectItem>
+                    <MudSelectItem Value="@("_more")" Disabled="true">── More formats on the way ──</MudSelectItem>
+                </MudSelect>
+            </div>
+
+        </div>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.Download"
+                   OnClick="ExportAsync"
+                   Disabled="@_exporting">
+            @(_exporting ? "Preparing…" : "Download")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public required List<PersonDto> People { get; set; }
+    [Parameter] public PersonDto? FocusPerson { get; set; }
+
+    private string _scope  = "all";
+    private string _format = "json";
+    private bool   _exporting;
+
+    private int ScopedCount => GetScopedPeople().Count;
+
+    // ── Scope filtering ───────────────────────────────────────────────────────
+
+    private List<PersonDto> GetScopedPeople() => _scope switch
+    {
+        "immediate"  when FocusPerson != null => ImmediateFamily(FocusPerson),
+        "ancestors"  when FocusPerson != null => Ancestors(FocusPerson),
+        "descendants" when FocusPerson != null => Descendants(FocusPerson),
+        _ => People
+    };
+
+    private List<PersonDto> ImmediateFamily(PersonDto focus)
+    {
+        var ids = new HashSet<Guid> { focus.Id };
+        foreach (var id in focus.ParentIds      ?? []) ids.Add(id);
+        foreach (var id in focus.ChildIds       ?? []) ids.Add(id);
+        foreach (var id in focus.SpouseIds      ?? []) ids.Add(id);
+        foreach (var id in focus.FormerSpouseIds ?? []) ids.Add(id);
+        return People.Where(p => ids.Contains(p.Id)).ToList();
+    }
+
+    private List<PersonDto> Ancestors(PersonDto focus)
+    {
+        var byId   = People.ToDictionary(p => p.Id);
+        var result = new HashSet<Guid>();
+        var queue  = new Queue<Guid>();
+        queue.Enqueue(focus.Id);
+        while (queue.Count > 0)
+        {
+            var id = queue.Dequeue();
+            if (!result.Add(id) || !byId.TryGetValue(id, out var p)) continue;
+            foreach (var pid in p.ParentIds ?? [])
+                if (!result.Contains(pid)) queue.Enqueue(pid);
+        }
+        return People.Where(p => result.Contains(p.Id)).ToList();
+    }
+
+    private List<PersonDto> Descendants(PersonDto focus)
+    {
+        var byId   = People.ToDictionary(p => p.Id);
+        var result = new HashSet<Guid>();
+        var queue  = new Queue<Guid>();
+        queue.Enqueue(focus.Id);
+        while (queue.Count > 0)
+        {
+            var id = queue.Dequeue();
+            if (!result.Add(id) || !byId.TryGetValue(id, out var p)) continue;
+            foreach (var cid in p.ChildIds ?? [])
+                if (!result.Contains(cid)) queue.Enqueue(cid);
+        }
+        return People.Where(p => result.Contains(p.Id)).ToList();
+    }
+
+    // ── Export ────────────────────────────────────────────────────────────────
+
+    private async Task ExportAsync()
+    {
+        _exporting = true;
+        StateHasChanged();
+
+        var people    = GetScopedPeople();
+        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmm");
+        var tag       = _scope == "all"
+            ? "full-tree"
+            : $"{FocusPerson?.LastName ?? "export"}-{_scope}";
+
+        if (_format == "json")
+        {
+            var opts = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+            var json = JsonSerializer.Serialize(people, opts);
+            await JS.InvokeVoidAsync("ftDownloadFile",
+                $"familytree-{tag}-{timestamp}.json", json, "application/json");
+        }
+        else if (_format == "csv")
+        {
+            var csv = BuildCsv(people);
+            await JS.InvokeVoidAsync("ftDownloadFile",
+                $"familytree-{tag}-{timestamp}.csv", csv, "text/csv;charset=utf-8;");
+        }
+
+        _exporting = false;
+        MudDialog.Close();
+    }
+
+    private static string BuildCsv(List<PersonDto> people)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Id,FirstName,MiddleName,LastName,MaidenName,Gender," +
+                      "BirthDate,BirthPlace,DeathDate,DeathPlace,Age,IsDeceased,BiographyNotes");
+
+        foreach (var p in people)
+        {
+            sb.AppendLine(string.Join(",",
+                Q(p.Id.ToString()),
+                Q(p.FirstName),
+                Q(p.MiddleName),
+                Q(p.LastName),
+                Q(p.MaidenName),
+                Q(p.Gender?.ToString()),
+                Q(p.BirthDate?.ToString("yyyy-MM-dd")),
+                Q(p.BirthPlace),
+                Q(p.DeathDate?.ToString("yyyy-MM-dd")),
+                Q(p.DeathPlace),
+                Q(p.Age?.ToString()),
+                Q(p.IsDeceased.ToString()),
+                Q(p.BiographyNotes)));
+        }
+
+        return sb.ToString();
+    }
+
+    // RFC 4180-compliant CSV quoting
+    private static string Q(string? v)
+    {
+        if (v is null) return "";
+        if (v.Contains(',') || v.Contains('"') || v.Contains('\n') || v.Contains('\r'))
+            return $"\"{v.Replace("\"", "\"\"")}\"";
+        return v;
+    }
+}

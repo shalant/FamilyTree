@@ -8,6 +8,7 @@
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Shared.DTOs
 @using FamilyTree.Web.Modules.Components
+@using FamilyTree.Web.Modules.Dialogs
 @using FamilyTree.Web.Services
 @using MudBlazor
 
@@ -62,7 +63,8 @@ else
         <CustomToolbar OnZoomIn="@(async () => { if (_canvas != null) await _canvas.ZoomIn(); })"
                        OnZoomOut="@(async () => { if (_canvas != null) await _canvas.ZoomOut(); })"
                        OnCenterTree="@(async () => { if (_canvas != null) await _canvas.CenterTree(); })"
-                       OnReset="HandleReset" />
+                       OnReset="HandleReset"
+                       OnExport="HandleExport" />
     </div>
 
     <HeroOverlayComponent FocusPerson="_focusPerson"
@@ -220,6 +222,19 @@ else
         catch { }
         if (_canvas != null) await _canvas.CenterTree();
         StateHasChanged();
+    }
+
+    private async Task HandleExport()
+    {
+        var parameters = new DialogParameters<ExportDialog>
+        {
+            { d => d.People,      _people },
+            { d => d.FocusPerson, _focusPerson }
+        };
+
+        await DialogService.ShowAsync<ExportDialog>(
+            "Export", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
     }
 
     private async Task ShareView()
