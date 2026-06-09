@@ -1,11 +1,15 @@
 using System;
+using FamilyTree.Core.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace FamilyTree.Core.Migrations
 {
-    /// <inheritdoc />
+    [DbContext(typeof(AppDbContext))]
+    [Migration("20260609125817_AddUserFocusPerson")]
     public partial class AddUserFocusPerson : Migration
     {
         /// <inheritdoc />
