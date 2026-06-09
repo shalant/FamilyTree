@@ -150,8 +150,6 @@ else
 // ── Pipeline ──────────────────────────────────────────────────
 var app = builder.Build();
 
-<<<<<<< HEAD
-=======
 // Auto-run EF migrations on startup (safe — idempotent)
 using (var scope = app.Services.CreateScope())
 {
@@ -159,7 +157,6 @@ using (var scope = app.Services.CreateScope())
     await db.Database.MigrateAsync();
 }
 
->>>>>>> 818e70e (Clean history - remove secrets)
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
