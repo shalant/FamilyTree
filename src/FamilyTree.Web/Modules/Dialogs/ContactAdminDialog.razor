@@ -1,0 +1,101 @@
+@using MudBlazor
+@using FamilyTree.Core.Services
+@inject IUserMessageService MessageService
+
+<MudDialog>
+    <DialogContent>
+        <div style="font-family:var(--ft-font-body); min-width:420px; max-width:520px;">
+
+            <div style="font-size:13px; color:var(--ft-gray-400); line-height:1.6; margin-bottom:20px;">
+                Send a message to the administrator. Include your email if you'd like a reply.
+            </div>
+
+            <MudStack Spacing="3">
+                <div class="ft-field-label">Subject</div>
+                <MudTextField @bind-Value="_subject"
+                              Placeholder="What's this about?"
+                              Variant="Variant.Outlined"
+                              Counter="120"
+                              MaxLength="120" />
+
+                <div class="ft-field-label">Message</div>
+                <MudTextField @bind-Value="_body"
+                              Placeholder="Your message…"
+                              Lines="5"
+                              Variant="Variant.Outlined"
+                              Counter="2000"
+                              MaxLength="2000" />
+
+                <div class="ft-field-label">Your email (optional)</div>
+                <MudTextField @bind-Value="_email"
+                              Placeholder="So we can reply to you"
+                              InputType="InputType.Email"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Outlined.Email" />
+            </MudStack>
+
+            @if (_error is not null)
+            {
+                <div class="auth-error" style="margin-top:12px;">@_error</div>
+            }
+
+            @if (_submitted)
+            {
+                <MudAlert Severity="Severity.Success" Class="mt-4">
+                    Message sent. We'll get back to you soon.
+                </MudAlert>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text"
+                   Style="color:var(--ft-gray-400);"
+                   OnClick="Cancel">
+            Cancel
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Style="background:var(--ft-green-600); color:#fff;"
+                   Disabled="@(string.IsNullOrWhiteSpace(_subject) || string.IsNullOrWhiteSpace(_body) || _submitted)"
+                   OnClick="Submit">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Send message
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string  _subject = "";
+    private string  _body    = "";
+    private string  _email   = "";
+    private bool    _saving;
+    private bool    _submitted;
+    private string? _error;
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_subject) || string.IsNullOrWhiteSpace(_body)) return;
+
+        _saving = true;
+        _error  = null;
+        var result = await MessageService.SubmitContactMessageAsync(_subject, _body, _email);
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Message;
+            return;
+        }
+
+        _submitted = true;
+        await Task.Delay(1800);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

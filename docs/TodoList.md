@@ -6,7 +6,6 @@
 
 - [ ] **Deploy** — push accumulated changes (performance indexes, family scoping, email flow) to production; verify `DevAuth__Enabled = false` in Azure config
 - [ ] **Feature request backend** — store `RequestFeatureDialog` submissions in a DB table
-- [ ] **Email verification on register** — send confirmation email when a new account is created; block login until verified (currently accounts work immediately without verification)
 - [ ] **Mobile layout** — tree canvas and forms are not optimized for small screens
 
 ---

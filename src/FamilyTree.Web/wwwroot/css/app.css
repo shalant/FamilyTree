@@ -195,13 +195,6 @@ html, body {
     margin-bottom: 16px;
 }
 
-.hero-actions {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 24px;
-}
-
-
 .hero-drag-handle {
     display: flex;
     justify-content: center;
@@ -265,7 +258,6 @@ html, body {
         width: 320px;
         background: rgba(255,255,255,0.65);
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
-        transform: scale(1.03);
     }
 
 .hero-title {
@@ -281,13 +273,15 @@ html, body {
 }
 
 .hero-actions {
-    margin-top: 12px;
+    margin-top: 10px;
+    margin-bottom: 4px;
     display: flex;
+    align-items: center;
     gap: 8px;
 }
 
 .hero-expanded {
-    margin-top: 16px;
+    margin-top: 6px;
     font-size: 13px;
     color: var(--ft-text-secondary);
 }
@@ -307,6 +301,51 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 4px;
+}
+
+/* Mini hero state */
+.hero-glass.mini {
+    padding: 8px 14px;
+    gap: 0;
+    width: auto;
+    min-width: 0;
+    transform: none !important;
+}
+
+.hero-mini-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.hero-mini-name {
+    font-size: 14px;
+    font-weight: 500;
+    font-style: italic;
+    font-family: var(--ft-font-display);
+    color: var(--ft-green-800);
+}
+
+/* Rounded light-green search bar */
+.ft-search-wrap .mud-input-root {
+    border-radius: 24px !important;
+    background: var(--ft-green-50) !important;
+}
+.ft-search-wrap .mud-input-root fieldset {
+    border-radius: 24px !important;
+    border-color: rgba(29, 158, 117, 0.35) !important;
+}
+.ft-search-wrap .mud-input-root:hover fieldset {
+    border-color: var(--ft-green-400) !important;
+}
+.ft-search-wrap .mud-input-root.mud-focused fieldset,
+.ft-search-wrap .mud-input-root.mud-input-root-outlined:focus-within fieldset {
+    border-color: var(--ft-green-600) !important;
+    border-width: 1.5px !important;
+}
+[data-theme="dark"] .ft-search-wrap .mud-input-root {
+    background: rgba(29, 158, 117, 0.1) !important;
 }
 
 [data-theme="dark"] .hero-glass {

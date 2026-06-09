@@ -20,6 +20,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<UserActivity> UserActivities => Set<UserActivity>();
     public DbSet<PasswordResetRequest> PasswordResetRequests => Set<PasswordResetRequest>();
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
+    public DbSet<UserMessage> UserMessages => Set<UserMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -232,6 +233,21 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(b => b.Id).HasDefaultValueSql("newsequentialid()");
             e.Property(b => b.Note).HasMaxLength(500);
             e.Property(b => b.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        // ── USER MESSAGE ──────────────────────────────────────────────────────
+        modelBuilder.Entity<UserMessage>(e =>
+        {
+            e.HasKey(m => m.Id);
+            e.Property(m => m.Id).HasDefaultValueSql("newsequentialid()");
+            e.Property(m => m.Type).HasMaxLength(50).IsRequired();
+            e.Property(m => m.SenderEmail).HasMaxLength(256);
+            e.Property(m => m.Title).HasMaxLength(200).IsRequired();
+            e.Property(m => m.Body).HasMaxLength(2000);
+            e.Property(m => m.Category).HasMaxLength(100);
+            e.Property(m => m.Priority).HasMaxLength(100);
+            e.Property(m => m.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            e.ToTable("UserMessages");
         });
 
         modelBuilder.Entity<Person>(e =>

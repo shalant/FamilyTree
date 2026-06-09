@@ -94,7 +94,8 @@ else
                           OnShare="ShareView"
                           Visible="(_detailPerson == null)"
                           DragLeft="_heroPos?.Left"
-                          DragTop="_heroPos?.Top" />
+                          DragTop="_heroPos?.Top"
+                          OnPositionReset="() => _heroPos = null" />
 }
 
 <PersonDetailDrawer Person="_detailPerson"

@@ -36,33 +36,32 @@
         <img src="/images/arborkin-logo__transparent.png" alt="ArborKin"
              style="height:30px; display:block;" />
     </div> *@
-    <div style="margin-left:-8px; margin-right:16px; padding:0 8px 0 0;
+    <div style="margin-left:-20px; margin-right:12px; padding:0;
                 flex-shrink:0; cursor:pointer; user-select:none;
-                display:flex; align-items:center;justify-content:center"
+                display:flex; align-items:center; align-self:center;"
          @onclick='() => Nav.NavigateTo("/")'>
         <img src="/images/arborkin-logo__transparent.png" alt="ArborKin"
-             style="height:170px;" />
+             style="height:170px; display:block;" />
     </div>
 
     @* ── People search ──────────────────────────────────────────────────── *@
-    <div style="flex:1; max-width:420px;">
+    <div class="ft-search-wrap" style="flex:1; max-width:420px;">
         <MudAutocomplete T="PersonDto"
                          Value="_searchSelection"
                          SearchFunc="SearchPeople"
                          ValueChanged="OnPersonSelected"
                          ToStringFunc="@(p => p?.FullName ?? "")"
                          Placeholder="Search people…"
-                         Variant="Variant.Filled"
+                         Variant="Variant.Outlined"
                          Margin="Margin.Dense"
                          Adornment="Adornment.Start"
                          AdornmentIcon="@Icons.Material.Outlined.Search"
-                         AdornmentColor="Color.Default"
+                         AdornmentColor="Color.Success"
                          ResetValueOnEmptyText="true"
                          CoerceText="false"
                          Clearable="true"
                          Dense="true"
                          MaxItems="8"
-                         Style="border-radius:8px;"
                          PopoverClass="ft-search-popover">
             <ItemTemplate Context="person">
                 <div style="display:flex; align-items:center; gap:10px; padding:6px 4px;">

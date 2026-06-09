@@ -1,4 +1,6 @@
 @using MudBlazor
+@using FamilyTree.Core.Services
+@inject IUserMessageService MessageService
 
 <MudDialog>
     <DialogContent>
@@ -57,6 +59,11 @@
                               AdornmentIcon="@Icons.Material.Outlined.Email" />
             </MudStack>
 
+            @if (_error is not null)
+            {
+                <div class="auth-error" style="margin-top:12px;">@_error</div>
+            }
+
             @if (_submitted)
             {
                 <MudAlert Severity="Severity.Success" Class="mt-4">
@@ -87,23 +94,32 @@
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
 
-    private string _title = "";
-    private string _category = "Other";
-    private string _description = "";
-    private string _priority = "Nice to have";
-    private string _email = "";
-    private bool _saving;
-    private bool _submitted;
+    private string  _title       = "";
+    private string  _category    = "Other";
+    private string  _description = "";
+    private string  _priority    = "Nice to have";
+    private string  _email       = "";
+    private bool    _saving;
+    private bool    _submitted;
+    private string? _error;
 
     private async Task Submit()
     {
         if (string.IsNullOrWhiteSpace(_title)) return;
 
         _saving = true;
-        await Task.Delay(600); // placeholder — wire to API or email when ready
+        _error  = null;
+        var result = await MessageService.SubmitFeatureRequestAsync(
+            _title, _category, _description, _priority, _email);
         _saving = false;
-        _submitted = true;
 
+        if (!result.Success)
+        {
+            _error = result.Message;
+            return;
+        }
+
+        _submitted = true;
         await Task.Delay(1800);
         MudDialog.Close(DialogResult.Ok(true));
     }

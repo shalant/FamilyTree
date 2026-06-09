@@ -177,6 +177,20 @@
             </MudPaper>
 
             <MudPaper Elevation="0" Class="pa-4"
+                      Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+                <SectionHeading Icon="@Icons.Material.Outlined.MailOutline" Title="Contact the admin" />
+                <div style="font-size:13px; color:var(--ft-gray-400); line-height:1.6; margin-bottom:12px;">
+                    Questions, concerns, or anything else — send a message directly.
+                </div>
+                <MudButton Variant="Variant.Outlined" FullWidth="true"
+                           StartIcon="@Icons.Material.Outlined.Send"
+                           Style="border-color:var(--ft-gray-300); color:var(--ft-gray-600);"
+                           OnClick="OpenContactAdmin">
+                    Send a message
+                </MudButton>
+            </MudPaper>
+
+            <MudPaper Elevation="0" Class="pa-4"
                       Style="background:var(--ft-brown-50); border-radius:var(--ft-radius-card);
                 border:1px solid var(--ft-brown-200);">
                 <SectionHeading Icon="@Icons.Material.Outlined.VolunteerActivism" Title="Support the project" />
@@ -253,6 +267,12 @@
     private async Task OpenRequestFeature()
     {
         var dialog = await DialogService.ShowAsync<RequestFeatureDialog>("Request a feature");
+        await dialog.Result;
+    }
+
+    private async Task OpenContactAdmin()
+    {
+        var dialog = await DialogService.ShowAsync<ContactAdminDialog>("Contact admin");
         await dialog.Result;
     }
 

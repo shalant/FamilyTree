@@ -14,6 +14,7 @@
 @inject IPersonService PersonService
 @inject IAuthService AuthService
 @inject IImportService ImportService
+@inject IUserMessageService MessageService
 @inject IDbContextFactory<AppDbContext> DbFactory
 @inject UserManager<AppUser> UserManager
 @inject ToastService Toast
@@ -736,6 +737,85 @@
             }
         </MudTabPanel>
 
+        <MudTabPanel Text="Messages" Icon="@Icons.Material.Outlined.MailOutline">
+
+            @if (_loadingMessages)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_messages.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    No messages yet.
+                </MudAlert>
+            }
+            else
+            {
+                <MudPaper Elevation="0" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+                    <MudTable Items="_messages" Hover="true" Dense="true"
+                              Style="background:transparent;">
+                        <HeaderContent>
+                            <MudTh>Type</MudTh>
+                            <MudTh>From</MudTh>
+                            <MudTh>Subject</MudTh>
+                            <MudTh>Category</MudTh>
+                            <MudTh>Priority</MudTh>
+                            <MudTh>Date</MudTh>
+                            <MudTh></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@(context.Type == "FeatureRequest" ? Color.Primary : Color.Default)">
+                                    @(context.Type == "FeatureRequest" ? "Feature" : "Message")
+                                </MudChip>
+                            </MudTd>
+                            <MudTd Style="font-size:12px; color:var(--ft-gray-400);">
+                                @(string.IsNullOrWhiteSpace(context.SenderEmail) ? "—" : context.SenderEmail)
+                            </MudTd>
+                            <MudTd>
+                                <div style="font-size:13px; font-weight:@(context.ReadAt == null ? "600" : "400");
+                                    color:var(--ft-gray-700);">
+                                    @context.Title
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(context.Body))
+                                {
+                                    <div style="font-size:11px; color:var(--ft-gray-300); margin-top:2px;
+                                        white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:300px;">
+                                        @context.Body
+                                    </div>
+                                }
+                            </MudTd>
+                            <MudTd Style="font-size:12px; color:var(--ft-gray-400);">
+                                @(context.Category ?? "—")
+                            </MudTd>
+                            <MudTd Style="font-size:12px; color:var(--ft-gray-400);">
+                                @(context.Priority ?? "—")
+                            </MudTd>
+                            <MudTd Style="font-size:11px; color:var(--ft-gray-300);">
+                                @context.CreatedAt.ToLocalTime().ToString("MMM d, h:mm tt")
+                            </MudTd>
+                            <MudTd>
+                                @if (context.ReadAt == null)
+                                {
+                                    <MudTooltip Text="Mark as read">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.MarkEmailRead"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => MarkMessageReadAsync(context.Id))" />
+                                    </MudTooltip>
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Outlined.DoneAll"
+                                             Style="font-size:16px; color:var(--ft-gray-200);" />
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            }
+        </MudTabPanel>
+
     </MudTabs>
 </div>
 
@@ -746,12 +826,13 @@
     private void GoToTab(int index) => _activeTab = index;
 
     // ── Loading flags ────────────────────────────────────────────────────────
-    private bool _loading         = true;
-    private bool _loadingDeleted  = true;
-    private bool _loadingAudit    = true;
-    private bool _loadingUsers    = true;
-    private bool _loadingActivity = true;
-    private bool _loadingImports  = true;
+    private bool _loading          = true;
+    private bool _loadingDeleted   = true;
+    private bool _loadingAudit     = true;
+    private bool _loadingUsers     = true;
+    private bool _loadingActivity  = true;
+    private bool _loadingImports   = true;
+    private bool _loadingMessages  = true;
 
     // ── Dashboard stats ──────────────────────────────────────────────────────
     private int _totalPeople;
@@ -775,6 +856,7 @@
     private Dictionary<Guid, List<string>> _userRoles         = new();
     private List<PasswordResetRequest>     _pendingResets     = [];
     private List<ImportBatch>              _importBatches     = [];
+    private List<UserMessage>              _messages          = [];
 
     // ── Invite creation ──────────────────────────────────────────────────────
     private string  _inviteEmail    = "";
@@ -830,7 +912,8 @@
             LoadPeopleAsync(),
             LoadPendingInvitesAsync(),
             LoadPendingResetsAsync(),
-            LoadImportBatchesAsync());
+            LoadImportBatchesAsync(),
+            LoadMessagesAsync());
     }
 
     private async Task LoadDashboardAsync()
@@ -965,6 +1048,20 @@
     {
         _importBatches = await ImportService.GetImportBatchesAsync();
         _loadingImports = false;
+    }
+
+    private async Task LoadMessagesAsync()
+    {
+        var result = await MessageService.GetAllAsync();
+        if (result.Success) _messages = result.Data!;
+        _loadingMessages = false;
+    }
+
+    private async Task MarkMessageReadAsync(Guid id)
+    {
+        await MessageService.MarkReadAsync(id);
+        var msg = _messages.FirstOrDefault(m => m.Id == id);
+        if (msg != null) msg.ReadAt = DateTime.UtcNow;
     }
 
     private async Task ConfirmRollbackAsync(ImportBatch batch)
