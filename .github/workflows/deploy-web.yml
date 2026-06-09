@@ -1,12 +1,6 @@
 name: Deploy Web
 
 on:
-  push:
-    branches: [master, main]
-    paths:
-      - 'src/FamilyTree.Web/**'
-      - 'src/FamilyTree.Shared/**'
-      - '.github/workflows/deploy-web.yml'
   workflow_dispatch:
 
 jobs:

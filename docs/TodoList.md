@@ -4,15 +4,23 @@
 
 ## In Progress / Up Next
 
-- [ ] **Auth** — ASP.NET Core Identity + Google social login; replace `AdminEnabled` config flag with `<AuthorizeView Roles="Admin,SuperUser">`; resolve `FamilyId` from claims and filter all service queries by it; wire invite flow (schema + `UserInvite` table already exist)
-- [ ] **Photo upload** — replace `ProfilePhotoUrl` plain-string with actual file upload to Azure Blob Storage (infrastructure already exists: `BlobStorageService`)
+- [ ] **DB performance indexes** — add filtered composite indexes on `(FamilyId, LastName, FirstName) WHERE DeletedAt IS NULL` (People), `(PersonAId/PersonBId) WHERE DeletedAt IS NULL` (Relationships), and `(EntityType, EntityId, Timestamp DESC)` (AuditLog) via new EF migration `AddPerformanceIndexes`
+- [ ] **Testing** — bUnit component tests for `PersonForm`, `FamilyTreeCanvas`; xUnit + FluentAssertions integration tests for `PersonService` and `RelationshipService` against real DB
+- [ ] **Email verification & password reset** — `UserManager` token flow + SendGrid; log token URL to console in dev
+- [ ] **Family scoping** — add `.Where(p => p.FamilyId == currentFamilyId)` to all service queries; populate `CreatedBy`/`UpdatedBy`/`AuditLog.UserId` from current user on every write
+- [ ] **Feature request backend** — store `RequestFeatureDialog` submissions in a DB table or forward via SendGrid
 
 ---
 
 ## Recently Completed
 
-- [x] **Pre-auth iteration** — soft delete on Person/Relationship/Medium (`DeletedAt`/`DeletedBy` + EF Global Query Filters); `AuditLog`, `UserActivity`, `AppUser`, `UserFamily`, `UserInvite` tables created (migration `PreAuthIteration` applied); `IAuditLogService` writes on Create/Update/Delete/Restore; `PersonService.DeleteAsync` is now a soft delete; `PersonService.RestoreAsync` + `GetDeletedAsync` added; `/admin` page with Dashboard, Deleted people + restore, Audit log, Users, Activity tabs; `AdminEnabled` config flag gates nav link and page redirect
-- [x] **Export dialog** — toolbar FileDownload button opens `ExportDialog` with scope (all/immediate/ancestors/descendants) and format (JSON/CSV); downloads via `ftDownloadFile` JS; RFC 4180-compliant CSV
+- [x] **Auth** — ASP.NET Core Identity with cookie auth; Google OAuth + email/password login; invite-only registration (`Auth:RegistrationMode`); rate limiting on `/auth/do-login` (5 req/15 min/IP); account lockout after 5 failed attempts; super-user bootstrap on startup; `LoginOverlay`, `Register.razor` with `?invite=<token>` query param; `DevAuth` bypass for dev; `Admin.razor` with dashboard, deleted people, audit log, users, and activity tabs
+- [x] **SVG export — multi-style/theme** — `ExportDialog` updated with Style (Classic/Minimal/Dark), Color Theme (Forest/Ocean/Sepia/Mono), and Degrees of Separation slider; BFS filter to include only people within N hops of focus person; `SvgExportService` rewired with 12 hand-tuned palettes, radial gradients, drop shadows, decade bands (Classic), and flat rendering (Minimal/Dark)
+- [x] **Focus persisted to DB** — `AppUser.FocusPersonId` column added (migration `20260609165520_AddUserFocusPerson`); `IAuthService.SaveFocusPersonAsync` / `GetFocusPersonIdAsync`; `ResolveFocusAsync` chains DB → localStorage → first person; login/Google OAuth redirects to `/?focus=<id>` using `FocusPersonId ?? PersonId`
+- [x] **Search opens drawer without re-centering** — search now navigates to `/?view=<id>` instead of `/?focus=<id>`; `OnParametersSetAsync` handles `View` param (opens drawer only) separately from `Focus` param (re-centers tree + opens drawer)
+- [x] **CI/CD split** — `deploy-web.yml` is now `workflow_dispatch` only (manual deploy); new `ci.yml` runs build + test on every push to `master`/`main`
+- [x] **Pre-auth iteration** — soft delete on Person/Relationship/Medium (`DeletedAt`/`DeletedBy` + EF Global Query Filters); `AuditLog`, `UserActivity`, `AppUser`, `UserFamily`, `UserInvite` tables created; `IAuditLogService` writes on Create/Update/Delete/Restore; `PersonService.DeleteAsync` is now a soft delete; `PersonService.RestoreAsync` + `GetDeletedAsync` added
+- [x] **Export dialog (initial)** — toolbar FileDownload button opens `ExportDialog` with scope (all/immediate/ancestors/descendants) and format (JSON/CSV); downloads via `ftDownloadFile` JS; RFC 4180-compliant CSV
 - [x] `FamilyId` schema migration — `Family` table added; `Person.FamilyId` (nullable FK); seeder creates "My Family" and assigns all seeded people to it
 - [x] Cross-root couple layout fix — children of two sibling-in-law families (e.g. Rose/Ray and Bud/Florence) no longer tangle horizontally; each partner placed as leaf under own parent group, children centered at couple midpoint
 - [x] Former/divorced spouse support — `Relationship.EndDate` distinguishes active (null) from former (set); `PersonDto.FormerSpouseIds` added; dashed grey 💔 connector vs. solid green ❤ in canvas; full UI in `PersonForm`
@@ -41,8 +49,8 @@
 | Tree view — zoom, pan, focus, T-bar connectors | ✅ done |
 | Theme — light/dark mode | ✅ done |
 | Hosting — Azure App Service + Blob Storage | ✅ done |
-| Accounts — sign in (Google, role-based) | 🔲 next |
-| Privacy — private tree by default | 🔲 with auth |
+| Accounts — sign in (Google, role-based) | ✅ done |
+| Privacy — private tree by default | 🔲 family scoping |
 
 ---
 

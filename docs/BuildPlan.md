@@ -37,7 +37,7 @@ Structured roadmap organized by phase. Items marked ✅ are complete; 🔲 are p
 - ✅ `/admin` page — Dashboard (stat cards + recent activity), Deleted people + Restore, Audit log with filters, Users, Activity
 - ✅ `AdminEnabled` config flag — replaced by real `AuthorizeView` roles once Identity is wired
 
-### 2b — Identity schema ✅ (complete, pending migration)
+### 2b — Identity schema ✅ (complete)
 - ✅ `Microsoft.AspNetCore.Identity.EntityFrameworkCore` added to Core
 - ✅ `AppUser` extends `IdentityUser<Guid>` — Identity owns Email, UserName, PasswordHash, etc.
 - ✅ `AppDbContext` extends `IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>`
@@ -49,33 +49,36 @@ Structured roadmap organized by phase. Items marked ✅ are complete; 🔲 are p
 - ✅ `AppUser.PersonClaimStatus` enum (None/Pending/Approved) — tracks node claim state
 - ✅ `Person.IsMinorOverride` (bool?) — null=derive from BirthDate, true=force minor, false=force adult
 - ✅ Unique filtered index on `AppUser.PersonId` — one person node per user account
-- 🔲 **Run migration: `dotnet ef migrations add AddIdentity` → `dotnet ef database update`**
+- ✅ `AppUser.FocusPersonId` (Guid?) — persists tree focus across devices; migration `20260609165520_AddUserFocusPerson` applied to prod
 
-### 2c — Authentication flow ← **Next**
-- 🔲 Google OAuth + email/password (`AddAuthentication().AddGoogle().AddCookie()`)
-- 🔲 Open registration page — anyone can create an account
-- 🔲 Login / Logout pages
-- 🔲 Email verification on registration
-- 🔲 Forgot password / reset password (+ SendGrid email)
-- 🔲 Seed super-user on startup (Development only)
-- 🔲 Replace `DevAuthHandler` scheme with real auth in `Program.cs`
-- 🔲 Replace `CustomAppBar` stubs with real claims (name, email, initials, avatar)
-- 🔲 Wire `LoginOverlay` component (currently non-functional)
+### 2c — Authentication flow ✅ (core complete)
+- ✅ Google OAuth + email/password (`AddAuthentication().AddGoogle().AddCookie()`) in `Program.cs`
+- ✅ Registration modes: `Open` / `InviteOnly` / `Closed` controlled by `Auth:RegistrationMode`
+- ✅ `LoginOverlay` component wired — email/password POST to `/auth/do-login`, Google redirect to `/auth/google`
+- ✅ `Register.razor` — reads `?invite=<token>`, validates token, creates account + `UserFamily` row
+- ✅ Logout — `/auth/do-logout` POST and `/auth/logout` GET
+- ✅ Seed super-user on startup (`SuperUser:Email` config, idempotent)
+- ✅ `DevAuthHandler` replaced by real auth in production (`DevAuth:Enabled = false` in prod)
+- ✅ Rate limiting on `/auth/do-login` — 5 req / 15 min / IP; account lockout after 5 failed attempts
+- ✅ `AppUserClaimsPrincipalFactory` injects `DisplayName`, `PersonId`, and role claims into cookie
+- 🔲 Email verification on registration (SendGrid not configured)
+- 🔲 Forgot password / reset password — `PasswordResetRequest` table exists, flow not yet built
 - 🔲 MFA required for Super-user and Admin roles (ASP.NET Identity TOTP)
 
-### 2d — Post-registration flows
+### 2d — Post-registration flows (partial)
+- ✅ Invite flow — `IAuthService.CreateInviteAsync` generates token; admin copies link from `/admin → Users`; `/register?invite=<token>` validates and creates `UserFamily` row
 - 🔲 Onboarding page (post-registration): "Create a family" or "I have an invite code"
 - 🔲 Public family search / "find my node" wizard:
   - Unauthenticated search by name on public families (`Family.IsPublic = true`)
   - Living adults: name only shown publicly; minors: hidden entirely
   - "This is me" → register/login → `PersonClaimStatus = Pending`
   - Admin approves/rejects in `/admin → Users` tab
-- 🔲 Invite flow: admin sends invite → email with token → `/join?token=...` → creates UserFamily row
 - 🔲 Super-admin user deletion — `UserManager.DeleteAsync` in `/admin → Users` tab
 
-### 2e — Post-auth wiring
-- 🔲 `ICurrentUserService` — returns current AppUser from ClaimsPrincipal
-- 🔲 Populate `CreatedBy` / `UpdatedBy` / `DeletedBy` / `AuditLog.UserId` from current user
+### 2e — Post-auth wiring (partial)
+- ✅ `FocusPersonId` DB persist — `IAuthService.SaveFocusPersonAsync` / `GetFocusPersonIdAsync`; `ResolveFocusAsync` chains DB → localStorage → first person
+- ✅ `AuditLog` fires on Person/Relationship/Medium CRUD via `IAuditLogService`
+- 🔲 Populate `CreatedBy` / `UpdatedBy` / `DeletedBy` / `AuditLog.UserId` from current user (auth wired; write-path population pending)
 - 🔲 Populate `UserActivity` daily action counts on every write
 - 🔲 Scoped data access — filter all service queries by `FamilyId` from claims
 - 🔲 Data visibility tiers enforced in service layer:
@@ -135,11 +138,13 @@ Structured roadmap organized by phase. Items marked ✅ are complete; 🔲 are p
 
 ## Phase 5 — Export
 
+- ✅ SVG export — multi-style (Classic/Minimal/Dark) × multi-theme (Forest/Ocean/Sepia/Mono); degrees-of-separation BFS filter on focus person; `SvgExportService` generates full server-side SVG with radial gradients, decade bands, and drop shadows
+- ✅ JSON export — full `PersonDto` list serialized to JSON via `ExportDialog`
+- ✅ CSV export — RFC 4180-compliant `PersonDto` list; `ExportDialog` scope filters (all/immediate/ancestors/descendants)
 - 🔲 GEDCOM export: serialize People + Relationships to GEDCOM 5.5.1 format
 - 🔲 Excel export: ClosedXML, one sheet per entity type (People, Relationships)
-- 🔲 CSV export: serialize PersonDto list, pipe through file download
 - 🔲 PDF report: QuestPDF — printable summary with tree stats and person list
-- 🔲 Wire export buttons in Dashboard (currently "Coming soon" disabled)
+- 🔲 Wire additional export buttons in Dashboard (currently "Coming soon" disabled)
 
 ---
 
@@ -183,13 +188,13 @@ Consider whether fields belong on `Person` (scalar, one per person) or a child t
 
 ## Phase 8 — Sharing & Multi-User
 
-- ✅ Audit log table schema (`AuditLog`) — wired to Person CRUD; awaiting UserId from auth
-- ✅ User activity table schema (`UserActivity`) — awaiting UserId from auth
-- ✅ Invite table schema (`UserInvite`) — awaiting email send and accept flow
+- ✅ Audit log table schema (`AuditLog`) — wired to Person CRUD; UserId pending write-path population
+- ✅ User activity table schema (`UserActivity`) — awaiting write-path population from auth
+- ✅ Invite table schema (`UserInvite`) — invite creation and token-based registration working; email send pending (SendGrid)
 - ✅ `UserFamily` role model schema — Admin/Member/Viewer scoped per family
 - ✅ `Family.IsPublic` — opt-in public discoverability
 - ✅ `Family.RequireApproval` — admin approval gate for new member claims
-- 🔲 Invite flow: send email (SendGrid), accept token endpoint, create `UserFamily` row
+- 🔲 Invite email send (SendGrid) — token URL currently returned to admin to copy manually
 - 🔲 Permission enforcement: gate write operations behind Member+ role check
 - 🔲 Public family search and "find my node" wizard (see Phase 2d)
 - 🔲 Activity feed: recent edits visible to collaborators
@@ -211,11 +216,14 @@ Consider whether fields belong on `Person` (scalar, one per person) or a child t
 
 ## Phase 10 — Infrastructure & Production
 
-- 🔲 Azure App Service deployment (GitHub Actions CI/CD already scaffolded)
+- ✅ Azure App Service B1 Linux deployed; GitHub Actions `deploy-web.yml` (manual `workflow_dispatch`)
+- ✅ `ci.yml` — build + test on every push to `master`/`main`; deploy is separate and manual
+- ✅ Rate limiting on `/auth/do-login` (fixed-window, 5 req/15 min/IP)
+- ✅ EF migrations auto-run on startup via `ctx.Database.MigrateAsync()` — schema always in sync with code
+- 🔲 DB performance indexes — add filtered composite indexes on People, Relationships, AuditLog (`AddPerformanceIndexes` migration)
 - 🔲 Custom domain + SSL certificate
 - 🔲 Azure Key Vault for production secrets / connection strings
-- 🔲 Azure SQL automatic backups, 7-day retention policy
-- 🔲 Rate limiting on sensitive API endpoints (auth, import)
+- 🔲 Azure SQL automatic backups — default 7-day retention; verify policy in portal
 - 🔲 Application Insights or Sentry for error monitoring
 - 🔲 GDPR: cookie notice, data export, right-to-erasure workflow
 
@@ -232,4 +240,4 @@ Consider whether fields belong on `Person` (scalar, one per person) or a child t
 
 ---
 
-*Last updated: 2026-06-07*
+*Last updated: 2026-06-09*

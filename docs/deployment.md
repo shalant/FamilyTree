@@ -1,123 +1,84 @@
-﻿# Deployment Guide — Azure App Service + Azure SQL (Free Tiers)
+# Deployment Guide — Azure App Service + Azure SQL
 
-## Overview
+## Current setup
 
-| Resource | Azure Service | Cost |
+| Resource | Azure Service | Tier | Cost |
+|---|---|---|---|
+| Web app | App Service (Linux) | B1 | ~$13/mo |
+| Database | Azure SQL Database | Basic 5 DTU | ~$5/mo |
+| Blob Storage | Azure Storage | LRS | ~$0.50/mo |
+| **Total** | | | **~$18–20/mo** |
+
+The app is a single Blazor Server project (`FamilyTree.Web`) — there is no separate API service.
+Blazor Server requires **Always On** to keep SignalR connections alive; B1 is the minimum viable
+tier. F1 (free) cannot be used reliably because it spins down after inactivity, killing all
+active WebSocket connections.
+
+---
+
+## CI/CD
+
+Two GitHub Actions workflows:
+
+| Workflow | Trigger | What it does |
 |---|---|---|
-| API | App Service F1 (Free) | $0/mo |
-| Web | App Service F1 (Free) | $0/mo |
-| Database | Azure SQL Database (Free offer) | $0/mo |
+| `ci.yml` | Push to `master`/`main`, PRs | Build + test only |
+| `deploy-web.yml` | Manual `workflow_dispatch` | Build, publish, deploy to App Service |
 
-**Total: $0/mo** — forever, as long as you stay within free tier limits.
+To deploy: GitHub → Actions → Deploy Web → Run workflow.
 
-Free tier limits that matter for a family app:
-- App Service F1: 60 CPU minutes/day (shared) — ample for low traffic
-- Azure SQL: 100,000 vCore-seconds/month, 32 GB storage — more than enough
+### Required GitHub secrets
+
+| Secret | Value |
+|---|---|
+| `AZURE_CREDENTIALS` | Service principal JSON (`az ad sp create-for-rbac`) |
+| `AZURE_WEB_APP_NAME` | Your App Service name (e.g. `arborkin`) |
 
 ---
 
-## One-time Azure setup
+## Database migrations
 
-### 1. Create the Azure SQL Database (free tier)
+EF Core migrations run automatically on startup via `ctx.Database.MigrateAsync()` in
+`Program.cs`. Every deploy applies any pending migrations to Azure SQL automatically.
+You never need to run SQL manually against production — unless emergency hotfixes are needed
+(use Azure Portal Query Editor in that case).
 
-1. Azure Portal → Create a resource → Azure SQL Database
-2. On the provisioning page, look for the **"Apply offer: Free Azure SQL Database"** banner and click it
-3. Settings:
-   - Database name: `FamilyTreeDb`
-   - Server: create new → pick a name, region, SQL auth username + password
-   - Compute + storage: **Free offer** should be pre-selected (General Purpose, Serverless)
-   - Backup redundancy: Locally redundant (cheapest)
-4. **Behavior when free limit reached: Auto-pause until next month** — ensures $0 bill
-5. Create
-
-Note the server name: `yourserver.database.windows.net`
-
-### 2. Configure the SQL Server firewall
-
-In the SQL Server resource (not the database):
-- Networking → Add your current client IP
-- Toggle "Allow Azure services and resources to access this server" → ON (needed for App Service)
-
-### 3. Create the API App Service
-
-1. Create a resource → Web App
-2. Settings:
-   - Name: `familytree-api` (becomes `familytree-api.azurewebsites.net`)
-   - Runtime: .NET 10
-   - OS: Linux (cheaper than Windows on free tier)
-   - Plan: **Free F1**
-3. Create
-
-After creation, go to **Configuration → Application settings** and add:
-
-| Name | Value |
-|---|---|
-| `ConnectionStrings__DefaultConnection` | `Server=yourserver.database.windows.net;Database=FamilyTreeDb;User Id=youruser;Password=yourpassword;TrustServerCertificate=False;Encrypt=True` |
-| `AllowedOrigins__Web` | `https://familytree-web.azurewebsites.net` |
-| `ASPNETCORE_ENVIRONMENT` | `Production` |
-
-### 4. Create the Web App Service
-
-Same as above but:
-- Name: `familytree-web`
-- After creation, add application setting:
-
-| Name | Value |
-|---|---|
-| `ApiSettings__BaseUrl` | `https://familytree-api.azurewebsites.net` |
-| `ASPNETCORE_ENVIRONMENT` | `Production` |
-
----
-
-## GitHub Actions setup
-
-The deploy workflows use publish profiles for authentication — simpler than service principals for personal projects.
-
-### Get publish profiles
-
-For each App Service (API and Web):
-1. Azure Portal → App Service → Overview → Download publish profile
-2. Open the downloaded `.PublishSettings` file and copy the entire XML content
-
-### Add GitHub secrets
-
-In your GitHub repo → Settings → Secrets and variables → Actions:
-
-| Secret name | Value |
-|---|---|
-| `AZURE_API_APP_NAME` | `familytree-api` |
-| `AZURE_API_PUBLISH_PROFILE` | (paste entire XML from API publish profile) |
-| `AZURE_WEB_APP_NAME` | `familytree-web` |
-| `AZURE_WEB_PUBLISH_PROFILE` | (paste entire XML from Web publish profile) |
-
-### Trigger first deploy
-
-Push to `main` — GitHub Actions will build, test, and deploy both apps.
-EF Core migrations run automatically on API startup, creating all tables in Azure SQL.
-
----
-
-## Local dev → Azure SQL sync
-
-EF Core migrations are the single source of truth for schema.
-
-```
 Local workflow:
-1. Change a model in FamilyTree.Core/Models/
-2. dotnet ef migrations add <MigrationName>   ← generates migration file
-3. dotnet ef database update                  ← applies to local SQL Server
-4. git commit + push to main
-5. GitHub Actions deploys API
-6. API starts → db.Database.Migrate() runs → Azure SQL updated automatically
+```
+1. Change a model in src/FamilyTree.Core/Models/
+2. dotnet ef migrations add <MigrationName> --project src/FamilyTree.Core --startup-project src/FamilyTree.Web
+3. dotnet ef database update --startup-project src/FamilyTree.Web   ← applies to local SQL
+4. git commit + push to master
+5. workflow_dispatch deploy → App Service starts → MigrateAsync runs → Azure SQL updated
 ```
 
-You never need to manually run SQL against Azure SQL. Migrations handle it.
+**Important:** When creating migrations manually (without running `dotnet ef`), you must include:
+- The `[Migration("timestamp_name")]` attribute (EF won't discover the migration without it)
+- A timestamp strictly after the last applied migration (check `__EFMigrationsHistory`)
+- A matching snapshot update in `AppDbContextModelSnapshot.cs`
+
+---
+
+## App Service configuration
+
+In Azure Portal → App Service → Configuration → Application settings:
+
+| Name | Value |
+|---|---|
+| `ConnectionStrings__DefaultConnection` | `Server=...database.windows.net;Database=FamilyTreeDb;User Id=...;Password=...;Encrypt=True` |
+| `ASPNETCORE_ENVIRONMENT` | `Production` |
+| `SuperUser__Email` | your admin email |
+| `Google__ClientId` | (optional) Google OAuth client ID |
+| `Google__ClientSecret` | (optional) Google OAuth client secret |
+| `AzureStorage__ConnectionString` | Azure Storage connection string |
+
+Use double-underscore for nested config keys (Azure App Service convention).
+
+Always On: Configuration → General Settings → **Always On: On** (included in B1, required for Blazor Server SignalR).
 
 ---
 
 ## Connecting to Azure SQL from SSMS
-
-You can inspect your production data directly in SSMS:
 
 ```
 Server:   yourserver.database.windows.net
@@ -126,4 +87,13 @@ Username: your admin user
 Password: your password
 ```
 
-Make sure your current IP is allowed in the SQL Server firewall first.
+Make sure your current IP is allowed in the SQL Server firewall (Portal → SQL Server → Networking → Add client IP).
+
+---
+
+## Cost reduction options
+
+- **Azure SQL Serverless** — auto-pauses after 1 hour of inactivity; cheaper at very low usage but adds a 30–60s cold-start delay after pause. Basic DTU is more predictable.
+- **No deployment slots needed** — slots require Standard tier ($56/mo). Stick with direct deploy to the single production slot.
+- **Disable Application Insights** — if auto-attached, it adds $2–5/mo at low volume. Check App Service → Application Insights in portal.
+- **Connection string pool tuning** — add `Min Pool Size=0;` to reduce idle DTU consumption on the Basic tier.
