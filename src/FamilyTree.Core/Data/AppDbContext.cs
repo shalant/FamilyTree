@@ -19,6 +19,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<UserActivity> UserActivities => Set<UserActivity>();
     public DbSet<PasswordResetRequest> PasswordResetRequests => Set<PasswordResetRequest>();
+    public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -222,6 +223,23 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(r => r.Email).HasMaxLength(256).IsRequired();
             e.Property(r => r.Token).HasColumnType("nvarchar(max)").IsRequired();
             e.Property(r => r.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        // ── IMPORT BATCH ──────────────────────────────────────────────────────
+        modelBuilder.Entity<ImportBatch>(e =>
+        {
+            e.HasKey(b => b.Id);
+            e.Property(b => b.Id).HasDefaultValueSql("newsequentialid()");
+            e.Property(b => b.Note).HasMaxLength(500);
+            e.Property(b => b.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        modelBuilder.Entity<Person>(e =>
+        {
+            e.HasOne(p => p.ImportBatch)
+                .WithMany()
+                .HasForeignKey(p => p.ImportBatchId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

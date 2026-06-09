@@ -76,6 +76,15 @@ public class ClaudeImportService(
         var idMap = new Dictionary<int, Guid>();
         var peopleCreated = 0;
 
+        // Create the batch record first so we can tag each person
+        var batch = new ImportBatch
+        {
+            Id        = Guid.NewGuid(),
+            Note      = "Text paste import",
+            CreatedAt = DateTime.UtcNow,
+        };
+        ctx.ImportBatches.Add(batch);
+
         // Pass 1: create all selected people (no relationships yet)
         foreach (var p in selected)
         {
@@ -90,6 +99,7 @@ public class ClaudeImportService(
                 DeathDate = ParseDate(p.DeathDate),
                 Gender    = ParseGender(p.Gender),
                 FamilyId  = familyId,
+                ImportBatchId = batch.Id,
                 CreatedAt = DateTime.UtcNow,
                 BiographyNotes = BuildNotes(p),
             };
@@ -137,9 +147,57 @@ public class ClaudeImportService(
             });
             relCreated++;
         }
+        // Update batch totals
+        batch.PersonCount      = peopleCreated;
+        batch.RelationshipCount = relCreated;
         await ctx.SaveChangesAsync(ct);
 
         return new ImportResult(peopleCreated, relCreated);
+    }
+
+    public async Task<List<ImportBatch>> GetImportBatchesAsync(CancellationToken ct = default)
+    {
+        await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+        return await ctx.ImportBatches
+            .OrderByDescending(b => b.CreatedAt)
+            .ToListAsync(ct);
+    }
+
+    public async Task RollbackBatchAsync(Guid batchId, CancellationToken ct = default)
+    {
+        await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+        var now = DateTime.UtcNow;
+
+        var personIds = await ctx.People
+            .IgnoreQueryFilters()
+            .Where(p => p.ImportBatchId == batchId && p.DeletedAt == null)
+            .Select(p => p.Id)
+            .ToListAsync(ct);
+
+        if (personIds.Count == 0) goto markBatch;
+
+        // Soft-delete all persons in this batch
+        await ctx.People
+            .IgnoreQueryFilters()
+            .Where(p => p.ImportBatchId == batchId && p.DeletedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.DeletedAt, now), ct);
+
+        // Soft-delete relationships where BOTH sides were in this batch
+        await ctx.Relationships
+            .IgnoreQueryFilters()
+            .Where(r => r.DeletedAt == null
+                     && personIds.Contains(r.PersonAId)
+                     && personIds.Contains(r.PersonBId))
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.DeletedAt, now), ct);
+
+        markBatch:
+        var batch = await ctx.ImportBatches.FindAsync([batchId], ct);
+        if (batch != null)
+        {
+            batch.RolledBackAt = now;
+            await ctx.SaveChangesAsync(ct);
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

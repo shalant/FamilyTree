@@ -23,6 +23,9 @@ public partial class Person
     public Guid? FamilyId { get; set; }
     public virtual Family? Family { get; set; }
 
+    public Guid? ImportBatchId { get; set; }
+    public virtual ImportBatch? ImportBatch { get; set; }
+
     public DateTime? CreatedAt { get; set; }
     public Guid? CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }

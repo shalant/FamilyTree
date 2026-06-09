@@ -13,6 +13,7 @@
 
 @inject IPersonService PersonService
 @inject IAuthService AuthService
+@inject IImportService ImportService
 @inject IDbContextFactory<AppDbContext> DbFactory
 @inject UserManager<AppUser> UserManager
 @inject ToastService Toast
@@ -672,6 +673,69 @@
             }
         </MudTabPanel>
 
+        @* ═══════════════════════════════════════════════════════════════════
+            TAB 5 — IMPORTS
+           ═══════════════════════════════════════════════════════════════════ *@
+        <MudTabPanel Text="Imports" Icon="@Icons.Material.Outlined.Upload">
+
+            @if (_loadingImports)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_importBatches.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    No bulk imports yet. Use the Import page to add people from a document.
+                </MudAlert>
+            }
+            else
+            {
+                <MudPaper Elevation="0" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+                    <MudTable Items="_importBatches" Hover="true" Dense="true"
+                              Style="background:transparent;">
+                        <HeaderContent>
+                            <MudTh>Date</MudTh>
+                            <MudTh>People</MudTh>
+                            <MudTh>Relationships</MudTh>
+                            <MudTh>Status</MudTh>
+                            <MudTh></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.CreatedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</MudTd>
+                            <MudTd>@context.PersonCount</MudTd>
+                            <MudTd>@context.RelationshipCount</MudTd>
+                            <MudTd>
+                                @if (context.RolledBackAt.HasValue)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default">
+                                        Rolled back @context.RolledBackAt.Value.ToLocalTime().ToString("MMM d")
+                                    </MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Active</MudChip>
+                                }
+                            </MudTd>
+                            <MudTd>
+                                @if (!context.RolledBackAt.HasValue)
+                                {
+                                    <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                                               Color="Color.Error"
+                                               StartIcon="@Icons.Material.Outlined.Undo"
+                                               OnClick="@(() => ConfirmRollbackAsync(context))">
+                                        Roll back
+                                    </MudButton>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                    Rolling back removes all people and relationships from that import. People are soft-deleted and can be restored individually from the People tab.
+                </MudAlert>
+            }
+        </MudTabPanel>
+
     </MudTabs>
 </div>
 
@@ -682,11 +746,12 @@
     private void GoToTab(int index) => _activeTab = index;
 
     // ── Loading flags ────────────────────────────────────────────────────────
-    private bool _loading        = true;
-    private bool _loadingDeleted = true;
-    private bool _loadingAudit   = true;
-    private bool _loadingUsers   = true;
+    private bool _loading         = true;
+    private bool _loadingDeleted  = true;
+    private bool _loadingAudit    = true;
+    private bool _loadingUsers    = true;
     private bool _loadingActivity = true;
+    private bool _loadingImports  = true;
 
     // ── Dashboard stats ──────────────────────────────────────────────────────
     private int _totalPeople;
@@ -709,6 +774,7 @@
     private List<UserInvite>               _pendingInvitesList = [];
     private Dictionary<Guid, List<string>> _userRoles         = new();
     private List<PasswordResetRequest>     _pendingResets     = [];
+    private List<ImportBatch>              _importBatches     = [];
 
     // ── Invite creation ──────────────────────────────────────────────────────
     private string  _inviteEmail    = "";
@@ -763,7 +829,8 @@
             LoadActivityAsync(),
             LoadPeopleAsync(),
             LoadPendingInvitesAsync(),
-            LoadPendingResetsAsync());
+            LoadPendingResetsAsync(),
+            LoadImportBatchesAsync());
     }
 
     private async Task LoadDashboardAsync()
@@ -892,6 +959,32 @@
     {
         await AuthService.DismissResetRequestAsync(id);
         _pendingResets.RemoveAll(r => r.Id == id);
+    }
+
+    private async Task LoadImportBatchesAsync()
+    {
+        _importBatches = await ImportService.GetImportBatchesAsync();
+        _loadingImports = false;
+    }
+
+    private async Task ConfirmRollbackAsync(ImportBatch batch)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm",
+            $"Roll back the import from {batch.CreatedAt.ToLocalTime():MMM d, yyyy}? " +
+            $"This will soft-delete {batch.PersonCount} people and their relationships.");
+        if (!confirmed) return;
+
+        try
+        {
+            await ImportService.RollbackBatchAsync(batch.Id);
+            batch.RolledBackAt = DateTime.UtcNow;
+            Toast.Success($"Import rolled back — {batch.PersonCount} people removed.");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Toast.Error($"Rollback failed: {ex.Message}");
+        }
     }
 
     private async Task CreateInviteAsync()
