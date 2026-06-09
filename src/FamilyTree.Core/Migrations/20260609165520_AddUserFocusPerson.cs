@@ -9,10 +9,9 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FamilyTree.Core.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260609125817_AddUserFocusPerson")]
+    [Migration("20260609165520_AddUserFocusPerson")]
     public partial class AddUserFocusPerson : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<Guid>(
@@ -22,7 +21,6 @@ namespace FamilyTree.Core.Migrations
                 nullable: true);
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
