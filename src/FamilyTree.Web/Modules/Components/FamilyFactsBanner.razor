@@ -1,0 +1,154 @@
+@using FamilyTree.Shared.DTOs.Person
+@using MudBlazor
+@implements IDisposable
+
+@if (_visible && _facts.Count > 0)
+{
+    <div class="facts-banner @(_leaving ? "facts-banner--leave" : "")">
+        <div class="facts-banner-inner">
+            <svg width="13" height="16" viewBox="0 0 13 16" fill="none"
+                 style="flex-shrink:0;" aria-hidden="true">
+                <path d="M6.5 1C6.5 1 3 6 3 9.5a3.5 3.5 0 0 0 7 0C10 6 6.5 1 6.5 1Z"
+                      fill="var(--ft-green-600)" opacity="0.85"/>
+                <line x1="6.5" y1="13" x2="6.5" y2="15.5"
+                      stroke="var(--ft-green-600)" stroke-width="1.4" stroke-linecap="round"/>
+                <line x1="4.5" y1="14.5" x2="8.5" y2="14.5"
+                      stroke="var(--ft-green-600)" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+            <div class="facts-banner-text @(_fading ? "facts-banner-text--fading" : "")">
+                @_currentFact
+            </div>
+            <button class="facts-banner-close" @onclick="Dismiss" title="Dismiss">×</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<PersonDto> People { get; set; } = [];
+
+    private List<string> _facts = [];
+    private int          _index;
+    private string       _currentFact = "";
+    private bool         _fading;
+    private bool         _visible = true;
+    private bool         _leaving;
+    private Timer?       _timer;
+    private Random       _rng = new();
+
+    protected override void OnParametersSet()
+    {
+        if (People.Count == 0 || _facts.Count > 0) return;
+        _facts = BuildFacts();
+        if (_facts.Count == 0) return;
+        _index = _rng.Next(_facts.Count);
+        _currentFact = _facts[_index];
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender || _facts.Count == 0) return;
+        _timer = new Timer(Rotate, null, TimeSpan.FromSeconds(9), TimeSpan.FromSeconds(9));
+    }
+
+    private async void Rotate(object? _)
+    {
+        _fading = true;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(360);
+        _index = (_index + 1) % _facts.Count;
+        _currentFact = _facts[_index];
+        _fading = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void Dismiss()
+    {
+        _leaving = true;
+        StateHasChanged();
+        _timer?.Dispose();
+        _timer = null;
+        Task.Delay(300).ContinueWith(_ => InvokeAsync(() => { _visible = false; StateHasChanged(); }));
+    }
+
+    private List<string> BuildFacts()
+    {
+        var people    = People.Where(p => p.DeletedAt == null).ToList();
+        if (people.Count == 0) return [];
+
+        var withBirth = people.Where(p => p.BirthDate.HasValue).ToList();
+        var living    = people.Where(p => !p.IsDeceased).ToList();
+        var facts     = new List<string>();
+
+        // Family size
+        facts.Add($"Your family tree has {people.Count} {(people.Count == 1 ? "person" : "people")}.");
+
+        // Year span
+        if (withBirth.Count >= 2)
+        {
+            int oldest = withBirth.Min(p => p.BirthDate!.Value.Year);
+            int newest = withBirth.Max(p => p.BirthDate!.Value.Year);
+            if (newest > oldest)
+                facts.Add($"Your family spans {newest - oldest} years — from {oldest} to {newest}.");
+        }
+
+        // Living members
+        if (living.Count > 0 && living.Count < people.Count)
+            facts.Add($"{living.Count} of {people.Count} family members are still living.");
+
+        // Oldest ancestor
+        var ancestor = withBirth.OrderBy(p => p.BirthDate).FirstOrDefault();
+        if (ancestor is not null)
+            facts.Add($"The oldest ancestor is {ancestor.FullName}, born in {ancestor.BirthDate!.Value.Year}.");
+
+        // Youngest
+        var youngest = living.Where(p => p.BirthDate.HasValue).OrderByDescending(p => p.BirthDate).FirstOrDefault();
+        if (youngest is not null)
+            facts.Add($"The youngest family member is {youngest.FirstName}, born in {youngest.BirthDate!.Value.Year}.");
+
+        // Oldest living
+        var oldestLiving = living.Where(p => p.Age.HasValue).OrderByDescending(p => p.Age).FirstOrDefault();
+        if (oldestLiving is not null)
+            facts.Add($"{oldestLiving.FirstName} is the oldest living member at {oldestLiving.Age} years old.");
+
+        // Birth places (up to 3 random)
+        var withPlace = people.Where(p => !string.IsNullOrWhiteSpace(p.BirthPlace)).ToList();
+        foreach (var p in withPlace.OrderBy(_ => _rng.Next()).Take(3))
+            facts.Add($"{p.FirstName} was born in {p.BirthPlace}.");
+
+        // Most children
+        var bigParent = people.Where(p => (p.ChildIds?.Count ?? 0) >= 3)
+                              .OrderByDescending(p => p.ChildIds!.Count)
+                              .FirstOrDefault();
+        if (bigParent is not null)
+            facts.Add($"{bigParent.FirstName} has {bigParent.ChildIds!.Count} children in this tree.");
+
+        // Birthday this month
+        int thisMonth = DateTime.Today.Month;
+        var bornThisMonth = withBirth.Where(p => p.BirthDate!.Value.Month == thisMonth).ToList();
+        if (bornThisMonth.Count > 0)
+        {
+            var pick = bornThisMonth[_rng.Next(bornThisMonth.Count)];
+            facts.Add($"🎂 Born this month: {pick.FullName} ({pick.BirthDate!.Value.Year}).");
+        }
+
+        // Average age
+        var ages = living.Where(p => p.Age.HasValue).Select(p => p.Age!.Value).ToList();
+        if (ages.Count >= 4)
+            facts.Add($"The average age of living family members is {(int)ages.Average()} years.");
+
+        // Biography snippet
+        var withBio = people.Where(p => !string.IsNullOrWhiteSpace(p.BiographyNotes)).ToList();
+        if (withBio.Count > 0)
+        {
+            var pick    = withBio[_rng.Next(withBio.Count)];
+            var snippet = pick.BiographyNotes!.Length > 85
+                ? pick.BiographyNotes[..85].TrimEnd() + "…"
+                : pick.BiographyNotes;
+            facts.Add($"{pick.FirstName}: \"{snippet}\"");
+        }
+
+        return facts.Distinct().Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

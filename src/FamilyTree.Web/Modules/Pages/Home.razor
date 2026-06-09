@@ -79,6 +79,8 @@ else
                       FocusId="_focusPerson?.Id"
                       OnPersonSelected="HandlePersonSelected" />
 
+    <FamilyFactsBanner People="_people" />
+
     <div id="ft-toolbar" style="@_toolbarStyle">
         <CustomToolbar OnZoomIn="@(async () => { if (_canvas != null) await _canvas.ZoomIn(); })"
                        OnZoomOut="@(async () => { if (_canvas != null) await _canvas.ZoomOut(); })"
