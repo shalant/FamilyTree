@@ -154,7 +154,8 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.MigrateAsync();
+    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+    await db.Database.MigrateAsync(cts.Token);
 }
 
 if (!app.Environment.IsDevelopment())
