@@ -30,9 +30,13 @@ jobs:
       - name: Publish
         run: dotnet publish src/FamilyTree.Web/FamilyTree.Web.csproj -c Release -o publish/web
 
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ secrets.AZURE_WEB_APP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEB_PUBLISH_PROFILE }}
           package: publish/web
