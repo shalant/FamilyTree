@@ -13,6 +13,9 @@ public interface IAuthService
     Task<UserInvite?>                   ValidateInviteTokenAsync(string token);
     string                              GetRegistrationMode();
 
+    Task                                SaveFocusPersonAsync(Guid userId, Guid? personId);
+    Task<Guid?>                         GetFocusPersonIdAsync(Guid userId);
+
     Task<AuthResult>                    RequestPasswordResetAsync(string email);
     Task<AuthResult>                    ResetPasswordAsync(string email, string token, string newPassword);
     Task<List<PasswordResetRequest>>    GetPendingResetRequestsAsync();

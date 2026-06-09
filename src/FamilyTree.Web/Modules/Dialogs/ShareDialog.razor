@@ -1,0 +1,106 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:600">Share this tree</MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <div style="display:flex; flex-direction:column; gap:20px; padding-top:4px;">
+
+            @* ── Link row ─────────────────────────────────────────────────────── *@
+            <div style="display:flex; gap:8px; align-items:flex-start;">
+                <MudTextField @bind-Value="ShareUrl"
+                              ReadOnly="true"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Style="flex:1; font-size:12px;"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Outlined.Link" />
+                <MudButton Variant="Variant.Filled"
+                           Color="@(_copied ? Color.Success : Color.Primary)"
+                           StartIcon="@(_copied ? Icons.Material.Filled.Check : Icons.Material.Outlined.ContentCopy)"
+                           OnClick="CopyLinkAsync"
+                           Style="margin-top:3px; flex-shrink:0;">
+                    @(_copied ? "Copied!" : "Copy")
+                </MudButton>
+            </div>
+
+            @* ── Social buttons ───────────────────────────────────────────────── *@
+            <div>
+                <MudText Typo="Typo.caption"
+                         Style="color:var(--ft-text-secondary); margin-bottom:10px; display:block;">
+                    Share directly
+                </MudText>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <MudButton Variant="Variant.Outlined"
+                               Style="border-color:#000; color:#000; font-weight:700; min-width:0;"
+                               StartIcon="@Icons.Material.Filled.Share"
+                               OnClick="ShareTwitterAsync">
+                        X / Twitter
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Style="border-color:#1877f2; color:#1877f2; min-width:0;"
+                               StartIcon="@Icons.Material.Filled.Share"
+                               OnClick="ShareFacebookAsync">
+                        Facebook
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Style="border-color:#25d366; color:#25d366; min-width:0;"
+                               StartIcon="@Icons.Material.Filled.Chat"
+                               OnClick="ShareWhatsAppAsync">
+                        WhatsApp
+                    </MudButton>
+                </div>
+            </div>
+
+            <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                Anyone with this link can view the tree (login required).
+            </MudText>
+
+        </div>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())" Variant="Variant.Text">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public required string ShareUrl  { get; set; }
+    [Parameter] public required string FocusName { get; set; }
+
+    private bool _copied;
+
+    private async Task CopyLinkAsync()
+    {
+        await JS.InvokeVoidAsync("copyText", ShareUrl);
+        _copied = true;
+        StateHasChanged();
+        await Task.Delay(2200);
+        _copied = false;
+        StateHasChanged();
+    }
+
+    private async Task ShareTwitterAsync()
+    {
+        var text = Uri.EscapeDataString($"Explore {FocusName}'s family tree on ArborKin");
+        var url  = Uri.EscapeDataString(ShareUrl);
+        await JS.InvokeVoidAsync("ftOpenUrl", $"https://x.com/intent/tweet?text={text}&url={url}");
+    }
+
+    private async Task ShareFacebookAsync()
+    {
+        var url = Uri.EscapeDataString(ShareUrl);
+        await JS.InvokeVoidAsync("ftOpenUrl", $"https://www.facebook.com/sharer/sharer.php?u={url}");
+    }
+
+    private async Task ShareWhatsAppAsync()
+    {
+        var text = Uri.EscapeDataString($"Explore {FocusName}'s family tree: {ShareUrl}");
+        await JS.InvokeVoidAsync("ftOpenUrl", $"https://api.whatsapp.com/send?text={text}");
+    }
+}

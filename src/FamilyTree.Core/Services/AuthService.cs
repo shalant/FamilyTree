@@ -158,6 +158,20 @@ public class AuthService(
             && i.ExpiresAt > DateTime.UtcNow);
     }
 
+    public async Task SaveFocusPersonAsync(Guid userId, Guid? personId)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null) return;
+        user.FocusPersonId = personId;
+        await userManager.UpdateAsync(user);
+    }
+
+    public async Task<Guid?> GetFocusPersonIdAsync(Guid userId)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        return user?.FocusPersonId;
+    }
+
     public async Task<AuthResult> RequestPasswordResetAsync(string email)
     {
         var user = await userManager.FindByEmailAsync(email.Trim());

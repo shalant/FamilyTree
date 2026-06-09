@@ -13,6 +13,7 @@ public class AppUser : IdentityUser<Guid>
     public string? FeatureFlags { get; set; } // JSON: canEdit, isLocked, dailyCrudCap, isDonor
     public DateTime? CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    public Guid? FocusPersonId { get; set; }
 
     public virtual Person? Person { get; set; }
     public virtual ICollection<UserFamily> UserFamilies { get; set; } = new List<UserFamily>();

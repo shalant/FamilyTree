@@ -94,6 +94,7 @@ builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<FamilyTreeLayoutEngine>();
+builder.Services.AddScoped<SvgExportService>();
 builder.Services.AddSingleton(_ =>
 {
     var connectionString = builder.Configuration["AzureStorage:ConnectionString"];
@@ -201,7 +202,8 @@ if (!devAuthEnabled)
             return Results.LocalRedirect("/?loginError=invalid");
 
         var user = await userManager.FindByEmailAsync(email);
-        var redirect = user?.PersonId.HasValue == true ? $"/?focus={user.PersonId}" : "/";
+        var focusId = user?.FocusPersonId ?? user?.PersonId;
+        var redirect = focusId.HasValue ? $"/?focus={focusId}" : "/";
         return Results.LocalRedirect(redirect);
     }).RequireRateLimiting("login");
 
@@ -252,7 +254,8 @@ if (!devAuthEnabled)
         if (signInResult.Succeeded)
         {
             var u = await userManager.FindByEmailAsync(email);
-            return Results.LocalRedirect(u?.PersonId.HasValue == true ? $"/?focus={u.PersonId}" : "/");
+            var fid = u?.FocusPersonId ?? u?.PersonId;
+            return Results.LocalRedirect(fid.HasValue ? $"/?focus={fid}" : "/");
         }
 
         // Email account exists but Google not yet linked → link and sign in
@@ -261,7 +264,8 @@ if (!devAuthEnabled)
         {
             await userManager.AddLoginAsync(existing, info);
             await signInManager.SignInAsync(existing, isPersistent: true);
-            return Results.LocalRedirect(existing.PersonId.HasValue ? $"/?focus={existing.PersonId}" : "/");
+            var fid2 = existing.FocusPersonId ?? existing.PersonId;
+            return Results.LocalRedirect(fid2.HasValue ? $"/?focus={fid2}" : "/");
         }
 
         // Brand-new user — check registration mode

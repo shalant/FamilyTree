@@ -52,7 +52,7 @@
                          ValueChanged="OnPersonSelected"
                          ToStringFunc="@(p => p?.FullName ?? "")"
                          Placeholder="Search people…"
-                         Variant="Variant.Outlined"
+                         Variant="Variant.Filled"
                          Margin="Margin.Dense"
                          Adornment="Adornment.Start"
                          AdornmentIcon="@Icons.Material.Outlined.Search"
@@ -62,7 +62,7 @@
                          Clearable="true"
                          Dense="true"
                          MaxItems="8"
-                         Style="background:var(--ft-surface); border-radius:8px;"
+                         Style="border-radius:8px;"
                          PopoverClass="ft-search-popover">
             <ItemTemplate Context="person">
                 <div style="display:flex; align-items:center; gap:10px; padding:6px 4px;">
@@ -381,9 +381,8 @@
     {
         if (person is null) return;
 
-        // Navigate to the tree with this person as focus.
-        // Home.razor reads [SupplyParameterFromQuery] Guid? Focus.
-        Nav.NavigateTo($"/?focus={person.Id}");
+        // Navigate with ?view= — opens the drawer without re-centering the tree.
+        Nav.NavigateTo($"/?view={person.Id}");
         _searchSelection = null;    // clear the input after nav
     }
 

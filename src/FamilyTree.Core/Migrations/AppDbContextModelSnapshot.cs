@@ -57,6 +57,9 @@ namespace FamilyTree.Core.Migrations
                     b.Property<bool>("IsSuperUser")
                         .HasColumnType("bit");
 
+                    b.Property<Guid?>("FocusPersonId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("datetime2");
 

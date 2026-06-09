@@ -13,12 +13,28 @@
 @using MudBlazor
 
 @inject IPersonService PersonService
+@inject IAuthService AuthService
 @inject NavigationManager Nav
 @inject IDialogService DialogService
 @inject ToastService Toast
 @inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>ArborKin</PageTitle>
+
+@* Open Graph / Twitter card meta tags — populated from focus person for link previews *@
+@if (_focusPerson != null && _ready)
+{
+    <HeadContent>
+        <meta property="og:title"            content="@($"{_focusPerson.FirstName}'s Family Tree")" />
+        <meta property="og:description"      content="@($"Explore {_people.Count} family members across generations on ArborKin.")" />
+        <meta property="og:url"              content="@Nav.ToAbsoluteUri($"/?focus={_focusPerson.Id}")" />
+        <meta property="og:type"             content="website" />
+        <meta name="twitter:card"            content="summary" />
+        <meta name="twitter:title"           content="@($"{_focusPerson.FirstName}'s Family Tree")" />
+        <meta name="twitter:description"     content="@($"Explore {_people.Count} family members on ArborKin.")" />
+    </HeadContent>
+}
 
 <AuthorizeView>
     <NotAuthorized>
@@ -94,6 +110,7 @@ else
     private void HideIntro() => _showIntro = false;
 
     [SupplyParameterFromQuery] public Guid? Focus { get; set; }
+    [SupplyParameterFromQuery] public Guid? View  { get; set; }
     [SupplyParameterFromQuery] public string? LoginError { get; set; }
 
     private List<PersonDto> _people = [];
@@ -103,6 +120,9 @@ else
     private bool _loading = true;
     private bool _ready   = false;  // true once JS-dependent focus init is done
     private FamilyTreeCanvas? _canvas;
+    private Guid? _lastHandledFocus;  // prevents re-processing the same Focus on re-renders
+    private Guid? _lastHandledView;   // prevents re-processing the same View on re-renders
+    private Guid? _currentUserId;
 
     // ── Drag state ────────────────────────────────────────────────────────────
     private IJSObjectReference? _dragModule;
@@ -116,6 +136,11 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // Capture auth user ID for DB focus persistence
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userIdClaim = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (Guid.TryParse(userIdClaim, out var uid)) _currentUserId = uid;
+
         var result = await PersonService.GetAllAsync();
         if (result.Success)
         {
@@ -124,44 +149,65 @@ else
 
             if (!_people.Any())
             {
-                // No people — empty-state doesn't need a focus; skip JS init
                 _ready = true;
             }
             else if (Focus.HasValue)
             {
-                // URL param is available during SSR — use it directly, no JS needed
+                // Explicit URL focus param (shared link, login redirect)
+                _lastHandledFocus = Focus.Value;
                 _focusPerson = _people.FirstOrDefault(p => p.Id == Focus.Value)
                             ?? _people.FirstOrDefault();
-                try { await JS.InvokeVoidAsync("localStorage.setItem", "ft-focus", Focus.Value.ToString()); }
-                catch { }
+                if (_focusPerson?.Id == Focus.Value)
+                    _detailPerson = _focusPerson;
+                await PersistFocusAsync(_focusPerson?.Id);
                 _ready = true;
             }
-            // else: _ready stays false — OnAfterRenderAsync reads localStorage
+            // else: _ready stays false — OnAfterRenderAsync reads DB/localStorage
         }
         else
         {
             Toast.Error(result.Message);
-            _ready = true; // error path — don't block on JS
+            _ready = true;
         }
         _loading = false;
     }
 
+    // Handles same-page navigation (query param changes without full reload).
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_ready || _people.Count == 0) return;
+
+        // ?focus= re-centers the tree (shared links, login redirect)
+        if (Focus.HasValue && Focus.Value != _lastHandledFocus)
+        {
+            _lastHandledFocus = Focus.Value;
+            var person = _people.FirstOrDefault(p => p.Id == Focus.Value);
+            if (person != null)
+            {
+                _focusPerson  = person;
+                _detailPerson = person;
+                await PersistFocusAsync(person.Id);
+            }
+        }
+
+        // ?view= opens the drawer only — no tree re-centering
+        if (View.HasValue && View.Value != _lastHandledView)
+        {
+            _lastHandledView = View.Value;
+            var person = _people.FirstOrDefault(p => p.Id == View.Value);
+            if (person != null)
+                _detailPerson = person;
+        }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Read localStorage for focus once JS is available (only when not set by URL param)
+        // Resolve focus once JS is available (only when not set by URL param)
         if (!_ready && _people.Count > 0)
         {
-            try
-            {
-                var saved = await JS.InvokeAsync<string?>("localStorage.getItem", "ft-focus");
-                _focusPerson = Guid.TryParse(saved, out var savedId)
-                    ? _people.FirstOrDefault(p => p.Id == savedId) ?? _people.FirstOrDefault()
-                    : _people.FirstOrDefault();
-            }
-            catch { _focusPerson = _people.FirstOrDefault(); }
-
+            _focusPerson = await ResolveFocusAsync();
             _ready = true;
-            StateHasChanged(); // triggers one clean render with the correct person
+            StateHasChanged();
         }
 
         // Load the drag module once; call init on every render so that
@@ -211,10 +257,52 @@ else
 
     private async Task SetFocus(PersonDto person)
     {
-        _focusPerson = person;
+        _focusPerson  = person;
         _detailPerson = null;
-        try { await JS.InvokeVoidAsync("localStorage.setItem", "ft-focus", person.Id.ToString()); }
+        await PersistFocusAsync(person.Id);
+    }
+
+    // Saves focus to DB (if authenticated) and localStorage.
+    private async Task PersistFocusAsync(Guid? personId)
+    {
+        if (_currentUserId.HasValue && personId.HasValue)
+        {
+            try { await AuthService.SaveFocusPersonAsync(_currentUserId.Value, personId.Value); }
+            catch { }
+        }
+        try { await JS.InvokeVoidAsync("localStorage.setItem", "ft-focus", personId?.ToString() ?? ""); }
         catch { }
+    }
+
+    // Resolves initial focus: DB (authenticated) → localStorage → first person.
+    private async Task<PersonDto?> ResolveFocusAsync()
+    {
+        if (_currentUserId.HasValue)
+        {
+            try
+            {
+                var dbId = await AuthService.GetFocusPersonIdAsync(_currentUserId.Value);
+                if (dbId.HasValue)
+                {
+                    var dbPerson = _people.FirstOrDefault(p => p.Id == dbId.Value);
+                    if (dbPerson != null) return dbPerson;
+                }
+            }
+            catch { }
+        }
+
+        try
+        {
+            var saved = await JS.InvokeAsync<string?>("localStorage.getItem", "ft-focus");
+            if (Guid.TryParse(saved, out var savedId))
+            {
+                var lsPerson = _people.FirstOrDefault(p => p.Id == savedId);
+                if (lsPerson != null) return lsPerson;
+            }
+        }
+        catch { }
+
+        return _people.FirstOrDefault();
     }
 
     private async Task CenterTree()
@@ -252,9 +340,17 @@ else
 
     private async Task ShareView()
     {
-        var url = Nav.ToAbsoluteUri($"/?focus={_focusPerson?.Id}");
-        await JS.InvokeVoidAsync("copyText", url.ToString());
-        Toast.Success("Link copied to clipboard");
+        var url = Nav.ToAbsoluteUri($"/?focus={_focusPerson?.Id}").ToString();
+
+        var parameters = new DialogParameters<ShareDialog>
+        {
+            { d => d.ShareUrl,   url },
+            { d => d.FocusName,  _focusPerson?.FirstName ?? "Family" }
+        };
+
+        await DialogService.ShowAsync<ShareDialog>(
+            "Share", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
     }
 
     private async Task PromptDelete(PersonDto person)

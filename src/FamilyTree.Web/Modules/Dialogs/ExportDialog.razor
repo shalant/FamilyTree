@@ -4,8 +4,10 @@
 @using System.Text
 @using System.Text.Json
 @using System.Text.Json.Serialization
+@using FamilyTree.Web.Services
 
 @inject IJSRuntime JS
+@inject SvgExportService SvgExport
 
 <MudDialog>
     <TitleContent>
@@ -13,41 +15,82 @@
     </TitleContent>
 
     <DialogContent>
-        <div style="display:flex; flex-direction:column; gap:24px; padding-top:4px;">
-
-            @* ── Scope ── *@
-            <div>
-                <MudSelect T="string" Label="Scope" @bind-Value="_scope"
-                           Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
-                    <MudSelectItem Value="@("all")">
-                        Full tree — @People.Count @(People.Count == 1 ? "person" : "people")
-                    </MudSelectItem>
-                    <MudSelectItem Value="@("immediate")" Disabled="@(FocusPerson == null)">
-                        @(FocusPerson != null ? $"{FocusPerson.FirstName}'s immediate family" : "Immediate family (no focus set)")
-                    </MudSelectItem>
-                    <MudSelectItem Value="@("ancestors")" Disabled="@(FocusPerson == null)">
-                        @(FocusPerson != null ? $"Ancestors of {FocusPerson.FirstName}" : "Ancestors (no focus set)")
-                    </MudSelectItem>
-                    <MudSelectItem Value="@("descendants")" Disabled="@(FocusPerson == null)">
-                        @(FocusPerson != null ? $"Descendants of {FocusPerson.FirstName}" : "Descendants (no focus set)")
-                    </MudSelectItem>
-                </MudSelect>
-                <MudText Typo="Typo.caption" Style="color:var(--ft-text-secondary); margin-top:6px; display:block;">
-                    @{ var count = ScopedCount; }
-                    @count @(count == 1 ? "person" : "people") will be included
-                </MudText>
-            </div>
+        <div style="display:flex; flex-direction:column; gap:20px; padding-top:4px;">
 
             @* ── Format ── *@
-            <div>
-                <MudSelect T="string" Label="Format" @bind-Value="_format"
-                           Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
-                           HelperText="PDF, SVG, and GEDCOM coming soon">
-                    <MudSelectItem Value="@("json")">JSON — structured data, all fields</MudSelectItem>
-                    <MudSelectItem Value="@("csv")">CSV — spreadsheet-friendly, key fields</MudSelectItem>
-                    <MudSelectItem Value="@("_more")" Disabled="true">── More formats on the way ──</MudSelectItem>
-                </MudSelect>
-            </div>
+            <MudSelect T="string" Label="Format" @bind-Value="_format"
+                       Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
+                <MudSelectItem Value="@("svg")">Visual (SVG) — scalable tree image</MudSelectItem>
+                <MudSelectItem Value="@("png")">Image (PNG) — easy to share snapshot</MudSelectItem>
+                <MudSelectItem Value="@("json")">JSON — structured data, all fields</MudSelectItem>
+                <MudSelectItem Value="@("csv")">CSV — spreadsheet-friendly</MudSelectItem>
+            </MudSelect>
+
+            @* ── Visual style & theme (svg/png only) ── *@
+            @if (_format is "svg" or "png")
+            {
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <MudSelect T="SvgStyle" Label="Style" @bind-Value="_style"
+                               Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
+                        <MudSelectItem Value="SvgStyle.Classic">Classic</MudSelectItem>
+                        <MudSelectItem Value="SvgStyle.Minimal">Minimal</MudSelectItem>
+                        <MudSelectItem Value="SvgStyle.Dark">Dark</MudSelectItem>
+                    </MudSelect>
+                    <MudSelect T="SvgColorTheme" Label="Color theme" @bind-Value="_theme"
+                               Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
+                        <MudSelectItem Value="SvgColorTheme.Forest">Forest</MudSelectItem>
+                        <MudSelectItem Value="SvgColorTheme.Ocean">Ocean</MudSelectItem>
+                        <MudSelectItem Value="SvgColorTheme.Sepia">Sepia</MudSelectItem>
+                        <MudSelectItem Value="SvgColorTheme.Mono">Mono</MudSelectItem>
+                    </MudSelect>
+                </div>
+            }
+
+            @* ── Scope ── *@
+            <MudSelect T="string" Label="Scope" @bind-Value="_scope"
+                       Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
+                <MudSelectItem Value="@("all")">
+                    Full tree — @People.Count @(People.Count == 1 ? "person" : "people")
+                </MudSelectItem>
+                <MudSelectItem Value="@("immediate")" Disabled="@(FocusPerson == null)">
+                    @(FocusPerson != null ? $"{FocusPerson.FirstName}'s immediate family" : "Immediate family (no focus set)")
+                </MudSelectItem>
+                <MudSelectItem Value="@("ancestors")" Disabled="@(FocusPerson == null)">
+                    @(FocusPerson != null ? $"Ancestors of {FocusPerson.FirstName}" : "Ancestors (no focus set)")
+                </MudSelectItem>
+                <MudSelectItem Value="@("descendants")" Disabled="@(FocusPerson == null)">
+                    @(FocusPerson != null ? $"Descendants of {FocusPerson.FirstName}" : "Descendants (no focus set)")
+                </MudSelectItem>
+            </MudSelect>
+
+            @* ── Degrees of separation (only when focus person is set) ── *@
+            @if (FocusPerson != null)
+            {
+                <div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                        <MudText Typo="Typo.caption" Style="color:var(--ft-text-primary); font-weight:500;">
+                            Degrees of separation
+                        </MudText>
+                        <MudText Typo="Typo.caption" Style="color:var(--ft-text-secondary);">
+                            @{ var depthDesc = _maxDepth == 0 ? "All connections" : $"{_maxDepth} {(_maxDepth == 1 ? "degree" : "degrees")} from {FocusPerson!.FirstName}"; }
+                        @depthDesc
+                        </MudText>
+                    </div>
+                    <MudSlider T="int" @bind-Value="_maxDepth" Min="0" Max="6" Step="1"
+                               Color="Color.Primary" Size="Size.Small">
+                    </MudSlider>
+                    <div style="display:flex; justify-content:space-between;">
+                        <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">All</MudText>
+                        <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">6°</MudText>
+                    </div>
+                </div>
+            }
+
+            @* ── People count summary ── *@
+            <MudText Typo="Typo.caption" Style="color:var(--ft-text-secondary);">
+                @{ var count = ScopedCount; }
+                @count @(count == 1 ? "person" : "people") will be included
+            </MudText>
 
         </div>
     </DialogContent>
@@ -69,28 +112,41 @@
     [Parameter] public required List<PersonDto> People { get; set; }
     [Parameter] public PersonDto? FocusPerson { get; set; }
 
-    private string _scope  = "all";
-    private string _format = "json";
-    private bool   _exporting;
+    private string       _scope    = "all";
+    private string       _format   = "svg";
+    private SvgStyle     _style    = SvgStyle.Classic;
+    private SvgColorTheme _theme   = SvgColorTheme.Forest;
+    private int          _maxDepth = 0;  // 0 = unlimited
+
+    private bool _exporting;
 
     private int ScopedCount => GetScopedPeople().Count;
 
-    // ── Scope filtering ───────────────────────────────────────────────────────
+    // ── Scope + depth filtering ───────────────────────────────────────────────
 
-    private List<PersonDto> GetScopedPeople() => _scope switch
+    private List<PersonDto> GetScopedPeople()
     {
-        "immediate"  when FocusPerson != null => ImmediateFamily(FocusPerson),
-        "ancestors"  when FocusPerson != null => Ancestors(FocusPerson),
-        "descendants" when FocusPerson != null => Descendants(FocusPerson),
-        _ => People
-    };
+        var scoped = _scope switch
+        {
+            "immediate"   when FocusPerson != null => ImmediateFamily(FocusPerson),
+            "ancestors"   when FocusPerson != null => Ancestors(FocusPerson),
+            "descendants" when FocusPerson != null => Descendants(FocusPerson),
+            _ => People
+        };
+
+        // Apply degrees-of-separation filter on top of scope (only when focus is set)
+        if (_maxDepth > 0 && FocusPerson != null)
+            scoped = WithinDegrees(scoped, FocusPerson.Id, _maxDepth);
+
+        return scoped;
+    }
 
     private List<PersonDto> ImmediateFamily(PersonDto focus)
     {
         var ids = new HashSet<Guid> { focus.Id };
-        foreach (var id in focus.ParentIds      ?? []) ids.Add(id);
-        foreach (var id in focus.ChildIds       ?? []) ids.Add(id);
-        foreach (var id in focus.SpouseIds      ?? []) ids.Add(id);
+        foreach (var id in focus.ParentIds       ?? []) ids.Add(id);
+        foreach (var id in focus.ChildIds        ?? []) ids.Add(id);
+        foreach (var id in focus.SpouseIds       ?? []) ids.Add(id);
         foreach (var id in focus.FormerSpouseIds ?? []) ids.Add(id);
         return People.Where(p => ids.Contains(p.Id)).ToList();
     }
@@ -127,6 +183,36 @@
         return People.Where(p => result.Contains(p.Id)).ToList();
     }
 
+    // BFS across all relationship types up to maxDepth hops from the focus person.
+    private List<PersonDto> WithinDegrees(List<PersonDto> pool, Guid focusId, int maxDepth)
+    {
+        var byId  = pool.ToDictionary(p => p.Id);
+        var dist  = new Dictionary<Guid, int> { [focusId] = 0 };
+        var queue = new Queue<Guid>();
+        queue.Enqueue(focusId);
+        while (queue.Count > 0)
+        {
+            var id = queue.Dequeue();
+            if (!byId.TryGetValue(id, out var p)) continue;
+            var d = dist[id];
+            if (d >= maxDepth) continue;
+            var neighbors = (p.ParentIds       ?? [])
+                .Concat(p.ChildIds        ?? [])
+                .Concat(p.SpouseIds       ?? [])
+                .Concat(p.FormerSpouseIds ?? [])
+                .Concat(p.SiblingIds      ?? []);
+            foreach (var nid in neighbors)
+            {
+                if (!dist.ContainsKey(nid))
+                {
+                    dist[nid] = d + 1;
+                    queue.Enqueue(nid);
+                }
+            }
+        }
+        return pool.Where(p => dist.ContainsKey(p.Id)).ToList();
+    }
+
     // ── Export ────────────────────────────────────────────────────────────────
 
     private async Task ExportAsync()
@@ -140,7 +226,27 @@
             ? "full-tree"
             : $"{FocusPerson?.LastName ?? "export"}-{_scope}";
 
-        if (_format == "json")
+        var svgTitle = _scope switch
+        {
+            "immediate"   => $"{FocusPerson?.FirstName}'s Immediate Family",
+            "ancestors"   => $"Ancestors of {FocusPerson?.FirstName}",
+            "descendants" => $"Descendants of {FocusPerson?.FirstName}",
+            _             => "Family Tree"
+        };
+
+        if (_format == "svg")
+        {
+            var svg = SvgExport.GenerateSvg(people, FocusPerson, svgTitle, _style, _theme);
+            await JS.InvokeVoidAsync("ftDownloadFile",
+                $"familytree-{tag}-{timestamp}.svg", svg, "image/svg+xml;charset=utf-8");
+        }
+        else if (_format == "png")
+        {
+            var svg = SvgExport.GenerateSvg(people, FocusPerson, svgTitle, _style, _theme);
+            await JS.InvokeVoidAsync("ftSvgToPng",
+                svg, $"familytree-{tag}-{timestamp}.png");
+        }
+        else if (_format == "json")
         {
             var opts = new JsonSerializerOptions
             {
@@ -189,7 +295,6 @@
         return sb.ToString();
     }
 
-    // RFC 4180-compliant CSV quoting
     private static string Q(string? v)
     {
         if (v is null) return "";
