@@ -9,8 +9,8 @@
             </div>
 
             <MudStack Spacing="3">
+                <div class="ft-field-label">Feature title</div>
                 <MudTextField @bind-Value="_title"
-                              Label="Feature title"
                               Placeholder="e.g. Export to PDF, Dark mode tree, Mobile layout…"
                               Required="true"
                               RequiredError="Please give your idea a short title."
@@ -32,8 +32,8 @@
                     <MudSelectItem Value="@("Other")">Other</MudSelectItem>
                 </MudSelect>
 
+                <div class="ft-field-label">Description</div>
                 <MudTextField @bind-Value="_description"
-                              Label="Description"
                               Placeholder="Describe the problem it solves or the workflow it improves…"
                               Lines="4"
                               Variant="Variant.Outlined"
@@ -48,8 +48,8 @@
                     <MudSelectItem Value="@("Blocking my use of the app")">Blocking my use of the app</MudSelectItem>
                 </MudSelect>
 
+                <div class="ft-field-label">Your email (optional)</div>
                 <MudTextField @bind-Value="_email"
-                              Label="Your email (optional)"
                               Placeholder="So we can follow up with you"
                               InputType="InputType.Email"
                               Variant="Variant.Outlined"

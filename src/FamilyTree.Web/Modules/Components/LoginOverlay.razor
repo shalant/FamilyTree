@@ -5,7 +5,7 @@
 
         @* ── Branding ──────────────────────────────────────────────────────── *@
         <div style="display:flex; justify-content:center; margin-bottom:4px; user-select:none;">
-            <img src="/images/arborkin-logo.png" alt="ArborKin"
+            <img src="/images/arborkin-logo__transparent.png" alt="ArborKin"
                  style="height:90px;" />
         </div>
         <div class="intro-subtitle" style="margin-bottom:20px;">
@@ -66,16 +66,18 @@
             <input type="hidden" name="email"    value="@_email" />
             <input type="hidden" name="password" value="@_password" />
 
+            <div class="ft-field-label">Email</div>
             <MudTextField @bind-Value="_email"
-                          Label="Email"
+                          Placeholder="your@email.com"
                           Variant="Variant.Outlined"
                           InputType="InputType.Email"
                           Margin="Margin.Dense"
                           Immediate="true"
                           Class="mb-3" />
 
+            <div class="ft-field-label">Password</div>
             <MudTextField @bind-Value="_password"
-                          Label="Password"
+                          Placeholder="••••••••••"
                           Variant="Variant.Outlined"
                           InputType="InputType.Password"
                           Margin="Margin.Dense"

@@ -86,42 +86,47 @@
 
             @* ── Name row ──────────────────────────────────────────────────── *@
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                <MudTextField @bind-Value="_firstName"
-                              Label="First name"
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Disabled="_loading"
-                              Error="@(!string.IsNullOrEmpty(_firstNameError))"
-                              ErrorText="@_firstNameError" />
-
-                <MudTextField @bind-Value="_lastName"
-                              Label="Last name"
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Disabled="_loading"
-                              Error="@(!string.IsNullOrEmpty(_lastNameError))"
-                              ErrorText="@_lastNameError" />
+                <div>
+                    <div class="ft-field-label">First name</div>
+                    <MudTextField @bind-Value="_firstName"
+                                  Placeholder="e.g. Jane"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Disabled="_loading"
+                                  Error="@(!string.IsNullOrEmpty(_firstNameError))"
+                                  ErrorText="@_firstNameError" />
+                </div>
+                <div>
+                    <div class="ft-field-label">Last name</div>
+                    <MudTextField @bind-Value="_lastName"
+                                  Placeholder="e.g. Smith"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Disabled="_loading"
+                                  Error="@(!string.IsNullOrEmpty(_lastNameError))"
+                                  ErrorText="@_lastNameError" />
+                </div>
             </div>
 
             @* ── Email ─────────────────────────────────────────────────────── *@
+            <div class="ft-field-label" style="margin-top:12px;">Email address</div>
             <MudTextField @bind-Value="_email"
-                          Label="Email address"
+                          Placeholder="you@example.com"
                           Variant="Variant.Outlined"
                           InputType="InputType.Email"
                           Margin="Margin.Dense"
                           Disabled="@(_loading || _invite != null)"
-                          Class="mt-3"
                           Error="@(!string.IsNullOrEmpty(_emailError))"
                           ErrorText="@_emailError" />
 
             @* ── Password ──────────────────────────────────────────────────── *@
+            <div class="ft-field-label" style="margin-top:12px;">Password</div>
             <MudTextField @bind-Value="_password"
-                          Label="Password"
+                          Placeholder="Minimum 10 characters"
                           Variant="Variant.Outlined"
                           InputType="@(_showPassword ? InputType.Text : InputType.Password)"
                           Margin="Margin.Dense"
                           Disabled="_loading"
-                          Class="mt-3"
                           Adornment="Adornment.End"
                           AdornmentIcon="@(_showPassword ? Icons.Material.Outlined.VisibilityOff
                                                          : Icons.Material.Outlined.Visibility)"
@@ -129,16 +134,14 @@
                           Error="@(!string.IsNullOrEmpty(_passwordError))"
                           ErrorText="@_passwordError" />
 
-            <div class="auth-password-hint">Minimum 10 characters</div>
-
             @* ── Confirm password ──────────────────────────────────────────── *@
+            <div class="ft-field-label" style="margin-top:12px;">Confirm password</div>
             <MudTextField @bind-Value="_confirmPassword"
-                          Label="Confirm password"
+                          Placeholder="Re-enter your password"
                           Variant="Variant.Outlined"
                           InputType="@(_showConfirm ? InputType.Text : InputType.Password)"
                           Margin="Margin.Dense"
                           Disabled="_loading"
-                          Class="mt-3"
                           Adornment="Adornment.End"
                           AdornmentIcon="@(_showConfirm ? Icons.Material.Outlined.VisibilityOff
                                                         : Icons.Material.Outlined.Visibility)"
