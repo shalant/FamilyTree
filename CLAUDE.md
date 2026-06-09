@@ -25,7 +25,19 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<connstr>" --proj
 dotnet user-secrets set "SuperUser:Email"      "<email>"  --project src/FamilyTree.Web
 dotnet user-secrets set "Google:ClientId"      "<id>"     --project src/FamilyTree.Web
 dotnet user-secrets set "Google:ClientSecret"  "<secret>" --project src/FamilyTree.Web
+
+# Email (optional — omit SmtpHost to use console-log fallback in dev)
+dotnet user-secrets set "Email:SmtpHost"    "<host>"    --project src/FamilyTree.Web
+dotnet user-secrets set "Email:SmtpPort"    "587"       --project src/FamilyTree.Web
+dotnet user-secrets set "Email:EnableSsl"   "true"      --project src/FamilyTree.Web
+dotnet user-secrets set "Email:Username"    "<user>"    --project src/FamilyTree.Web
+dotnet user-secrets set "Email:Password"    "<pass>"    --project src/FamilyTree.Web
+dotnet user-secrets set "Email:FromAddress" "<from>"    --project src/FamilyTree.Web
+dotnet user-secrets set "Email:FromName"    "ArborKin"  --project src/FamilyTree.Web
 ```
+
+Azure App Service config keys (double-underscore for nested):
+`Email__SmtpHost`, `Email__SmtpPort`, `Email__EnableSsl`, `Email__Username`, `Email__Password`, `Email__FromAddress`, `Email__FromName`
 
 ## Architecture Overview
 

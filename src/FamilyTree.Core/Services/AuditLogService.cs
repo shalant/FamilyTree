@@ -17,6 +17,7 @@ public class AuditLogService(
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
             ctx.AuditLogs.Add(new AuditLog
             {
                 Action = action,
@@ -28,6 +29,20 @@ public class AuditLogService(
                 IpAddress = ipAddress,
                 Timestamp = DateTime.UtcNow
             });
+
+            if (userId.HasValue)
+            {
+                var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                var activity = await ctx.UserActivities
+                    .FirstOrDefaultAsync(a => a.UserId == userId && a.Date == today, ct);
+
+                if (activity is null)
+                    ctx.UserActivities.Add(new UserActivity
+                        { UserId = userId, Date = today, ActionCount = 1 });
+                else
+                    activity.ActionCount++;
+            }
+
             await ctx.SaveChangesAsync(ct);
         }
         catch (Exception ex)

@@ -12,7 +12,9 @@ namespace FamilyTree.Core.Services;
 
 public class RelationshipService(
     IDbContextFactory<AppDbContext> dbFactory,
-    ILogger<RelationshipService> logger) : IRelationshipService
+    ILogger<RelationshipService> logger,
+    IAuditLogService auditLog,
+    ICurrentUserService currentUser) : IRelationshipService
 {
     public async Task<ServiceResponse<List<RelationshipDto>>> GetAllAsync(
         CancellationToken ct = default)
@@ -101,6 +103,7 @@ public class RelationshipService(
             if (ruleError != null)
                 return ServiceResponse<RelationshipDto>.Fail(ruleError);
 
+            var userId = currentUser.UserId;
             var relationship = new Relationship
             {
                 PersonAId = a,
@@ -108,11 +111,14 @@ public class RelationshipService(
                 Type = request.Type,
                 StartDate = request.StartDate,
                 Notes = request.Notes?.Trim(),
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId,
             };
 
             ctx.Relationships.Add(relationship);
             await ctx.SaveChangesAsync(ct);
+
+            _ = auditLog.LogAsync("Create", "Relationship", relationship.Id, userId: userId);
 
             return ServiceResponse<RelationshipDto>.Ok(RelationshipMapper.MapRelationshipToDto(relationship));
         }
@@ -157,6 +163,7 @@ public class RelationshipService(
                 return ServiceResponse<RelationshipDto>.Fail(ruleError);
 
             // Apply updates
+            var userId = currentUser.UserId;
             rel.PersonAId = a;
             rel.PersonBId = b;
             rel.Type = request.Type;
@@ -164,8 +171,11 @@ public class RelationshipService(
             rel.EndDate = request.EndDate;
             rel.Notes = request.Notes?.Trim();
             rel.UpdatedAt = DateTime.UtcNow;
+            rel.UpdatedBy = userId;
 
             await ctx.SaveChangesAsync(ct);
+
+            _ = auditLog.LogAsync("Update", "Relationship", id, userId: userId);
 
             return ServiceResponse<RelationshipDto>.Ok(RelationshipMapper.MapRelationshipToDto(rel));
         }
@@ -202,6 +212,8 @@ public class RelationshipService(
 
             ctx.Relationships.Remove(relationship);
             await ctx.SaveChangesAsync(ct);
+
+            _ = auditLog.LogAsync("Delete", "Relationship", id, userId: currentUser.UserId);
 
             return ServiceResponse.Ok();
         }

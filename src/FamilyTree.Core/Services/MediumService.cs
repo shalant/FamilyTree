@@ -10,7 +10,9 @@ namespace FamilyTree.Core.Services;
 public class MediumService(
     IDbContextFactory<AppDbContext> dbFactory,
     IBlobStorageService blobStorage,
-    ILogger<MediumService> logger) : IMediumService
+    ILogger<MediumService> logger,
+    IAuditLogService auditLog,
+    ICurrentUserService currentUser) : IMediumService
 {
     // ─────────────────────────────────────────────────────────────
     //  GET ALL
@@ -116,6 +118,7 @@ public class MediumService(
             var fileName = $"{dto.Type}-{Guid.NewGuid()}{Path.GetExtension(dto.FileName)}";
             var url = await blobStorage.UploadAsync(fileStream, fileName, dto.MimeType, ct);
 
+            var userId = currentUser.UserId;
             var medium = new Medium
             {
                 Id = Guid.NewGuid(),
@@ -126,10 +129,13 @@ public class MediumService(
                 Type = dto.Type,
                 Url = url,
                 CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId,
             };
 
             ctx.Media.Add(medium);
             await ctx.SaveChangesAsync(ct);
+
+            _ = auditLog.LogAsync("Create", "Medium", medium.Id, userId: userId);
 
             return ServiceResponse<MediumDto>.Ok(MapToDto(medium));
         }
@@ -159,12 +165,16 @@ public class MediumService(
             if (medium is null)
                 return ServiceResponse<MediumDto>.Fail($"Medium {id} not found.");
 
+            var userId = currentUser.UserId;
             medium.Caption = dto.Caption;
             medium.Type = dto.Type;
             medium.UpdatedAt = DateTime.UtcNow;
+            medium.UpdatedBy = userId;
 
             ctx.Media.Update(medium);
             await ctx.SaveChangesAsync(ct);
+
+            _ = auditLog.LogAsync("Update", "Medium", id, userId: userId);
 
             return ServiceResponse<MediumDto>.Ok(MapToDto(medium));
         }
@@ -189,11 +199,12 @@ public class MediumService(
             if (medium is null)
                 return ServiceResponse.Fail($"Medium {id} not found.");
 
-            // TODO: Delete from blob storage
             _ = await blobStorage.DeleteAsync(medium.Url, ct);
 
             ctx.Media.Remove(medium);
             await ctx.SaveChangesAsync(ct);
+
+            _ = auditLog.LogAsync("Delete", "Medium", id, userId: currentUser.UserId);
 
             return ServiceResponse.Ok();
         }

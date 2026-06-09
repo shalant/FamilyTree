@@ -9,7 +9,8 @@ namespace FamilyTree.Core.Services;
 public class AuthService(
     UserManager<AppUser> userManager,
     IConfiguration config,
-    IDbContextFactory<AppDbContext> dbFactory) : IAuthService
+    IDbContextFactory<AppDbContext> dbFactory,
+    IEmailSender emailSender) : IAuthService
 {
     public string GetRegistrationMode() =>
         config["Auth:RegistrationMode"] ?? "Open";
@@ -172,7 +173,7 @@ public class AuthService(
         return user?.FocusPersonId;
     }
 
-    public async Task<AuthResult> RequestPasswordResetAsync(string email)
+    public async Task<AuthResult> RequestPasswordResetAsync(string email, string? baseUrl = null)
     {
         var user = await userManager.FindByEmailAsync(email.Trim());
         if (user != null)
@@ -197,6 +198,26 @@ public class AuthService(
                 ExpiresAt = DateTime.UtcNow.AddHours(24),
             });
             await ctx.SaveChangesAsync();
+
+            if (!string.IsNullOrWhiteSpace(baseUrl))
+            {
+                var link = $"{baseUrl.TrimEnd('/')}/reset-password" +
+                           $"?email={Uri.EscapeDataString(email.Trim())}" +
+                           $"&token={Uri.EscapeDataString(token)}";
+                _ = emailSender.SendAsync(
+                    email.Trim(),
+                    "Reset your ArborKin password",
+                    $"""
+                    <p>Hi,</p>
+                    <p>We received a request to reset the password for your ArborKin account.
+                    Click the link below to choose a new password. This link expires in 24 hours.</p>
+                    <p><a href="{link}" style="font-weight:600;">Reset my password</a></p>
+                    <p style="color:#666; font-size:13px;">
+                        If you didn't request this, you can safely ignore this email.
+                        Your password will not change.
+                    </p>
+                    """);
+            }
         }
         return new AuthResult(true);
     }

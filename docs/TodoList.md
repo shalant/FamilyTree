@@ -4,16 +4,19 @@
 
 ## In Progress / Up Next
 
-- [ ] **DB performance indexes** — add filtered composite indexes on `(FamilyId, LastName, FirstName) WHERE DeletedAt IS NULL` (People), `(PersonAId/PersonBId) WHERE DeletedAt IS NULL` (Relationships), and `(EntityType, EntityId, Timestamp DESC)` (AuditLog) via new EF migration `AddPerformanceIndexes`
-- [ ] **Testing** — bUnit component tests for `PersonForm`, `FamilyTreeCanvas`; xUnit + FluentAssertions integration tests for `PersonService` and `RelationshipService` against real DB
-- [ ] **Email verification & password reset** — `UserManager` token flow + SendGrid; log token URL to console in dev
-- [ ] **Family scoping** — add `.Where(p => p.FamilyId == currentFamilyId)` to all service queries; populate `CreatedBy`/`UpdatedBy`/`AuditLog.UserId` from current user on every write
-- [ ] **Feature request backend** — store `RequestFeatureDialog` submissions in a DB table or forward via SendGrid
+- [ ] **Deploy** — push accumulated changes (performance indexes, family scoping, email flow) to production; verify `DevAuth__Enabled = false` in Azure config
+- [ ] **Feature request backend** — store `RequestFeatureDialog` submissions in a DB table
+- [ ] **Email verification on register** — send confirmation email when a new account is created; block login until verified (currently accounts work immediately without verification)
+- [ ] **Mobile layout** — tree canvas and forms are not optimized for small screens
 
 ---
 
 ## Recently Completed
 
+- [x] **Password reset email** — `IEmailSender` abstraction; `SmtpEmailSender` (Gmail SMTP) + `LogEmailSender` (dev console fallback); `AuthService` sends reset link automatically; Gmail App Password configured in Azure
+- [x] **Family scoping** — `ICurrentUserService` (interface in Core, impl in Web); `FamilyId` claim baked into auth cookie; all service queries scoped; `CreatedBy`/`UpdatedBy`/`DeletedBy` stamped on every write; super-users bypass scoping
+- [x] **DB performance indexes** — filtered composite indexes on People, Relationships, AuditLogs via `AddPerformanceIndexes` migration
+- [x] **Testing** — 11 xUnit tests with InMemory EF; covers create/audit stamping/family scoping/soft delete/restore/canonical ordering/duplicate prevention
 - [x] **Auth** — ASP.NET Core Identity with cookie auth; Google OAuth + email/password login; invite-only registration (`Auth:RegistrationMode`); rate limiting on `/auth/do-login` (5 req/15 min/IP); account lockout after 5 failed attempts; super-user bootstrap on startup; `LoginOverlay`, `Register.razor` with `?invite=<token>` query param; `DevAuth` bypass for dev; `Admin.razor` with dashboard, deleted people, audit log, users, and activity tabs
 - [x] **SVG export — multi-style/theme** — `ExportDialog` updated with Style (Classic/Minimal/Dark), Color Theme (Forest/Ocean/Sepia/Mono), and Degrees of Separation slider; BFS filter to include only people within N hops of focus person; `SvgExportService` rewired with 12 hand-tuned palettes, radial gradients, drop shadows, decade bands (Classic), and flat rendering (Minimal/Dark)
 - [x] **Focus persisted to DB** — `AppUser.FocusPersonId` column added (migration `20260609165520_AddUserFocusPerson`); `IAuthService.SaveFocusPersonAsync` / `GetFocusPersonIdAsync`; `ResolveFocusAsync` chains DB → localStorage → first person; login/Google OAuth redirects to `/?focus=<id>` using `FocusPersonId ?? PersonId`

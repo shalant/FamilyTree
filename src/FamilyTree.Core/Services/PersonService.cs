@@ -1,4 +1,4 @@
-﻿using FamilyTree.Core.Data;
+using FamilyTree.Core.Data;
 using FamilyTree.Core.Mappers;
 using FamilyTree.Core.Models;
 using FamilyTree.Shared;
@@ -12,7 +12,8 @@ namespace FamilyTree.Core.Services;
 public class PersonService(
     IDbContextFactory<AppDbContext> dbFactory,
     ILogger<PersonService> logger,
-    IAuditLogService auditLog) : IPersonService
+    IAuditLogService auditLog,
+    ICurrentUserService currentUser) : IPersonService
 {
     // ─────────────────────────────────────────────────────────────
     //  GET ALL
@@ -24,8 +25,11 @@ public class PersonService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
+            var familyId = currentUser.FamilyId;
+
             var people = await ctx.People
                 .AsNoTracking()
+                .Where(p => !familyId.HasValue || p.FamilyId == familyId)
                 .OrderBy(p => p.LastName)
                 .ThenBy(p => p.FirstName)
                 .ToListAsync(ct);
@@ -36,7 +40,7 @@ public class PersonService(
                 .AsNoTracking()
                 .ToListAsync(ct);
 
-            // Exclude relationships where either party is soft-deleted
+            // Exclude relationships where either party is soft-deleted or outside this family
             relationships = relationships
                 .Where(r => peopleIds.Contains(r.PersonAId) && peopleIds.Contains(r.PersonBId))
                 .ToList();
@@ -113,6 +117,7 @@ public class PersonService(
             if (spouseError != null) return ServiceResponse<PersonDto>.Fail(spouseError);
 
             var now = DateTime.UtcNow;
+            var userId = currentUser.UserId;
 
             var person = new Person
             {
@@ -127,17 +132,19 @@ public class PersonService(
                 Gender = dto.Gender,
                 BiographyNotes = dto.BiographyNotes?.Trim(),
                 ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim(),
+                FamilyId = currentUser.FamilyId,
                 CreatedAt = now,
-                UpdatedAt = now
+                CreatedBy = userId,
+                UpdatedAt = now,
             };
 
             ctx.People.Add(person);
             await ctx.SaveChangesAsync(ct);
 
-            await SyncRelationshipsAsync(ctx, person.Id, dto, ct);
+            await SyncRelationshipsAsync(ctx, person.Id, dto, userId, ct);
             await ctx.SaveChangesAsync(ct);
 
-            _ = auditLog.LogAsync("Create", "Person", person.Id);
+            _ = auditLog.LogAsync("Create", "Person", person.Id, userId: userId);
 
             var relationships = await ctx.Relationships
                 .AsNoTracking()
@@ -184,7 +191,8 @@ public class PersonService(
             var spouseError = await ValidateSpouseRelationshipsAsync(ctx, id, dto, ct);
             if (spouseError != null) return ServiceResponse<PersonDto>.Fail(spouseError);
 
-            // Update scalar fields
+            var userId = currentUser.UserId;
+
             person.FirstName = dto.FirstName.Trim();
             person.LastName = dto.LastName.Trim();
             person.MiddleName = string.IsNullOrWhiteSpace(dto.MiddleName) ? null : dto.MiddleName.Trim();
@@ -197,11 +205,12 @@ public class PersonService(
             person.BiographyNotes = dto.BiographyNotes?.Trim();
             person.ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim();
             person.UpdatedAt = DateTime.UtcNow;
+            person.UpdatedBy = userId;
 
-            await SyncRelationshipsDiffAsync(ctx, id, dto, ct);
+            await SyncRelationshipsDiffAsync(ctx, id, dto, userId, ct);
             await ctx.SaveChangesAsync(ct);
 
-            _ = auditLog.LogAsync("Update", "Person", id);
+            _ = auditLog.LogAsync("Update", "Person", id, userId: userId);
 
             var relationships = await ctx.Relationships
                 .AsNoTracking()
@@ -233,10 +242,12 @@ public class PersonService(
             if (person is null)
                 return ServiceResponse.Fail($"Person {id} not found.");
 
+            var userId = currentUser.UserId;
             person.DeletedAt = DateTime.UtcNow;
+            person.DeletedBy = userId;
             await ctx.SaveChangesAsync(ct);
 
-            _ = auditLog.LogAsync("Delete", "Person", id);
+            _ = auditLog.LogAsync("Delete", "Person", id, userId: userId);
 
             return ServiceResponse.Ok();
         }
@@ -272,7 +283,7 @@ public class PersonService(
             person.DeletedBy = null;
             await ctx.SaveChangesAsync(ct);
 
-            _ = auditLog.LogAsync("Restore", "Person", id);
+            _ = auditLog.LogAsync("Restore", "Person", id, userId: currentUser.UserId);
 
             return ServiceResponse.Ok();
         }
@@ -293,10 +304,13 @@ public class PersonService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
+            var familyId = currentUser.FamilyId;
+
             var people = await ctx.People
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .Where(p => p.DeletedAt != null)
+                .Where(p => p.DeletedAt != null &&
+                            (!familyId.HasValue || p.FamilyId == familyId))
                 .OrderByDescending(p => p.DeletedAt)
                 .ToListAsync(ct);
 
@@ -320,6 +334,7 @@ public class PersonService(
         AppDbContext ctx,
         Guid personId,
         PersonUpsertDto dto,
+        Guid? createdBy,
         CancellationToken ct)
     {
         var now = DateTime.UtcNow;
@@ -332,7 +347,8 @@ public class PersonService(
                 PersonAId = parentId,
                 PersonBId = personId,
                 Type = RelationshipType.Parent,
-                CreatedAt = now
+                CreatedAt = now,
+                CreatedBy = createdBy,
             });
         }
 
@@ -344,7 +360,8 @@ public class PersonService(
                 PersonAId = personId,
                 PersonBId = childId,
                 Type = RelationshipType.Parent,
-                CreatedAt = now
+                CreatedAt = now,
+                CreatedBy = createdBy,
             });
         }
 
@@ -368,7 +385,8 @@ public class PersonService(
                     PersonAId = a,
                     PersonBId = b,
                     Type = RelationshipType.Sibling,
-                    CreatedAt = now
+                    CreatedAt = now,
+                    CreatedBy = createdBy,
                 });
             }
         }
@@ -389,7 +407,8 @@ public class PersonService(
                     PersonAId = a, PersonBId = b,
                     Type = RelationshipType.Spouse,
                     EndDate = null,
-                    CreatedAt = now
+                    CreatedAt = now,
+                    CreatedBy = createdBy,
                 });
             }
         }
@@ -411,7 +430,8 @@ public class PersonService(
                     PersonAId = a, PersonBId = b,
                     Type = RelationshipType.Spouse,
                     EndDate = DateOnly.FromDateTime(DateTime.Today),
-                    CreatedAt = now
+                    CreatedAt = now,
+                    CreatedBy = createdBy,
                 });
             }
         }
@@ -421,6 +441,7 @@ public class PersonService(
     AppDbContext ctx,
     Guid personId,
     PersonUpsertDto dto,
+    Guid? createdBy,
     CancellationToken ct)
     {
         var now = DateTime.UtcNow;
@@ -447,7 +468,8 @@ public class PersonService(
                 PersonAId = parentId,
                 PersonBId = personId,
                 Type = RelationshipType.Parent,
-                CreatedAt = now
+                CreatedAt = now,
+                CreatedBy = createdBy,
             });
         }
 
@@ -479,7 +501,8 @@ public class PersonService(
                 PersonAId = personId,
                 PersonBId = childId,
                 Type = RelationshipType.Parent,
-                CreatedAt = now
+                CreatedAt = now,
+                CreatedBy = createdBy,
             });
         }
 
@@ -512,7 +535,8 @@ public class PersonService(
                 PersonAId = ordered[0],
                 PersonBId = ordered[1],
                 Type = RelationshipType.Sibling,
-                CreatedAt = now
+                CreatedAt = now,
+                CreatedBy = createdBy,
             });
         }
 
@@ -555,7 +579,8 @@ public class PersonService(
                 ctx.Relationships.Add(new Relationship
                 {
                     PersonAId = ordered[0], PersonBId = ordered[1],
-                    Type = RelationshipType.Spouse, EndDate = null, CreatedAt = now
+                    Type = RelationshipType.Spouse, EndDate = null,
+                    CreatedAt = now, CreatedBy = createdBy,
                 });
             }
         }
@@ -576,7 +601,7 @@ public class PersonService(
                     PersonAId = ordered[0], PersonBId = ordered[1],
                     Type = RelationshipType.Spouse,
                     EndDate = DateOnly.FromDateTime(DateTime.Today),
-                    CreatedAt = now
+                    CreatedAt = now, CreatedBy = createdBy,
                 });
             }
         }

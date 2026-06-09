@@ -83,6 +83,12 @@ var identityBuilder = builder.Services.AddIdentityCore<AppUser>(options =>
 .AddEntityFrameworkStores<AppDbContext>()
 .AddClaimsPrincipalFactory<AppUserClaimsPrincipalFactory>();
 
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Email:SmtpHost"]))
+    builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+else
+    builder.Services.AddScoped<IEmailSender, LogEmailSender>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IImportService, ClaudeImportService>();
 builder.Services.AddHttpClient("anthropic");
