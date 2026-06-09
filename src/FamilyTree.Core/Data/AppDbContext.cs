@@ -18,6 +18,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<UserInvite> UserInvites => Set<UserInvite>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<UserActivity> UserActivities => Set<UserActivity>();
+    public DbSet<PasswordResetRequest> PasswordResetRequests => Set<PasswordResetRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -211,6 +212,16 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithMany(u => u.Activities)
                 .HasForeignKey(ua => ua.UserId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── PASSWORD RESET REQUEST ────────────────────────────────────────────
+        modelBuilder.Entity<PasswordResetRequest>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.Property(r => r.Id).HasDefaultValueSql("newsequentialid()");
+            e.Property(r => r.Email).HasMaxLength(256).IsRequired();
+            e.Property(r => r.Token).HasColumnType("nvarchar(max)").IsRequired();
+            e.Property(r => r.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
         });
     }
 }

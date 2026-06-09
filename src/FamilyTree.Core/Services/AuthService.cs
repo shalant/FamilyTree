@@ -157,4 +157,76 @@ public class AuthService(
             && i.CancelledAt == null
             && i.ExpiresAt > DateTime.UtcNow);
     }
+
+    public async Task<AuthResult> RequestPasswordResetAsync(string email)
+    {
+        var user = await userManager.FindByEmailAsync(email.Trim());
+        if (user != null)
+        {
+            var token = await userManager.GeneratePasswordResetTokenAsync(user);
+
+            await using var ctx = await dbFactory.CreateDbContextAsync();
+
+            var existing = await ctx.PasswordResetRequests
+                .Where(r => r.Email == email.Trim().ToLower()
+                         && r.CompletedAt == null && r.DismissedAt == null)
+                .ToListAsync();
+            foreach (var old in existing)
+                old.DismissedAt = DateTime.UtcNow;
+
+            ctx.PasswordResetRequests.Add(new PasswordResetRequest
+            {
+                Id        = Guid.NewGuid(),
+                Email     = email.Trim().ToLower(),
+                Token     = token,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddHours(24),
+            });
+            await ctx.SaveChangesAsync();
+        }
+        return new AuthResult(true);
+    }
+
+    public async Task<AuthResult> ResetPasswordAsync(string email, string token, string newPassword)
+    {
+        var user = await userManager.FindByEmailAsync(email.Trim());
+        if (user == null)
+            return new AuthResult(false, "Invalid or expired reset link.");
+
+        var result = await userManager.ResetPasswordAsync(user, token, newPassword);
+        if (!result.Succeeded)
+            return new AuthResult(false, "This reset link has expired or is invalid. Please request a new one.");
+
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+        var req = await ctx.PasswordResetRequests
+            .Where(r => r.Email == email.Trim().ToLower() && r.CompletedAt == null)
+            .FirstOrDefaultAsync();
+        if (req != null)
+        {
+            req.CompletedAt = DateTime.UtcNow;
+            await ctx.SaveChangesAsync();
+        }
+
+        return new AuthResult(true);
+    }
+
+    public async Task<List<PasswordResetRequest>> GetPendingResetRequestsAsync()
+    {
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+        return await ctx.PasswordResetRequests
+            .Where(r => r.CompletedAt == null && r.DismissedAt == null && r.ExpiresAt > DateTime.UtcNow)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task DismissResetRequestAsync(Guid id)
+    {
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+        var req = await ctx.PasswordResetRequests.FindAsync(id);
+        if (req != null)
+        {
+            req.DismissedAt = DateTime.UtcNow;
+            await ctx.SaveChangesAsync();
+        }
+    }
 }

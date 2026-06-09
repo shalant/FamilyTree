@@ -425,6 +425,40 @@
                 </MudPaper>
             }
 
+            @* ── Pending password resets ──────────────────────────────────── *@
+            @if (_pendingResets.Count > 0)
+            {
+                <MudPaper Elevation="0" Class="pa-4 mb-4"
+                          Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+                    <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+                        letter-spacing:.1em; color:var(--mud-palette-warning-text); margin-bottom:14px;">
+                        Pending password resets
+                    </div>
+                    @foreach (var req in _pendingResets)
+                    {
+                        <div style="display:flex; align-items:center; gap:8px; padding:8px 0;
+                            border-bottom:.5px solid var(--ft-line-border); max-width:520px;">
+                            <div style="min-width:0; flex:1;">
+                                <div style="font-size:13px; color:var(--ft-gray-700);">@req.Email</div>
+                                <div style="font-size:11px; color:var(--ft-gray-300);">
+                                    Requested @req.CreatedAt.ToLocalTime().ToString("MMM d, h:mm tt") · expires @req.ExpiresAt.ToLocalTime().ToString("h:mm tt")
+                                </div>
+                            </div>
+                            <MudTooltip Text="Copy reset link">
+                                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
+                                               Size="Size.Small"
+                                               OnClick="@(() => CopyResetLink(req))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Dismiss">
+                                <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                                               Size="Size.Small"
+                                               OnClick="@(() => DismissResetAsync(req.Id))" />
+                            </MudTooltip>
+                        </div>
+                    }
+                </MudPaper>
+            }
+
             @* ── Registered users ─────────────────────────────────────────── *@
             @if (_loadingUsers)
             {
@@ -674,6 +708,7 @@
     private Dictionary<Guid, Guid?>        _personLinks       = new();
     private List<UserInvite>               _pendingInvitesList = [];
     private Dictionary<Guid, List<string>> _userRoles         = new();
+    private List<PasswordResetRequest>     _pendingResets     = [];
 
     // ── Invite creation ──────────────────────────────────────────────────────
     private string  _inviteEmail    = "";
@@ -727,7 +762,8 @@
             LoadUsersAsync(),
             LoadActivityAsync(),
             LoadPeopleAsync(),
-            LoadPendingInvitesAsync());
+            LoadPendingInvitesAsync(),
+            LoadPendingResetsAsync());
     }
 
     private async Task LoadDashboardAsync()
@@ -837,6 +873,25 @@
     private async Task LoadPendingInvitesAsync()
     {
         _pendingInvitesList = await AuthService.GetPendingInvitesAsync();
+    }
+
+    private async Task LoadPendingResetsAsync()
+    {
+        _pendingResets = await AuthService.GetPendingResetRequestsAsync();
+    }
+
+    private async Task CopyResetLink(PasswordResetRequest req)
+    {
+        var baseUri = NavManager.BaseUri.TrimEnd('/');
+        var link = $"{baseUri}/reset-password?email={Uri.EscapeDataString(req.Email)}&token={Uri.EscapeDataString(req.Token)}";
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", link);
+        Toast.Success("Reset link copied.");
+    }
+
+    private async Task DismissResetAsync(Guid id)
+    {
+        await AuthService.DismissResetRequestAsync(id);
+        _pendingResets.RemoveAll(r => r.Id == id);
     }
 
     private async Task CreateInviteAsync()
