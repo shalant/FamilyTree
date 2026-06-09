@@ -5,7 +5,7 @@
 
 <PageTitle>Settings</PageTitle>
 
-<MudStack Spacing="4" Class="mt-4" MaxWidth="600px" Style="margin:auto;">
+<MudStack Spacing="4" Class="mt-4" Style="margin:auto; max-width:600px;">
 
     <MudText Typo="Typo.h5"
              Style="font-style:italic; font-family:Georgia,serif;
@@ -17,13 +17,13 @@
     <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface-card);">
         <MudText Typo="Typo.subtitle1" Class="mb-2">Tree Display</MudText>
 
-        <MudSwitch T="bool" @bind-Checked="_showPhotos"
+        <MudSwitch T="bool" @bind-Value="_showPhotos"
                    Label="Show profile photos" />
 
-        <MudSwitch T="bool" @bind-Checked="_compactMode"
+        <MudSwitch T="bool" @bind-Value="_compactMode"
                    Label="Compact layout" />
 
-        <MudSwitch T="bool" @bind-Checked="_showYears"
+        <MudSwitch T="bool" @bind-Value="_showYears"
                    Label="Show birth/death years" />
     </MudPaper>
 

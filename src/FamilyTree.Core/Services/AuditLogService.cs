@@ -1,6 +1,7 @@
 using FamilyTree.Core.Data;
 using FamilyTree.Core.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FamilyTree.Core.Services;
 

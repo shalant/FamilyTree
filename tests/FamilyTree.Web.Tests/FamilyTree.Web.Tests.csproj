@@ -12,7 +12,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="bunit" Version="1.37.5" />
+    <PackageReference Include="bunit" Version="1.37.7" />
     <PackageReference Include="FluentAssertions" Version="7.0.0" />
   </ItemGroup>
   <ItemGroup>

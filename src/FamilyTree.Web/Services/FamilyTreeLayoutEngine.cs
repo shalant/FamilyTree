@@ -498,7 +498,7 @@ public class FamilyTreeLayoutEngine
 
         // Pass 0: Assign from known birth dates.
         foreach (var person in people.Where(p => p.BirthDate.HasValue))
-            years[person.Id] = person.BirthDate.Value.Year;
+            years[person.Id] = person.BirthDate!.Value.Year;
 
         // Pass 1: Infer parents from children.
         bool changed = true;

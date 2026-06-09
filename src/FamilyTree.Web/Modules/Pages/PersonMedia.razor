@@ -210,7 +210,7 @@ else
                         <MudTextField @bind-Value="_newRecordCaption"
                                       Label="Brief description (optional)"
                                       Variant="Variant.Outlined"
-                                      Dense="true" />
+                                      Margin="Margin.Dense" />
                     </MudItem>
                     <MudItem xs="12">
                         <MediaUploadZone Label="Drop file here or click to browse"
@@ -324,7 +324,7 @@ else
     // ── Photos ───────────────────────────────────────────────────────────
 
     private List<PhotoItem> _photos = [];
-    private bool _uploadingPhoto;
+
     private string? _profilePhotoUrl;
 
     private class PhotoItem
@@ -420,7 +420,6 @@ else
 
     private async Task OnPhotosSelected(IReadOnlyList<IBrowserFile> files)
     {
-        _uploadingPhoto = true;
         foreach (var file in files)
         {
             try
@@ -458,7 +457,6 @@ else
                 Toast.Error($"Error uploading {file.Name}: {ex.Message}");
             }
         }
-        _uploadingPhoto = false;
         StateHasChanged();
     }
 
@@ -472,7 +470,7 @@ else
         var dialog = await DialogService.ShowAsync<CaptionDialog>("Edit photo caption", parameters);
         var result = await dialog.Result;
 
-        if (!result.Canceled && result.Data is string newCaption)
+        if (result is { Canceled: false } && result.Data is string newCaption)
         {
             try
             {

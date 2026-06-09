@@ -3,6 +3,7 @@ using FamilyTree.Core.Models;
 using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Medium;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FamilyTree.Core.Services;
 

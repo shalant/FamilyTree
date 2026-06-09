@@ -147,7 +147,7 @@
     {
         <MudChip T="string" Size="Size.Small" Color="_authChipColor"
                  Style="margin-right:2px; cursor:default; font-size:11px; height:22px;"
-                 DisableRipple="true">
+                 Ripple="false">
             @_authChipLabel
         </MudChip>
     }
@@ -205,7 +205,7 @@
                     {
                         <MudChip T="string" Size="Size.Small" Color="_authChipColor"
                                  Style="height:18px; font-size:10px; cursor:default;"
-                                 DisableRipple="true">
+                                 Ripple="false">
                             @_authChipLabel
                         </MudChip>
                     }
@@ -311,7 +311,7 @@
         _isDark = Theme.IsDark;
         Theme.OnChange += OnThemeChanged;
 
-        LoadUserInfoAsync(authState.User);
+        _ = LoadUserInfoAsync(authState.User);
     }
 
     private Task LoadUserInfoAsync(ClaimsPrincipal principal)

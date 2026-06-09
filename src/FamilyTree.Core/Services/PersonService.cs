@@ -5,6 +5,7 @@ using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Person;
 using FamilyTree.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FamilyTree.Core.Services;
 

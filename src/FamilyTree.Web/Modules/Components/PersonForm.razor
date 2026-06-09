@@ -7,7 +7,7 @@
 
 @inject IMediumService MediumService
 
-<MudStack Spacing="4" MaxWidth="680px" Style="margin:auto; font-family:var(--ft-font-body);">
+<MudStack Spacing="4" Style="margin:auto; max-width:680px; font-family:var(--ft-font-body);">
 
     <!-- Identity Card -->
     <MudPaper Elevation="0" Class="pa-5" Style="background:var(--ft-surface-card); border-radius:12px;">
@@ -433,7 +433,6 @@
         <MudTextField @bind-Value="_notes"
                       Placeholder="Write anything memorable about this person…"
                       Lines="4"
-                      AutoGrow="true"
                       Variant="Variant.Outlined" />
     </MudPaper>
 
