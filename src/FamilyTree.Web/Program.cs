@@ -84,6 +84,8 @@ var identityBuilder = builder.Services.AddIdentityCore<AppUser>(options =>
 .AddClaimsPrincipalFactory<AppUserClaimsPrincipalFactory>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IImportService, ClaudeImportService>();
+builder.Services.AddHttpClient("anthropic");
 builder.Services.AddScoped<IPersonService, PersonService>();
 builder.Services.AddScoped<IRelationshipService, RelationshipService>();
 builder.Services.AddScoped<IMediumService, MediumService>();

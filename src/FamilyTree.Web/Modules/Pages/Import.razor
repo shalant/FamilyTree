@@ -2,6 +2,8 @@
 @rendermode InteractiveServer
 
 @using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Shared.DTOs.Import
+@using FamilyTree.Core.Services
 @using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Services
 @using MudBlazor
@@ -9,6 +11,7 @@
 
 @inject NavigationManager Nav
 @inject ToastService Toast
+@inject IImportService ImportService
 
 <PageTitle>Import data</PageTitle>
 
@@ -200,98 +203,224 @@
     @* ── Paste text tab ───────────────────────────────────────────────────── *@
     @if (_activeTab == "text")
     {
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">
-            <div>
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                    <div style="font-size:15px; font-weight:600; color:var(--ft-gray-700);">
-                        Paste free text
+        @if (_textState == TextImportState.Idle)
+        {
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">
+                <div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <div style="font-size:15px; font-weight:600; color:var(--ft-gray-700);">
+                            Paste free text
+                        </div>
+                        <div style="background:var(--ft-focus-fill); color:#fff; font-size:10px;
+                            font-weight:600; padding:2px 7px; border-radius:10px; letter-spacing:0.04em;">
+                            AI-powered
+                        </div>
                     </div>
-                    <div style="background:var(--ft-focus-fill); color:#fff; font-size:10px;
-                        font-weight:600; padding:2px 7px; border-radius:10px; letter-spacing:0.04em;">
-                        AI-powered
+                    <div style="font-size:13px; color:var(--ft-gray-400); line-height:1.7; margin-bottom:16px;">
+                        Paste any text containing family information — a family history document,
+                        old letters, a Wikipedia article, anything. Claude AI will extract people and relationships.
+                    </div>
+                    @if (!ImportService.IsConfigured)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                            AI import requires an Anthropic API key. Set <code>AI__AnthropicApiKey</code> in App Service config or user secrets (<code>dotnet user-secrets set "AI:AnthropicApiKey" "sk-ant-..."</code>).
+                        </MudAlert>
+                    }
+                    <div class="ft-field-label">Paste your text here</div>
+                    <MudTextField @bind-Value="_pasteText"
+                                  Placeholder="Paste genealogy data, family history text, or any structured content…"
+                                  Lines="12"
+                                  Variant="Variant.Outlined"
+                                  FullWidth="true"
+                                  Style="font-size:13px; font-family:monospace;" />
+                    <div style="font-size:11px; color:var(--ft-gray-300); margin-top:6px;">
+                        @_pasteText.Length / 50,000 characters
                     </div>
                 </div>
-                <div style="font-size:13px; color:var(--ft-gray-400); line-height:1.7; margin-bottom:16px;">
-                    Paste any text containing family information — a family history essay,
-                    an email chain, old letters, a Wikipedia article, anything. Our AI will
-                    extract people and relationships.
+                <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-focus-ring); border-radius:var(--ft-radius-card);">
+                    <div style="font-size:12px; font-weight:600; text-transform:uppercase;
+                        letter-spacing:0.07em; color:var(--ft-focus-fill); margin-bottom:10px;">
+                        Works great with
+                    </div>
+                    @foreach (var ex in new[]{ "Family history essays or memoirs",
+                        "Old letters or diaries (transcribed)",
+                        "Email threads about family history",
+                        "Wikipedia / newspaper articles",
+                        "Ancestry message board posts",
+                        "Handwritten notes (typed out)" })
+                    {
+                        <div style="display:flex; gap:8px; margin-bottom:7px; font-size:13px; color:var(--ft-gray-600);">
+                            <MudIcon Icon="@Icons.Material.Outlined.TextSnippet"
+                                     Style="font-size:14px; color:var(--ft-focus-fill); flex-shrink:0; margin-top:2px;" />
+                            @ex
+                        </div>
+                    }
+                </MudPaper>
+            </div>
+        }
+        else if (_textState == TextImportState.Extracting)
+        {
+            <div style="text-align:center; padding:60px 0;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+                <div style="margin-top:20px; font-size:14px; color:var(--ft-gray-500);">
+                    Analyzing document with Claude AI…
                 </div>
-                <div class="ft-field-label">Paste your text here</div>
-                <MudTextField @bind-Value="_pasteText"
-                              Placeholder="Paste genealogy data, family history text, or any structured content…"
-                              Lines="12"
-                              Variant="Variant.Outlined"
-                              FullWidth="true"
-                              Style="font-size:13px; font-family:monospace;" />
-                <div style="font-size:11px; color:var(--ft-gray-300); margin-top:6px;">
-                    @_pasteText.Length / 50,000 characters
+                <div style="margin-top:6px; font-size:12px; color:var(--ft-gray-300);">
+                    This usually takes 15–30 seconds for large documents.
                 </div>
             </div>
-            <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-focus-ring); border-radius:var(--ft-radius-card);">
-                <div style="font-size:12px; font-weight:600; text-transform:uppercase;
-                    letter-spacing:0.07em; color:var(--ft-focus-fill); margin-bottom:10px;">
-                    Works great with
+        }
+        else if (_textState == TextImportState.Preview && _preview != null)
+        {
+            <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div style="font-size:15px; font-weight:600; color:var(--ft-gray-700);">
+                    @_preview.People.Count(p => p.Selected) of @_preview.People.Count people selected
                 </div>
-                @foreach (var ex in new[]{ "Family history essays or memoirs",
-                    "Old letters or diaries (transcribed)",
-                    "Email threads about family history",
-                    "Wikipedia / newspaper articles",
-                    "Ancestry message board posts",
-                    "Handwritten notes (typed out)" })
+                <div style="font-size:12px; color:var(--ft-gray-400);">
+                    · @_preview.Relationships.Count relationships detected
+                </div>
+                <MudButton Variant="Variant.Text" Size="Size.Small"
+                           Style="color:var(--ft-green-600); margin-left:auto;"
+                           OnClick="@(() => _preview.People.ForEach(p => p.Selected = true))">
+                    Select all
+                </MudButton>
+                <MudButton Variant="Variant.Text" Size="Size.Small"
+                           Style="color:var(--ft-gray-400);"
+                           OnClick="@(() => _preview.People.ForEach(p => p.Selected = !p.ReferenceOnly))">
+                    Skip reference-only
+                </MudButton>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_extractError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-3">@_extractError</MudAlert>
+            }
+
+            <div style="max-height:480px; overflow-y:auto; border:1px solid var(--ft-line-border);
+                border-radius:8px; background:var(--ft-surface-card);">
+                @foreach (var person in _preview.People)
                 {
-                    <div style="display:flex; gap:8px; margin-bottom:7px; font-size:13px; color:var(--ft-gray-600);">
-                        <MudIcon Icon="@Icons.Material.Outlined.TextSnippet"
-                                 Style="font-size:14px; color:var(--ft-focus-fill); flex-shrink:0; margin-top:2px;" />
-                        @ex
+                    <div style="display:flex; align-items:flex-start; gap:10px; padding:10px 14px;
+                        border-bottom:.5px solid var(--ft-line-border);
+                        opacity:@(person.Selected ? "1" : "0.45");">
+                        <MudCheckBox @bind-Value="person.Selected"
+                                     Size="Size.Small"
+                                     Style="margin-top:1px; flex-shrink:0;" />
+                        <div style="flex:1; min-width:0;">
+                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                <span style="font-size:13px; font-weight:600; color:var(--ft-gray-700);">
+                                    @person.FirstName @person.MiddleName @person.LastName
+                                </span>
+                                @if (!string.IsNullOrEmpty(person.MaidenName))
+                                {
+                                    <span style="font-size:11px; color:var(--ft-gray-400);">(née @person.MaidenName)</span>
+                                }
+                                @if (person.ReferenceOnly)
+                                {
+                                    <span style="font-size:10px; background:var(--ft-gray-100);
+                                        color:var(--ft-gray-500); padding:1px 6px; border-radius:8px;">
+                                        reference only
+                                    </span>
+                                }
+                                @if (person.IsDeceased)
+                                {
+                                    <span style="font-size:11px; color:var(--ft-gray-300);">†</span>
+                                }
+                            </div>
+                            <div style="font-size:11px; color:var(--ft-gray-400); margin-top:2px;">
+                                @LifeSpan(person)
+                                @if (person.Aliases?.Length > 0)
+                                {
+                                    <span> · also @string.Join(", ", person.Aliases)</span>
+                                }
+                            </div>
+                        </div>
                     </div>
                 }
-            </MudPaper>
-        </div>
-    }
-
-    @* ── Preview placeholder ──────────────────────────────────────────────── *@
-    @if (_showPreview)
-    {
-        <div style="margin-top:32px; border-top:1px solid var(--ft-line-border); padding-top:28px;">
-            <div style="font-size:15px; font-weight:600; color:var(--ft-gray-700); margin-bottom:4px;">
-                Import preview
             </div>
-            <div style="font-size:13px; color:var(--ft-gray-400); margin-bottom:16px;">
-                Review these records before they are added to your tree.
-                Uncheck any you want to skip.
+        }
+        else if (_textState == TextImportState.Importing)
+        {
+            <div style="text-align:center; padding:60px 0;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Success" Size="Size.Large" />
+                <div style="margin-top:20px; font-size:14px; color:var(--ft-gray-500);">
+                    Importing people into your tree…
+                </div>
             </div>
-            <MudAlert Severity="Severity.Info">
-                Preview is not yet available — AI extraction is coming soon. Your file has been received.
-            </MudAlert>
-        </div>
+        }
+        else if (_textState == TextImportState.Done && _importResult != null)
+        {
+            <div style="text-align:center; padding:48px 0;">
+                <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline"
+                         Style="font-size:48px; color:var(--ft-green-600); display:block; margin:0 auto 16px;" />
+                <div style="font-size:18px; font-weight:600; color:var(--ft-gray-700); margin-bottom:8px;">
+                    Import complete!
+                </div>
+                <div style="font-size:14px; color:var(--ft-gray-400);">
+                    @_importResult.PeopleCreated people added · @_importResult.RelationshipsCreated relationships created
+                </div>
+            </div>
+        }
     }
 
     @* ── Action bar ───────────────────────────────────────────────────────── *@
     <div style="margin-top:32px; padding-top:20px; border-top:0.5px solid var(--ft-line-border);
         display:flex; justify-content:space-between; align-items:center;">
-        <MudButton Variant="Variant.Text" Style="color:var(--ft-gray-400);"
-                   OnClick='() => Nav.NavigateTo("/dashboard")'>
-            Cancel
-        </MudButton>
-        <MudButton Variant="Variant.Filled"
-                   Disabled="@(!HasFile)"
-                   Style="background:var(--ft-green-600); color:#fff; min-width:160px;"
-                   StartIcon="@Icons.Material.Outlined.Visibility"
-                   OnClick="PreviewImport">
-            Preview import
-        </MudButton>
+
+        @if (_activeTab == "text" && _textState == TextImportState.Preview)
+        {
+            <MudButton Variant="Variant.Text" Style="color:var(--ft-gray-400);"
+                       OnClick="@(() => _textState = TextImportState.Idle)">
+                ← Back
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Disabled="@(_preview == null || !_preview.People.Any(p => p.Selected))"
+                       Style="background:var(--ft-green-600); color:#fff; min-width:180px;"
+                       StartIcon="@Icons.Material.Outlined.Download"
+                       OnClick="CommitImportAsync">
+                Import @(_preview?.People.Count(p => p.Selected) ?? 0) people
+            </MudButton>
+        }
+        else if (_activeTab == "text" && _textState == TextImportState.Done)
+        {
+            <span />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick='() => Nav.NavigateTo("/")'>
+                Go to tree
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Text" Style="color:var(--ft-gray-400);"
+                       OnClick='() => Nav.NavigateTo("/dashboard")'>
+                Cancel
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Disabled="@(!CanProceed)"
+                       Style="background:var(--ft-green-600); color:#fff; min-width:160px;"
+                       StartIcon="@Icons.Material.Outlined.Visibility"
+                       OnClick="ProceedAsync">
+                @(_activeTab == "text" ? "Extract people" : "Preview import")
+            </MudButton>
+        }
     </div>
 
 </div>
 
 @code {
-    private string _activeTab = "gedcom";
-    private bool _showPreview;
-    private string _pasteText = "";
+    private enum TextImportState { Idle, Extracting, Preview, Importing, Done }
+
+    private string _activeTab  = "gedcom";
+    private string _pasteText  = "";
 
     private IBrowserFile? _gedcomFile;
     private IBrowserFile? _documentFile;
     private IBrowserFile? _spreadsheetFile;
+
+    private TextImportState  _textState    = TextImportState.Idle;
+    private ImportPreview?   _preview;
+    private ImportResult?    _importResult;
+    private string?          _extractError;
 
     private readonly Dictionary<string, (string Label, string Icon)> _tabs = new()
     {
@@ -301,13 +430,13 @@
         ["text"]   = ("Paste text", "✍️"),
     };
 
-    private bool HasFile => _activeTab switch
+    private bool CanProceed => _activeTab switch
     {
         "gedcom" => _gedcomFile != null,
         "pdf"    => _documentFile != null,
         "excel"  => _spreadsheetFile != null,
-        "text"   => _pasteText.Trim().Length > 20,
-        _ => false
+        "text"   => _pasteText.Trim().Length > 20 && ImportService.IsConfigured,
+        _        => false
     };
 
     private void OnGedcomSelected(IReadOnlyList<IBrowserFile> files) =>
@@ -319,10 +448,57 @@
     private void OnSpreadsheetSelected(IReadOnlyList<IBrowserFile> files) =>
         _spreadsheetFile = files.FirstOrDefault();
 
-    private void PreviewImport()
+    private async Task ProceedAsync()
     {
-        _showPreview = true;
-        Toast.Info("File received — preview pipeline coming soon.");
+        if (_activeTab != "text")
+        {
+            Toast.Info("File received — non-text import pipeline coming soon.");
+            return;
+        }
+
+        _extractError = null;
+        _textState = TextImportState.Extracting;
+        StateHasChanged();
+
+        try
+        {
+            _preview = await ImportService.ExtractFromTextAsync(_pasteText);
+            _textState = TextImportState.Preview;
+        }
+        catch (Exception ex)
+        {
+            _extractError = ex.Message;
+            _textState = TextImportState.Idle;
+        }
+    }
+
+    private async Task CommitImportAsync()
+    {
+        if (_preview == null) return;
+
+        _textState = TextImportState.Importing;
+        StateHasChanged();
+
+        try
+        {
+            _importResult = await ImportService.CommitAsync(_preview);
+            _textState = TextImportState.Done;
+        }
+        catch (Exception ex)
+        {
+            _extractError = ex.Message;
+            _textState = TextImportState.Preview;
+        }
+    }
+
+    private static string LifeSpan(ImportPersonDto p)
+    {
+        var birth = p.BirthDate?[..4];
+        var death = p.DeathDate?[..4];
+        if (birth == null && death == null) return "";
+        if (birth != null && death != null) return $"{birth}–{death}";
+        if (birth != null) return $"b. {birth}";
+        return $"d. {death}";
     }
 
     private static string FormatSize(long bytes) => bytes switch
