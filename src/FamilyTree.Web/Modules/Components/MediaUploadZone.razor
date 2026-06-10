@@ -136,6 +136,8 @@
 
     private bool _dragging;
     private string _inputId = $"upload-{Guid.NewGuid():N}";
+
+    public string InputId => _inputId;
     private List<IBrowserFile> _queued = [];
     private long _totalBytes;
 

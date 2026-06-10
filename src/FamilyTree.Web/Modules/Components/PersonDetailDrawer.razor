@@ -186,18 +186,32 @@
                             text-transform:uppercase; color:var(--ft-gray-300);">
                             Photos &amp; records
                         </div>
-                        <button style="font-size:12px; color:var(--ft-green-600); border:none;
-                            background:transparent; cursor:pointer; padding:0;
-                            font-family:var(--ft-font-body);"
-                                @onclick="NavigateToMedia">
-                            View all →
-                        </button>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <button style="display:flex; align-items:center; gap:4px;
+                                font-size:12px; color:var(--ft-green-600); border:none;
+                                background:transparent; cursor:pointer; padding:0;
+                                font-family:var(--ft-font-body);"
+                                    @onclick="NavigateToMedia"
+                                    title="Add a photo">
+                                <MudIcon Icon="@Icons.Material.Outlined.AddPhotoAlternate"
+                                         Style="font-size:15px;" />
+                                Add photo
+                            </button>
+                            @if (_previewPhotos.Any())
+                            {
+                                <button style="font-size:12px; color:var(--ft-gray-400); border:none;
+                                    background:transparent; cursor:pointer; padding:0;
+                                    font-family:var(--ft-font-body);"
+                                        @onclick="NavigateToMedia">
+                                    View all →
+                                </button>
+                            }
+                        </div>
                     </div>
 
-                    @* Photo thumbnails — populated once media API is live *@
-                    @if (Person.ProfilePhotoUrl is not null || _previewPhotos.Any())
+                    @if (_previewPhotos.Any())
                     {
-                        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
                             @foreach (var url in _previewPhotos.Take(4))
                             {
                                 <div style="width:52px; height:52px; border-radius:6px; overflow:hidden;
@@ -206,20 +220,6 @@
                                 </div>
                             }
                         </div>
-                    }
-                    else
-                    {
-                        @* Empty state — tappable to go straight to media page *@
-                        <button style="width:100%; padding:10px; border-radius:6px; cursor:pointer;
-                            border:1.5px dashed var(--ft-line-border); background:transparent;
-                            color:var(--ft-gray-300); font-size:12px;
-                            font-family:var(--ft-font-body); display:flex;
-                            align-items:center; justify-content:center; gap:6px;"
-                                @onclick="NavigateToMedia">
-                            <MudIcon Icon="@Icons.Material.Outlined.AddPhotoAlternate"
-                                     Style="font-size:16px;" />
-                            Add photos &amp; records
-                        </button>
                     }
                 </div>
 

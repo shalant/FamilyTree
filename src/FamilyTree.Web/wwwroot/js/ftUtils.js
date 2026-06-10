@@ -36,6 +36,40 @@ window.ftSubmitLogout = () => {
 window.ftOpenUrl = (url) =>
     window.open(url, '_blank', 'noopener,noreferrer');
 
+// Compresses an image from <input id=inputId> at fileIndex.
+// Returns base64-encoded JPEG, or null if not an image / compression fails.
+window.ftCompressImage = (inputId, fileIndex, maxPx, quality) => {
+    const input = document.getElementById(inputId);
+    if (!input || !input.files || input.files.length <= fileIndex) return Promise.resolve(null);
+    const file = input.files[fileIndex];
+    if (!file.type.startsWith('image/')) return Promise.resolve(null);
+
+    return new Promise((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            let w = img.naturalWidth, h = img.naturalHeight;
+            if (w > maxPx || h > maxPx) {
+                const r = Math.min(maxPx / w, maxPx / h);
+                w = Math.round(w * r); h = Math.round(h * r);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            canvas.toBlob(blob => {
+                if (!blob) { resolve(null); return; }
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(blob);
+            }, 'image/jpeg', quality);
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        img.src = url;
+    });
+};
+
 window.ftSvgToPng = async (svgContent, filename) => {
     const parser = new DOMParser();
     const svgEl  = parser.parseFromString(svgContent, 'image/svg+xml').documentElement;

@@ -14,6 +14,7 @@
 @inject NavigationManager Nav
 @inject ToastService Toast
 @inject IDialogService DialogService
+@inject IJSRuntime JS
 
 <PageTitle>@(_person?.FirstName ?? "Person")'s media</PageTitle>
 
@@ -90,8 +91,9 @@ else
         {
             @* Upload zone *@
             <div style="margin-bottom:28px;">
-                <MediaUploadZone Label="Drop photos here or click to browse"
-                                 Hint="JPG, PNG, HEIC, WebP · max 20 MB each"
+                <MediaUploadZone @ref="_photoZone"
+                                 Label="Drop photos here or click to browse"
+                                 Hint="JPG, PNG, HEIC, WebP · max 8 MB each"
                                  Accept="image/*"
                                  Multiple="true"
                                  OnFilesSelected="OnPhotosSelected" />
@@ -324,6 +326,7 @@ else
 
     // ── Photos ───────────────────────────────────────────────────────────
 
+    private MediaUploadZone? _photoZone;
     private List<PhotoItem> _photos = [];
 
     private string? _profilePhotoUrl;
@@ -421,17 +424,20 @@ else
 
     private async Task OnPhotosSelected(IReadOnlyList<IBrowserFile> files)
     {
-        foreach (var file in files)
+        var fileList = files.ToList();
+        for (int i = 0; i < fileList.Count; i++)
         {
+            var file = fileList[i];
             try
             {
-                using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+                var (bytes, mime) = await CompressOrReadAsync(file, _photoZone?.InputId, i);
 
+                await using var stream = new MemoryStream(bytes);
                 var dto = new MediumUpsertDto
                 {
                     PersonId = Id,
-                    FileName = file.Name,
-                    MimeType = file.ContentType,
+                    FileName = mime == "image/jpeg" ? Path.ChangeExtension(file.Name, ".jpg") : file.Name,
+                    MimeType = mime,
                     Type = "photo"
                 };
 
@@ -443,7 +449,7 @@ else
                     {
                         Id = medium.Id,
                         Url = medium.Url,
-                        FileName = file.Name,
+                        FileName = dto.FileName,
                         Caption = null
                     });
                     Toast.Success($"{file.Name} uploaded successfully");
@@ -459,6 +465,25 @@ else
             }
         }
         StateHasChanged();
+    }
+
+    private async Task<(byte[] Bytes, string Mime)> CompressOrReadAsync(
+        IBrowserFile file, string? inputId, int fileIndex)
+    {
+        if (inputId is not null && file.ContentType.StartsWith("image/"))
+        {
+            try
+            {
+                var base64 = await JS.InvokeAsync<string?>("ftCompressImage", inputId, fileIndex, 1400, 0.82);
+                if (base64 is not null)
+                    return (Convert.FromBase64String(base64), "image/jpeg");
+            }
+            catch { }
+        }
+
+        using var ms = new MemoryStream();
+        await file.OpenReadStream(8L * 1024 * 1024).CopyToAsync(ms);
+        return (ms.ToArray(), file.ContentType);
     }
 
     private async Task EditPhoto(PhotoItem photo)

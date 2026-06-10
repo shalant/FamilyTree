@@ -227,7 +227,7 @@ public class MediumService(
         "image/gif",
     };
 
-    private static readonly long MaxFileSizeBytes = 50 * 1024 * 1024; // 50 MB
+    private static readonly long MaxFileSizeBytes = 8 * 1024 * 1024; // 8 MB (images compressed client-side before upload)
 
     private static string? ValidateMediumFile(Stream fileStream, MediumUpsertDto dto)
     {

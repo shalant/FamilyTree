@@ -6,6 +6,7 @@
 @using MudBlazor
 
 @inject IMediumService MediumService
+@inject IJSRuntime JS
 
 <MudStack Spacing="4" Style="margin:auto; max-width:680px; font-family:var(--ft-font-body);">
 
@@ -45,8 +46,9 @@
             <MudItem xs="5">
                 <div class="ft-field-label">Date of birth</div>
                 <MudDatePicker @bind-Date="_birthDate"
-                               Placeholder="dd/mm/yyyy"
-                               DateFormat="dd/MM/yyyy"
+                               Placeholder="mm/dd/yyyy"
+                               DateFormat="MM/dd/yyyy"
+                               Editable="true"
                                Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="7">
@@ -60,8 +62,9 @@
             <MudItem xs="5">
                 <div class="ft-field-label">Date of death</div>
                 <MudDatePicker @bind-Date="_deathDate"
-                               Placeholder="dd/mm/yyyy"
-                               DateFormat="dd/MM/yyyy"
+                               Placeholder="mm/dd/yyyy"
+                               DateFormat="MM/dd/yyyy"
+                               Editable="true"
                                Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="7">
@@ -557,20 +560,24 @@
         _uploading = true;
         StateHasChanged();
 
-        const long maxSize = 50L * 1024 * 1024;
+        const long fallbackMaxSize = 8L * 1024 * 1024;
 
         try
         {
-            foreach (var file in e.GetMultipleFiles(10))
+            var files = e.GetMultipleFiles(10).ToList();
+            for (int i = 0; i < files.Count; i++)
             {
+                var file = files[i];
+                var (bytes, mime) = await CompressOrReadAsync(file, "photo-upload", i, fallbackMaxSize);
+
                 if (EditingId.HasValue)
                 {
-                    await using var stream = file.OpenReadStream(maxSize);
+                    await using var stream = new MemoryStream(bytes);
                     var dto = new MediumUpsertDto
                     {
                         PersonId = EditingId.Value,
-                        FileName = file.Name,
-                        MimeType = file.ContentType,
+                        FileName = mime == "image/jpeg" ? Path.ChangeExtension(file.Name, ".jpg") : file.Name,
+                        MimeType = mime,
                         Type = "photo"
                     };
                     var result = await MediumService.CreateAsync(dto, stream);
@@ -587,11 +594,10 @@
                 }
                 else
                 {
-                    using var ms = new MemoryStream();
-                    await file.OpenReadStream(maxSize).CopyToAsync(ms);
-                    var bytes = ms.ToArray();
-                    var dataUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(bytes)}";
-                    _pendingPreviews.Add(new PendingPhoto(file.Name, file.ContentType, bytes, dataUrl));
+                    var dataUrl = $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+                    _pendingPreviews.Add(new PendingPhoto(
+                        mime == "image/jpeg" ? Path.ChangeExtension(file.Name, ".jpg") : file.Name,
+                        mime, bytes, dataUrl));
                 }
             }
         }
@@ -604,6 +610,22 @@
             _uploading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task<(byte[] Bytes, string Mime)> CompressOrReadAsync(
+        IBrowserFile file, string inputId, int fileIndex, long fallbackMaxSize)
+    {
+        try
+        {
+            var base64 = await JS.InvokeAsync<string?>("ftCompressImage", inputId, fileIndex, 1400, 0.82);
+            if (base64 is not null)
+                return (Convert.FromBase64String(base64), "image/jpeg");
+        }
+        catch { }
+
+        using var ms = new MemoryStream();
+        await file.OpenReadStream(fallbackMaxSize).CopyToAsync(ms);
+        return (ms.ToArray(), file.ContentType);
     }
 
     private async Task DeletePhoto(MediumDto photo)
