@@ -68,13 +68,68 @@ In Azure Portal → App Service → Configuration → Application settings:
 | `ConnectionStrings__DefaultConnection` | `Server=...database.windows.net;Database=FamilyTreeDb;User Id=...;Password=...;Encrypt=True` |
 | `ASPNETCORE_ENVIRONMENT` | `Production` |
 | `SuperUser__Email` | your admin email |
+| `Auth__RegistrationMode` | `InviteOnly` (production default; `Open` for dev) |
+| `DevAuth__Enabled` | `false` ← **must be false in production** |
 | `Google__ClientId` | (optional) Google OAuth client ID |
 | `Google__ClientSecret` | (optional) Google OAuth client secret |
 | `AzureStorage__ConnectionString` | Azure Storage connection string |
+| `Email__SmtpHost` | SMTP host (e.g. `smtp.gmail.com`) |
+| `Email__SmtpPort` | `587` |
+| `Email__EnableSsl` | `true` |
+| `Email__Username` | SMTP username / Gmail address |
+| `Email__Password` | Gmail App Password (not your Google account password) |
+| `Email__FromAddress` | From address for outbound email |
+| `Email__FromName` | `ArborKin` |
 
 Use double-underscore for nested config keys (Azure App Service convention).
 
 Always On: Configuration → General Settings → **Always On: On** (included in B1, required for Blazor Server SignalR).
+
+**ARR Affinity:** Configuration → General Settings → **ARR Affinity: On** (required — routes returning WebSocket connections back to the same instance that owns the Blazor circuit).
+
+---
+
+## Blazor Server circuit behavior
+
+Blazor Server runs over a persistent WebSocket (SignalR). The server holds a "circuit" in memory for each connected browser tab. This has two known failure modes users may encounter:
+
+### Stale tab after server restart or long idle
+**What happens:** If a browser tab is left open overnight (or across a deployment), the server-side circuit is cleaned up. When the tab wakes up it tries to reconnect; the server has no matching circuit and responds with `"The list of component operations is not valid"`, then immediately disconnects. The page freezes.
+
+**Console signature:**
+```
+Error: The list of component operations is not valid.
+Information: Connection disconnected.
+```
+
+**Fix for users:** Refresh the page. The app reconnects and works immediately.
+
+**This is expected Blazor Server behavior**, not a bug. It happens on every Azure deployment (the process restarts) and after Azure's idle recycling.
+
+### Circuit timeout
+The server discards a circuit after ~3 minutes of WebSocket inactivity by default. For an "always open" admin tab this can trigger the same disconnect. To extend it, configure in `Program.cs`:
+
+```csharp
+builder.Services.AddServerSideBlazor(options =>
+{
+    options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(10);
+});
+```
+
+The current app uses the default; adjust if user-testing shows too many unexpected disconnects.
+
+---
+
+## Post-deploy checklist
+
+After every `workflow_dispatch` deploy, verify:
+
+- [x] `DevAuth__Enabled` is `false` in App Service Configuration ✓ confirmed 2026-06-11
+- [ ] `ASPNETCORE_ENVIRONMENT` is `Production`
+- [x] `Auth__RegistrationMode` is `InviteOnly` ✓ confirmed 2026-06-11
+- [ ] App loads at production URL and login works
+- [ ] Google OAuth redirect completes (if configured)
+- [ ] EF migrations applied: check Azure SQL `__EFMigrationsHistory` table or watch startup logs in Log Stream
 
 ---
 
@@ -88,6 +143,38 @@ Password: your password
 ```
 
 Make sure your current IP is allowed in the SQL Server firewall (Portal → SQL Server → Networking → Add client IP).
+
+---
+
+## Custom domain (arborkin.com) — on hold
+
+> **Status: hold** — waiting on user-testing feedback and a security review before going public.
+
+The app runs on Azure App Service. Pointing `arborkin.com` at it requires no code changes and no migration — Azure simply answers to both the custom domain and the existing `azurewebsites.net` URL.
+
+**When ready, the steps are:**
+
+1. **Azure Portal → App Service → Custom domains → Add custom domain**
+   - Add `arborkin.com` and `www.arborkin.com`
+   - Copy the TXT verification record and A record / CNAME value Azure provides
+
+2. **At your domain registrar**
+   - Add the TXT record (domain ownership verification)
+   - Add an A record pointing `arborkin.com` to Azure's outbound IP, or a CNAME for `www`
+   - DNS propagation: minutes to a few hours
+
+3. **Back in Azure → Custom domains → Add binding**
+   - Select "App Service Managed Certificate" — free on B1, auto-renews
+   - Azure provisions TLS for `arborkin.com` automatically
+
+4. **Verify HTTPS Only is on** — Configuration → TLS/SSL settings → HTTPS Only: On (already the default)
+
+**Security items to review before going live on the custom domain:**
+- ✓ `Auth__RegistrationMode = InviteOnly` — confirmed 2026-06-11
+- ✓ `DevAuth__Enabled = false` — confirmed 2026-06-11
+- Review CORS / referrer policy headers
+- Consider adding a `Content-Security-Policy` header via App Service response headers
+- Decide whether `azurewebsites.net` URL should remain accessible or be blocked
 
 ---
 

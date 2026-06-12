@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
@@ -100,8 +101,10 @@ builder.Services.AddScoped<IUserMessageService, UserMessageService>();
 builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ToastService>();
+builder.Services.AddScoped<TreeContextService>();
 builder.Services.AddScoped<FamilyTreeLayoutEngine>();
 builder.Services.AddScoped<SvgExportService>();
+builder.Services.AddScoped<IGedcomExportService, GedcomExportService>();
 builder.Services.AddSingleton(_ =>
 {
     var connectionString = builder.Configuration["AzureStorage:ConnectionString"];
@@ -319,5 +322,15 @@ if (!string.IsNullOrWhiteSpace(superUserEmail))
         app.Logger.LogInformation("Bootstrapped super-user: {Email}", superUserEmail);
     }
 }
+
+// ── GEDCOM export endpoint ──────────────────────────────────────
+app.MapGet("/export/gedcom", async (
+    IGedcomExportService gedcom,
+    CancellationToken ct) =>
+{
+    var content = await gedcom.ExportAsync(ct);
+    var bytes = Encoding.UTF8.GetBytes(content);
+    return Results.File(bytes, "text/x-gedcom", "family-tree.ged");
+}).RequireAuthorization();
 
 app.Run();

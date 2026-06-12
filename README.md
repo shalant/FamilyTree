@@ -10,7 +10,7 @@ A full-stack family tree application built with **Blazor Server (.NET 10)**, **E
 
 ### 1. Full Family Tree Canvas
 
-![FamilyTree Hero](docs/screenshots/familytree-hero.png)
+![FamilyTree Hero](Screenshots/Home.png)
 
 Interactive canvas with SVG connectors, focus node highlight, and draggable hero overlay — light mode.
 
@@ -18,7 +18,7 @@ Interactive canvas with SVG connectors, focus node highlight, and draggable hero
 
 ### 2. Dark Mode Tree
 
-![FamilyTree Dark Mode](docs/screenshots/familytree-hero__dark.png)
+![FamilyTree Dark Mode](Screenshots/Home_Dark.png)
 
 Dark mode variant showing the token-driven theme system and glass surfaces.
 
@@ -26,41 +26,41 @@ Dark mode variant showing the token-driven theme system and glass surfaces.
 
 ### 3. Person Detail Drawer
 
-![Person Detail Drawer](docs/screenshots/familytree-detaildrawer.png)
+![Person Detail Drawer](Screenshots/PersonEditDrawer.png)
 
-Side drawer with edit / delete / focus actions while the live tree remains visible behind it.
-
----
-
-### 4. Edit Person Form
-
-![Edit Person Form](docs/screenshots/familytree-edit.png)
-
-Shared form component used for both add and edit; includes date validation and relationship selectors.
+Side drawer with edit / delete / focus-person actions while the live tree remains visible behind it.
 
 ---
 
-### 5. Add Person (Dark Mode)
+### 4. Add Person Form
 
-![Add Person Dark](docs/screenshots/familytree-add__dark.png)
+![Add Person Form](Screenshots/PersonAdd.png)
 
-Dark-mode form demonstrating consistent theming across all components.
-
----
-
-### 6. Media Upload Zone
-
-![Media Upload Zone](docs/screenshots/familytree-mediazone.png)
-
-Drag-and-drop upload with hover animation, file validation, and Azure Blob Storage backing.
+Shared form component used for both add and edit; includes date validation, photo upload, and relationship selectors.
 
 ---
 
-### 7. People List View
+### 5. Import Family Data
 
-![People List View](docs/screenshots/familytree-personlist.png)
+![Import Family Data](Screenshots/Import_Dark.png)
 
-Sortable, searchable table for managing family members alongside the tree canvas.
+GEDCOM / PDF / CSV / paste-text import wizard in dark mode; previews all relationships before committing.
+
+---
+
+### 6. Dashboard
+
+![Dashboard](Screenshots/Dashboard.png)
+
+"Your Family Tree" hub — stats, quick actions, recently added members, export options, and community links.
+
+---
+
+### 7. Admin Panel
+
+![Admin Panel](Screenshots/Admin.png)
+
+Admin panel: invite management, user roles, linked-person assignment, and audit tabs.
 
 ---
 

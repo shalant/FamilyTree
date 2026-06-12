@@ -70,6 +70,28 @@ window.ftCompressImage = (inputId, fileIndex, maxPx, quality) => {
     });
 };
 
+// Auto-reload when Blazor's circuit is rejected (stale tab after server restart/deployment).
+(function () {
+    const modal = document.getElementById('components-reconnect-modal');
+    if (!modal) return;
+    let countdownTimer = null;
+    new MutationObserver(() => {
+        if (modal.classList.contains('components-reconnect-rejected')) {
+            if (countdownTimer) return;
+            let secs = 3;
+            const el = document.getElementById('ft-reload-countdown');
+            countdownTimer = setInterval(() => {
+                secs--;
+                if (el) el.textContent = secs;
+                if (secs <= 0) { clearInterval(countdownTimer); location.reload(); }
+            }, 1000);
+        } else {
+            clearInterval(countdownTimer);
+            countdownTimer = null;
+        }
+    }).observe(modal, { attributes: true, attributeFilter: ['class'] });
+})();
+
 window.ftSvgToPng = async (svgContent, filename) => {
     const parser = new DOMParser();
     const svgEl  = parser.parseFromString(svgContent, 'image/svg+xml').documentElement;

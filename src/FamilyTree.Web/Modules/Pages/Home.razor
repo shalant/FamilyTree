@@ -19,6 +19,7 @@
 @inject ToastService Toast
 @inject IJSRuntime JS
 @inject AuthenticationStateProvider AuthStateProvider
+@inject TreeContextService TreeContext
 
 <PageTitle>ArborKin</PageTitle>
 
@@ -139,6 +140,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        TreeContext.OnCenterTreeRequested += OnCenterTreeFromAppBar;
+
         // Capture auth user ID for DB focus persistence
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var userIdClaim = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -162,6 +165,7 @@ else
                             ?? _people.FirstOrDefault();
                 if (_focusPerson?.Id == Focus.Value)
                     _detailPerson = _focusPerson;
+                TreeContext.SetContext(_focusPerson, _people.Count, _couples.Count);
                 await PersistFocusAsync(_focusPerson?.Id);
                 _ready = true;
             }
@@ -209,6 +213,7 @@ else
         if (!_ready && _people.Count > 0)
         {
             _focusPerson = await ResolveFocusAsync();
+            TreeContext.SetContext(_focusPerson, _people.Count, _couples.Count);
             _ready = true;
             StateHasChanged();
         }
@@ -243,8 +248,11 @@ else
         StateHasChanged(); // Blazor re-renders with new position — no more JS/Blazor conflict
     }
 
+    private void OnCenterTreeFromAppBar() => InvokeAsync(CenterTree);
+
     public async ValueTask DisposeAsync()
     {
+        TreeContext.OnCenterTreeRequested -= OnCenterTreeFromAppBar;
         try
         {
             if (_dragModule != null) await _dragModule.DisposeAsync();
@@ -262,6 +270,7 @@ else
     {
         _focusPerson  = person;
         _detailPerson = null;
+        TreeContext.SetContext(person, _people.Count, _couples.Count);
         await PersistFocusAsync(person.Id);
     }
 

@@ -10,6 +10,18 @@
 
 @inject ThemeService Theme
 
+@* Lock scroll at the layout level — no JS dependency, applies from first SSR render.
+   Prevents body whitespace from MudBlazor in-flow providers showing below the fixed canvas. *@
+<HeadContent>
+    <style>
+        html, body {
+            overflow: hidden !important;
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+        }
+    </style>
+</HeadContent>
+
 <MudThemeProvider Theme="_mudTheme" @bind-IsDarkMode="_isDark" />
 <MudDialogProvider />
 <MudSnackbarProvider />

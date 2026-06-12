@@ -4,14 +4,18 @@
 
 ## In Progress / Up Next
 
-- [ ] **Deploy** — push accumulated changes (performance indexes, family scoping, email flow) to production; verify `DevAuth__Enabled = false` in Azure config
-- [ ] **Feature request backend** — store `RequestFeatureDialog` submissions in a DB table
-- [ ] **Mobile layout** — tree canvas and forms are not optimized for small screens
+- [ ] **Deploy** — push accumulated changes to production (`DevAuth__Enabled` and `Auth__RegistrationMode` already verified correct in Azure)
+- [ ] **GEDCOM export** — wire the "Coming soon" stub in Dashboard; `GedcomExportService` writing standard `.ged` format from the current family's people + relationships
+- [ ] **Mobile layout** — tree canvas and forms are not optimized for small screens; no `@media` breakpoints exist yet
 
 ---
 
 ## Recently Completed
 
+- [x] **Admin Imports tab** — replaced placeholder alert with full `ImportFormPanel` component; extracted import UI (GEDCOM/PDF/CSV/paste tabs + action bar) into shared `ImportFormPanel.razor`; used in both `/import` page and admin tab; import history table preserved below the form; Blazor stale-circuit reconnect modal also added
+- [x] **Dashboard** — `/dashboard` hub with family stats (total/living/generations/photos), quick actions, recently added list, "Coming soon" export section, feature-request and contact-admin buttons
+- [x] **Import family data** — `/import` page with GEDCOM / PDF / CSV / paste-text tabs; `IImportService` (`ClaudeImportService`) backend; `ImportBatch` model + `AddImportBatch` migration; preview-before-commit flow
+- [x] **Feature request backend** — `UserMessage` DB model + `AddUserMessages` migration; `IUserMessageService.SubmitFeatureRequestAsync`; Admin panel "Messages" tab shows all submissions with type badge (Feature / Message)
 - [x] **Password reset email** — `IEmailSender` abstraction; `SmtpEmailSender` (Gmail SMTP) + `LogEmailSender` (dev console fallback); `AuthService` sends reset link automatically; Gmail App Password configured in Azure
 - [x] **Family scoping** — `ICurrentUserService` (interface in Core, impl in Web); `FamilyId` claim baked into auth cookie; all service queries scoped; `CreatedBy`/`UpdatedBy`/`DeletedBy` stamped on every write; super-users bypass scoping
 - [x] **DB performance indexes** — filtered composite indexes on People, Relationships, AuditLogs via `AddPerformanceIndexes` migration
@@ -52,7 +56,7 @@
 | Theme — light/dark mode | ✅ done |
 | Hosting — Azure App Service + Blob Storage | ✅ done |
 | Accounts — sign in (Google, role-based) | ✅ done |
-| Privacy — private tree by default | 🔲 family scoping |
+| Privacy — private tree by default | ✅ done |
 
 ---
 

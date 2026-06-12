@@ -1,13 +1,8 @@
-﻿@* ═══════════════════════════════════════════════════════════════════════════
+@* ═══════════════════════════════════════════════════════════════════════════
    AppHeader — top navigation bar.
 
-   Slots:
-   ┌──────────────────────────────────────────────────────────────────────┐
-   │  🌳 FamilyTree   [  🔍 Search people…  ]   + ☀ ○ (avatar)         │
-   └──────────────────────────────────────────────────────────────────────┘
-
-   Search navigates to /?focus={personId} — Home.razor picks up the param
-   and sets that person as the tree focus.
+   Desktop: logo | search | [add · people · import · dashboard · dark · chip · avatar]
+   Mobile:  logo | search | [hamburger]  →  slide-in drawer with full nav
    ═══════════════════════════════════════════════════════════════════════════ *@
 
 @using FamilyTree.Shared.DTOs.Person
@@ -18,9 +13,10 @@
 @inject ThemeService Theme
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
+@inject TreeContextService TreeContext
 @implements IAsyncDisposable
 
-@* ── AppBar shell ─────────────────────────────────────────────────────────── *@
+@* ── AppBar shell ──────────────────────────────────────────────────────────── *@
 <MudAppBar id="ft-appbar"
            Elevation="0"
            Style="background: rgba(245,245,245,0.3) !important;
@@ -29,23 +25,13 @@
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.25);
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);">
 
-    @* Brand wordmark *@
-    @* <div style="background:#fff; border-radius:8px; padding:3px 10px;
-                margin-right:16px; flex-shrink:0; cursor:pointer; user-select:none;"
-         @onclick='() => Nav.NavigateTo("/")'>
-        <img src="/images/arborkin-logo__transparent.png" alt="ArborKin"
-             style="height:30px; display:block;" />
-    </div> *@
-    <div style="margin-left:-20px; margin-right:12px; padding:0;
-                flex-shrink:0; cursor:pointer; user-select:none;
-                display:flex; align-items:center; align-self:center;"
-         @onclick='() => Nav.NavigateTo("/")'>
-        <img src="/images/arborkin-logo__transparent.png" alt="ArborKin"
-             style="height:170px; display:block;" />
+    @* ── Logo ─────────────────────────────────────────────────────────────── *@
+    <div class="ft-appbar-logo" @onclick='() => Nav.NavigateTo("/")'>
+        <img src="/images/arborkin-logo__transparent.png" alt="ArborKin" />
     </div>
 
-    @* ── People search ──────────────────────────────────────────────────── *@
-    <div class="ft-search-wrap" style="flex:1; max-width:420px;">
+    @* ── Search (desktop only) ────────────────────────────────────────────── *@
+    <div class="ft-search-wrap">
         <MudAutocomplete T="PersonDto"
                          Value="_searchSelection"
                          SearchFunc="SearchPeople"
@@ -65,7 +51,6 @@
                          PopoverClass="ft-search-popover">
             <ItemTemplate Context="person">
                 <div style="display:flex; align-items:center; gap:10px; padding:6px 4px;">
-                    @* Mini avatar *@
                     <div style="width:28px; height:28px; border-radius:50%; flex-shrink:0;
                         background:var(--ft-focus-fill); color:var(--ft-focus-text);
                         display:flex; align-items:center; justify-content:center;
@@ -80,11 +65,8 @@
                             @MiniInitials(person)
                         }
                     </div>
-                    @* Name + dates *@
                     <div style="display:flex; flex-direction:column; line-height:1.3;">
-                        <span style="font-size:13px; color:var(--ft-text-primary);">
-                            @person.FullName
-                        </span>
+                        <span style="font-size:13px; color:var(--ft-text-primary);">@person.FullName</span>
                         @if (person.BirthDate.HasValue || person.DeathDate.HasValue)
                         {
                             <span style="font-size:11px; color:var(--ft-text-muted);">
@@ -96,198 +78,237 @@
                 </div>
             </ItemTemplate>
             <NoItemsTemplate>
-                <div style="padding:12px 16px; font-size:13px; color:var(--ft-text-muted);">
-                    No matches found
-                </div>
+                <div style="padding:12px 16px; font-size:13px; color:var(--ft-text-muted);">No matches found</div>
             </NoItemsTemplate>
         </MudAutocomplete>
     </div>
 
-    <MudSpacer />
-
-    @* ── Quick-add person ───────────────────────────────────────────────── *@
-    <MudTooltip Text="Add person" Placement="Placement.Bottom">
-        <MudIconButton Icon="@Icons.Material.Outlined.PersonAdd"
-                       Style="color:var(--ft-green-600);"
-                       OnClick='() => Nav.NavigateTo("/people/add")' />
-    </MudTooltip>
-
-    @* ── People list ────────────────────────────────────────────────────── *@
-    <MudTooltip Text="People list" Placement="Placement.Bottom">
-        <MudIconButton Icon="@Icons.Material.Outlined.People"
-                       Style="color:var(--ft-gray-400);"
-                       OnClick='() => Nav.NavigateTo("/people")' />
-    </MudTooltip>
-
-    @* ── Import ─────────────────────────────────────────────────────────── *@
-    <MudTooltip Text="Import data" Placement="Placement.Bottom">
-        <MudIconButton Icon="@Icons.Material.Outlined.Upload"
-                       Style="color:var(--ft-gray-400);"
-                       OnClick='() => Nav.NavigateTo("/import")' />
-    </MudTooltip>
-
-    @* ── Dashboard ──────────────────────────────────────────────────────── *@
-    <MudTooltip Text="Dashboard" Placement="Placement.Bottom">
-        <MudIconButton Icon="@Icons.Material.Outlined.Dashboard"
-                       Style="color:var(--ft-gray-400);"
-                       OnClick='() => Nav.NavigateTo("/dashboard")' />
-    </MudTooltip>
-
-    @* ── Dark-mode toggle ───────────────────────────────────────────────── *@
-    <MudTooltip Text="@(_isDark ? "Light mode" : "Dark mode")" Placement="Placement.Bottom">
-        <MudIconButton Icon="@(_isDark? Icons.Material.Outlined.LightMode
-                                                                                                : Icons.Material.Outlined.DarkMode)"
-                       Style="color:var(--ft-gray-400);"
-                       OnClick="ToggleTheme" />
-    </MudTooltip>
-
-    @* ── Auth level chip ────────────────────────────────────────────────── *@
-    @if (_authChipLabel is not null)
+    @* ── Focus context chip (mobile only — replaces search) ──────────────────── *@
+    @if (TreeContext.FocusPerson is { } fp)
     {
-        <MudChip T="string" Size="Size.Small" Color="_authChipColor"
-                 Style="margin-right:2px; cursor:default; font-size:11px; height:22px;"
-                 Ripple="false">
-            @_authChipLabel
-        </MudChip>
-    }
-
-    @* ── User avatar ────────────────────────────────────────────────────── *@
-    <MudMenu AnchorOrigin="Origin.BottomRight"
-             TransformOrigin="Origin.TopRight"
-             Dense="true">
-        <ActivatorContent>
-            @* Avatar bubble — swap src for real photo when auth is wired.*@
-
-            @* <div
-                 style="width:32px; height:32px; border-radius:50%; cursor:pointer;
-                background:var(--ft-green-600); color:#fff;
-                display:flex; align-items:center; justify-content:center;
-                font-size:13px; font-weight:500; margin-left:6px;
-                border:2px solid var(--ft-green-400);
-                overflow:hidden; flex-shrink:0;">
-                @if (!string.IsNullOrWhiteSpace(_userPhotoUrl))
+        <div class="ft-appbar-context @(_contextExpanded ? "ft-appbar-context--active" : "")"
+             @onclick="ToggleContext">
+            <div class="ft-context-avatar">
+                @if (!string.IsNullOrWhiteSpace(fp.ProfilePhotoUrl))
                 {
-                    <img src="@_userPhotoUrl" alt="You"
-                         style="width:100%; height:100%; object-fit:cover;" />
+                    <img src="@fp.ProfilePhotoUrl" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />
                 }
                 else
                 {
-                    @_userInitials
+                    @MiniInitials(fp)
                 }
-            </div> *@
-            <div @onclick="@context.ToggleAsync" class="custom-avatar" style="cursor: pointer">
-
-                <MudAvatar Size="Size.Medium"
-                           Color="Color.Primary"
-                           Style="cursor:pointer;">
-                    @if (!string.IsNullOrWhiteSpace(_userPhotoUrl))
-                    {
-                        <img src="@_userPhotoUrl" alt="You"
-                             style="width:100%; height:100%; object-fit:cover;" />
-                    }
-                    else
-                    {
-                        @_userInitials
-                    }
-                </MudAvatar>
             </div>
-        </ActivatorContent>
-        <ChildContent>
-            @* User identity header *@
-            <div style="padding:12px 16px 10px; border-bottom:0.5px solid var(--ft-line-border);
-                min-width:180px;">
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                    <span style="font-size:13px; font-weight:500; color:var(--ft-text-primary);">
-                        @_userName
-                    </span>
-                    @if (_authChipLabel is "Admin" or "Super-user")
-                    {
-                        <MudChip T="string" Size="Size.Small" Color="_authChipColor"
-                                 Style="height:18px; font-size:10px; cursor:default;"
-                                 Ripple="false">
-                            @_authChipLabel
-                        </MudChip>
-                    }
-                </div>
-                <div style="font-size:11px; color:var(--ft-text-muted); margin-top:2px;">
-                    @_userEmail
-                </div>
+            <div class="ft-context-info">
+                <span class="ft-context-name">@fp.FirstName</span>
+                <span class="ft-context-sub">@TreeContext.PeopleCount people</span>
             </div>
-            <MudMenuItem Icon="@Icons.Material.Outlined.Dashboard"
-                         OnClick='() => Nav.NavigateTo("/dashboard")'>
-                Dashboard
-            </MudMenuItem>
-            <MudMenuItem Icon="@Icons.Material.Outlined.Settings"
-                         OnClick='() => Nav.NavigateTo("/settings")'>
-                Settings
-            </MudMenuItem>
-            @if (_authChipLabel is "Admin" or "Super-user")
-            {
-                <MudMenuItem Icon="@Icons.Material.Outlined.AdminPanelSettings"
-                             OnClick='() => Nav.NavigateTo("/admin")'>
-                    Admin
-                </MudMenuItem>
-            }
-            <MudDivider />
-            <MudMenuItem Icon="@Icons.Material.Outlined.Info"
-                         OnClick='() => Nav.NavigateTo("/about")'>
-                About
-            </MudMenuItem>
-            <MudMenuItem Icon="@Icons.Material.Outlined.HelpOutline"
-                         OnClick='() => Nav.NavigateTo("/faq")'>
-                FAQ & security
-            </MudMenuItem>
-            <MudDivider />
-            <MudMenuItem Icon="@Icons.Material.Outlined.Logout"
-                         Style="color:var(--ft-gray-500);"
-                         OnClick="SignOut">
-                Sign out
-            </MudMenuItem>
-        </ChildContent>
-    </MudMenu>
-    @* <MudMenu AnchorOrigin="Origin.BottomRight"
-             TransformOrigin="Origin.TopRight"
-             Dense="true"
-             Class="ft-user-menu">
+            <MudIcon Icon="@(_contextExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                     Style="font-size:16px; color:var(--ft-gray-400); flex-shrink:0;" />
+        </div>
+    }
 
-        <ActivatorContent>
-            <MudAvatar Size="Size.Medium"
-                       Color="Color.Primary"
-                       Style="cursor:pointer;"
-                       Text="D" />
-        </ActivatorContent>
+    <MudSpacer />
 
-        <ChildContent>
-            <MudMenuItem Icon="@Icons.Material.Outlined.Person" Href="/account">Account</MudMenuItem>
-            <MudMenuItem Icon="@Icons.Material.Outlined.Settings" Href="/settings">Settings</MudMenuItem>
-            <MudDivider />
-            <MudMenuItem Icon="@Icons.Material.Outlined.HelpOutline" Href="/help">Help</MudMenuItem>
-            <MudDivider />
-            <MudMenuItem Icon="@Icons.Material.Outlined.Logout"
-                         Style="color:#A32D2D;"
-                         OnClick="SignOut">Sign out</MudMenuItem>
-        </ChildContent>
-    </MudMenu> *@
+    @* ── Desktop nav (hidden on mobile) ───────────────────────────────────── *@
+    <div class="ft-nav-desktop">
+        <MudTooltip Text="Add person" Placement="Placement.Bottom">
+            <MudIconButton Icon="@Icons.Material.Outlined.PersonAdd"
+                           Style="color:var(--ft-green-600);"
+                           OnClick='() => Nav.NavigateTo("/people/add")' />
+        </MudTooltip>
+
+        <MudTooltip Text="People list" Placement="Placement.Bottom">
+            <MudIconButton Icon="@Icons.Material.Outlined.People"
+                           Style="color:var(--ft-gray-400);"
+                           OnClick='() => Nav.NavigateTo("/people")' />
+        </MudTooltip>
+
+        <MudTooltip Text="Import data" Placement="Placement.Bottom">
+            <MudIconButton Icon="@Icons.Material.Outlined.Upload"
+                           Style="color:var(--ft-gray-400);"
+                           OnClick='() => Nav.NavigateTo("/import")' />
+        </MudTooltip>
+
+        <MudTooltip Text="Dashboard" Placement="Placement.Bottom">
+            <MudIconButton Icon="@Icons.Material.Outlined.Dashboard"
+                           Style="color:var(--ft-gray-400);"
+                           OnClick='() => Nav.NavigateTo("/dashboard")' />
+        </MudTooltip>
+
+        <MudTooltip Text="@(_isDark ? "Light mode" : "Dark mode")" Placement="Placement.Bottom">
+            <MudIconButton Icon="@(_isDark ? Icons.Material.Outlined.LightMode : Icons.Material.Outlined.DarkMode)"
+                           Style="color:var(--ft-gray-400);"
+                           OnClick="ToggleTheme" />
+        </MudTooltip>
+
+        @if (_authChipLabel is not null)
+        {
+            <MudChip T="string" Size="Size.Small" Color="_authChipColor"
+                     Style="margin-right:2px; cursor:default; font-size:11px; height:22px;"
+                     Ripple="false">
+                @_authChipLabel
+            </MudChip>
+        }
+
+        @* User avatar menu *@
+        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true">
+            <ActivatorContent>
+                <div @onclick="@context.ToggleAsync" class="custom-avatar" style="cursor:pointer;">
+                    <MudAvatar Size="Size.Medium" Color="Color.Primary" Style="cursor:pointer;">
+                        @if (!string.IsNullOrWhiteSpace(_userPhotoUrl))
+                        {
+                            <img src="@_userPhotoUrl" alt="You"
+                                 style="width:100%; height:100%; object-fit:cover;" />
+                        }
+                        else
+                        {
+                            @_userInitials
+                        }
+                    </MudAvatar>
+                </div>
+            </ActivatorContent>
+            <ChildContent>
+                <div style="padding:12px 16px 10px; border-bottom:0.5px solid var(--ft-line-border); min-width:180px;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <span style="font-size:13px; font-weight:500; color:var(--ft-text-primary);">@_userName</span>
+                        @if (_authChipLabel is "Admin" or "Super-user")
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="_authChipColor"
+                                     Style="height:18px; font-size:10px; cursor:default;" Ripple="false">
+                                @_authChipLabel
+                            </MudChip>
+                        }
+                    </div>
+                    <div style="font-size:11px; color:var(--ft-text-muted); margin-top:2px;">@_userEmail</div>
+                </div>
+                <MudMenuItem Icon="@Icons.Material.Outlined.Dashboard"   OnClick='() => Nav.NavigateTo("/dashboard")'>Dashboard</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Outlined.Settings"    OnClick='() => Nav.NavigateTo("/settings")'>Settings</MudMenuItem>
+                @if (_authChipLabel is "Admin" or "Super-user")
+                {
+                    <MudMenuItem Icon="@Icons.Material.Outlined.AdminPanelSettings" OnClick='() => Nav.NavigateTo("/admin")'>Admin</MudMenuItem>
+                }
+                <MudDivider />
+                <MudMenuItem Icon="@Icons.Material.Outlined.Info"         OnClick='() => Nav.NavigateTo("/about")'>About</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Outlined.HelpOutline"  OnClick='() => Nav.NavigateTo("/faq")'>FAQ & security</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem Icon="@Icons.Material.Outlined.Logout" Style="color:var(--ft-gray-500);" OnClick="SignOut">Sign out</MudMenuItem>
+            </ChildContent>
+        </MudMenu>
+    </div>
+
+    @* ── Hamburger (mobile only) ───────────────────────────────────────────── *@
+    <div class="ft-nav-mobile">
+        <MudIconButton Icon="@Icons.Material.Outlined.Menu"
+                       Style="color:var(--ft-gray-600);"
+                       OnClick="@(() => _drawerOpen = true)" />
+    </div>
+
 </MudAppBar>
 
+@* ── Context mini-panel (drops below AppBar when chip is tapped, mobile only) ── *@
+@if (_contextExpanded && TreeContext.FocusPerson is { } panel)
+{
+    <div class="ft-context-panel" @onclick:stopPropagation="true">
+        <div class="ft-context-panel-name">@panel.FullName</div>
+        @if (panel.BirthDate.HasValue || panel.DeathDate.HasValue)
+        {
+            <div class="ft-context-panel-dates">
+                @(panel.BirthDate?.Year.ToString() ?? "?")
+                @(panel.DeathDate.HasValue ? $" – {panel.DeathDate.Value.Year}" : (panel.IsDeceased ? "" : " – present"))
+                @if (!string.IsNullOrWhiteSpace(panel.BirthPlace))
+                {
+                    <span> · @panel.BirthPlace</span>
+                }
+            </div>
+        }
+        <div class="ft-context-panel-stats">
+            <span>@TreeContext.PeopleCount people</span>
+            <span class="ft-context-panel-dot">·</span>
+            <span>@TreeContext.CoupleCount couples</span>
+        </div>
+        <button class="ft-context-panel-center" @onclick="RequestCenter" @onclick:stopPropagation="true">
+            <MudIcon Icon="@Icons.Material.Outlined.CenterFocusStrong" Style="font-size:16px; margin-right:6px;" />
+            Center tree
+        </button>
+    </div>
+    <div class="ft-context-panel-backdrop" @onclick="@(() => _contextExpanded = false)"></div>
+}
+
+@* ── Mobile nav panel (custom — no MudDrawer to avoid layout side-effects) ───── *@
+@if (_drawerOpen)
+{
+    <div class="ft-mobile-backdrop" @onclick="@(() => _drawerOpen = false)"></div>
+
+    <div class="ft-mobile-nav">
+        <div class="ft-drawer-header">
+            <div>
+                <div class="ft-drawer-username">@_userName</div>
+                @if (_authChipLabel is not null)
+                {
+                    <div class="ft-drawer-role">@_authChipLabel</div>
+                }
+            </div>
+            <button class="ft-drawer-close" @onclick="@(() => _drawerOpen = false)" aria-label="Close">✕</button>
+        </div>
+
+        <div class="ft-drawer-divider"></div>
+
+        <nav class="ft-drawer-nav">
+            <div class="ft-drawer-item" @onclick="@(() => NavTo("/people/add"))">
+                <MudIcon Icon="@Icons.Material.Outlined.PersonAdd" Class="ft-drawer-icon" />
+                <span>Add person</span>
+            </div>
+            <div class="ft-drawer-item" @onclick="@(() => NavTo("/people"))">
+                <MudIcon Icon="@Icons.Material.Outlined.People" Class="ft-drawer-icon" />
+                <span>People list</span>
+            </div>
+            <div class="ft-drawer-item" @onclick="@(() => NavTo("/import"))">
+                <MudIcon Icon="@Icons.Material.Outlined.Upload" Class="ft-drawer-icon" />
+                <span>Import data</span>
+            </div>
+            <div class="ft-drawer-item" @onclick="@(() => NavTo("/dashboard"))">
+                <MudIcon Icon="@Icons.Material.Outlined.Dashboard" Class="ft-drawer-icon" />
+                <span>Dashboard</span>
+            </div>
+            @if (_authChipLabel is "Admin" or "Super-user")
+            {
+                <div class="ft-drawer-item" @onclick="@(() => NavTo("/admin"))">
+                    <MudIcon Icon="@Icons.Material.Outlined.AdminPanelSettings" Class="ft-drawer-icon" />
+                    <span>Admin</span>
+                </div>
+            }
+            <div class="ft-drawer-item" @onclick="@(() => NavTo("/settings"))">
+                <MudIcon Icon="@Icons.Material.Outlined.Settings" Class="ft-drawer-icon" />
+                <span>Settings</span>
+            </div>
+        </nav>
+
+        <div class="ft-drawer-divider"></div>
+
+        <nav class="ft-drawer-nav">
+            <div class="ft-drawer-item" @onclick="ToggleTheme">
+                <MudIcon Icon="@(_isDark ? Icons.Material.Outlined.LightMode : Icons.Material.Outlined.DarkMode)"
+                         Class="ft-drawer-icon" />
+                <span>@(_isDark ? "Light mode" : "Dark mode")</span>
+            </div>
+            <div class="ft-drawer-item ft-drawer-item--signout" @onclick="SignOut">
+                <MudIcon Icon="@Icons.Material.Outlined.Logout" Class="ft-drawer-icon" />
+                <span>Sign out</span>
+            </div>
+        </nav>
+    </div>
+}
+
 @code {
-    // ── Parameters ────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Raised when the user picks a person in the search box.
-    /// Navigate to /?focus={id} — the tree will centre on them.
-    /// </summary>
-    [Parameter] public EventCallback<PersonDto> OnPersonFocused { get; set; }
-
-    /// <summary>Kept in sync with MainLayout's IsDarkMode binding.</summary>
     [Parameter] public bool IsDark { get; set; }
     [Parameter] public EventCallback<bool> IsDarkChanged { get; set; }
-
-    // ── State ─────────────────────────────────────────────────────────────
+    [Parameter] public EventCallback<PersonDto> OnPersonFocused { get; set; }
 
     private PersonDto? _searchSelection;
     private List<PersonDto> _allPeople = [];
     private bool _isDark;
+    private bool _drawerOpen;
+    private bool _contextExpanded;
 
     private string _userName     = "";
     private string _userEmail    = "";
@@ -295,8 +316,6 @@
     private string _userPhotoUrl = "";
     private string? _authChipLabel;
     private Color   _authChipColor = Color.Default;
-
-    // ── Lifecycle ─────────────────────────────────────────────────────────
 
     protected override async Task OnInitializedAsync()
     {
@@ -308,10 +327,13 @@
             _allPeople = result.Data ?? [];
 
         _isDark = Theme.IsDark;
-        Theme.OnChange += OnThemeChanged;
+        Theme.OnChange    += OnThemeChanged;
+        TreeContext.OnChange += OnTreeContextChanged;
 
         _ = LoadUserInfoAsync(authState.User);
     }
+
+    private void OnTreeContextChanged() => InvokeAsync(StateHasChanged);
 
     private Task LoadUserInfoAsync(ClaimsPrincipal principal)
     {
@@ -324,26 +346,10 @@
                   ?? "—";
         _userEmail = principal.FindFirst(ClaimTypes.Email)?.Value ?? "";
 
-        if (isDevAuth)
-        {
-            _authChipLabel = "Dev";
-            _authChipColor = Color.Info;
-        }
-        else if (principal.IsInRole("SuperUser"))
-        {
-            _authChipLabel = "Super-user";
-            _authChipColor = Color.Default;
-        }
-        else if (principal.IsInRole("Admin"))
-        {
-            _authChipLabel = "Admin";
-            _authChipColor = Color.Default;
-        }
-        else
-        {
-            _authChipLabel = "Member";
-            _authChipColor = Color.Success;
-        }
+        if (isDevAuth)          { _authChipLabel = "Dev";        _authChipColor = Color.Info; }
+        else if (principal.IsInRole("SuperUser")) { _authChipLabel = "Super-user"; _authChipColor = Color.Default; }
+        else if (principal.IsInRole("Admin"))     { _authChipLabel = "Admin";      _authChipColor = Color.Default; }
+        else                    { _authChipLabel = "Member";     _authChipColor = Color.Success; }
 
         var parts = _userName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
         _userInitials = parts.Length >= 2
@@ -355,37 +361,47 @@
 
     protected override void OnParametersSet() => _isDark = IsDark;
 
-    // ftDrag.js self-initialises via MutationObserver — no OnAfterRenderAsync needed
-
     public async ValueTask DisposeAsync()
     {
-        Theme.OnChange -= OnThemeChanged;
+        Theme.OnChange       -= OnThemeChanged;
+        TreeContext.OnChange -= OnTreeContextChanged;
         await ValueTask.CompletedTask;
     }
-
-    // ── Search ────────────────────────────────────────────────────────────
 
     private Task<IEnumerable<PersonDto>> SearchPeople(string value, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(value))
             return Task.FromResult(_allPeople.Take(6));
-
-        var results = _allPeople
+        return Task.FromResult(_allPeople
             .Where(p => p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Take(8);
-        return Task.FromResult(results);
+            .Take(8));
     }
 
     private void OnPersonSelected(PersonDto? person)
     {
         if (person is null) return;
-
-        // Navigate with ?view= — opens the drawer without re-centering the tree.
         Nav.NavigateTo($"/?view={person.Id}");
-        _searchSelection = null;    // clear the input after nav
+        _searchSelection = null;
     }
 
-    // ── Theme ─────────────────────────────────────────────────────────────
+    private void ToggleContext()
+    {
+        _contextExpanded = !_contextExpanded;
+        if (_contextExpanded) _drawerOpen = false;
+    }
+
+    private void RequestCenter()
+    {
+        _contextExpanded = false;
+        TreeContext.RequestCenterTree();
+    }
+
+    private void NavTo(string url)
+    {
+        _drawerOpen = false;
+        _contextExpanded = false;
+        Nav.NavigateTo(url);
+    }
 
     private async Task ToggleTheme()
     {
@@ -399,10 +415,6 @@
         _isDark = Theme.IsDark;
         InvokeAsync(StateHasChanged);
     }
-
-
-
-    // ── Helpers ───────────────────────────────────────────────────────────
 
     private static string MiniInitials(PersonDto p) =>
         $"{p.FirstName?.FirstOrDefault()}{p.LastName?.FirstOrDefault()}"

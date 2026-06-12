@@ -68,10 +68,10 @@
                     : "var(--ft-gray-100)";           // more distant
 
     private string BgColor => (_hovered && !IsFocus)
-        ? "var(--ft-green-50)"
+        ? "rgba(220, 245, 225, 0.82)"
         : IsFocus
             ? "var(--ft-focus-fill)"
-            : "var(--ft-surface-card)";
+            : "rgba(255, 255, 255, 0.68)";
 
     private string TextColor => (_hovered && !IsFocus)
         ? "var(--ft-green-800)"

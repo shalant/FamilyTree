@@ -6,6 +6,7 @@
 @using FamilyTree.Core.Models
 @using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Services
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.EntityFrameworkCore
@@ -679,61 +680,60 @@
            ═══════════════════════════════════════════════════════════════════ *@
         <MudTabPanel Text="Imports" Icon="@Icons.Material.Outlined.Upload">
 
-            @if (_loadingImports)
+            <ImportFormPanel />
+
+            @* ── Import history ──────────────────────────────────────────────── *@
+            @if (_importBatches.Count > 0)
             {
-                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-            }
-            else if (_importBatches.Count == 0)
-            {
-                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-                    No bulk imports yet. Use the Import page to add people from a document.
-                </MudAlert>
-            }
-            else
-            {
-                <MudPaper Elevation="0" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
-                    <MudTable Items="_importBatches" Hover="true" Dense="true"
-                              Style="background:transparent;">
-                        <HeaderContent>
-                            <MudTh>Date</MudTh>
-                            <MudTh>People</MudTh>
-                            <MudTh>Relationships</MudTh>
-                            <MudTh>Status</MudTh>
-                            <MudTh></MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd>@context.CreatedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</MudTd>
-                            <MudTd>@context.PersonCount</MudTd>
-                            <MudTd>@context.RelationshipCount</MudTd>
-                            <MudTd>
-                                @if (context.RolledBackAt.HasValue)
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Default">
-                                        Rolled back @context.RolledBackAt.Value.ToLocalTime().ToString("MMM d")
-                                    </MudChip>
-                                }
-                                else
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Active</MudChip>
-                                }
-                            </MudTd>
-                            <MudTd>
-                                @if (!context.RolledBackAt.HasValue)
-                                {
-                                    <MudButton Variant="Variant.Outlined" Size="Size.Small"
-                                               Color="Color.Error"
-                                               StartIcon="@Icons.Material.Outlined.Undo"
-                                               OnClick="@(() => ConfirmRollbackAsync(context))">
-                                        Roll back
-                                    </MudButton>
-                                }
-                            </MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                </MudPaper>
-                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
-                    Rolling back removes all people and relationships from that import. People are soft-deleted and can be restored individually from the People tab.
-                </MudAlert>
+                <div style="margin-top:40px; padding-top:24px; border-top:1px solid var(--ft-line-border);">
+                    <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+                        letter-spacing:.1em; color:var(--ft-green-600); margin-bottom:14px;">
+                        Import history
+                    </div>
+                    <MudPaper Elevation="0" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+                        <MudTable Items="_importBatches" Hover="true" Dense="true"
+                                  Style="background:transparent;">
+                            <HeaderContent>
+                                <MudTh>Date</MudTh>
+                                <MudTh>People</MudTh>
+                                <MudTh>Relationships</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh></MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.CreatedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</MudTd>
+                                <MudTd>@context.PersonCount</MudTd>
+                                <MudTd>@context.RelationshipCount</MudTd>
+                                <MudTd>
+                                    @if (context.RolledBackAt.HasValue)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Default">
+                                            Rolled back @context.RolledBackAt.Value.ToLocalTime().ToString("MMM d")
+                                        </MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Active</MudChip>
+                                    }
+                                </MudTd>
+                                <MudTd>
+                                    @if (!context.RolledBackAt.HasValue)
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   StartIcon="@Icons.Material.Outlined.Undo"
+                                                   OnClick="@(() => ConfirmRollbackAsync(context))">
+                                            Roll back
+                                        </MudButton>
+                                    }
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudPaper>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                        Rolling back removes all people and relationships from that import. People are soft-deleted and can be restored individually from the Deleted tab.
+                    </MudAlert>
+                </div>
             }
         </MudTabPanel>
 

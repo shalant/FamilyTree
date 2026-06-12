@@ -132,6 +132,7 @@ html, body {
     margin: 0;
     padding: 0;
     /*overflow: hidden;*/
+    overflow-x: hidden;
     overflow-y: auto;
     font-family: var(--ft-font-body);
     background: var(--ft-surface);
@@ -634,7 +635,9 @@ html, body {
     inset: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
+    touch-action: none;
     background:
         radial-gradient(ellipse at 15% 28%, rgba(93, 202, 165, 0.18) 0%, transparent 48%),
         radial-gradient(ellipse at 85% 72%, rgba(29, 158, 117, 0.10) 0%, transparent 42%),
@@ -680,14 +683,20 @@ html, body {
 .ft-band-label {
     position: absolute;
     left: 10px;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 500;
     color: var(--ft-green-700);
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     font-family: var(--ft-font-body);
     pointer-events: none;
-    opacity: 0.7;
     white-space: nowrap;
+    opacity: 0.65;
+    line-height: 1;
+}
+
+[data-theme="dark"] .ft-band-label {
+    color: var(--ft-green-300);
+    opacity: 0.55;
 }
 
 .ft-band--grandparents {
@@ -724,6 +733,7 @@ html, body {
     top: 0;
     transform-origin: 0 0;
     will-change: transform;
+    z-index: 3; /* above #ft-timeline (z-index:2) so nodes paint over year labels */
 }
 
 .ft-empty-message {
@@ -756,8 +766,15 @@ html, body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    overflow: hidden; /* clips backdrop-filter to the circular shape */
     box-shadow: var(--ft-shadow-sm);
     transition: transform .18s ease, box-shadow .18s ease;
+}
+
+/* Glassy — non-focus nodes are semi-transparent so year labels show through when overlapped */
+.person-node:not(.person-node--focus) {
+    backdrop-filter: blur(3px) saturate(1.2);
+    -webkit-backdrop-filter: blur(3px) saturate(1.2);
 }
 
     .person-node:hover {
@@ -1130,6 +1147,25 @@ html.ft-no-select * {
 }
 
 
+/* ── Toolbar mini pill (collapsed state) ─────────────────────────────────── */
+.ft-toolbar-mini {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 6px;
+    background: rgba(245, 245, 245, 0.35);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.20);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+}
+
+/* Auto-collapse the full toolbar on very short viewports (landscape mobile) */
+@media (max-height: 520px) {
+    .ft-toolbar-full { display: none !important; }
+}
+
 /* Toolbar drag handle */
 .ft-toolbar-grip {
     display: flex;
@@ -1217,6 +1253,92 @@ html.ft-no-select * {
     to   { transform: translateX(calc(100% + 2rem)); opacity: 0; }
 }
 
+/* ── Blazor reconnect modal ───────────────────────────────────────────────── */
+#components-reconnect-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+    font-family: var(--ft-font-body);
+}
+
+#components-reconnect-modal.components-reconnect-show,
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-rejected {
+    display: flex;
+}
+
+.ft-reconnect-card {
+    background: var(--ft-surface-card);
+    border-radius: 14px;
+    padding: 32px 36px;
+    text-align: center;
+    box-shadow: 0 16px 48px rgba(0,0,0,.18);
+    min-width: 260px;
+}
+
+.ft-reconnect-body {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+#components-reconnect-modal.components-reconnect-show     .ft-reconnect-body--reconnecting,
+#components-reconnect-modal.components-reconnect-failed   .ft-reconnect-body--failed,
+#components-reconnect-modal.components-reconnect-rejected .ft-reconnect-body--rejected {
+    display: flex;
+}
+
+.ft-reconnect-body p {
+    margin: 0;
+    color: var(--ft-gray-500);
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.ft-reconnect-sub {
+    font-size: 13px !important;
+    font-weight: 400 !important;
+    color: var(--ft-gray-400) !important;
+}
+
+.ft-reconnect-btn {
+    margin-top: 4px;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 8px;
+    background: var(--ft-green-600);
+    color: #fff;
+    font-family: var(--ft-font-body);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.ft-reconnect-btn--ghost {
+    background: transparent;
+    color: var(--ft-gray-400);
+    border: 1px solid var(--ft-gray-200);
+    margin-top: 0;
+}
+
+.ft-reconnect-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--ft-green-100);
+    border-top-color: var(--ft-green-600);
+    border-radius: 50%;
+    animation: ft-spin 0.8s linear infinite;
+}
+
+@keyframes ft-spin {
+    to { transform: rotate(360deg); }
+}
+
 .ft-toast--success { border-left: 4px solid #22c55e; padding-left: 14px; }
 .ft-toast--error   { border-left: 4px solid #ef4444; padding-left: 14px; }
 .ft-toast--warning { border-left: 4px solid #f59e0b; padding-left: 14px; }
@@ -1256,6 +1378,329 @@ html.ft-no-select * {
 .ft-toast-msg--solo {
     font-size: 0.875rem;
     color: var(--ft-text-primary);
+}
+
+/* ── AppBar logo ──────────────────────────────────────────────────────────── */
+.ft-appbar-logo {
+    flex-shrink: 0;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    margin-right: 12px;
+    padding-top: 14px;
+}
+
+.ft-appbar-logo img {
+    height: 170px;
+    display: block;
+}
+
+/* ── AppBar search (desktop only) ────────────────────────────────────────── */
+.ft-search-wrap {
+    flex: 1;
+    max-width: 420px;
+}
+
+/* Make the MudAutocomplete input blend with the glassmorphism AppBar */
+.ft-search-wrap .mud-input-outlined {
+    background: rgba(255, 255, 255, 0.14) !important;
+    border-radius: 10px !important;
+    transition: background 0.15s;
+}
+.ft-search-wrap .mud-input-outlined:hover,
+.ft-search-wrap .mud-input-outlined.mud-focused {
+    background: rgba(255, 255, 255, 0.24) !important;
+}
+.ft-search-wrap .mud-input-outlined fieldset {
+    border-color: rgba(255, 255, 255, 0.28) !important;
+    border-radius: 10px !important;
+}
+.ft-search-wrap .mud-input-outlined.mud-focused fieldset {
+    border-color: rgba(255, 255, 255, 0.60) !important;
+}
+/* Placeholder and input text color in glassy context */
+.ft-search-wrap .mud-input-slot input::placeholder { color: rgba(60, 80, 60, 0.55); }
+.ft-search-wrap .mud-input-slot input { color: var(--ft-text-primary); }
+
+/* ── AppBar focus context chip (mobile only) ─────────────────────────────── */
+.ft-appbar-context {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+    padding: 0 8px;
+    cursor: pointer;
+}
+
+.ft-context-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--ft-focus-fill);
+    color: var(--ft-focus-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.ft-context-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.ft-context-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ft-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ft-context-sub {
+    font-size: 11px;
+    color: var(--ft-gray-400);
+    line-height: 1.2;
+}
+
+.ft-appbar-context--active {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
+}
+
+/* ── Context mini-panel (drops below AppBar on mobile) ───────────────────── */
+.ft-context-panel {
+    display: none; /* shown only on mobile via media query */
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    background: rgba(236, 246, 236, 0.88);
+    backdrop-filter: blur(24px) saturate(1.6);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.45);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+    padding: 16px 20px 18px;
+    z-index: 1299;
+}
+
+[data-theme="dark"] .ft-context-panel {
+    background: rgba(14, 24, 14, 0.88);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.ft-context-panel-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1298;
+}
+
+.ft-context-panel-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ft-green-800);
+    font-family: var(--ft-font-display);
+    margin-bottom: 4px;
+}
+
+[data-theme="dark"] .ft-context-panel-name { color: var(--ft-green-200); }
+
+.ft-context-panel-dates {
+    font-size: 12px;
+    color: var(--ft-gray-400);
+    margin-bottom: 10px;
+}
+
+.ft-context-panel-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--ft-text-secondary);
+    margin-bottom: 14px;
+}
+
+.ft-context-panel-dot { color: var(--ft-gray-300); }
+
+.ft-context-panel-center {
+    display: flex;
+    align-items: center;
+    background: var(--ft-green-600);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    width: 100%;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.ft-context-panel-center:active { background: var(--ft-green-700); }
+
+/* ── Mobile nav panel (custom overlay, no MudDrawer) ─────────────────────── */
+.ft-mobile-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 19999;
+}
+
+.ft-mobile-nav {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 260px;
+    max-width: 85vw;
+    background: rgba(238, 246, 238, 0.82);
+    backdrop-filter: blur(28px) saturate(1.7);
+    -webkit-backdrop-filter: blur(28px) saturate(1.7);
+    border-left: 0.5px solid rgba(255, 255, 255, 0.45);
+    z-index: 20000;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    box-shadow: -4px 0 32px rgba(0, 0, 0, 0.14);
+}
+
+[data-theme="dark"] .ft-mobile-nav {
+    background: rgba(14, 24, 14, 0.84);
+    border-left-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Mobile nav drawer ────────────────────────────────────────────────────── */
+.ft-drawer-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 20px 16px 14px;
+}
+
+.ft-drawer-username {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ft-text-primary);
+    line-height: 1.3;
+}
+
+.ft-drawer-role {
+    font-size: 11px;
+    color: var(--ft-gray-400);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.ft-drawer-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--ft-gray-500);
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.ft-drawer-close:hover { background: var(--ft-green-50); }
+
+.ft-drawer-divider {
+    height: 0.5px;
+    background: var(--ft-line-border);
+    margin: 0;
+}
+
+.ft-drawer-nav {
+    padding: 6px 0;
+}
+
+.ft-drawer-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 20px;
+    font-size: 15px;
+    color: var(--ft-text-primary);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+}
+
+.ft-drawer-item:hover  { background: var(--ft-green-50); }
+.ft-drawer-item:active { background: var(--ft-green-100); }
+
+.ft-drawer-icon { font-size: 20px !important; color: var(--ft-gray-400); flex-shrink: 0; }
+
+.ft-drawer-item--signout { color: var(--ft-gray-500); }
+
+/* ── AppBar responsive nav ────────────────────────────────────────────────── */
+.ft-nav-desktop {
+    display: flex;
+    align-items: center;
+}
+
+.ft-nav-mobile {
+    display: none;
+    align-items: center;
+}
+
+/* Tree scroll lock is now injected by TreeLayout.razor via <HeadContent>. */
+
+/* ── Mobile baseline (≤ 768px) ────────────────────────────────────────────── */
+@media (max-width: 768px) {
+
+    /* Kill horizontal overflow caused by off-screen drag positions */
+    html, body { overflow-x: hidden; }
+
+    /* Hero overlay not yet adapted for mobile */
+    .hero-overlay { display: none !important; }
+    .facts-banner { display: none !important; }
+
+    /* Canvas fills the true visible viewport (accounts for mobile address bar) */
+    .ft-viewport {
+        height: 100dvh;
+        width: 100dvw;
+    }
+
+    /* Drawer goes full-width on small screens */
+    .ft-person-drawer { width: 100% !important; max-width: 100% !important; }
+
+    /* Swap desktop nav for hamburger */
+    .ft-nav-desktop { display: none; }
+    .ft-nav-mobile  { display: flex; }
+
+    /* Logo flush to the left edge —
+       MudBlazor's toolbar adds ~16-24px left gutter; negative margin counteracts it */
+    .mud-toolbar,
+    .mud-toolbar-appbar,
+    .mud-toolbar-gutters { padding-left: 0 !important; }
+    .mud-appbar { padding-left: 0 !important; }
+    .ft-appbar-logo { margin: 0 0 0 -16px; padding: 0; }
+
+    /* Search is desktop-only; show focus context chip instead */
+    .ft-search-wrap    { display: none; }
+    .ft-appbar-context { display: flex; }
+
+    /* Context mini-panel and its tap-away backdrop */
+    .ft-context-panel         { display: block; }
+    .ft-context-panel-backdrop { display: block; }
+
+    /* Toolbar: anchor at bottom-left, touch-friendly button sizes */
+    #ft-toolbar { bottom: 16px; left: 12px; }
+    #ft-toolbar .mud-icon-button { min-width: 44px; min-height: 44px; }
 }
 
 .ft-toast-x {
