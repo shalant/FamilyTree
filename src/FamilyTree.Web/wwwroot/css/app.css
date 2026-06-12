@@ -1423,6 +1423,27 @@ html.ft-no-select * {
 .ft-search-wrap .mud-input-slot input::placeholder { color: rgba(60, 80, 60, 0.55); }
 .ft-search-wrap .mud-input-slot input { color: var(--ft-text-primary); }
 
+/* ── AppBar family title (mobile only — replaces search) ─────────────────── */
+.ft-appbar-family-title {
+    display: none;
+    flex: 1;
+    justify-content: center;
+    align-items: center;
+    min-width: 0;
+    padding: 0 8px;
+    pointer-events: none;
+}
+
+.ft-family-title-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ft-text-primary);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* ── AppBar focus context chip (mobile only) ─────────────────────────────── */
 .ft-appbar-context {
     display: none;
@@ -1690,9 +1711,9 @@ html.ft-no-select * {
     .mud-appbar { padding-left: 0 !important; }
     .ft-appbar-logo { margin: 0 0 0 -16px; padding: 0; }
 
-    /* Search is desktop-only; show focus context chip instead */
-    .ft-search-wrap    { display: none; }
-    .ft-appbar-context { display: flex; }
+    /* Search is desktop-only; show family title instead */
+    .ft-search-wrap         { display: none; }
+    .ft-appbar-family-title { display: flex; }
 
     /* Context mini-panel and its tap-away backdrop */
     .ft-context-panel         { display: block; }

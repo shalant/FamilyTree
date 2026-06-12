@@ -83,29 +83,17 @@
         </MudAutocomplete>
     </div>
 
-    @* ── Focus context chip (mobile only — replaces search) ──────────────────── *@
-    @if (TreeContext.FocusPerson is { } fp)
-    {
-        <div class="ft-appbar-context @(_contextExpanded ? "ft-appbar-context--active" : "")"
-             @onclick="ToggleContext">
-            <div class="ft-context-avatar">
-                @if (!string.IsNullOrWhiteSpace(fp.ProfilePhotoUrl))
-                {
-                    <img src="@fp.ProfilePhotoUrl" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />
-                }
-                else
-                {
-                    @MiniInitials(fp)
-                }
-            </div>
-            <div class="ft-context-info">
-                <span class="ft-context-name">@fp.FirstName</span>
-                <span class="ft-context-sub">@TreeContext.PeopleCount people</span>
-            </div>
-            <MudIcon Icon="@(_contextExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
-                     Style="font-size:16px; color:var(--ft-gray-400); flex-shrink:0;" />
-        </div>
-    }
+    @* ── Family title (mobile only — replaces search) ────────────────────────── *@
+    <div class="ft-appbar-family-title">
+        @if (TreeContext.FocusPerson is { } fp)
+        {
+            <span class="ft-family-title-name">@fp.FirstName's Family Tree</span>
+        }
+        else
+        {
+            <span class="ft-family-title-name">Family Tree</span>
+        }
+    </div>
 
     <MudSpacer />
 
