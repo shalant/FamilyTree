@@ -4,9 +4,10 @@
 
 ## In Progress / Up Next
 
-- [ ] **Deploy** — push accumulated changes to production (`DevAuth__Enabled` and `Auth__RegistrationMode` already verified correct in Azure)
+- [x] **Deploy** — pushed to production; user testing in progress at arborkin-erbufqfkhzcka4cb.centralus-01.azurewebsites.net
 - [ ] **GEDCOM export** — wire the "Coming soon" stub in Dashboard; `GedcomExportService` writing standard `.ged` format from the current family's people + relationships
 - [ ] **Mobile layout** — tree canvas and forms are not optimized for small screens; no `@media` breakpoints exist yet
+- [ ] **Story invite email** — one-click beautiful invite email featuring a family member's story; see `docs/FutureFeatures/story-invite-email.md`
 
 ---
 
@@ -64,7 +65,9 @@
 | Area | Features |
 |------|----------|
 | Profile cards | Biography, photos, life events |
-| Timeline view | Chronological events per person |
+| Events table | Structured life events per person (bar mitzvah, immigration, military, etc.) — see `FutureFeatures/events-table.md` |
+| Stories table | Multiple attributed prose narratives per person — see `FutureFeatures/stories-table.md` |
+| Timeline view | Chronological events + stories per person — see `FutureFeatures/person-timeline-view.md` |
 | Media | Documents, voice clips (photos already done) |
 | Design polish | Smooth transitions |
 | Search & filter | By name, year, or relation |
@@ -75,6 +78,8 @@
 ### Phase 3 — Collaboration & sharing
 | Area | Features |
 |------|----------|
+| Story invite flow | Token-based email inviting non-members to contribute a memory; no login required to submit — see `FutureFeatures/story-invite-flow.md` |
+| Share a memory / Public profiles | Logged-in family members submit memories; optional public read-only profile URL — see `FutureFeatures/share-memory-public-profile.md` |
 | Invites | Share tree with family (viewer/editor roles) |
 | Change history | "Recently added/updated" feed |
 | Comments | Collaborative memories on person profiles |
