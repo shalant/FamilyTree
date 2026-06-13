@@ -69,9 +69,12 @@ public class PersonService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
+            var familyId = currentUser.FamilyId;
+
+            // TODO: Remove this guard when full family scoping is implemented via UserFamily membership.
             var person = await ctx.People
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == id, ct);
+                .FirstOrDefaultAsync(p => p.Id == id && (!familyId.HasValue || p.FamilyId == familyId), ct);
 
             if (person is null)
                 return ServiceResponse<PersonDto>.Fail($"Person {id} not found.");

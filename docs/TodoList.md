@@ -5,10 +5,11 @@
 ## In Progress / Up Next
 
 - [x] **Deploy** — pushed to production; user testing in progress at arborkin-erbufqfkhzcka4cb.centralus-01.azurewebsites.net
-- [ ] **[SECURITY — Critical] Family-scope check in `GetByIdAsync`** — `PersonService`, `RelationshipService`, and `MediumService` all lack a `FamilyId` guard on single-entity lookups; any authenticated user who knows a GUID can read across family boundaries
+- [x] **[SECURITY — Critical] Family-scope check in `GetByIdAsync`** — `PersonService`, `RelationshipService`, and `MediumService` all lack a `FamilyId` guard on single-entity lookups; any authenticated user who knows a GUID can read across family boundaries
 - [x] **[SECURITY — Critical] `DevAuth` production guard** — add a startup assertion that `DevAuth:Enabled` is false outside of Development environment
-- [ ] **[SECURITY — High] Lock `AllowedHosts`** — change `"AllowedHosts": "*"` to the actual production domain in `appsettings.json`
-- [ ] **[SECURITY — High] Add security response headers** — Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Referrer-Policy (middleware in `Program.cs`)
+- [x] **[SECURITY — High] Lock `AllowedHosts`** — set to `arborkin-erbufqfkhzcka4cb.centralus-01.azurewebsites.net` in `appsettings.json`; dev overrides to `*` in `appsettings.Development.json`.
+- [ ] **[SECURITY — DO WHEN DOMAIN MOVES] Update `AllowedHosts` for `arborkin.com`** — when the custom domain is live, update `"AllowedHosts"` in `appsettings.json` to `arborkin.com;arborkin-erbufqfkhzcka4cb.centralus-01.azurewebsites.net` (keep both until the Azure URL is fully retired)
+- [x] **[SECURITY — High] Add security response headers** — X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Content-Security-Policy added via middleware in `Program.cs`
 - [ ] **[SECURITY — High] Strengthen password policy** — re-enable at least one of `RequireDigit`/`RequireUppercase`/`RequireNonAlphanumeric` in `Program.cs` ~L74
 - [ ] **[SECURITY — Medium] Move reset/invite tokens out of URL** — submit via POST body instead of query string to prevent token leakage via `Referer` and server logs (`AuthService.cs` ~L204)
 - [ ] **[SECURITY — Medium] Upgrade `Azure.Storage.Blobs`** — replace `12.29.0-beta.1` with a stable release in `FamilyTree.Core.csproj`

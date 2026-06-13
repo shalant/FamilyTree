@@ -76,9 +76,13 @@ public class MediumService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
+            var familyId = currentUser.FamilyId;
+
+            // TODO: Remove this guard when full family scoping is implemented via UserFamily membership.
             var medium = await ctx.Media
                 .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.Id == id, ct);
+                .FirstOrDefaultAsync(m => m.Id == id &&
+                    (!familyId.HasValue || ctx.People.Any(p => p.Id == m.PersonId && p.FamilyId == familyId)), ct);
 
             if (medium is null)
                 return ServiceResponse<MediumDto>.Fail($"Medium {id} not found.");
@@ -161,7 +165,11 @@ public class MediumService(
 
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var medium = await ctx.Media.FirstOrDefaultAsync(m => m.Id == id, ct);
+            var familyId = currentUser.FamilyId;
+
+            // TODO: Remove this guard when full family scoping is implemented via UserFamily membership.
+            var medium = await ctx.Media.FirstOrDefaultAsync(m => m.Id == id &&
+                (!familyId.HasValue || ctx.People.Any(p => p.Id == m.PersonId && p.FamilyId == familyId)), ct);
             if (medium is null)
                 return ServiceResponse<MediumDto>.Fail($"Medium {id} not found.");
 
@@ -195,7 +203,11 @@ public class MediumService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var medium = await ctx.Media.FirstOrDefaultAsync(m => m.Id == id, ct);
+            var familyId = currentUser.FamilyId;
+
+            // TODO: Remove this guard when full family scoping is implemented via UserFamily membership.
+            var medium = await ctx.Media.FirstOrDefaultAsync(m => m.Id == id &&
+                (!familyId.HasValue || ctx.People.Any(p => p.Id == m.PersonId && p.FamilyId == familyId)), ct);
             if (medium is null)
                 return ServiceResponse.Fail($"Medium {id} not found.");
 
