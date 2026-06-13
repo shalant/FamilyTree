@@ -182,6 +182,58 @@ Viewer      Unauthenticated public access to public families; read-only, visibil
 
 ---
 
+## OWASP Top 10:2025 — Audit Findings (2026-06-12)
+
+> Status key: **OPEN** = unmitigated gap, **PARTIAL** = some protection exists, **OK** = well covered.
+
+### A01 · Broken Access Control — OPEN (Critical)
+- `PersonService.GetByIdAsync()` has **no `FamilyId` check** — any authenticated user who knows a GUID can fetch any person across family boundaries. Same gap exists in `RelationshipService` and `MediumService`.
+- `DevAuthHandler.cs` bypasses all authentication when `DevAuth:Enabled = true`. If this reaches a deployed environment the app is fully open.
+- *Fix:* add family-scope guard to every single-entity lookup; add a startup assertion that `DevAuth:Enabled` is false in non-Development environments.
+
+### A02 · Security Misconfiguration — OPEN (High)
+- `"AllowedHosts": "*"` in `appsettings.json` allows any Host header — enables Host Header Injection. Lock to the actual domain in production.
+- No **Content-Security-Policy**, **X-Frame-Options**, **X-Content-Type-Options**, or **Referrer-Policy** response headers configured anywhere.
+- `appsettings.Development.json` contains a hardcoded super-user email and `DevAuth:Enabled = true` — must never reach a deployed environment.
+
+### A03 · Software Supply Chain — PARTIAL
+- `Azure.Storage.Blobs 12.29.0-beta.1` is a pre-release package used in production (`FamilyTree.Core.csproj`). Upgrade to a stable release.
+- No committed NuGet lock file — enables dependency-confusion attacks. Add `RestorePackagesWithLockFile = true` to project files.
+
+### A04 · Cryptographic Failures — PARTIAL
+- Password policy is weakened: `RequireDigit = false`, `RequireNonAlphanumeric = false`, `RequireUppercase = false` (`Program.cs` ~L74). "aaaaaaaaaa" is a valid password.
+- *Note:* `security.md` lines 74 and 78 claim MFA is required for Admin/SuperUser and that HaveIBeenPwned is checked on registration — neither was found in the codebase. These should be treated as aspirational until implemented.
+
+### A05 · Injection — PARTIAL (mostly OK)
+- No raw SQL anywhere; EF Core parameterizes all queries.
+- `Faq.razor` uses `@((MarkupString)item.A)` to render FAQ answers as raw HTML. If FAQ content ever comes from the database or user input without sanitization, this is a stored XSS vector. (`security.md` line 146 correctly documents the rule — enforce it here.)
+
+### A06 · Insecure Design — OPEN (Medium)
+- **Password reset tokens are in the URL query string** (`AuthService.cs` ~L204) — tokens leak via `Referer` headers, server logs, and browser history. Same issue with registration invite tokens.
+- No rate limit on invite generation — an admin could spam invitations with no throttle.
+- No "a password reset was requested for your account" notification email to the account owner.
+
+### A07 · Authentication Failures — PARTIAL
+- No MFA/2FA implemented (`security.md` line 74 says it's required — it is not yet built).
+- Password reset tokens are not session- or IP-bound; token theft before redemption is undetected.
+- No login history visible to users; no new-device alerts.
+
+### A08 · Software/Data Integrity — PARTIAL
+- `AuditLogService` silently swallows its own exceptions (~L48) — audit failures are invisible to admins.
+- Audit log rows are mutable/deletable by anyone with direct DB access; not tamper-proof.
+
+### A09 · Security Logging & Alerting — PARTIAL
+- No real-time alerts for suspicious events (mass deletes, repeated lockouts, role escalation, new registrations). Admins must manually poll the admin page.
+- Rate-limit rejections are not logged (`Program.cs` ~L65).
+- No integration with Application Insights, Sentry, or equivalent for centralized error visibility.
+
+### A10 · Exception Handling — OK (minor notes)
+- Generic error messages used throughout; `UseExceptionHandler` active in production.
+- Some error messages include entity GUIDs (minor information leakage).
+- If `db.Database.MigrateAsync()` throws on startup the app crashes with no graceful degradation.
+
+---
+
 ## Incident checklist
 
 1. **Unauthorized access** → revoke `UserFamily` row; check audit log; rotate secrets if needed

@@ -5,6 +5,17 @@
 ## In Progress / Up Next
 
 - [x] **Deploy** — pushed to production; user testing in progress at arborkin-erbufqfkhzcka4cb.centralus-01.azurewebsites.net
+- [ ] **[SECURITY — Critical] Family-scope check in `GetByIdAsync`** — `PersonService`, `RelationshipService`, and `MediumService` all lack a `FamilyId` guard on single-entity lookups; any authenticated user who knows a GUID can read across family boundaries
+- [x] **[SECURITY — Critical] `DevAuth` production guard** — add a startup assertion that `DevAuth:Enabled` is false outside of Development environment
+- [ ] **[SECURITY — High] Lock `AllowedHosts`** — change `"AllowedHosts": "*"` to the actual production domain in `appsettings.json`
+- [ ] **[SECURITY — High] Add security response headers** — Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Referrer-Policy (middleware in `Program.cs`)
+- [ ] **[SECURITY — High] Strengthen password policy** — re-enable at least one of `RequireDigit`/`RequireUppercase`/`RequireNonAlphanumeric` in `Program.cs` ~L74
+- [ ] **[SECURITY — Medium] Move reset/invite tokens out of URL** — submit via POST body instead of query string to prevent token leakage via `Referer` and server logs (`AuthService.cs` ~L204)
+- [ ] **[SECURITY — Medium] Upgrade `Azure.Storage.Blobs`** — replace `12.29.0-beta.1` with a stable release in `FamilyTree.Core.csproj`
+- [ ] **[SECURITY — Medium] Surface `AuditLogService` failures** — exceptions are silently swallowed (~L48); at minimum log at Error level so admins are aware
+- [ ] **[SECURITY — Medium] MFA/2FA** — `security.md` documents this as required for Admin/SuperUser but it is not yet implemented
+- [ ] **[SECURITY — DO BEFORE 2ND FAMILY] Family scoping gap** — `RegisterAsync` does not create a `UserFamily` row after invite acceptance; users land in a permissive state where they see all families' data. Safe while single-family; becomes a real data-isolation failure the moment a second family is created. Fix requires: (1) add `UserFamily` insert in `AuthService.RegisterAsync` after marking invite accepted; (2) run backfill SQL on prod DB (`INSERT INTO UserFamilies` for any users missing a row). See security audit notes.
+- [ ] **[SECURITY — Low] NuGet lock file** — add `RestorePackagesWithLockFile = true` to prevent dependency-confusion attacks
 - [ ] **GEDCOM export** — wire the "Coming soon" stub in Dashboard; `GedcomExportService` writing standard `.ged` format from the current family's people + relationships
 - [ ] **Mobile layout** — tree canvas and forms are not optimized for small screens; no `@media` breakpoints exist yet
 - [ ] **Story invite email** — one-click beautiful invite email featuring a family member's story; see `docs/FutureFeatures/story-invite-email.md`

@@ -120,6 +120,11 @@ builder.Services.AddAuthorization();
 
 var devAuthEnabled = builder.Configuration.GetValue<bool>("DevAuth:Enabled");
 
+if (devAuthEnabled && !builder.Environment.IsDevelopment())
+    throw new InvalidOperationException(
+        "DevAuth:Enabled is true in a non-Development environment. " +
+        "This is a critical security misconfiguration. Startup aborted.");
+
 if (devAuthEnabled)
 {
     var dev = builder.Configuration.GetSection("DevAuth");
