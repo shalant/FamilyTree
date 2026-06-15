@@ -831,7 +831,6 @@
     private bool _loadingAudit     = true;
     private bool _loadingUsers     = true;
     private bool _loadingActivity  = true;
-    private bool _loadingImports   = true;
     private bool _loadingMessages  = true;
 
     // ── Dashboard stats ──────────────────────────────────────────────────────
@@ -1047,7 +1046,6 @@
     private async Task LoadImportBatchesAsync()
     {
         _importBatches = await ImportService.GetImportBatchesAsync();
-        _loadingImports = false;
     }
 
     private async Task LoadMessagesAsync()

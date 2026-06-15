@@ -22,8 +22,9 @@ internal sealed class TestDbContextFactory : IDbContextFactory<AppDbContext>
 
 internal sealed class FakeCurrentUserService : ICurrentUserService
 {
-    public Guid? UserId { get; set; }
-    public Guid? FamilyId { get; set; }
+    public Guid?   UserId   { get; set; }
+    public Guid?   FamilyId { get; set; }
+    public string? Email    { get; set; }
 }
 
 internal sealed class FakeAuditLogService : IAuditLogService
