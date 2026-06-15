@@ -270,7 +270,8 @@ if (!devAuthEnabled)
     app.MapGet("/auth/google-callback", async (
         Microsoft.AspNetCore.Identity.SignInManager<FamilyTree.Core.Models.AppUser> signInManager,
         Microsoft.AspNetCore.Identity.UserManager<FamilyTree.Core.Models.AppUser> userManager,
-        IAuthService authService) =>
+        IAuthService authService,
+        IDbContextFactory<AppDbContext> dbFactory) =>
     {
         var info = await signInManager.GetExternalLoginInfoAsync();
         if (info == null)
@@ -323,6 +324,20 @@ if (!devAuthEnabled)
         var created = await userManager.CreateAsync(newUser);
         if (!created.Succeeded)
             return Results.LocalRedirect("/?loginError=google_error");
+
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+        var family = await ctx.Families.FirstOrDefaultAsync();
+        if (family != null)
+        {
+            ctx.UserFamilies.Add(new UserFamily
+            {
+                UserId   = newUser.Id,
+                FamilyId = family.Id,
+                Role     = "Member",
+                JoinedAt = DateTime.UtcNow
+            });
+            await ctx.SaveChangesAsync();
+        }
 
         await userManager.AddLoginAsync(newUser, info);
         await signInManager.SignInAsync(newUser, isPersistent: true);
