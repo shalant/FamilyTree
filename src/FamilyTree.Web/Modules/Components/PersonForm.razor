@@ -7,6 +7,7 @@
 
 @inject IMediumService MediumService
 @inject IJSRuntime JS
+@inject IDialogService DialogService
 
 <MudStack Spacing="4" Style="margin:auto; max-width:680px; font-family:var(--ft-font-body);">
 
@@ -92,13 +93,15 @@
         <MudText Typo="Typo.h5" Class="mb-4" Style="font-family:var(--ft-font-display); color:var(--ft-green-800);">Photos</MudText>
 
         <MudStack Spacing="3">
-            <!-- Profile photo preview — centered, larger -->
-            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
-                <div style="width:88px; height:88px; border-radius:50%; overflow:hidden;
+            <!-- Profile photo preview row -->
+            <div style="display:flex; align-items:center; gap:14px; padding:12px 14px;
+                        border-radius:8px; background:var(--ft-green-50);
+                        border:1px solid var(--ft-green-100);">
+                <div style="width:60px; height:60px; border-radius:50%; overflow:hidden; flex-shrink:0;
                             background:var(--ft-focus-fill); color:var(--ft-focus-text);
-                            border:2.5px solid var(--ft-focus-border); flex-shrink:0;
+                            border:2.5px solid var(--ft-focus-border);
                             display:flex; align-items:center; justify-content:center;
-                            font-size:26px; font-weight:500; letter-spacing:0.02em;">
+                            font-size:20px; font-weight:500; letter-spacing:0.02em;">
                     @if (!string.IsNullOrEmpty(AvatarSrc))
                     {
                         <img src="@AvatarSrc" alt="Profile" style="width:100%; height:100%; object-fit:cover;" />
@@ -108,49 +111,70 @@
                         @Initials
                     }
                 </div>
-                <MudText Typo="Typo.caption" Style="color:var(--ft-gray-400); text-align:center;">
-                    @if (string.IsNullOrEmpty(_photoUrl) && _pendingPreviews.Count == 0)
-                    {
-                        <span>Star a photo below to set it as primary</span>
-                    }
-                    else if (!string.IsNullOrEmpty(_photoUrl))
-                    {
-                        <span>Profile photo set</span>
-                    }
-                    else
-                    {
-                        <span>Will be set from first upload</span>
-                    }
-                </MudText>
+                <div>
+                    <div style="font-size:13px; font-weight:600; color:var(--ft-gray-700);">Profile photo</div>
+                    <div style="font-size:12px; margin-top:3px;">
+                        @if (string.IsNullOrEmpty(_photoUrl) && _pendingPreviews.Count == 0)
+                        {
+                            <span style="color:var(--ft-gray-400);">Upload a photo, then tap "Use as profile" to set it here</span>
+                        }
+                        else if (!string.IsNullOrEmpty(_photoUrl))
+                        {
+                            <span style="color:var(--ft-green-600); font-weight:500;">✓ Profile photo is set</span>
+                        }
+                        else
+                        {
+                            <span style="color:var(--ft-gray-400);">Will be set from first upload</span>
+                        }
+                    </div>
+                </div>
             </div>
 
             <!-- Existing photos (edit mode) -->
             @if (_existingPhotos.Count > 0)
             {
-                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600); margin-bottom:-4px;">Uploaded photos</MudText>
-                <div style="display:flex; flex-wrap:wrap; gap:12px;">
-                    @foreach (var photo in _existingPhotos)
-                    {
-                        var isPrimary = photo.Url == _photoUrl;
-                        var starColor = isPrimary ? "var(--ft-green-600)" : "var(--ft-gray-400)";
-                        var starStyle = $"position:absolute; bottom:-8px; right:-8px; background:#fff; border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:{starColor};";
-                        <div style="position:relative; width:84px; height:84px; flex-shrink:0;">
-                            <img src="@photo.Url"
-                                 style="width:84px; height:84px; object-fit:cover; border-radius:8px;
-                                        border:@(isPrimary ? "2.5px solid var(--ft-green-600)" : "1px solid var(--ft-line-border)");"
-                                 alt="@photo.FileName" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Cancel"
-                                           Size="Size.Small"
-                                           Style="position:absolute; top:-8px; right:-8px; background:#fff; border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:var(--ft-gray-500);"
-                                           OnClick="@(() => DeletePhoto(photo))" />
-                            <MudTooltip Text="@(isPrimary ? "Primary photo" : "Set as primary")">
-                                <MudIconButton Icon="@(isPrimary ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarOutline)"
-                                               Size="Size.Small"
-                                               Style="@starStyle"
-                                               OnClick="@(() => SetPrimary(photo.Url))" />
-                            </MudTooltip>
-                        </div>
-                    }
+                <div>
+                    <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600); margin-bottom:10px;">Uploaded photos</MudText>
+                    <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start;">
+                        @foreach (var photo in _existingPhotos)
+                        {
+                            var isPrimary = photo.Url == _photoUrl;
+                            <div style="display:flex; flex-direction:column; align-items:center; gap:6px; width:88px;">
+                                <div style="position:relative; width:88px; height:88px; flex-shrink:0;">
+                                    <img src="@photo.Url"
+                                         style="width:88px; height:88px; object-fit:cover; border-radius:8px;
+                                                border:@(isPrimary ? "2.5px solid var(--ft-green-600)" : "1.5px solid var(--ft-line-border)");"
+                                         alt="@photo.FileName" />
+                                    @if (isPrimary)
+                                    {
+                                        <div style="position:absolute; top:5px; left:5px;
+                                                    background:var(--ft-green-600); color:#fff;
+                                                    border-radius:4px; padding:2px 6px;
+                                                    font-size:10px; font-weight:600; letter-spacing:0.03em;
+                                                    line-height:1.4;">
+                                            ✓ Profile
+                                        </div>
+                                    }
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                                                   Size="Size.Small"
+                                                   Style="position:absolute; top:-9px; right:-9px; background:var(--ft-gray-100); border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:var(--ft-gray-600);"
+                                                   OnClick="@(() => DeletePhoto(photo))" />
+                                </div>
+                                @if (!isPrimary)
+                                {
+                                    <MudButton Variant="Variant.Text" Size="Size.Small"
+                                               OnClick="@(() => SetPrimary(photo.Url))"
+                                               Style="font-size:11px; color:var(--ft-green-600); padding:2px 4px; min-height:0; height:auto; line-height:1.4; width:100%; text-align:center;">
+                                        Use as profile
+                                    </MudButton>
+                                }
+                                else
+                                {
+                                    <span style="font-size:11px; color:var(--ft-gray-300); text-align:center; line-height:1.4;">profile photo</span>
+                                }
+                            </div>
+                        }
+                    </div>
                 </div>
             }
             else if (EditingId.HasValue && !_photosLoaded)
@@ -161,34 +185,52 @@
             <!-- Pending previews (add mode) -->
             @if (_pendingPreviews.Count > 0)
             {
-                <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600); margin-bottom:-4px;">
-                    Photos to upload (@_pendingPreviews.Count)
-                </MudText>
-                <div style="display:flex; flex-wrap:wrap; gap:12px;">
-                    @for (int i = 0; i < _pendingPreviews.Count; i++)
-                    {
-                        var idx = i;
-                        var preview = _pendingPreviews[i];
-                        var isPrimary = idx == _primaryPendingIndex;
-                        var starColor = isPrimary ? "var(--ft-green-600)" : "var(--ft-gray-400)";
-                        var starStyle = $"position:absolute; bottom:-8px; right:-8px; background:#fff; border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:{starColor};";
-                        <div style="position:relative; width:84px; height:84px; flex-shrink:0;">
-                            <img src="@preview.DataUrl"
-                                 style="width:84px; height:84px; object-fit:cover; border-radius:8px;
-                                        border:@(isPrimary ? "2.5px solid var(--ft-green-600)" : "1px solid var(--ft-line-border)");"
-                                 alt="@preview.FileName" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Cancel"
-                                           Size="Size.Small"
-                                           Style="position:absolute; top:-8px; right:-8px; background:#fff; border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:var(--ft-gray-500);"
-                                           OnClick="@(() => RemovePending(idx))" />
-                            <MudTooltip Text="@(isPrimary ? "Primary photo" : "Set as primary")">
-                                <MudIconButton Icon="@(isPrimary ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarOutline)"
-                                               Size="Size.Small"
-                                               Style="@starStyle"
-                                               OnClick="@(() => _primaryPendingIndex = idx)" />
-                            </MudTooltip>
-                        </div>
-                    }
+                <div>
+                    <MudText Typo="Typo.subtitle2" Style="color:var(--ft-gray-600); margin-bottom:10px;">
+                        Photos to upload (@_pendingPreviews.Count)
+                    </MudText>
+                    <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start;">
+                        @for (int i = 0; i < _pendingPreviews.Count; i++)
+                        {
+                            var idx = i;
+                            var preview = _pendingPreviews[i];
+                            var isPrimary = idx == _primaryPendingIndex;
+                            <div style="display:flex; flex-direction:column; align-items:center; gap:6px; width:88px;">
+                                <div style="position:relative; width:88px; height:88px; flex-shrink:0;">
+                                    <img src="@preview.DataUrl"
+                                         style="width:88px; height:88px; object-fit:cover; border-radius:8px;
+                                                border:@(isPrimary ? "2.5px solid var(--ft-green-600)" : "1.5px solid var(--ft-line-border)");"
+                                         alt="@preview.FileName" />
+                                    @if (isPrimary)
+                                    {
+                                        <div style="position:absolute; top:5px; left:5px;
+                                                    background:var(--ft-green-600); color:#fff;
+                                                    border-radius:4px; padding:2px 6px;
+                                                    font-size:10px; font-weight:600; letter-spacing:0.03em;
+                                                    line-height:1.4;">
+                                            ✓ Profile
+                                        </div>
+                                    }
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                                                   Size="Size.Small"
+                                                   Style="position:absolute; top:-9px; right:-9px; background:var(--ft-gray-100); border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:var(--ft-gray-600);"
+                                                   OnClick="@(() => RemovePending(idx))" />
+                                </div>
+                                @if (!isPrimary)
+                                {
+                                    <MudButton Variant="Variant.Text" Size="Size.Small"
+                                               OnClick="@(() => _primaryPendingIndex = idx)"
+                                               Style="font-size:11px; color:var(--ft-green-600); padding:2px 4px; min-height:0; height:auto; line-height:1.4; width:100%; text-align:center;">
+                                        Use as profile
+                                    </MudButton>
+                                }
+                                else
+                                {
+                                    <span style="font-size:11px; color:var(--ft-gray-300); text-align:center; line-height:1.4;">profile photo</span>
+                                }
+                            </div>
+                        }
+                    </div>
                 </div>
             }
 
@@ -630,16 +672,25 @@
 
     private async Task DeletePhoto(MediumDto photo)
     {
-        var result = await MediumService.DeleteAsync(photo.Id);
-        if (result.Success)
+        var parameters = new DialogParameters<ConfirmDialog>
         {
-            _existingPhotos.Remove(photo);
-            if (_photoUrl == photo.Url)
-                _photoUrl = _existingPhotos.FirstOrDefault()?.Url ?? "";
-        }
-        else
+            { x => x.Message,      "Delete this photo? This cannot be undone." },
+            { x => x.ConfirmLabel, "Delete" }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete photo", parameters);
+        if ((await dialog.Result) is { Canceled: false })
         {
-            _uploadError = result.Message;
+            var result = await MediumService.DeleteAsync(photo.Id);
+            if (result.Success)
+            {
+                _existingPhotos.Remove(photo);
+                if (_photoUrl == photo.Url)
+                    _photoUrl = _existingPhotos.FirstOrDefault()?.Url ?? "";
+            }
+            else
+            {
+                _uploadError = result.Message;
+            }
         }
     }
 

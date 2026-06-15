@@ -1,6 +1,7 @@
 @using MudBlazor
 @using FamilyTree.Core.Services
 @inject IUserMessageService MessageService
+@inject ICurrentUserService CurrentUser
 
 <MudDialog>
     <DialogContent>
@@ -76,6 +77,9 @@
     private bool    _saving;
     private bool    _submitted;
     private string? _error;
+
+    protected override void OnInitialized() =>
+        _email = CurrentUser.Email ?? "";
 
     private async Task Submit()
     {

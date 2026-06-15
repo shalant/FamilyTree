@@ -72,9 +72,9 @@ builder.Services.AddRateLimiter(options =>
 var identityBuilder = builder.Services.AddIdentityCore<AppUser>(options =>
 {
     options.Password.RequiredLength = 10;
-    options.Password.RequireDigit = false;
+    options.Password.RequireDigit = true;
+    options.Password.RequireUppercase = true;
     options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = false;
     options.User.RequireUniqueEmail = true;
     options.Lockout.MaxFailedAccessAttempts = 5;
     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);

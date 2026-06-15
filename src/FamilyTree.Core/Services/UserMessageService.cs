@@ -115,20 +115,95 @@ public class UserMessageService(
 
         try
         {
-            var typeLabel = msg.Type == "FeatureRequest" ? "Feature Request" : "Message";
-            var from      = string.IsNullOrWhiteSpace(msg.SenderEmail) ? "an anonymous user" : msg.SenderEmail;
-            var subject   = $"[ArborKin] New {typeLabel} from {from}";
+            var typeLabel  = msg.Type == "FeatureRequest" ? "Feature Request" : "Message";
+            var resolvedEmail = !string.IsNullOrWhiteSpace(msg.SenderEmail) ? msg.SenderEmail : currentUser.Email;
+            var from       = string.IsNullOrWhiteSpace(resolvedEmail) ? "an anonymous user" : resolvedEmail;
+            var subject    = $"[ArborKin] New {typeLabel} from {from}";
+            var dateString = msg.CreatedAt.ToString("dddd, MMMM d, yyyy 'at' h:mm tt") + " UTC";
 
-            var details = msg.Category is not null
-                ? $"<p><strong>Category:</strong> {msg.Category}<br><strong>Priority:</strong> {msg.Priority}</p>"
-                : "";
+            var metaBadges = msg.Category is not null ? $"""
+                <table cellpadding="0" cellspacing="0" border="0" style="margin-top:20px;">
+                  <tr>
+                    <td style="padding-right:10px;">
+                      <span style="display:inline-block; background:#e8f5ee; color:#085041;
+                        border:1px solid #b6dfc8; border-radius:20px; padding:4px 14px;
+                        font-size:12px; font-weight:600; letter-spacing:0.04em;">
+                        {msg.Category}
+                      </span>
+                    </td>
+                    <td>
+                      <span style="display:inline-block; background:#fdf6ec; color:#7a4f1e;
+                        border:1px solid #f0d9b5; border-radius:20px; padding:4px 14px;
+                        font-size:12px; font-weight:600; letter-spacing:0.04em;">
+                        {msg.Priority}
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+                """ : "";
+
+            var bodyContent = !string.IsNullOrWhiteSpace(msg.Body) ? $"""
+                <p style="margin:20px 0 0; font-size:15px; line-height:1.65; color:#374151;">
+                  {msg.Body}
+                </p>
+                """ : "";
 
             var body = $"""
-                <p><strong>{msg.Title}</strong></p>
-                {details}
-                <p>{msg.Body}</p>
-                <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
-                <p style="font-size:12px;color:#888;">From: {from} · {msg.CreatedAt:f} UTC</p>
+                <!DOCTYPE html>
+                <html lang="en">
+                <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+                <body style="margin:0; padding:0; background:#f0faf4; font-family:'Georgia',serif;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                    style="background:#f0faf4; padding:40px 16px;">
+                    <tr><td align="center">
+                      <table width="580" cellpadding="0" cellspacing="0" border="0"
+                        style="max-width:580px; width:100%; border-radius:12px;
+                          overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.10);">
+
+                        <!-- Header -->
+                        <tr>
+                          <td style="background:#085041; padding:28px 36px 24px;">
+                            <p style="margin:0; font-size:22px; font-weight:700;
+                              color:#ffffff; letter-spacing:0.02em; font-family:'Georgia',serif;">
+                              ArborKin
+                            </p>
+                            <p style="margin:6px 0 0; font-size:13px; color:#9FE1CB;
+                              letter-spacing:0.06em; text-transform:uppercase;
+                              font-family:Arial,sans-serif; font-weight:600;">
+                              New {typeLabel}
+                            </p>
+                          </td>
+                        </tr>
+
+                        <!-- Content card -->
+                        <tr>
+                          <td style="background:#ffffff; padding:32px 36px 36px;">
+                            <p style="margin:0; font-size:20px; font-weight:700;
+                              color:#0d1f1a; line-height:1.35; font-family:'Georgia',serif;">
+                              {msg.Title}
+                            </p>
+                            {metaBadges}
+                            {bodyContent}
+                          </td>
+                        </tr>
+
+                        <!-- Footer -->
+                        <tr>
+                          <td style="background:#f8faf9; padding:18px 36px;
+                            border-top:1px solid #e2ede8;">
+                            <p style="margin:0; font-size:12px; color:#6b7280;
+                              font-family:Arial,sans-serif; line-height:1.6;">
+                              Sent by <strong style="color:#085041;">{from}</strong>
+                              &nbsp;·&nbsp; {dateString}
+                            </p>
+                          </td>
+                        </tr>
+
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
                 """;
 
             await emailSender.SendAsync(adminEmail, subject, body);

@@ -42,8 +42,8 @@
     --ft-focus-text: var(--ft-green-800);
     --ft-focus-ring: var(--ft-green-400);
     /* Tree connector lines */
-    --ft-line-couple: var(--ft-green-400); /* U-arc between spouses */
-    --ft-line-parent: var(--ft-gray-300); /* stem + drops to children */
+    --ft-line-couple: #B09870; /* U-arc between spouses */
+    --ft-line-parent: #B09870; /* stem + drops to children */
     /* Generation band backgrounds */
     --ft-band-grandparents: var(--ft-green-50);
     --ft-band-parents: var(--ft-green-100);
@@ -102,8 +102,8 @@
     --ft-focus-text: var(--ft-green-800);
     --ft-focus-ring: var(--ft-green-500);
     /* Tree connector lines */
-    --ft-line-couple: var(--ft-green-500);
-    --ft-line-parent: var(--ft-gray-400);
+    --ft-line-couple: #C4956A; /* warmer twig for dark canvas */
+    --ft-line-parent: #C4956A;
     /* Generation band backgrounds */
     --ft-band-grandparents: var(--ft-green-50);
     --ft-band-parents: var(--ft-green-100);
@@ -1003,7 +1003,7 @@ html, body {
     display: flex;
     align-items: center;
     padding: 0 20px;
-    background: rgba(212, 240, 228, 0.72);
+    background: rgba(212, 240, 228, 0.45);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     border-bottom: 0.5px solid rgba(29, 158, 117, 0.18);

@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArborKin — Subtle Brown Variations</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0C0B09;
+    color: #D4CFC5;
+    font-family: 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    min-height: 100vh;
+    padding: 56px 32px 88px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 52px;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .brand-name {
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #5B8C5B;
+    font-weight: 400;
+  }
+
+  h1 {
+    font-size: clamp(1.7rem, 4.5vw, 2.9rem);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    color: #EDE8DE;
+  }
+
+  h1 em { font-style: italic; color: #87B87A; }
+
+  .meta {
+    margin-top: 10px;
+    font-size: 0.72rem;
+    color: #3E3B35;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .hairline {
+    width: 64px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #2D4828, transparent);
+    margin: 18px auto 0;
+  }
+
+  /* ── Grid: 3 cols × 2 rows = 6 cards ── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    max-width: 1160px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.015);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+    cursor: default;
+  }
+
+  /* Baseline card gets a faint green outline */
+  .card.baseline {
+    border-color: rgba(93, 202, 165, 0.25);
+  }
+
+  .card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+  }
+
+  .card-header {
+    padding: 14px 17px 11px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: rgba(0,0,0,0.2);
+  }
+
+  .card-badge {
+    display: inline-block;
+    font-size: 0.56rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 20px;
+    margin-bottom: 5px;
+    font-family: 'Palatino Linotype', Georgia, serif;
+  }
+
+  .badge-current {
+    background: rgba(93, 202, 165, 0.12);
+    color: #5DCAA5;
+    border: 1px solid rgba(93, 202, 165, 0.2);
+  }
+
+  .badge-var {
+    background: rgba(160, 113, 79, 0.12);
+    color: #C4956A;
+    border: 1px solid rgba(160, 113, 79, 0.2);
+  }
+
+  .card-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #EDE8DE;
+    letter-spacing: 0.01em;
+  }
+
+  .card-desc {
+    font-size: 0.68rem;
+    font-style: italic;
+    color: #524E47;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  /* What changed tag */
+  .card-change {
+    margin-top: 6px;
+    font-size: 0.62rem;
+    font-family: 'Courier New', Courier, monospace;
+    color: #C4956A;
+    letter-spacing: 0.04em;
+  }
+
+  .preview {
+    line-height: 0;
+    overflow: hidden;
+  }
+
+  .preview svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* ── Swatches ── */
+  .swatches {
+    display: flex;
+    height: 28px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .sw {
+    flex: 1;
+    position: relative;
+    transition: flex 0.18s ease;
+    overflow: hidden;
+  }
+
+  .sw:hover { flex: 1.7; }
+
+  .sw .tip {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+    gap: 1px;
+  }
+
+  .sw:hover .tip { opacity: 1; }
+
+  .sw .tip span {
+    font-size: 6px;
+    font-family: 'Courier New', monospace;
+    mix-blend-mode: difference;
+    color: white;
+    letter-spacing: 0.04em;
+  }
+
+  .footnote {
+    text-align: center;
+    margin-top: 52px;
+    font-size: 0.68rem;
+    color: #2A2822;
+    font-style: italic;
+    letter-spacing: 0.06em;
+    line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M11 3v16M11 7.5 L7 12M11 7.5 L15 12M11 12 L8.5 15.5M11 12 L13.5 15.5"
+            stroke="#5B8C5B" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>
+    <span class="brand-name">ArborKin</span>
+  </div>
+  <h1>Subtle Brown <em>Variations</em></h1>
+  <p class="meta">Starting from today's UI · One element changes per variation · June 2026</p>
+  <div class="hairline"></div>
+</header>
+
+<main class="grid" id="grid"></main>
+
+<p class="footnote">
+  Each variation touches exactly one element of the current UI.<br>
+  The mint-green canvas gradient, node fills, and overall feel are preserved throughout.<br>
+  Hover swatches for hex values.
+</p>
+
+<script>
+// ── Current app values (derived from app.css) ─────────────────────────────
+// Canvas: linear-gradient(#f0faf4 → #aee5c4) + green radial overlays
+// Parent lines: --ft-gray-300 (approximated as #CBD8D0, very light grey-green)
+// Couple lines: --ft-green-400 = #4db282
+// Node stroke:  ~#9AB8AF (soft greenish-gray seen in screenshot)
+// Focus fill:   --ft-green-100 = #d6f2e0
+// Focus border: --ft-green-500 = #2e9966
+
+const BASE = {
+  ct:  '#f0faf4',   // canvas top
+  cb:  '#aee5c4',   // canvas bottom
+  wr:  null,        // warm radial (null = none)
+  nf:  '#ffffff',   // node fill
+  ns:  '#9AB8AF',   // node stroke
+  ff:  '#d6f2e0',   // focus fill
+  fb:  '#2e9966',   // focus border
+  ft:  '#15623d',   // focus text
+  nt:  '#444441',   // node text
+  st:  '#B8C4BE',   // year text
+  pl:  '#CBD8D0',   // parent lines (gray-green)
+  cl:  '#4db282',   // couple lines (green)
+  ax:  '#C0CECA',   // timeline axis
+};
+
+const CARDS = [
+  {
+    name: 'Current',
+    badge: 'baseline',
+    desc: 'The actual UI today — mint green canvas gradient, green connectors, white nodes.',
+    change: null,
+    baseline: true,
+    ...BASE,
+    swatches: [
+      { c: '#f0faf4', l: 'canvas top' },
+      { c: '#aee5c4', l: 'canvas btm' },
+      { c: '#4db282', l: 'couple' },
+      { c: '#2e9966', l: 'focus' },
+    ]
+  },
+  {
+    name: 'Twig Lines',
+    badge: 'variation',
+    desc: 'Only the parent-child connector lines shift to warm taupe. Reads as tree branches rather than graph edges.',
+    change: 'parent lines · #CBD8D0 → #B09870',
+    ...BASE,
+    pl: '#B09870',
+    swatches: [
+      { c: '#f0faf4', l: 'canvas top' },
+      { c: '#B09870', l: 'parent ←' },
+      { c: '#4db282', l: 'couple' },
+      { c: '#2e9966', l: 'focus' },
+    ]
+  },
+  {
+    name: 'Node Rings',
+    badge: 'variation',
+    desc: 'Every node border shifts from greenish-gray to warm brown-gray. All circles carry a wood tone.',
+    change: 'node stroke · #9AB8AF → #9B8A6A',
+    ...BASE,
+    ns: '#9B8A6A',
+    swatches: [
+      { c: '#f0faf4', l: 'canvas top' },
+      { c: '#aee5c4', l: 'canvas btm' },
+      { c: '#9B8A6A', l: 'stroke ←' },
+      { c: '#2e9966', l: 'focus' },
+    ]
+  },
+  {
+    name: 'Couple Links',
+    badge: 'variation',
+    desc: 'The heart connector lines shift from green to warm caramel. The most visible single change — every marriage link warms.',
+    change: 'couple lines · #4db282 → #C49060',
+    ...BASE,
+    cl: '#C49060',
+    swatches: [
+      { c: '#f0faf4', l: 'canvas top' },
+      { c: '#aee5c4', l: 'canvas btm' },
+      { c: '#C49060', l: 'couple ←' },
+      { c: '#2e9966', l: 'focus' },
+    ]
+  },
+  {
+    name: 'Focus Warmth',
+    badge: 'variation',
+    desc: 'Only the focus node shifts — from mint green to warm ivory with an olive border. Everything else stays green.',
+    change: 'focus fill · #d6f2e0 → #F0E8D8 · border → #7B6B4A',
+    ...BASE,
+    ff: '#F0E8D8',
+    fb: '#7B6B4A',
+    ft: '#3A2E1E',
+    swatches: [
+      { c: '#f0faf4', l: 'canvas top' },
+      { c: '#aee5c4', l: 'canvas btm' },
+      { c: '#F0E8D8', l: 'focus ←' },
+      { c: '#7B6B4A', l: 'focus bdr' },
+    ]
+  },
+  {
+    name: 'Ground Tone',
+    badge: 'variation',
+    desc: 'The canvas gradient base shifts toward yellow-green with a faint warm bloom at the bottom. The most subtle — feels like late afternoon light.',
+    change: 'canvas bottom · #aee5c4 → #bcd8a4 + warm radial',
+    ...BASE,
+    cb:  '#bcd8a4',
+    wr:  '#8B5A2B',
+    swatches: [
+      { c: '#f0faf4', l: 'canvas top' },
+      { c: '#bcd8a4', l: 'canvas ←' },
+      { c: '#4db282', l: 'couple' },
+      { c: '#2e9966', l: 'focus' },
+    ]
+  },
+];
+
+// ── Layout constants ───────────────────────────────────────────────────────
+const W = 330, H = 258;
+const axX = 36;
+const g1y = 52, fcy = 147, g3y = 224;
+const r1 = 15, rf = 22, rs = 15, rc = 13;
+
+const MR = [88,  g1y], ER = [146, g1y], EL = [198, g1y], SS = [256, g1y];
+const DR = [138, fcy], LR = [213, fcy];
+const EZ = [104, g3y], WK = [171, g3y];
+
+const lgMid = (MR[0] + ER[0]) / 2;
+const rgMid = (EL[0] + SS[0]) / 2;
+const coMid = (DR[0] + LR[0]) / 2;
+
+function seg(x1,y1,x2,y2,col,sw) {
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${sw}" stroke-linecap="round"/>`;
+}
+
+function node(cx, cy, r, nf, ns, sw, init, year, nt, st) {
+  return `
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="${nf}" stroke="${ns}" stroke-width="${sw}"/>
+    <text x="${cx}" y="${cy+3.5}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${nt}" font-family="Georgia,serif">${init}</text>
+    <text x="${cx}" y="${cy+r+9}" text-anchor="middle" font-size="6" fill="${st}" font-family="Georgia,serif">${year}</text>`;
+}
+
+function buildSVG(p, idx) {
+  const bgId  = `bg${idx}`;
+  const wrId  = `wr${idx}`;
+
+  // Radial green overlays matching the actual canvas
+  const gr1 = `radial-${idx}-1`, gr2 = `radial-${idx}-2`;
+
+  const defs = `<defs>
+    <linearGradient id="${bgId}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${p.ct}"/>
+      <stop offset="100%" stop-color="${p.cb}"/>
+    </linearGradient>
+    <radialGradient id="${gr1}" cx="15%" cy="28%" r="48%">
+      <stop offset="0%" stop-color="rgba(93,202,165,0.18)"/>
+      <stop offset="100%" stop-color="rgba(93,202,165,0)"/>
+    </radialGradient>
+    <radialGradient id="${gr2}" cx="85%" cy="72%" r="42%">
+      <stop offset="0%" stop-color="rgba(29,158,117,0.10)"/>
+      <stop offset="100%" stop-color="rgba(29,158,117,0)"/>
+    </radialGradient>
+    ${p.wr ? `<radialGradient id="${wrId}" cx="50%" cy="90%" r="60%">
+      <stop offset="0%" stop-color="${p.wr}" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="${p.wr}" stop-opacity="0"/>
+    </radialGradient>` : ''}
+  </defs>`;
+
+  const canvas = `
+    <rect width="${W}" height="${H}" fill="url(#${bgId})"/>
+    <rect width="${W}" height="${H}" fill="url(#${gr1})"/>
+    <rect width="${W}" height="${H}" fill="url(#${gr2})"/>
+    ${p.wr ? `<rect width="${W}" height="${H}" fill="url(#${wrId})"/>` : ''}`;
+
+  const timeline = `
+    <line x1="${axX}" y1="36" x2="${axX}" y2="${H-10}" stroke="${p.ax}" stroke-width="0.4" opacity="0.6"/>
+    <line x1="${axX-3}" y1="${g1y}" x2="${axX+3}" y2="${g1y}" stroke="${p.ax}" stroke-width="0.5"/>
+    <line x1="${axX-3}" y1="${fcy}"  x2="${axX+3}" y2="${fcy}"  stroke="${p.ax}" stroke-width="0.5"/>
+    <line x1="${axX-3}" y1="${g3y}" x2="${axX+3}" y2="${g3y}" stroke="${p.ax}" stroke-width="0.5"/>
+    <text x="${axX-5}" y="${g1y+2.5}" text-anchor="end" font-size="6" fill="${p.ax}" font-family="Georgia,serif">1940</text>
+    <text x="${axX-5}" y="${fcy+2.5}"  text-anchor="end" font-size="6" fill="${p.ax}" font-family="Georgia,serif">1975</text>
+    <text x="${axX-5}" y="${g3y+2.5}" text-anchor="end" font-size="6" fill="${p.ax}" font-family="Georgia,serif">2010</text>`;
+
+  const connectors = `
+    <!-- Left grandparent couple -->
+    ${seg(MR[0]+r1, g1y, ER[0]-r1, g1y, p.cl, 0.8)}
+    <text x="${lgMid}" y="${g1y+3.5}" text-anchor="middle" font-size="7" fill="${p.cl}">♥</text>
+    <!-- Right grandparent couple -->
+    ${seg(EL[0]+r1, g1y, SS[0]-r1, g1y, p.cl, 0.8)}
+    <text x="${rgMid}" y="${g1y+3.5}" text-anchor="middle" font-size="7" fill="${p.cl}">♥</text>
+    <!-- Left gp → DR -->
+    ${seg(lgMid, g1y+r1, lgMid, 100, p.pl, 0.9)}
+    ${seg(lgMid, 100, DR[0], 100, p.pl, 0.9)}
+    ${seg(DR[0], 100, DR[0], fcy-rf, p.pl, 0.9)}
+    <!-- Right gp → LR -->
+    ${seg(rgMid, g1y+r1, rgMid, 100, p.pl, 0.9)}
+    ${seg(rgMid, 100, LR[0], 100, p.pl, 0.9)}
+    ${seg(LR[0], 100, LR[0], fcy-rs, p.pl, 0.9)}
+    <!-- DR-LR couple -->
+    ${seg(DR[0]+rf, fcy, LR[0]-rs, fcy, p.cl, 0.8)}
+    <text x="${coMid}" y="${fcy+3.5}" text-anchor="middle" font-size="7" fill="${p.cl}">♥</text>
+    <!-- DR → children -->
+    ${seg(DR[0], fcy+rf, DR[0], 190, p.pl, 0.9)}
+    ${seg(EZ[0], 190, WK[0], 190, p.pl, 0.9)}
+    ${seg(EZ[0], 190, EZ[0], g3y-rc, p.pl, 0.9)}
+    ${seg(WK[0], 190, WK[0], g3y-rc, p.pl, 0.9)}`;
+
+  const nodes = `
+    ${node(MR[0], g1y, r1, p.nf, p.ns, 0.9, 'MR', '1948', p.nt, p.st)}
+    ${node(ER[0], g1y, r1, p.nf, p.ns, 0.9, 'ER', '1950', p.nt, p.st)}
+    ${node(EL[0], g1y, r1, p.nf, p.ns, 0.9, 'EL', '1948', p.nt, p.st)}
+    ${node(SS[0], g1y, r1, p.nf, p.ns, 0.9, 'SS', '1950', p.nt, p.st)}
+    <!-- Focus -->
+    <circle cx="${DR[0]}" cy="${fcy}" r="${rf}" fill="${p.ff}" stroke="${p.fb}" stroke-width="2.2"/>
+    <text x="${DR[0]}" y="${fcy+4}" text-anchor="middle" font-size="10" font-weight="700" fill="${p.ft}" font-family="Georgia,serif">DR</text>
+    ${node(LR[0], fcy, rs, p.nf, p.ns, 0.9, 'LR', '1981', p.nt, p.st)}
+    ${node(EZ[0], g3y, rc, p.nf, p.ns, 0.8, 'EZ', '2019', p.nt, p.st)}
+    ${node(WK[0], g3y, rc, p.nf, p.ns, 0.8, 'WK', '2016', p.nt, p.st)}`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+  ${defs}${canvas}${timeline}${connectors}${nodes}
+</svg>`;
+}
+
+function buildCard(p, idx) {
+  const badgeClass = p.baseline ? 'badge-current' : 'badge-var';
+  const badgeText  = p.baseline ? 'Current UI' : `Variation 0${idx}`;
+  const changeHtml = p.change
+    ? `<div class="card-change">↳ ${p.change}</div>`
+    : '';
+
+  const swHtml = p.swatches.map(s => `
+    <div class="sw" style="background:${s.c}">
+      <div class="tip">
+        <span>${s.l}</span>
+        <span>${s.c}</span>
+      </div>
+    </div>`).join('');
+
+  return `<div class="card${p.baseline ? ' baseline' : ''}">
+    <div class="card-header">
+      <span class="card-badge ${badgeClass}">${badgeText}</span>
+      <div class="card-name">${p.name}</div>
+      <div class="card-desc">${p.desc}</div>
+      ${changeHtml}
+    </div>
+    <div class="preview">${buildSVG(p, idx)}</div>
+    <div class="swatches">${swHtml}</div>
+  </div>`;
+}
+
+const grid = document.getElementById('grid');
+CARDS.forEach((p, i) => {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = buildCard(p, i);
+  grid.appendChild(wrap.firstElementChild);
+});
+</script>
+</body>
+</html>

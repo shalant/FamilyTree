@@ -103,59 +103,63 @@ else
             {
                 @* Photo grid *@
                 <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));
-                    gap:12px;">
+                    gap:16px;">
                     @foreach (var photo in _photos)
                     {
                         var isPrimary = photo.Url == _profilePhotoUrl;
-                        var cardBorder = isPrimary ? "2px solid var(--ft-green-600)" : "0.5px solid var(--ft-line-border)";
-                        <div style="position:relative; aspect-ratio:1; border-radius:8px;
-                            overflow:hidden; background:var(--ft-surface-card);
-                            border:@cardBorder;"
-                             @onmouseenter="@(() => photo.Hovered = true)"
-                             @onmouseleave="@(() => photo.Hovered = false)">
-                            <img src="@photo.Url" alt="@photo.Caption"
-                                 style="width:100%; height:100%; object-fit:cover;" />
-                            @* Always-visible primary badge *@
-                            @if (isPrimary)
-                            {
-                                <div style="position:absolute; top:6px; left:6px;
-                                    background:var(--ft-green-600); border-radius:4px;
-                                    padding:2px 6px; display:flex; align-items:center; gap:3px;">
-                                    <MudIcon Icon="@Icons.Material.Filled.Star"
-                                             Style="font-size:11px; color:#fff;" />
-                                    <span style="font-size:10px; color:#fff; font-weight:600;
-                                        letter-spacing:0.04em;">PRIMARY</span>
-                                </div>
-                            }
-                            @if (photo.Hovered)
-                            {
-                                <div style="position:absolute; inset:0; background:rgba(0,0,0,0.45);
-                                    display:flex; flex-direction:column; align-items:center;
-                                    justify-content:flex-end; padding:10px; gap:6px;">
-                                    @if (!string.IsNullOrWhiteSpace(photo.Caption))
-                                    {
-                                        <div style="font-size:12px; color:#fff; text-align:center;
-                                            text-shadow:0 1px 3px rgba(0,0,0,0.6);">
-                                            @photo.Caption
-                                        </div>
-                                    }
-                                    <div style="display:flex; gap:6px;">
-                                        <MudTooltip Text="@(isPrimary ? "Profile photo" : "Set as profile photo")">
-                                            <MudIconButton Icon="@(isPrimary ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarOutline)"
-                                                           Size="Size.Small"
-                                                           Style="@($"color:{(isPrimary ? "gold" : "#fff")}; background:rgba(255,255,255,0.15);")"
-                                                           OnClick="@(() => SetProfilePhoto(photo))" />
-                                        </MudTooltip>
-                                        <MudIconButton Icon="@Icons.Material.Outlined.Edit"
-                                                       Size="Size.Small"
-                                                       Style="color:#fff; background:rgba(255,255,255,0.15);"
-                                                       OnClick="@(() => EditPhoto(photo))" />
-                                        <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                                       Size="Size.Small"
-                                                       Style="color:#fff; background:rgba(255,255,255,0.15);"
-                                                       OnClick="@(() => DeletePhoto(photo))" />
+                        var cardBorder = isPrimary ? "2.5px solid var(--ft-green-600)" : "1px solid var(--ft-line-border)";
+                        <div style="display:flex; flex-direction:column; gap:6px;">
+                            <div style="position:relative; aspect-ratio:1; border-radius:8px;
+                                overflow:hidden; background:var(--ft-surface-card); border:@cardBorder;"
+                                 @onmouseenter="@(() => photo.Hovered = true)"
+                                 @onmouseleave="@(() => photo.Hovered = false)">
+                                <img src="@photo.Url" alt="@photo.Caption"
+                                     style="width:100%; height:100%; object-fit:cover;" />
+                                @if (isPrimary)
+                                {
+                                    <div style="position:absolute; top:6px; left:6px;
+                                        background:var(--ft-green-600); border-radius:4px;
+                                        padding:2px 7px; font-size:10px; color:#fff;
+                                        font-weight:600; letter-spacing:0.03em;">
+                                        ✓ Profile
                                     </div>
-                                </div>
+                                }
+                                @if (photo.Hovered)
+                                {
+                                    <div style="position:absolute; inset:0; background:rgba(0,0,0,0.42);
+                                        display:flex; flex-direction:column; align-items:center;
+                                        justify-content:flex-end; padding:8px; gap:4px;">
+                                        @if (!string.IsNullOrWhiteSpace(photo.Caption))
+                                        {
+                                            <div style="font-size:12px; color:#fff; text-align:center;
+                                                text-shadow:0 1px 3px rgba(0,0,0,0.6);">
+                                                @photo.Caption
+                                            </div>
+                                        }
+                                        <div style="display:flex; gap:6px;">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                                           Size="Size.Small"
+                                                           Style="color:#fff; background:rgba(255,255,255,0.18);"
+                                                           OnClick="@(() => EditPhoto(photo))" />
+                                            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                                           Size="Size.Small"
+                                                           Style="color:#fff; background:rgba(255,255,255,0.18);"
+                                                           OnClick="@(() => DeletePhoto(photo))" />
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            @if (!isPrimary)
+                            {
+                                <MudButton Variant="Variant.Text" Size="Size.Small"
+                                           OnClick="@(() => SetProfilePhoto(photo))"
+                                           Style="font-size:11px; color:var(--ft-green-600); padding:2px 4px; min-height:0; height:auto; line-height:1.4; width:100%; text-align:center;">
+                                    Use as profile
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <span style="font-size:11px; color:var(--ft-gray-300); text-align:center; display:block;">profile photo</span>
                             }
                         </div>
                     }
@@ -563,6 +567,14 @@ else
 
     private async Task DeletePhoto(PhotoItem photo)
     {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message,      "Delete this photo? This cannot be undone." },
+            { x => x.ConfirmLabel, "Delete" }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete photo", parameters);
+        if ((await dialog.Result) is { Canceled: true }) return;
+
         var result = await MediumService.DeleteAsync(photo.Id);
         if (result.Success)
         {
@@ -675,6 +687,14 @@ else
 
     private async Task DeleteRecord(RecordItem rec)
     {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message,      $"Delete this {rec.DocType ?? "record"}? This cannot be undone." },
+            { x => x.ConfirmLabel, "Delete" }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete record", parameters);
+        if ((await dialog.Result) is { Canceled: true }) return;
+
         var result = await MediumService.DeleteAsync(rec.Id);
         if (result.Success)
         {

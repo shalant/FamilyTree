@@ -25,4 +25,7 @@ public class CurrentUserService(IHttpContextAccessor httpContextAccessor) : ICur
             return Guid.TryParse(value, out var id) ? id : null;
         }
     }
+
+    public string? Email =>
+        httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Email);
 }

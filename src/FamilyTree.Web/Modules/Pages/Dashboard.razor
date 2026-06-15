@@ -248,9 +248,7 @@
         {
             _totalPeople = people.Count;
             _living = people.Count(p => !p.IsDeceased);
-            _generations = people.Any()
-                ? (people.Max(p => p.GenerationDepth) + 1)
-                : 0;
+            _generations = ComputeGenerations(people);
             _recentPeople = people
                 .OrderByDescending(p => p.Id)
                 .Take(6)
@@ -274,6 +272,35 @@
     {
         var dialog = await DialogService.ShowAsync<ContactAdminDialog>("Contact admin");
         await dialog.Result;
+    }
+
+    private static int ComputeGenerations(List<PersonDto> people)
+    {
+        if (people.Count == 0) return 0;
+        var lookup  = people.ToDictionary(p => p.Id);
+        var allIds  = lookup.Keys.ToHashSet();
+        var hasParentInSet = people
+            .Where(p => (p.ParentIds ?? []).Any(pid => allIds.Contains(pid)))
+            .Select(p => p.Id)
+            .ToHashSet();
+        var roots = people.Where(p => !hasParentInSet.Contains(p.Id)).ToList();
+        if (roots.Count == 0) roots = people.Take(1).ToList();
+
+        var visited = new HashSet<Guid>();
+        var queue   = new Queue<(Guid id, int depth)>();
+        foreach (var r in roots) queue.Enqueue((r.Id, 1));
+        int max = 1;
+        while (queue.Count > 0)
+        {
+            var (id, depth) = queue.Dequeue();
+            if (!visited.Add(id)) continue;
+            max = Math.Max(max, depth);
+            if (lookup.TryGetValue(id, out var p))
+                foreach (var cid in p.ChildIds ?? [])
+                    if (!visited.Contains(cid))
+                        queue.Enqueue((cid, depth + 1));
+        }
+        return max;
     }
 
     // ── Render helpers ────────────────────────────────────────────────────
