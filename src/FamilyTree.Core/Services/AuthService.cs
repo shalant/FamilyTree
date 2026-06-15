@@ -65,6 +65,13 @@ public class AuthService(
             if (invite != null)
             {
                 invite.AcceptedAt = DateTime.UtcNow;
+                ctx.UserFamilies.Add(new UserFamily
+                {
+                    UserId   = user.Id,
+                    FamilyId = invite.FamilyId,
+                    Role     = invite.RoleToGrant,
+                    JoinedAt = DateTime.UtcNow
+                });
                 await ctx.SaveChangesAsync();
             }
         }
