@@ -17,7 +17,8 @@ public interface IAuthService
     Task<Guid?>                         GetFocusPersonIdAsync(Guid userId);
 
     Task<AuthResult>                    RequestPasswordResetAsync(string email, string? baseUrl = null);
-    Task<AuthResult>                    ResetPasswordAsync(string email, string token, string newPassword);
+    Task<bool>                          IsResetRequestValidAsync(Guid requestId);
+    Task<AuthResult>                    ResetPasswordAsync(Guid requestId, string newPassword);
     Task<List<PasswordResetRequest>>    GetPendingResetRequestsAsync();
     Task                                DismissResetRequestAsync(Guid id);
 }

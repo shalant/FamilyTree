@@ -82,7 +82,8 @@ var identityBuilder = builder.Services.AddIdentityCore<AppUser>(options =>
 })
 .AddRoles<IdentityRole<Guid>>()
 .AddEntityFrameworkStores<AppDbContext>()
-.AddClaimsPrincipalFactory<AppUserClaimsPrincipalFactory>();
+.AddClaimsPrincipalFactory<AppUserClaimsPrincipalFactory>()
+.AddDefaultTokenProviders();
 
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));

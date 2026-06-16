@@ -15,7 +15,7 @@
 - [x] **[SECURITY — Medium] Upgrade `Azure.Storage.Blobs`** — upgraded from `12.29.0-beta.1` to `12.29.0` stable
 - [x] **[SECURITY — Medium] Surface `AuditLogService` failures** — already logs at `LogError` level in catch block
 - [ ] **[SECURITY — Medium] MFA/2FA** — `security.md` documents this as required for Admin/SuperUser but it is not yet implemented
-- [ ] **[SECURITY — DO BEFORE 2ND FAMILY] Family scoping gap** — `RegisterAsync` does not create a `UserFamily` row after invite acceptance; users land in a permissive state where they see all families' data. Safe while single-family; becomes a real data-isolation failure the moment a second family is created. Fix requires: (1) add `UserFamily` insert in `AuthService.RegisterAsync` after marking invite accepted; (2) run backfill SQL on prod DB (`INSERT INTO UserFamilies` for any users missing a row). See security audit notes.
+- [x] **[SECURITY — DO BEFORE 2ND FAMILY] Family scoping gap** — fixed `AuthService.RegisterAsync` and Google OAuth callback to insert `UserFamily` row on registration; backfilled prod DB (`FamilyId` on all People, `UserFamily` rows for all 3 users, seed data deleted)
 - [x] **[SECURITY — Low] NuGet lock file** — `Directory.Build.props` added with `RestorePackagesWithLockFile = true`; `packages.lock.json` generated for all 5 projects
 - [ ] **GEDCOM export** — wire the "Coming soon" stub in Dashboard; `GedcomExportService` writing standard `.ged` format from the current family's people + relationships
 - [ ] **Mobile layout** — tree canvas and forms are not optimized for small screens; no `@media` breakpoints exist yet

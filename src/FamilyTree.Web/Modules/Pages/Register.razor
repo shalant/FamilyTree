@@ -6,6 +6,7 @@
 @using MudBlazor
 @inject IAuthService AuthService
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Create account — Arborkin</PageTitle>
 
@@ -15,7 +16,7 @@
         @* ── Branding ──────────────────────────────────────────────────────── *@
         <div style="display:flex; justify-content:center; margin-bottom:4px; user-select:none;">
             <img src="/images/arborkin-logo__transparent.png" alt="ArborKin"
-                 style="height:80px;" />
+                 style="height:400px; max-width:100%; width:auto;" />
         </div>
 
         @if (_mode == "Closed")
@@ -204,7 +205,8 @@
     [SupplyParameterFromQuery(Name = "invite")]
     public string? InviteToken { get; set; }
 
-    private string _mode      = "Open";
+    private string?     _inviteToken; // saved from query param before URL strip
+    private string      _mode   = "Open";
     private UserInvite? _invite;
 
     private string _firstName = "";
@@ -231,10 +233,17 @@
 
         if (!string.IsNullOrWhiteSpace(InviteToken))
         {
+            _inviteToken = InviteToken;
             _invite = await AuthService.ValidateInviteTokenAsync(InviteToken);
             if (_invite != null)
                 _email = _invite.Email;
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !string.IsNullOrWhiteSpace(_inviteToken))
+            await JS.InvokeVoidAsync("history.replaceState", null, "", "/register");
     }
 
     private void SignUpWithGoogle() =>
@@ -271,7 +280,7 @@
         if (!valid) return;
 
         _loading = true;
-        var result = await AuthService.RegisterAsync(_firstName, _lastName, _email, _password, InviteToken);
+        var result = await AuthService.RegisterAsync(_firstName, _lastName, _email, _password, _inviteToken);
         _loading = false;
 
         if (!result.Success)
