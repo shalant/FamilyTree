@@ -141,28 +141,7 @@
             _jsModule = await JS.InvokeAsync<IJSObjectReference>(
                 "import", "/js/canvas-interaction.js");
 
-            var focusNode = _layout.Nodes.FirstOrDefault(n => n.IsFocus);
-            var fx = focusNode?.X ?? _layout.CanvasWidth / 2.0;
-            var fy = focusNode?.Y ?? _layout.CanvasHeight / 2.0;
-
-            // Compute the Y range of ±1 generation so JS can zoom to show just parents
-            // and children on first load (rather than the entire tree).
-            var fd = _layout.FocusDepth;
-            var parentNodes = _layout.Nodes.Where(n => n.Depth == fd + 1).ToList();
-            var childNodes  = _layout.Nodes.Where(n => n.Depth == fd - 1).ToList();
-
-            double? genTopY = null;
-            double? genBotY = null;
-            if (parentNodes.Count > 0)
-                genTopY = parentNodes.Min(n => (double)n.Y - n.Size / 2.0) - 30;
-            else if (focusNode != null)
-                genTopY = focusNode.Y - focusNode.Size / 2.0 - 30;
-
-            if (childNodes.Count > 0)
-                genBotY = childNodes.Max(n => (double)n.Y + n.Size / 2.0) + 30;
-            else if (focusNode != null)
-                genBotY = focusNode.Y + focusNode.Size / 2.0 + 30;
-
+            var (fx, fy, genTopY, genBotY) = ComputeDefaultView();
             await _jsModule.InvokeVoidAsync("init", "ft-viewport", "ft-transform", fx, fy, genTopY, genBotY);
             _prevFocusId = FocusId;
         }
@@ -173,6 +152,34 @@
                 await _jsModule.InvokeVoidAsync("centerOn", focusNode.X, focusNode.Y);
             _prevFocusId = FocusId;
         }
+    }
+
+    // Shared by the first-render init (fit ±1 generation around the focus person)
+    // and ResetView (which needs to recompute the same default zoom/pan, not just
+    // re-pan at whatever zoom the user is currently at).
+    private (double Fx, double Fy, double? GenTopY, double? GenBotY) ComputeDefaultView()
+    {
+        var focusNode = _layout.Nodes.FirstOrDefault(n => n.IsFocus);
+        var fx = focusNode?.X ?? _layout.CanvasWidth / 2.0;
+        var fy = focusNode?.Y ?? _layout.CanvasHeight / 2.0;
+
+        var fd = _layout.FocusDepth;
+        var parentNodes = _layout.Nodes.Where(n => n.Depth == fd + 1).ToList();
+        var childNodes  = _layout.Nodes.Where(n => n.Depth == fd - 1).ToList();
+
+        double? genTopY = null;
+        double? genBotY = null;
+        if (parentNodes.Count > 0)
+            genTopY = parentNodes.Min(n => (double)n.Y - n.Size / 2.0) - 30;
+        else if (focusNode != null)
+            genTopY = focusNode.Y - focusNode.Size / 2.0 - 30;
+
+        if (childNodes.Count > 0)
+            genBotY = childNodes.Max(n => (double)n.Y + n.Size / 2.0) + 30;
+        else if (focusNode != null)
+            genBotY = focusNode.Y + focusNode.Size / 2.0 + 30;
+
+        return (fx, fy, genTopY, genBotY);
     }
 
     public async Task ZoomIn()
@@ -192,6 +199,15 @@
         var fx = focusNode?.X ?? _layout.CanvasWidth / 2.0;
         var fy = focusNode?.Y ?? _layout.CanvasHeight / 2.0;
         await _jsModule.InvokeVoidAsync("centerOn", fx, fy);
+    }
+
+    // Unlike CenterTree (re-pan only, keeps current zoom), this restores the
+    // original fit-to-generation zoom too — what "Reset view" should actually do.
+    public async Task ResetView()
+    {
+        if (_jsModule == null) return;
+        var (fx, fy, genTopY, genBotY) = ComputeDefaultView();
+        await _jsModule.InvokeVoidAsync("resetView", fx, fy, genTopY, genBotY);
     }
 
     public async ValueTask DisposeAsync()

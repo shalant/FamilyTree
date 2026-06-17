@@ -4,6 +4,7 @@ using FamilyTree.Core.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FamilyTree.Core.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260617034512_AddStoriesTable")]
+    partial class AddStoriesTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -498,10 +501,6 @@ namespace FamilyTree.Core.Migrations
                     b.Property<Guid?>("AuthorId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("AuthorName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
                     b.Property<string>("Body")
                         .IsRequired()
                         .HasMaxLength(10000)
@@ -515,20 +514,11 @@ namespace FamilyTree.Core.Migrations
                     b.Property<Guid?>("EventId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("InviteId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<bool>("IsApproved")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsHidden")
                         .HasColumnType("bit");
 
                     b.Property<Guid?>("PersonId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -546,65 +536,9 @@ namespace FamilyTree.Core.Migrations
 
                     b.HasIndex("AuthorId");
 
-                    b.HasIndex("InviteId");
-
                     b.HasIndex("PersonId");
 
                     b.ToTable("Stories");
-                });
-
-            modelBuilder.Entity("FamilyTree.Core.Models.StoryInvite", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("newsequentialid()");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("InvitedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("InvitedEmail")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<bool>("IsUsed")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid?>("PersonId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("PersonalNote")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("UnlinkedPersonName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InvitedByUserId");
-
-                    b.HasIndex("PersonId");
-
-                    b.HasIndex("Token")
-                        .IsUnique();
-
-                    b.ToTable("StoryInvites");
                 });
 
             modelBuilder.Entity("FamilyTree.Core.Models.UserActivity", b =>
@@ -966,37 +900,12 @@ namespace FamilyTree.Core.Migrations
                         .HasForeignKey("AuthorId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("FamilyTree.Core.Models.StoryInvite", "Invite")
-                        .WithMany()
-                        .HasForeignKey("InviteId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("FamilyTree.Core.Models.Person", "Person")
                         .WithMany()
                         .HasForeignKey("PersonId")
                         .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("Author");
-
-                    b.Navigation("Invite");
-
-                    b.Navigation("Person");
-                });
-
-            modelBuilder.Entity("FamilyTree.Core.Models.StoryInvite", b =>
-                {
-                    b.HasOne("FamilyTree.Core.Models.AppUser", "InvitedByUser")
-                        .WithMany()
-                        .HasForeignKey("InvitedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FamilyTree.Core.Models.Person", "Person")
-                        .WithMany()
-                        .HasForeignKey("PersonId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("InvitedByUser");
 
                     b.Navigation("Person");
                 });

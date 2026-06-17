@@ -97,6 +97,8 @@ builder.Services.AddHttpClient("anthropic");
 builder.Services.AddScoped<IPersonService, PersonService>();
 builder.Services.AddScoped<IRelationshipService, RelationshipService>();
 builder.Services.AddScoped<IMediumService, MediumService>();
+builder.Services.AddScoped<IStoryService, StoryService>();
+builder.Services.AddScoped<IStoryInviteService, StoryInviteService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IUserMessageService, UserMessageService>();
 builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
@@ -169,12 +171,70 @@ else
 // ── Pipeline ──────────────────────────────────────────────────
 var app = builder.Build();
 
-// Auto-run EF migrations on startup (safe — idempotent)
+// Auto-run EF migrations on startup (idempotent — already-applied migrations are skipped)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-    await db.Database.MigrateAsync(cts.Token);
+    var migrationLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        await db.Database.MigrateAsync(cts.Token);
+        migrationLogger.LogInformation("Database migrations applied successfully.");
+    }
+    catch (OperationCanceledException ex)
+    {
+        migrationLogger.LogCritical(ex,
+            "Database migration timed out after 60 seconds. The application will not start.");
+        await TryNotifyMigrationFailureAsync(scope, migrationLogger,
+            "Database migration timed out after 60 seconds.", ex);
+        throw;
+    }
+    catch (Exception ex)
+    {
+        migrationLogger.LogCritical(ex,
+            "Database migration failed. The application will not start.");
+        // Rethrow rather than continue: serving requests against a schema the code
+        // doesn't match (missing tables/columns) would fail unpredictably across the
+        // app instead of failing loudly and immediately here.
+        await TryNotifyMigrationFailureAsync(scope, migrationLogger,
+            "Database migration failed.", ex);
+        throw;
+    }
+}
+
+// Best-effort email alert on migration failure — failures here must never mask
+// the original migration exception, so every failure mode is swallowed and logged.
+async Task TryNotifyMigrationFailureAsync(
+    IServiceScope scope, ILogger logger, string summary, Exception ex)
+{
+    try
+    {
+        var alertEmail = app.Configuration["Ops:AlertEmail"] ?? app.Configuration["SuperUser:Email"];
+        if (string.IsNullOrWhiteSpace(alertEmail))
+        {
+            logger.LogWarning(
+                "No Ops:AlertEmail or SuperUser:Email configured — skipping migration failure notification.");
+            return;
+        }
+
+        var emailSender = scope.ServiceProvider.GetRequiredService<IEmailSender>();
+        var html = $"""
+            <p><strong>{summary}</strong></p>
+            <p>Environment: {app.Environment.EnvironmentName}</p>
+            <p>Time (UTC): {DateTime.UtcNow:u}</p>
+            <pre style="white-space:pre-wrap;">{System.Net.WebUtility.HtmlEncode(ex.ToString())}</pre>
+            """;
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        await emailSender.SendAsync(
+            alertEmail, "ArborKin: deployment failed (database migration)", html, cts.Token);
+    }
+    catch (Exception notifyEx)
+    {
+        logger.LogError(notifyEx, "Failed to send migration-failure notification email.");
+    }
 }
 
 if (!app.Environment.IsDevelopment())

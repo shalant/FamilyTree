@@ -1,0 +1,133 @@
+@using FamilyTree.Core.Services
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Shared.DTOs.Story
+@using MudBlazor
+
+@inject IStoryService StoryService
+
+<MudDialog>
+    <DialogContent>
+        @if (PersonId.HasValue)
+        {
+            <div class="ft-field-label">Who is this story about?</div>
+            <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined" Dense="true" Class="mb-3">
+                @PersonName
+            </MudAlert>
+        }
+        else
+        {
+            <div class="ft-field-label">Who is this story about?</div>
+
+            <MudCheckBox @bind-Value="_isUnlinkedPerson"
+                         Label="They're not in the tree yet"
+                         Dense="true"
+                         Class="mb-2" />
+
+            @if (_isUnlinkedPerson)
+            {
+                <MudTextField @bind-Value="_typedName"
+                              Placeholder="Type their name"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Class="mb-3" />
+            }
+            else
+            {
+                <MudAutocomplete @ref="_personAc"
+                                  T="PersonDto"
+                                  SearchFunc="SearchPeople"
+                                  ValueChanged="SelectPerson"
+                                  ToStringFunc="@(p => p?.FullName ?? "")"
+                                  Placeholder="Search by name…"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Dense="true"
+                                  Class="mb-3" />
+            }
+        }
+
+        <MudTextField @bind-Value="_dto.Title"
+                       Label="Title"
+                       Placeholder="Her years in Cleveland"
+                       MaxLength="300"
+                       Immediate="true"
+                       Class="mb-3" />
+        <MudTextField @bind-Value="_dto.Body"
+                       Label="Story"
+                       Placeholder="Share what you remember..."
+                       Lines="8"
+                       MaxLength="10000"
+                       Immediate="true" />
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3" Dense="true">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton OnClick="Save"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="_saving">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public Guid? PersonId { get; set; }
+    [Parameter] public string? PersonName { get; set; }
+    [Parameter] public List<PersonDto> AllPeople { get; set; } = [];
+
+    private MudAutocomplete<PersonDto>? _personAc;
+    private PersonDto? _selectedPerson;
+    private string _typedName = "";
+    private bool _isUnlinkedPerson;
+    private readonly StoryUpsertDto _dto = new();
+    private string? _error;
+    private bool _saving;
+
+    private Task<IEnumerable<PersonDto>> SearchPeople(string value, CancellationToken _) =>
+        Task.FromResult(AllPeople
+            .Where(p => string.IsNullOrWhiteSpace(value) ||
+                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(8));
+
+    private void SelectPerson(PersonDto? person) => _selectedPerson = person;
+
+    private async Task Save()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_dto.Title) || string.IsNullOrWhiteSpace(_dto.Body))
+        {
+            _error = "Title and story are both required.";
+            return;
+        }
+
+        _dto.PersonId = PersonId ?? (_isUnlinkedPerson ? null : _selectedPerson?.Id);
+        _dto.UnlinkedPersonName = (PersonId is null && _isUnlinkedPerson) ? _typedName.Trim() : null;
+
+        if (_dto.PersonId is null && string.IsNullOrWhiteSpace(_dto.UnlinkedPersonName))
+        {
+            _error = "Choose an existing person or type a name.";
+            return;
+        }
+
+        _saving = true;
+        var result = await StoryService.CreateAsync(_dto);
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Message;
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(result.Data));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

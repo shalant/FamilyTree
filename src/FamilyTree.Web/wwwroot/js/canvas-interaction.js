@@ -20,6 +20,29 @@ export function init(viewportId, transformId, focusX, focusY, genTopY, genBotY) 
     _transform = document.getElementById(transformId);
     if (!_viewport || !_transform) return;
 
+    _applyDefaultView(focusX, focusY, genTopY, genBotY);
+
+    _syncTimeline();
+
+    // Reveal after the correct position is applied — prevents the SSR-position flash
+    _viewport.style.opacity = '1';
+
+    _viewport.addEventListener('wheel', _onWheel, { passive: false });
+    _viewport.addEventListener('mousedown', _onMouseDown);
+    window.addEventListener('mousemove', _onMouseMove);
+    window.addEventListener('mouseup', _onMouseUp);
+    _viewport.style.cursor = 'grab';
+}
+
+// Re-fits ±1 generation around the focus person, same as the initial load —
+// unlike centerOn(), this also resets zoom rather than just re-panning at
+// whatever zoom level the user is currently at.
+export function resetView(focusX, focusY, genTopY, genBotY) {
+    if (!_viewport) return;
+    _applyDefaultView(focusX, focusY, genTopY, genBotY);
+}
+
+function _applyDefaultView(focusX, focusY, genTopY, genBotY) {
     const rect = _viewport.getBoundingClientRect();
 
     if (genTopY != null && genBotY != null && genBotY > genTopY) {
@@ -39,17 +62,6 @@ export function init(viewportId, transformId, focusX, focusY, genTopY, genBotY) 
 
     _clampPan();
     _applyTransform();
-
-    _syncTimeline();
-
-    // Reveal after the correct position is applied — prevents the SSR-position flash
-    _viewport.style.opacity = '1';
-
-    _viewport.addEventListener('wheel', _onWheel, { passive: false });
-    _viewport.addEventListener('mousedown', _onMouseDown);
-    window.addEventListener('mousemove', _onMouseMove);
-    window.addEventListener('mouseup', _onMouseUp);
-    _viewport.style.cursor = 'grab';
 }
 
 export function dispose() {

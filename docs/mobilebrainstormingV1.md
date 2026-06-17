@@ -1,6 +1,6 @@
 # Mobile Layout — Brainstorming V1
 
-> Status: pre-decision. No implementation started. This doc records thinking, not commitments.
+> Status: superseded by implementation (2026-06-17). This doc still records useful background thinking, but the decisions below are no longer hypothetical — see "What actually shipped" at the bottom.
 
 ---
 
@@ -136,3 +136,12 @@ Replace this file (or add V2) with:
 - Confirmed breakpoints used across components
 - Bottom sheet implementation details
 - Any iOS-specific workarounds discovered during testing
+
+## What actually shipped (2026-06-17)
+
+- **Breakpoint**: single `768px` max-width, almost entirely pure CSS (`@media (max-width: 768px)` in `app.css`) rather than JS-driven layout switching — matches this doc's note that forms/lists/admin/dashboard "just need `@media` breakpoints."
+- **Toolbar**: ended up *not* needing a bottom-sheet rebuild — the existing collapsed-mini/expanded-full toggle already built for desktop was reused. Mobile just changes the *default* (collapsed) and restyles the expanded state to dock full-width at the bottom instead of floating as a pill. See CLAUDE.md's "Mobile/Tablet Responsive Pattern" section for the JS viewport-watcher wiring.
+- **Nav**: collapsed to logo + hamburger, exactly the first option this doc proposed — not a bottom tab bar.
+- **Hero overlay**: explicitly out of scope so far — `.hero-overlay { display: none !important; }` on mobile, matching this doc's "not yet adapted for mobile" framing for it specifically (everything else here aside from the hero was tackled).
+- **Drawer width**: confirmed the prediction here (`PersonDetailDrawer` has a fixed pixel width designed for desktop) — swapped to full-width at the breakpoint, with a real gotcha: MudBlazor's closed-state animation reads its own `--mud-drawer-width` CSS variable, not the rendered `width`, so the override has to target that variable or the "closed" drawer leaves a visible gap. Documented in CLAUDE.md.
+- **Not yet done from this doc**: pinch-to-zoom, the `passive: false`/`touch-action`/`overscroll-behavior` touch-event hardening, `100dvh` keyboard handling, and `DisconnectedCircuitRetentionPeriod` tuning — none of that landed yet. The work so far has been layout/CSS responsiveness, not touch-gesture handling.

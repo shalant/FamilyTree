@@ -27,6 +27,7 @@ else
             <div class="page-header">Add person</div>
             <PersonForm @ref="_form"
                         AllPeople="_allPeople"
+                        Initial="_initial"
                         SubmitLabel="Add person"
                         OnSubmit="HandleSubmit"
                         OnCancel="@(() => Nav.NavigateTo("/people"))" />
@@ -40,13 +41,26 @@ else
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = "name")] public string? PrefillName { get; set; }
+
     private PersonForm? _form;
     private List<PersonDto> _allPeople = [];
+    private PersonUpsertDto? _initial;
     private bool _loading = true;
     private string _error = "";
 
     protected override async Task OnInitializedAsync()
     {
+        if (!string.IsNullOrWhiteSpace(PrefillName))
+        {
+            var parts = PrefillName.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            _initial = new PersonUpsertDto
+            {
+                FirstName = parts.Length > 0 ? parts[0] : "",
+                LastName = parts.Length > 1 ? parts[1] : "",
+            };
+        }
+
         try
         {
             var result = await PersonService.GetAllAsync();

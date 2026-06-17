@@ -88,6 +88,21 @@ else
     [Parameter] public EventCallback OnCenterTree { get; set; }
     [Parameter] public EventCallback OnReset { get; set; }
     [Parameter] public EventCallback OnExport { get; set; }
+    [Parameter] public bool ForceCollapsed { get; set; }
 
     private bool _collapsed = false;
+    private bool? _lastForceCollapsed;
+
+    // ForceCollapsed only sets the *default* — e.g. starting collapsed on a narrow
+    // viewport — without permanently locking out manual expand/collapse. Re-applying
+    // it on every render would fight the user's own toggle, so only re-sync when the
+    // value itself actually changes (e.g. crossing the mobile breakpoint live).
+    protected override void OnParametersSet()
+    {
+        if (_lastForceCollapsed != ForceCollapsed)
+        {
+            _collapsed = ForceCollapsed;
+            _lastForceCollapsed = ForceCollapsed;
+        }
+    }
 }

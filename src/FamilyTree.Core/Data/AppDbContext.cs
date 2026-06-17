@@ -21,6 +21,8 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<PasswordResetRequest> PasswordResetRequests => Set<PasswordResetRequest>();
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
     public DbSet<UserMessage> UserMessages => Set<UserMessage>();
+    public DbSet<Story> Stories => Set<Story>();
+    public DbSet<StoryInvite> StoryInvites => Set<StoryInvite>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -256,6 +258,61 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithMany()
                 .HasForeignKey(p => p.ImportBatchId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── STORY ─────────────────────────────────────────────────────────────
+        modelBuilder.Entity<Story>(e =>
+        {
+            e.HasKey(s => s.Id);
+            e.Property(s => s.Id).HasDefaultValueSql("newsequentialid()");
+
+            e.Property(s => s.UnlinkedPersonName).HasMaxLength(200);
+            e.Property(s => s.AuthorName).HasMaxLength(200);
+            e.Property(s => s.Title).HasMaxLength(300).IsRequired();
+            e.Property(s => s.Body).HasMaxLength(10000).IsRequired();
+
+            e.Property(s => s.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            e.HasOne(s => s.Person)
+                .WithMany()
+                .HasForeignKey(s => s.PersonId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(s => s.Author)
+                .WithMany()
+                .HasForeignKey(s => s.AuthorId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            e.HasOne(s => s.Invite)
+                .WithMany()
+                .HasForeignKey(s => s.InviteId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── STORY INVITE ─────────────────────────────────────────────────────
+        modelBuilder.Entity<StoryInvite>(e =>
+        {
+            e.HasKey(i => i.Id);
+            e.Property(i => i.Id).HasDefaultValueSql("newsequentialid()");
+
+            e.Property(i => i.Token).HasMaxLength(128).IsRequired();
+            e.HasIndex(i => i.Token).IsUnique();
+
+            e.Property(i => i.UnlinkedPersonName).HasMaxLength(200);
+            e.Property(i => i.InvitedEmail).HasMaxLength(256).IsRequired();
+            e.Property(i => i.PersonalNote).HasMaxLength(1000);
+
+            e.Property(i => i.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            e.HasOne(i => i.Person)
+                .WithMany()
+                .HasForeignKey(i => i.PersonId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            e.HasOne(i => i.InvitedByUser)
+                .WithMany()
+                .HasForeignKey(i => i.InvitedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
