@@ -3,8 +3,12 @@
 @using FamilyTree.Core.Services
 @using MudBlazor
 
+@using FamilyTree.Shared.DTOs.Story
+
 @inject NavigationManager Nav
 @inject IMediumService MediumService
+@inject IStoryService StoryService
+@inject IDialogService DialogService
 
 <MudDrawer Open="@(Person is not null)"
            OpenChanged="@(v => { if (!v) OnClose.InvokeAsync(); })"
@@ -178,6 +182,59 @@
                     </div>
                 }
 
+                @* ── Stories ──────────────────────────────────────────────── *@
+                <div style="margin-top:20px; padding-top:16px;
+                    border-top:0.5px solid var(--ft-line-border);">
+                    <div style="display:flex; align-items:center;
+                        justify-content:space-between; margin-bottom:10px;">
+                        <div style="font-size:10px; letter-spacing:0.08em;
+                            text-transform:uppercase; color:var(--ft-gray-300);">
+                            Stories
+                        </div>
+                        <button style="display:flex; align-items:center; gap:4px;
+                            font-size:12px; color:var(--ft-green-600); border:none;
+                            background:transparent; cursor:pointer; padding:0;
+                            font-family:var(--ft-font-body);"
+                                @onclick="AddStory"
+                                title="Add a story">
+                            <MudIcon Icon="@Icons.Material.Outlined.AddCircleOutline"
+                                     Style="font-size:15px;" />
+                            Add story
+                        </button>
+                    </div>
+
+                    @if (_stories.Any())
+                    {
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            @foreach (var story in _stories)
+                            {
+                                <div style="padding:9px 10px; border-radius:6px;
+                                    background:var(--ft-surface-card);
+                                    border:0.5px solid var(--ft-line-border);">
+                                    <div style="font-size:13px; font-weight:500;
+                                        color:var(--ft-gray-700); margin-bottom:3px;">
+                                        @story.Title
+                                    </div>
+                                    <p style="font-size:12px; color:var(--ft-gray-500);
+                                        line-height:1.55; margin:0 0 4px;">
+                                        @story.Body
+                                    </p>
+                                    <div style="font-size:11px; color:var(--ft-gray-300);">
+                                        @(story.AuthorDisplayName ?? "Unknown")
+                                        · @story.CreatedAt.ToString("d MMM yyyy")
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p style="font-size:12px; color:var(--ft-gray-400); margin:0;">
+                            No stories yet.
+                        </p>
+                    }
+                </div>
+
                 @* ── Media strip ─────────────────────────────────────────── *@
                 <div style="margin-top:20px; padding-top:16px;
                     border-top:0.5px solid var(--ft-line-border);">
@@ -265,6 +322,7 @@
 
     private List<RelatedPerson> _related = [];
     private List<string> _previewPhotos = [];  // populated by media API when ready
+    private List<StoryDto> _stories = [];
 
     protected override async Task OnParametersSetAsync()
     {
@@ -297,6 +355,34 @@
                 .Select(m => m.Url)
                 .ToList();
         }
+
+        await LoadStories();
+    }
+
+    private async Task LoadStories()
+    {
+        if (Person is null) return;
+
+        var storiesResult = await StoryService.GetByPersonAsync(Person.Id);
+        _stories = storiesResult.Success ? storiesResult.Data! : [];
+    }
+
+    private async Task AddStory()
+    {
+        if (Person is null) return;
+
+        var parameters = new DialogParameters<StoryFormDialog>
+        {
+            { d => d.PersonId, Person.Id }
+        };
+
+        var dialog = await DialogService.ShowAsync<StoryFormDialog>(
+            "Add a story", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await LoadStories();
     }
 
     private void NavigateToMedia()

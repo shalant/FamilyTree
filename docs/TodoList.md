@@ -20,11 +20,13 @@
 - [ ] **GEDCOM export** — wire the "Coming soon" stub in Dashboard; `GedcomExportService` writing standard `.ged` format from the current family's people + relationships
 - [ ] **Mobile layout** — tree canvas and forms are not optimized for small screens; no `@media` breakpoints exist yet
 - [ ] **Story invite email** — one-click beautiful invite email featuring a family member's story; see `docs/FutureFeatures/story-invite-email.md`
+- [ ] **[SECURITY — High] Branch protection on `master`** — confirmed via `gh api repos/shalant/FamilyTree/branches/master/protection` that master is unprotected; most history is direct pushes, not PR merges. `Deploy Web` is already manual (`workflow_dispatch` only) and decoupled from push, but with no PR requirement a buggy direct-to-master commit (this is how the broken dark mode reached prod) can still ride along on the next manual deploy. Add a branch protection rule requiring a PR + passing `CI` check before merge to `master`.
 
 ---
 
 ## Recently Completed
 
+- [x] **Naming conventions reviewed (2026-06-17)** — audited table/column naming after adding `Stories`; kept PascalCase table names, plural table nouns (`People`, `Media`, `Stories`, etc.) with singular C# entity classes, and plain `Id` PKs. This already matches standard .NET/EF Core + SQL Server convention (lowercase-snake_case is Postgres/Rails advice, not applicable here; `TableNameId`-style PKs would conflict with ASP.NET Identity's own `Id` columns). No renames needed.
 - [x] **Admin Imports tab** — replaced placeholder alert with full `ImportFormPanel` component; extracted import UI (GEDCOM/PDF/CSV/paste tabs + action bar) into shared `ImportFormPanel.razor`; used in both `/import` page and admin tab; import history table preserved below the form; Blazor stale-circuit reconnect modal also added
 - [x] **Dashboard** — `/dashboard` hub with family stats (total/living/generations/photos), quick actions, recently added list, "Coming soon" export section, feature-request and contact-admin buttons
 - [x] **Import family data** — `/import` page with GEDCOM / PDF / CSV / paste-text tabs; `IImportService` (`ClaudeImportService`) backend; `ImportBatch` model + `AddImportBatch` migration; preview-before-commit flow

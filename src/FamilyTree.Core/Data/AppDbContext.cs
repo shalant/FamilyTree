@@ -21,6 +21,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<PasswordResetRequest> PasswordResetRequests => Set<PasswordResetRequest>();
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
     public DbSet<UserMessage> UserMessages => Set<UserMessage>();
+    public DbSet<Story> Stories => Set<Story>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -255,6 +256,29 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasOne(p => p.ImportBatch)
                 .WithMany()
                 .HasForeignKey(p => p.ImportBatchId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── STORY ─────────────────────────────────────────────────────────────
+        modelBuilder.Entity<Story>(e =>
+        {
+            e.HasKey(s => s.Id);
+            e.Property(s => s.Id).HasDefaultValueSql("newsequentialid()");
+
+            e.Property(s => s.UnlinkedPersonName).HasMaxLength(200);
+            e.Property(s => s.Title).HasMaxLength(300).IsRequired();
+            e.Property(s => s.Body).HasMaxLength(10000).IsRequired();
+
+            e.Property(s => s.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            e.HasOne(s => s.Person)
+                .WithMany()
+                .HasForeignKey(s => s.PersonId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(s => s.Author)
+                .WithMany()
+                .HasForeignKey(s => s.AuthorId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
     }
