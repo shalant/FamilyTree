@@ -47,11 +47,12 @@
 ---
 
 ## Phase 7 — Person Data Model Expansion
-- 🔲 Scalar fields on `Person`: occupation, religion, ethnicity/heritage
+- 🔲 Open-ended attributes (occupation, religion, ethnicity, education, military branch, etc.) — see `FutureFeatures/person-facts.md`. **Not** scalar columns on `Person`; that idea is superseded by the generic facts table.
 - 🔲 Child table `PersonAlternateName` — nicknames, name changes
 - 🔲 Child table `PersonResidence` — address/city/country with date range
 - 🔲 Marriage date range UI (`StartDate`/`EndDate` already in DB) + divorce/separation relationship type
-- 🔲 Generic life-event log — see `FutureFeatures/events-table.md` (supersedes the old ad-hoc event-log idea formerly here)
+- 🔲 Generic life-event log — see `FutureFeatures/events-table.md`
+- 🔲 Provenance for stories/events/facts — see `FutureFeatures/sources-citations.md`
 
 ---
 
