@@ -388,6 +388,7 @@
         {
             { d => d.PersonId, Person.Id },
             { d => d.PersonName, Person.FullName },
+            { d => d.AllPeople, AllPeople },
         };
 
         var dialog = await DialogService.ShowAsync<StoryFormDialog>(
@@ -407,6 +408,7 @@
         {
             { d => d.PersonId, Person.Id },
             { d => d.PersonName, Person.FullName },
+            { d => d.AllPeople, AllPeople },
         };
 
         var dialog = await DialogService.ShowAsync<StoryInviteDialog>(

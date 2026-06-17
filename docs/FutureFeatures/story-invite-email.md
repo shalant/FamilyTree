@@ -1,7 +1,11 @@
 # Story-Driven Invite Email
 
-**Status:** Planned — not yet implemented  
+**Status:** Superseded (2026-06-17) — see `story-invite-flow.md`, which was built instead.
 **Goal:** Replace the manual copy-link flow with a one-click beautiful email that tells the story of a family member, pulling distant relatives back in emotionally.
+
+## Why superseded, not implemented as written
+
+This doc proposed featuring an *existing* person's `BiographyNotes` in a generic "join the app" invite email. What actually got built is a different, more direct feature: invite someone to *write* a new story about a person (existing or not-yet-in-the-tree), with a no-login response page, via the new `StoryInvite` token system. It solves the same "1 in 4 invited members registers" problem from a different angle — give them something concrete and personal to do (write one memory) rather than a generic "come join" email. See `story-invite-flow.md` for what shipped.
 
 ---
 

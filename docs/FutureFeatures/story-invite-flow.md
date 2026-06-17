@@ -1,7 +1,14 @@
 # Story Invite Flow
 
-**Status:** Planned — depends on Stories table  
+**Status:** Implemented (2026-06-17), with a few UX additions beyond this plan — see below.
 **Goal:** Let any user invite a non-member to tell a story about a specific family member via a beautiful, token-based email — no account required to submit. After submitting, the respondent is offered a frictionless path to join the app.
+
+## What actually shipped vs. this plan
+
+- The "existing person or type a name" picker ended up as an explicit checkbox ("They're not in the tree yet") toggling between an autocomplete and a free-text field, rather than an implicit empty-autocomplete fallback — matches a pattern from the user's other work app. Same component in both `StoryInviteDialog` and `StoryFormDialog`.
+- `StoryInviteDialog` can be opened with a person already preset (from the person drawer or the hero overlay's "Invite" button) but still offers a "Not them? Invite about someone else" override, so every invite entry point supports inviting about an unlinked/new person, not just the standalone one.
+- Invite entry points ended up being: the person detail drawer's "Invite" button, and the hero overlay's primary "Invite" button (which replaced an "Edit Profile" text button — edit moved to an icon button + the expanded hero's action list instead).
+- Everything else (schema, token generation, email content, `/story/respond/{token}` page, admin moderation) matches what was built.
 
 ---
 

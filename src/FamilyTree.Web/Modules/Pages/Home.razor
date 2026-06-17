@@ -344,7 +344,7 @@ else
             await JS.InvokeVoidAsync("localStorage.removeItem", "ftdrag:hero");
         }
         catch { }
-        if (_canvas != null) await _canvas.CenterTree();
+        if (_canvas != null) await _canvas.ResetView();
         StateHasChanged();
     }
 
@@ -384,6 +384,7 @@ else
         {
             { d => d.PersonId,   _focusPerson.Id },
             { d => d.PersonName, _focusPerson.FullName },
+            { d => d.AllPeople,  _people },
         };
 
         var dialog = await DialogService.ShowAsync<StoryInviteDialog>(

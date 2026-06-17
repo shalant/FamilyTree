@@ -56,7 +56,7 @@ SQL Server (local) / Azure SQL Database (prod)
 - `FamilyTree.Core` — Service layer, EF Core data access, blob storage abstraction; referenced directly by Web
 - `FamilyTree.Web` — Blazor Server UI; injects `IPersonService` etc. directly; no HTTP client
 
-**CI/CD:** GitHub Actions (`.github/workflows/deploy-web.yml`) builds and deploys to Azure App Service on push to `master` or `main`. Requires `AZURE_WEB_APP_NAME` and `AZURE_WEB_PUBLISH_PROFILE` secrets in the GitHub repo. EF migrations run automatically on Web startup via `ctx.Database.MigrateAsync()` in production.
+**CI/CD:** Two separate workflows. `ci.yml` runs build + test automatically on every push/PR to `master`/`main`. `deploy-web.yml` is **manual only** (`workflow_dispatch`) — merging to `master` never deploys by itself; deploying to Azure App Service is a deliberate, separate trigger. The deploy workflow requires `AZURE_WEB_APP_NAME` and `AZURE_WEB_PUBLISH_PROFILE`/`AZURE_CREDENTIALS` secrets in the GitHub repo, and pushes straight to the live App Service (no deployment slot/swap, no health gate). EF migrations run automatically on every Web startup (dev and prod alike) via `ctx.Database.MigrateAsync()` in `Program.cs`, wrapped in try/catch: a failed migration logs `LogCritical`, best-effort emails `Ops:AlertEmail` (falls back to `SuperUser:Email`) with the exception via `IEmailSender`, then rethrows — the app deliberately fails to start rather than serve requests against a schema the code doesn't match.
 
 ## Key Architectural Decisions
 
@@ -84,6 +84,14 @@ When a child of one root group marries a child of another (e.g. siblings-in-law)
 ### SSR Flash Prevention
 `Home.razor` uses a `_ready` flag to suppress tree rendering until after `OnAfterRenderAsync` reads `localStorage`. During SSR (no JS), the flag stays false and a spinner shows. After SignalR connects, `OnAfterRenderAsync` reads `ft-focus` from localStorage, sets the correct focus person, flips `_ready = true`, and calls `StateHasChanged()`. This prevents the brief flash of an alphabetically-first person before the user's saved focus loads.
 
+### Mobile/Tablet Responsive Pattern (≤768px)
+Most responsive behavior (AppBar swapping search for a hamburger + centered user identity, drawers going full-width, etc.) is pure CSS via a single `@media (max-width: 768px)` block in `app.css` — no Blazor/JS involvement. Two pieces need more than CSS:
+
+- **Toolbar default state**: `CustomToolbar` doesn't know the viewport size itself. `ftDrag.js`'s `watchViewport()` reports `window.innerWidth` to `Home.razor` via `[JSInvokable] OnViewportWidthChanged`, which sets `_isNarrowViewport` and passes it down as `CustomToolbar.ForceCollapsed`. `ForceCollapsed` only seeds the *default* `_collapsed` state when it changes (crossing the breakpoint) — it doesn't permanently lock out the user's own expand/collapse toggle. `watchViewport()` always re-targets the latest `dotNetRef` and forces one immediate report per call rather than gating on a "already watching" flag — a stale reference there previously meant later page instances (after a reconnect/navigation) silently never got notified.
+- **Expanded toolbar mobile styling**: `.ft-toolbar-full` (not `.ft-toolbar-mini`) sets its own `position: fixed` inside the mobile media query to dock as a full-width footer, independent of whatever position the parent `#ft-toolbar` div (used for the collapsed pill) has.
+
+**Known gotcha — MudBlazor drawer width overrides:** `MudDrawer`'s closed state is `right: calc(-1 * var(--mud-drawer-width))`, not `width: 0`. Overriding the rendered `width` alone (e.g. `.ft-person-drawer { width: 100% !important; }`) leaves the *closed-state offset* still using the original `Width="…"` Razor parameter, so the drawer only shifts off-screen by its old width while actually rendering at the new one — leaving the difference visible as a blank box. Always override the CSS variable MudBlazor itself reads (`--mud-drawer-width`), not the raw `width` property.
+
 ### Blazor Component Responsibilities
 | Component | Role |
 |-----------|------|
@@ -98,22 +106,33 @@ When a child of one root group marries a child of another (e.g. siblings-in-law)
 | `SiblingInferenceDialog` | Offers to link additional siblings when a new sibling is added |
 | `LoginOverlay` | Full-page auth card; handles email/password POST and Google OAuth redirect |
 | `Register.razor` | Invite-aware registration page; reads `?invite=<token>` query param |
-| `Admin.razor` | Admin panel: dashboard stats, deleted persons, user management, audit log, activity |
+| `Admin.razor` | Admin panel: dashboard stats, deleted persons, user management, audit log, activity, stories management |
 | `StatCard` | Dashboard stat tile; accepts `Icon`, `Accent`, `Href`, `Subtitle` parameters |
+| `CustomAppBar` | Top nav; desktop icon row vs. mobile hamburger + centered user identity, both pure CSS breakpoint-driven |
+| `Stories.razor` | `/stories` — family-wide feed of approved, non-hidden stories; "Add story" opens `StoryFormDialog` |
+| `StoryFormDialog` | Compose a story directly; optional `PersonId` (locked) or person-picker + "not in the tree yet" checkbox for a free-text name |
+| `StoryInviteDialog` | Email someone a token link to write a story about a person; same locked-vs-picker pattern as `StoryFormDialog`, plus a "Not them? Invite about someone else" override even when a person is preset |
+| `StoryRespond.razor` | Unauthenticated `/story/respond/{token}` page where invite recipients submit their memory; ends in an account-creation CTA |
+| `AdminStoryEditDialog` | Admin-only title/body edit for an existing story |
 
 ## Domain Model
 
-**Core entities:** `Person`, `Relationship`, `Medium`, `Family`
+**Core entities:** `Person`, `Relationship`, `Medium`, `Family`, `Story`, `StoryInvite`
 
 - `Family`: tenant/group container (`Id`, `Name`); all persons belong to one family via nullable `FamilyId` FK
 - `Person`: name fields, dates/places, `Gender` enum, `BiographyNotes` (5000 chars), `ProfilePhotoUrl` (500 chars), `FamilyId` (nullable), audit fields, SQL `RowVersion`
 - `Relationship`: bidirectional link with `Type` enum (Parent, Spouse, Sibling, Adopted), optional `StartDate`/`EndDate`, unique constraint on `(PersonAId, PersonBId, Type)`
 - `Medium`: photo/media file linked to a Person (cascade delete on person)
+- `Story`: prose narrative about a `Person` (nullable `PersonId` — see below) or a free-text `UnlinkedPersonName`. `AuthorId` (nullable, set null on user delete) for self-authored stories; `AuthorName` free-text fallback for anonymous invite-flow submissions. `IsApproved` gates the public `/stories` feed (always `true` for self-authored via `StoryService.CreateAsync`, always `false` for invite responses pending moderation). `IsHidden` lets an admin take an already-approved story down without losing its approval state. `SortOrder` (admin up/down reorder, swaps with the adjacent row in current display order) plus `CreatedAt` as the tiebreak define `/stories` ordering.
+- `StoryInvite`: token-based invite (URL-safe 64-byte random token, 30-day default TTL via `Stories:InviteTtlDays`) emailing someone a no-login link to write a `Story` about a `Person` or free-text name. `IsUsed` makes `SubmitResponseAsync` idempotent on the token.
+- **Unlinked stories**: both `Story` and `StoryInvite` allow `PersonId == null` with `UnlinkedPersonName` set instead — the subject doesn't have to exist in the tree yet. Admin's Stories tab has a dedicated linking queue with a "+ Add someone new…" option in the person-search dropdown that opens `/people/add?name=<typed name>` in a new tab, pre-filling the name.
 
 **DTOs (in `FamilyTree.Shared`):**
 - `PersonDto` — read model; `FullName`, `Age`, `IsDeceased` computed; derived ID lists `ParentIds`, `ChildIds`, `SpouseIds`, `FormerSpouseIds`, `SiblingIds` populated by `PersonMapper`
 - `PersonUpsertDto` — write model for create/update; includes `FormerSpouseIds`
 - `CoupleDto` — derived at render time by `CoupleHelper.Derive()`; carries `IsFormer` flag for connector styling
+- `StoryDto` / `StoryUpsertDto` — read/write models for `Story`; `AuthorDisplayName` (from the `Author` nav property) falls back to `AuthorName` (free-text), then `"Unknown"` in the UI
+- `StoryInviteCreateDto` / `StoryInviteValidationDto` / `StoryInviteResponseDto` — invite creation, token validation, and response submission
 
 ## Service & Data Access Patterns
 
@@ -158,6 +177,7 @@ On startup, if `SuperUser:Email` config is set, that `AppUser` is promoted to `I
 - **Dev seeding**: `DataSeeder.Seed()` runs on startup in development — creates a "My Family" row and a sample five-generation tree
 - **Blob storage**: `BlobStorageService` / `IBlobStorageService` abstracted; falls back to `UseDevelopmentStorage=true` (Azurite) if `AzureStorage:ConnectionString` is not set
 - **Azure App Service config keys**: Use double-underscore for nested keys — e.g. `ConnectionStrings__DefaultConnection`, `Google__ClientId`
+- **`Ops:AlertEmail`** (optional): recipient for the migration-failure notification email; falls back to `SuperUser:Email` if unset. A failed send never masks the original migration exception — see CI/CD above.
 
 ## Theme System
 

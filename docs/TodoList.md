@@ -18,8 +18,10 @@
 - [x] **[SECURITY — DO BEFORE 2ND FAMILY] Family scoping gap** — fixed `AuthService.RegisterAsync` and Google OAuth callback to insert `UserFamily` row on registration; backfilled prod DB (`FamilyId` on all People, `UserFamily` rows for all 3 users, seed data deleted)
 - [x] **[SECURITY — Low] NuGet lock file** — `Directory.Build.props` added with `RestorePackagesWithLockFile = true`; `packages.lock.json` generated for all 5 projects
 - [ ] **GEDCOM export** — wire the "Coming soon" stub in Dashboard; `GedcomExportService` writing standard `.ged` format from the current family's people + relationships
-- [ ] **Mobile layout** — tree canvas and forms are not optimized for small screens; no `@media` breakpoints exist yet
-- [ ] **Story invite email** — one-click beautiful invite email featuring a family member's story; see `docs/FutureFeatures/story-invite-email.md`
+- [x] **Mobile/tablet responsive layout (2026-06-17)** — `@media (max-width: 768px)` breakpoint across AppBar (hamburger nav + centered user identity), person drawer (full-width — with a MudBlazor `--mud-drawer-width` variable gotcha fixed along the way), toolbar (defaults collapsed via a JS viewport watcher, expanded state docks as a full-width footer)
+- [x] **Stories feature (2026-06-17)** — see `docs/FutureFeatures/stories-table.md` and `story-invite-flow.md` for what shipped (superseded `story-invite-email.md`)
+- [ ] **Azure Monitor alert for App Service health/5xx** — Action Group + alert rule in the Portal so a failed deploy/startup crash pages even if the in-app migration-failure email itself never fires; complements the `Program.cs` try/catch+email already in place
+- [ ] **Cache-busting for dynamically-imported JS** (`ftDrag.js`, `canvas-interaction.js`) — optional; only worth doing if stale-browser-module confusion during dev keeps costing real time. Not a production risk (fresh page load = fresh fetch for every user); purely a dev-loop nicety
 - [ ] **[SECURITY — High] Branch protection on `master`** — confirmed via `gh api repos/shalant/FamilyTree/branches/master/protection` that master is unprotected; most history is direct pushes, not PR merges. `Deploy Web` is already manual (`workflow_dispatch` only) and decoupled from push, but with no PR requirement a buggy direct-to-master commit (this is how the broken dark mode reached prod) can still ride along on the next manual deploy. Add a branch protection rule requiring a PR + passing `CI` check before merge to `master`.
 
 ---
@@ -80,19 +82,19 @@
 |------|----------|
 | Profile cards | Biography, photos, life events |
 | Events table | Structured life events per person (bar mitzvah, immigration, military, etc.) — see `FutureFeatures/events-table.md` |
-| Stories table | Multiple attributed prose narratives per person — see `FutureFeatures/stories-table.md` |
+| Stories table | ✅ done — see `FutureFeatures/stories-table.md` |
 | Timeline view | Chronological events + stories per person — see `FutureFeatures/person-timeline-view.md` |
 | Media | Documents, voice clips (photos already done) |
 | Design polish | Smooth transitions |
 | Search & filter | By name, year, or relation |
-| Responsive layout | Mobile-friendly tree and forms |
+| Responsive layout | ✅ done (2026-06-17) — mobile-friendly tree and forms |
 
 ---
 
 ### Phase 3 — Collaboration & sharing
 | Area | Features |
 |------|----------|
-| Story invite flow | Token-based email inviting non-members to contribute a memory; no login required to submit — see `FutureFeatures/story-invite-flow.md` |
+| Story invite flow | ✅ done — see `FutureFeatures/story-invite-flow.md` |
 | Share a memory / Public profiles | Logged-in family members submit memories; optional public read-only profile URL — see `FutureFeatures/share-memory-public-profile.md` |
 | Invites | Share tree with family (viewer/editor roles) |
 | Change history | "Recently added/updated" feed |

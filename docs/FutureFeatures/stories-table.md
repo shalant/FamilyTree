@@ -1,7 +1,14 @@
 # Stories Table
 
-**Status:** Planned — not yet implemented  
+**Status:** Implemented (2026-06-17), with some additions beyond this plan — see below.
 **Goal:** Allow multiple attributed prose narratives per person, replacing the single `BiographyNotes` blob with a richer, multi-author storytelling model.
+
+## What actually shipped vs. this plan
+
+- Two extra columns not in the original schema: `IsHidden` (bool) and `SortOrder` (int) — added so admins can take an already-approved story down without re-triggering moderation, and manually reorder the public feed. See `AddStoryManagement` migration.
+- Admin UI ended up as a full "Manage stories" table (status chip, approve/hide-show toggle, edit, delete, reorder) rather than just an approval queue — see `story-invite-flow.md`'s admin notes and `Admin.razor`.
+- The public-facing `/stories` page (`Stories.razor`) wasn't in this plan at all — it's a family-wide feed of approved + non-hidden stories, with its own "Add story" entry point via `StoryFormDialog`.
+- Everything else below (schema, unlinked-story handling, service method shapes) matches what was built.
 
 ---
 
