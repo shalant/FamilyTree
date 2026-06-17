@@ -11,4 +11,6 @@ public interface IStoryService
     Task<ServiceResponse> DeleteAsync(Guid id, CancellationToken ct = default);
     Task<ServiceResponse<List<StoryDto>>> GetUnlinkedAsync(CancellationToken ct = default);
     Task<ServiceResponse<StoryDto>> LinkToPersonAsync(Guid storyId, Guid personId, CancellationToken ct = default);
+    Task<ServiceResponse<List<StoryDto>>> GetPendingApprovalAsync(CancellationToken ct = default);
+    Task<ServiceResponse<StoryDto>> ApproveAsync(Guid storyId, CancellationToken ct = default);
 }

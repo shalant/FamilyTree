@@ -232,6 +232,62 @@ public class StoryService(
     }
 
     // ─────────────────────────────────────────────────────────────
+    //  GET PENDING APPROVAL
+    // ─────────────────────────────────────────────────────────────
+    public async Task<ServiceResponse<List<StoryDto>>> GetPendingApprovalAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var stories = await ctx.Stories
+                .AsNoTracking()
+                .Include(s => s.Author)
+                .Include(s => s.Person)
+                .Where(s => !s.IsApproved)
+                .OrderByDescending(s => s.CreatedAt)
+                .ToListAsync(ct);
+
+            return ServiceResponse<List<StoryDto>>.Ok(stories.Select(MapToDto).ToList());
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading stories pending approval");
+            return ServiceResponse<List<StoryDto>>.Fail(
+                "An error occurred loading stories pending approval.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  APPROVE
+    // ─────────────────────────────────────────────────────────────
+    public async Task<ServiceResponse<StoryDto>> ApproveAsync(Guid storyId, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var story = await ctx.Stories.FirstOrDefaultAsync(s => s.Id == storyId, ct);
+            if (story is null)
+                return ServiceResponse<StoryDto>.Fail($"Story {storyId} not found.");
+
+            story.IsApproved = true;
+            story.UpdatedAt = DateTime.UtcNow;
+            await ctx.SaveChangesAsync(ct);
+
+            _ = auditLog.LogAsync("Approve", "Story", storyId, userId: currentUser.UserId);
+
+            return ServiceResponse<StoryDto>.Ok(MapToDto(story));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error approving story {Id}", storyId);
+            return ServiceResponse<StoryDto>.Fail(
+                "An error occurred approving this story.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
     //  MAPPING
     // ─────────────────────────────────────────────────────────────
     private static StoryDto MapToDto(Story story) => new()
@@ -241,6 +297,8 @@ public class StoryService(
         UnlinkedPersonName = story.UnlinkedPersonName,
         AuthorId = story.AuthorId,
         AuthorDisplayName = story.Author?.DisplayName,
+        AuthorName = story.AuthorName,
+        InviteId = story.InviteId,
         Title = story.Title,
         Body = story.Body,
         CreatedAt = story.CreatedAt,

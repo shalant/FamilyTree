@@ -98,6 +98,7 @@ builder.Services.AddScoped<IPersonService, PersonService>();
 builder.Services.AddScoped<IRelationshipService, RelationshipService>();
 builder.Services.AddScoped<IMediumService, MediumService>();
 builder.Services.AddScoped<IStoryService, StoryService>();
+builder.Services.AddScoped<IStoryInviteService, StoryInviteService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IUserMessageService, UserMessageService>();
 builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();

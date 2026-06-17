@@ -1,0 +1,205 @@
+@page "/story/respond/{Token}"
+@rendermode InteractiveServer
+
+@using FamilyTree.Core.Services
+@using FamilyTree.Shared.DTOs.StoryInvite
+@using MudBlazor
+
+@inject IStoryInviteService StoryInviteService
+@inject NavigationManager Nav
+
+<PageTitle>Share a memory — ArborKin</PageTitle>
+
+<div class="ft-auth-page">
+    <div class="intro-glass auth-card" style="max-width:480px;">
+
+        <div style="display:flex; justify-content:center; margin-bottom:4px; user-select:none;">
+            <img src="/images/arborkin-logo__transparent.png" alt="ArborKin"
+                 style="width:70%; max-width:260px; height:auto;" />
+        </div>
+
+        @if (_loading)
+        {
+            <div style="text-align:center; padding:32px 0;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Success" />
+            </div>
+        }
+        else if (!_validation!.IsValid && !_submitted)
+        {
+            @* ── Invalid / expired / used states ──────────────────────────── *@
+            <div style="text-align:center; padding:8px 0 4px;">
+                <MudIcon Icon="@(_validation.IsUsed ? Icons.Material.Outlined.CheckCircleOutline
+                                                     : Icons.Material.Outlined.Schedule)"
+                         Style="font-size:40px; color:var(--ft-green-600); display:block; margin:0 auto 14px;" />
+
+                @if (_validation.IsUsed)
+                {
+                    <div style="font-size:18px; font-weight:600; color:var(--ft-text-primary); margin-bottom:8px;">
+                        Already shared
+                    </div>
+                    <p style="font-size:14px; color:var(--ft-text-muted); line-height:1.6;">
+                        A memory has already been submitted for this invite. Thank you!
+                    </p>
+                }
+                else if (_validation.IsExpired)
+                {
+                    <div style="font-size:18px; font-weight:600; color:var(--ft-text-primary); margin-bottom:8px;">
+                        This link has expired
+                    </div>
+                    <p style="font-size:14px; color:var(--ft-text-muted); line-height:1.6;">
+                        Invite links are only valid for a limited time. Reach out to whoever invited you
+                        and ask them to send a fresh link.
+                    </p>
+                }
+                else
+                {
+                    <div style="font-size:18px; font-weight:600; color:var(--ft-text-primary); margin-bottom:8px;">
+                        Link not found
+                    </div>
+                    <p style="font-size:14px; color:var(--ft-text-muted); line-height:1.6;">
+                        This invite link doesn't look right. Double-check the link or ask for a new one.
+                    </p>
+                }
+            </div>
+        }
+        else if (_submitted)
+        {
+            @* ── Conversion screen ─────────────────────────────────────────── *@
+            <div style="text-align:center; padding:8px 0 4px;">
+                <MudIcon Icon="@Icons.Material.Outlined.Favorite"
+                         Style="font-size:40px; color:var(--ft-green-600); display:block; margin:0 auto 14px;" />
+                <div style="font-size:18px; font-weight:600; color:var(--ft-text-primary); margin-bottom:8px;">
+                    Thank you — your memory of @_validation.DisplayName has been saved.
+                </div>
+                <p style="font-size:14px; color:var(--ft-text-muted); margin-bottom:24px; line-height:1.6;">
+                    Want to see the full family tree, add photos, and explore the rest of the story?
+                </p>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           OnClick='() => Nav.NavigateTo("/register")'>
+                    Create a free account
+                </MudButton>
+                <button class="auth-browse" style="margin-top:14px;"
+                        @onclick='() => Nav.NavigateTo("/")'>
+                    No thanks, I'm done →
+                </button>
+            </div>
+        }
+        else
+        {
+            @* ── Story form ───────────────────────────────────────────────── *@
+            <div style="text-align:center; margin-bottom:20px;">
+                @if (!string.IsNullOrWhiteSpace(_validation.PersonPhotoUrl))
+                {
+                    <img src="@_validation.PersonPhotoUrl" alt="@_validation.DisplayName"
+                         style="width:72px; height:72px; border-radius:50%; object-fit:cover;
+                            border:2px solid var(--ft-focus-border); margin-bottom:10px;" />
+                }
+                <div style="font-size:18px; font-weight:600; font-style:italic;
+                    font-family:var(--ft-font-display); color:var(--ft-green-800);">
+                    Share your memory of @_validation.DisplayName
+                </div>
+                @if (_validation.BirthYear.HasValue || _validation.DeathYear.HasValue)
+                {
+                    <div style="font-size:12px; color:var(--ft-gray-400); margin-top:4px;">
+                        @(_validation.DeathYear.HasValue
+                            ? $"{_validation.BirthYear} – {_validation.DeathYear}"
+                            : $"b. {_validation.BirthYear}")
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_validation.InvitedByDisplayName))
+                {
+                    <div style="font-size:13px; color:var(--ft-gray-400); margin-top:8px;">
+                        Invited by @_validation.InvitedByDisplayName
+                    </div>
+                }
+            </div>
+
+            @if (_error is not null)
+            {
+                <div class="auth-error">@_error</div>
+            }
+
+            <div class="ft-field-label">Your name <span style="opacity:0.6;">(optional)</span></div>
+            <MudTextField @bind-Value="_response.AuthorName"
+                          Placeholder="So we know who to thank"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Disabled="_saving"
+                          Class="mb-3" />
+
+            <div class="ft-field-label">Title <span style="opacity:0.6;">(optional)</span></div>
+            <MudTextField @bind-Value="_response.Title"
+                          Placeholder="A summer at the lake"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          MaxLength="300"
+                          Disabled="_saving"
+                          Class="mb-3" />
+
+            <div class="ft-field-label">Your memory</div>
+            <MudTextField @bind-Value="_response.Body"
+                          Placeholder="Share what you remember..."
+                          Variant="Variant.Outlined"
+                          Lines="8"
+                          MaxLength="10000"
+                          Disabled="_saving" />
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       FullWidth="true" Class="mt-4"
+                       OnClick="Submit"
+                       Disabled="_saving">
+                @if (_saving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true"
+                                         Style="color:#fff; margin-right:8px;" />
+                }
+                Share this memory
+            </MudButton>
+        }
+
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+
+    private bool _loading = true;
+    private bool _saving;
+    private bool _submitted;
+    private string? _error;
+    private StoryInviteValidationDto? _validation;
+    private readonly StoryInviteResponseDto _response = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await StoryInviteService.ValidateTokenAsync(Token);
+        _validation = result.Success
+            ? result.Data
+            : new StoryInviteValidationDto { IsValid = false };
+        _loading = false;
+    }
+
+    private async Task Submit()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_response.Body))
+        {
+            _error = "Please share your memory before submitting.";
+            return;
+        }
+
+        _saving = true;
+        _response.Token = Token;
+        var result = await StoryInviteService.SubmitResponseAsync(_response);
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Message;
+            return;
+        }
+
+        _submitted = true;
+    }
+}

@@ -1,0 +1,148 @@
+@using FamilyTree.Core.Services
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Shared.DTOs.StoryInvite
+@using MudBlazor
+
+@inject IStoryInviteService StoryInviteService
+@inject NavigationManager Nav
+
+<MudDialog>
+    <DialogContent>
+        <div style="font-size:13px; color:var(--ft-gray-400); margin-bottom:16px;">
+            We'll email them a link — no account required to write back.
+        </div>
+
+        @if (PersonId.HasValue)
+        {
+            <div class="ft-field-label">Who is the story about?</div>
+            <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined" Dense="true" Class="mb-3">
+                @PersonName
+            </MudAlert>
+        }
+        else
+        {
+            <div class="ft-field-label">Who is the story about?</div>
+            <MudAutocomplete @ref="_personAc"
+                              T="PersonDto"
+                              SearchFunc="SearchPeople"
+                              ValueChanged="SelectPerson"
+                              ToStringFunc="@(p => p?.FullName ?? "")"
+                              Placeholder="Search by name…"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Dense="true"
+                              Class="mb-2" />
+
+            @if (_selectedPerson is not null)
+            {
+                <MudChip T="string" OnClose="@(() => _selectedPerson = null)"
+                         Style="background:var(--ft-green-50); color:var(--ft-green-800); margin-bottom:8px;">
+                    @_selectedPerson.FullName
+                </MudChip>
+            }
+            else
+            {
+                <div class="ft-field-label" style="margin-top:8px;">
+                    Or, if they're not in the tree yet
+                </div>
+                <MudTextField @bind-Value="_typedName"
+                              Placeholder="Type their name"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Class="mb-3" />
+            }
+        }
+
+        <div class="ft-field-label" style="margin-top:8px;">Their email address</div>
+        <MudTextField @bind-Value="_email"
+                      Placeholder="them@example.com"
+                      InputType="InputType.Email"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Class="mb-3" />
+
+        <div class="ft-field-label">Personal note <span style="opacity:0.6;">(optional)</span></div>
+        <MudTextField @bind-Value="_note"
+                      Placeholder="A line or two about why you're asking..."
+                      Variant="Variant.Outlined"
+                      Lines="3"
+                      MaxLength="1000" />
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3" Dense="true">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton OnClick="Send"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="_sending">
+            Send invite
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public Guid? PersonId { get; set; }
+    [Parameter] public string? PersonName { get; set; }
+    [Parameter] public List<PersonDto> AllPeople { get; set; } = [];
+
+    private MudAutocomplete<PersonDto>? _personAc;
+    private PersonDto? _selectedPerson;
+    private string _typedName = "";
+    private string _email = "";
+    private string _note = "";
+    private string? _error;
+    private bool _sending;
+
+    private Task<IEnumerable<PersonDto>> SearchPeople(string value, CancellationToken _) =>
+        Task.FromResult(AllPeople
+            .Where(p => string.IsNullOrWhiteSpace(value) ||
+                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(8));
+
+    private void SelectPerson(PersonDto? person) => _selectedPerson = person;
+
+    private async Task Send()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_email))
+        {
+            _error = "An email address is required.";
+            return;
+        }
+
+        var dto = new StoryInviteCreateDto
+        {
+            PersonId = PersonId ?? _selectedPerson?.Id,
+            UnlinkedPersonName = (PersonId is null && _selectedPerson is null) ? _typedName.Trim() : null,
+            InvitedEmail = _email.Trim(),
+            PersonalNote = string.IsNullOrWhiteSpace(_note) ? null : _note.Trim(),
+        };
+
+        if (dto.PersonId is null && string.IsNullOrWhiteSpace(dto.UnlinkedPersonName))
+        {
+            _error = "Choose an existing person or type a name.";
+            return;
+        }
+
+        _sending = true;
+        var result = await StoryInviteService.CreateInviteAsync(dto, Nav.BaseUri);
+        _sending = false;
+
+        if (!result.Success)
+        {
+            _error = result.Message;
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

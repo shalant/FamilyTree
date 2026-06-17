@@ -8,6 +8,9 @@ public class Story
     public string? UnlinkedPersonName { get; set; }
 
     public Guid? AuthorId { get; set; }
+    public string? AuthorName { get; set; }
+
+    public Guid? InviteId { get; set; }
 
     public string Title { get; set; } = null!;
     public string Body { get; set; } = null!;
@@ -20,4 +23,5 @@ public class Story
 
     public virtual Person? Person { get; set; }
     public virtual AppUser? Author { get; set; }
+    public virtual StoryInvite? Invite { get; set; }
 }

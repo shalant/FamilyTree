@@ -9,6 +9,7 @@
 @inject IMediumService MediumService
 @inject IStoryService StoryService
 @inject IDialogService DialogService
+@inject FamilyTree.Web.Services.ToastService Toast
 
 <MudDrawer Open="@(Person is not null)"
            OpenChanged="@(v => { if (!v) OnClose.InvokeAsync(); })"
@@ -191,16 +192,28 @@
                             text-transform:uppercase; color:var(--ft-gray-300);">
                             Stories
                         </div>
-                        <button style="display:flex; align-items:center; gap:4px;
-                            font-size:12px; color:var(--ft-green-600); border:none;
-                            background:transparent; cursor:pointer; padding:0;
-                            font-family:var(--ft-font-body);"
-                                @onclick="AddStory"
-                                title="Add a story">
-                            <MudIcon Icon="@Icons.Material.Outlined.AddCircleOutline"
-                                     Style="font-size:15px;" />
-                            Add story
-                        </button>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <button style="display:flex; align-items:center; gap:4px;
+                                font-size:12px; color:var(--ft-green-600); border:none;
+                                background:transparent; cursor:pointer; padding:0;
+                                font-family:var(--ft-font-body);"
+                                    @onclick="InviteStory"
+                                    title="Invite someone to share a memory">
+                                <MudIcon Icon="@Icons.Material.Outlined.MailOutline"
+                                         Style="font-size:15px;" />
+                                Invite
+                            </button>
+                            <button style="display:flex; align-items:center; gap:4px;
+                                font-size:12px; color:var(--ft-green-600); border:none;
+                                background:transparent; cursor:pointer; padding:0;
+                                font-family:var(--ft-font-body);"
+                                    @onclick="AddStory"
+                                    title="Add a story">
+                                <MudIcon Icon="@Icons.Material.Outlined.AddCircleOutline"
+                                         Style="font-size:15px;" />
+                                Add story
+                            </button>
+                        </div>
                     </div>
 
                     @if (_stories.Any())
@@ -383,6 +396,25 @@
 
         if (result is { Canceled: false })
             await LoadStories();
+    }
+
+    private async Task InviteStory()
+    {
+        if (Person is null) return;
+
+        var parameters = new DialogParameters<StoryInviteDialog>
+        {
+            { d => d.PersonId, Person.Id },
+            { d => d.PersonName, Person.FullName },
+        };
+
+        var dialog = await DialogService.ShowAsync<StoryInviteDialog>(
+            "Invite someone to share a memory", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            Toast.Success("Invite sent!");
     }
 
     private void NavigateToMedia()

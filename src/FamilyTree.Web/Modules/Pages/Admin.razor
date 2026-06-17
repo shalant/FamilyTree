@@ -6,6 +6,7 @@
 @using FamilyTree.Core.Models
 @using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Shared.DTOs.Story
 @using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Services
 @using Microsoft.AspNetCore.Identity
@@ -16,6 +17,7 @@
 @inject IAuthService AuthService
 @inject IImportService ImportService
 @inject IUserMessageService MessageService
+@inject IStoryService StoryService
 @inject IDbContextFactory<AppDbContext> DbFactory
 @inject UserManager<AppUser> UserManager
 @inject ToastService Toast
@@ -737,6 +739,115 @@
             }
         </MudTabPanel>
 
+        @* ═══════════════════════════════════════════════════════════════════
+            TAB — STORIES
+           ═══════════════════════════════════════════════════════════════════ *@
+        <MudTabPanel Text="Stories" Icon="@Icons.Material.Outlined.AutoStories">
+
+            @if (_loadingStories)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else
+            {
+                <MudText Typo="Typo.subtitle2" Class="mb-2" Style="color:var(--ft-gray-400);">
+                    Pending approval
+                </MudText>
+                @if (_pendingStories.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4" Dense="true">
+                        No stories awaiting approval.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudPaper Elevation="0" Class="mb-4" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+                        <MudTable Items="_pendingStories" Hover="true" Dense="true" Style="background:transparent;">
+                            <HeaderContent>
+                                <MudTh>About</MudTh>
+                                <MudTh>Title</MudTh>
+                                <MudTh>Memory</MudTh>
+                                <MudTh>Submitted by</MudTh>
+                                <MudTh>Date</MudTh>
+                                <MudTh></MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd Style="font-size:13px;">
+                                    @(context.PersonId.HasValue
+                                        ? _people.FirstOrDefault(p => p.Id == context.PersonId)?.FullName ?? "—"
+                                        : context.UnlinkedPersonName)
+                                </MudTd>
+                                <MudTd Style="font-size:13px; font-weight:500;">@context.Title</MudTd>
+                                <MudTd Style="font-size:12px; color:var(--ft-gray-400); max-width:280px;
+                                    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    @context.Body
+                                </MudTd>
+                                <MudTd Style="font-size:12px; color:var(--ft-gray-400);">
+                                    @(context.AuthorDisplayName ?? context.AuthorName ?? "Unknown")
+                                </MudTd>
+                                <MudTd Style="font-size:11px; color:var(--ft-gray-300);">
+                                    @context.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")
+                                </MudTd>
+                                <MudTd>
+                                    <MudTooltip Text="Approve">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.CheckCircleOutline"
+                                                       Color="Color.Success"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => ApproveStoryAsync(context.Id))" />
+                                    </MudTooltip>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudPaper>
+                }
+
+                <MudText Typo="Typo.subtitle2" Class="mb-2" Style="color:var(--ft-gray-400);">
+                    Unlinked stories
+                </MudText>
+                @if (_unlinkedStories.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                        No unlinked stories.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudPaper Elevation="0" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+                        <MudTable Items="_unlinkedStories" Hover="true" Dense="true" Style="background:transparent;">
+                            <HeaderContent>
+                                <MudTh>Typed name</MudTh>
+                                <MudTh>Title</MudTh>
+                                <MudTh>Link to person</MudTh>
+                                <MudTh></MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd Style="font-size:13px;">@context.UnlinkedPersonName</MudTd>
+                                <MudTd Style="font-size:13px; font-weight:500;">@context.Title</MudTd>
+                                <MudTd>
+                                    <MudAutocomplete T="PersonDto"
+                                                      SearchFunc="SearchPeopleForLinking"
+                                                      ValueChanged="@(p => _linkSelections[context.Id] = p)"
+                                                      ToStringFunc="@(p => p?.FullName ?? "")"
+                                                      Placeholder="Search by name…"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Dense="true" />
+                                </MudTd>
+                                <MudTd>
+                                    <MudTooltip Text="Link">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.Link"
+                                                       Size="Size.Small"
+                                                       Disabled="@(!_linkSelections.ContainsKey(context.Id))"
+                                                       OnClick="@(() => LinkStoryAsync(context.Id))" />
+                                    </MudTooltip>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudPaper>
+                }
+            }
+        </MudTabPanel>
+
         <MudTabPanel Text="Messages" Icon="@Icons.Material.Outlined.MailOutline">
 
             @if (_loadingMessages)
@@ -857,6 +968,12 @@
     private List<ImportBatch>              _importBatches     = [];
     private List<UserMessage>              _messages          = [];
 
+    // ── Stories ──────────────────────────────────────────────────────────────
+    private bool _loadingStories = true;
+    private List<StoryDto> _pendingStories = [];
+    private List<StoryDto> _unlinkedStories = [];
+    private readonly Dictionary<Guid, PersonDto> _linkSelections = [];
+
     // ── Invite creation ──────────────────────────────────────────────────────
     private string  _inviteEmail    = "";
     private string? _inviteLink;
@@ -912,7 +1029,8 @@
             LoadPendingInvitesAsync(),
             LoadPendingResetsAsync(),
             LoadImportBatchesAsync(),
-            LoadMessagesAsync());
+            LoadMessagesAsync(),
+            LoadStoriesAsync());
     }
 
     private async Task LoadDashboardAsync()
@@ -1060,6 +1178,54 @@
         await MessageService.MarkReadAsync(id);
         var msg = _messages.FirstOrDefault(m => m.Id == id);
         if (msg != null) msg.ReadAt = DateTime.UtcNow;
+    }
+
+    private async Task LoadStoriesAsync()
+    {
+        var pending = await StoryService.GetPendingApprovalAsync();
+        if (pending.Success) _pendingStories = pending.Data!;
+
+        var unlinked = await StoryService.GetUnlinkedAsync();
+        if (unlinked.Success) _unlinkedStories = unlinked.Data!;
+
+        _loadingStories = false;
+    }
+
+    private Task<IEnumerable<PersonDto>> SearchPeopleForLinking(string value, CancellationToken _) =>
+        Task.FromResult(_people
+            .Where(p => string.IsNullOrWhiteSpace(value) ||
+                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .Take(8));
+
+    private async Task ApproveStoryAsync(Guid storyId)
+    {
+        var result = await StoryService.ApproveAsync(storyId);
+        if (result.Success)
+        {
+            _pendingStories.RemoveAll(s => s.Id == storyId);
+            Toast.Success("Story approved");
+        }
+        else
+        {
+            Toast.Error(result.Message);
+        }
+    }
+
+    private async Task LinkStoryAsync(Guid storyId)
+    {
+        if (!_linkSelections.TryGetValue(storyId, out var person)) return;
+
+        var result = await StoryService.LinkToPersonAsync(storyId, person.Id);
+        if (result.Success)
+        {
+            _unlinkedStories.RemoveAll(s => s.Id == storyId);
+            _linkSelections.Remove(storyId);
+            Toast.Success($"Linked to {person.FullName}");
+        }
+        else
+        {
+            Toast.Error(result.Message);
+        }
     }
 
     private async Task ConfirmRollbackAsync(ImportBatch batch)
