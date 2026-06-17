@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 800" width="1400" height="800">
+  <rect width="1400" height="800" fill="#fdfaf5"/>
+
+  <!-- Timeline dashed lines -->
+  <line x1="68" y1="88" x2="1380" y2="88"  stroke="#e8e3da" stroke-width="0.6" stroke-dasharray="3,14"/>
+  <line x1="68" y1="260" x2="1380" y2="260" stroke="#e8e3da" stroke-width="0.6" stroke-dasharray="3,14"/>
+  <line x1="68" y1="432" x2="1380" y2="432" stroke="#e8e3da" stroke-width="0.6" stroke-dasharray="3,14"/>
+  <line x1="68" y1="604" x2="1380" y2="604" stroke="#e8e3da" stroke-width="0.6" stroke-dasharray="3,14"/>
+
+  <!-- Year labels -->
+  <text x="10" y="92"  fill="#c4bfb6" font-family="system-ui,sans-serif" font-size="11">1920</text>
+  <text x="10" y="264" fill="#c4bfb6" font-family="system-ui,sans-serif" font-size="11">1950</text>
+  <text x="10" y="436" fill="#c4bfb6" font-family="system-ui,sans-serif" font-size="11">1980</text>
+  <text x="10" y="608" fill="#c4bfb6" font-family="system-ui,sans-serif" font-size="11">2010</text>
+
+  <!-- ══════════════════════════════════════════════════
+       CONNECTORS  (drawn behind nodes)
+       Couple lines: #9FE1CB  |  Parent lines: #5DCAA5
+       ══════════════════════════════════════════════════ -->
+
+  <!-- Gen 0 couples -->
+  <line x1="220" y1="88" x2="420" y2="88"   stroke="#9FE1CB" stroke-width="2"/>
+  <line x1="640" y1="88" x2="840" y2="88"   stroke="#9FE1CB" stroke-width="2"/>
+  <line x1="1020" y1="88" x2="1220" y2="88" stroke="#9FE1CB" stroke-width="2"/>
+
+  <!-- Gen 0 → Gen 1 parent lines -->
+  <!-- Left couple (mid=320) → child at 320,260 -->
+  <line x1="320" y1="88"  x2="320" y2="260" stroke="#5DCAA5" stroke-width="1.5"/>
+  <!-- Center couple (mid=740) → child at 740,260 -->
+  <line x1="740" y1="88"  x2="740" y2="260" stroke="#5DCAA5" stroke-width="1.5"/>
+  <!-- Right couple (mid=1120) → child bends left to 1060,260 -->
+  <line x1="1120" y1="88"  x2="1120" y2="174" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="1120" y1="174" x2="1060" y2="174" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="1060" y1="174" x2="1060" y2="260" stroke="#5DCAA5" stroke-width="1.5"/>
+
+  <!-- Gen 1 couple: 320 + 740 -->
+  <line x1="320" y1="260" x2="740" y2="260" stroke="#9FE1CB" stroke-width="2"/>
+  <!-- Gen 1 right couple: 900 + 1060 -->
+  <line x1="900" y1="260" x2="1060" y2="260" stroke="#9FE1CB" stroke-width="2"/>
+
+  <!-- Gen 1 left couple (mid=530) → Gen 2 children -->
+  <line x1="530" y1="260" x2="530" y2="350" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="530" y1="350" x2="380" y2="350" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="380" y1="350" x2="380" y2="432" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="530" y1="350" x2="610" y2="350" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="610" y1="350" x2="610" y2="432" stroke="#5DCAA5" stroke-width="1.5"/>
+
+  <!-- Gen 1 right couple (mid=980) → Gen 2 right child -->
+  <line x1="980" y1="260" x2="980" y2="350" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="980" y1="350" x2="1010" y2="350" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="1010" y1="350" x2="1010" y2="432" stroke="#5DCAA5" stroke-width="1.5"/>
+
+  <!-- Gen 2 couple: focus (610) + right child (1010) -->
+  <line x1="610" y1="432" x2="1010" y2="432" stroke="#9FE1CB" stroke-width="2"/>
+
+  <!-- Gen 2 sibling (380) → Gen 3 child -->
+  <line x1="380" y1="432" x2="380" y2="516" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="380" y1="516" x2="410" y2="516" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="410" y1="516" x2="410" y2="604" stroke="#5DCAA5" stroke-width="1.5"/>
+
+  <!-- Gen 2 couple (mid=810) → Gen 3 children -->
+  <line x1="810" y1="432" x2="810" y2="516" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="810" y1="516" x2="680" y2="516" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="680" y1="516" x2="680" y2="604" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="810" y1="516" x2="920" y2="516" stroke="#5DCAA5" stroke-width="1.5"/>
+  <line x1="920" y1="516" x2="920" y2="604" stroke="#5DCAA5" stroke-width="1.5"/>
+
+  <!-- ══════════════════════════════════════════════════
+       NODES
+       ══════════════════════════════════════════════════ -->
+
+  <!-- Gen 0: Left couple -->
+  <circle cx="220" cy="88" r="30" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="220" y="84" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="12" font-weight="600">GR</text>
+  <text x="220" y="97" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1918</text>
+
+  <circle cx="420" cy="88" r="30" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="420" y="84" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="12" font-weight="600">ER</text>
+  <text x="420" y="97" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1922</text>
+
+  <!-- Gen 0: Center couple -->
+  <circle cx="640" cy="88" r="30" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="640" y="84" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="12" font-weight="600">TM</text>
+  <text x="640" y="97" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1920</text>
+
+  <circle cx="840" cy="88" r="30" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="840" y="84" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="12" font-weight="600">AM</text>
+  <text x="840" y="97" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1924</text>
+
+  <!-- Gen 0: Right couple -->
+  <circle cx="1020" cy="88" r="30" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="1020" y="84" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="12" font-weight="600">WS</text>
+  <text x="1020" y="97" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1919</text>
+
+  <circle cx="1220" cy="88" r="30" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="1220" y="84" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="12" font-weight="600">LS</text>
+  <text x="1220" y="97" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1923</text>
+
+  <!-- Gen 1: Left couple -->
+  <circle cx="320" cy="260" r="37" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="320" y="256" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="13" font-weight="600">JR</text>
+  <text x="320" y="270" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1948</text>
+
+  <circle cx="740" cy="260" r="37" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="740" y="256" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="13" font-weight="600">FM</text>
+  <text x="740" y="270" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1952</text>
+
+  <!-- Gen 1: Right couple -->
+  <circle cx="900" cy="260" r="30" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="900" y="256" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="12" font-weight="600">BS</text>
+  <text x="900" y="269" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1950</text>
+
+  <circle cx="1060" cy="260" r="30" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="1060" y="256" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="12" font-weight="600">PS</text>
+  <text x="1060" y="269" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1954</text>
+
+  <!-- Gen 2: Sibling -->
+  <circle cx="380" cy="432" r="30" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="380" y="428" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="12" font-weight="600">CR</text>
+  <text x="380" y="441" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1978</text>
+
+  <!-- Gen 2: FOCUS node (purple ring, larger) -->
+  <circle cx="610" cy="432" r="44" fill="white" stroke="#534AB7" stroke-width="2.5"/>
+  <text x="610" y="427" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="15" font-weight="700">DR</text>
+  <text x="610" y="443" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="10">1982</text>
+
+  <!-- Gen 2: Spouse -->
+  <circle cx="1010" cy="432" r="37" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="1010" y="428" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="13" font-weight="600">KS</text>
+  <text x="1010" y="442" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="9">1984</text>
+
+  <!-- Gen 3: Children of sibling -->
+  <circle cx="410" cy="604" r="24" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="410" y="601" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="10" font-weight="600">TR</text>
+  <text x="410" y="612" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="8">2007</text>
+
+  <!-- Gen 3: Children of focus couple -->
+  <circle cx="680" cy="604" r="24" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="680" y="601" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="10" font-weight="600">LR</text>
+  <text x="680" y="612" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="8">2011</text>
+
+  <circle cx="920" cy="604" r="24" fill="white" stroke="#888780" stroke-width="1.5"/>
+  <text x="920" y="601" text-anchor="middle" fill="#444441" font-family="system-ui,sans-serif" font-size="10" font-weight="600">AR</text>
+  <text x="920" y="612" text-anchor="middle" fill="#a09c94" font-family="system-ui,sans-serif" font-size="8">2014</text>
+</svg>

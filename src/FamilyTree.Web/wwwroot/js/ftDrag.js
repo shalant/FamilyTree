@@ -1,10 +1,22 @@
 // ES module — imported by Home.razor via IJSObjectReference.
 // Blazor owns the final position (C# state). JS owns the gesture.
 
-export function loadPos(key) {
+export function loadPos(key, elId, minTop) {
     try {
         const p = JSON.parse(localStorage.getItem('ftdrag:' + key));
-        return p ? [p.left, p.top] : null;
+        if (!p) return null;
+
+        // The saved left/top are absolute pixels from whatever window size was
+        // active when the user last dragged this widget. If the window has
+        // since been resized/shrunk, blindly trusting them can park the widget
+        // partly or fully outside the current viewport. Clamp against the
+        // widget's actual current size so it always stays fully visible.
+        const el = elId && document.getElementById(elId);
+        const w  = el ? el.offsetWidth  : 0;
+        const h  = el ? el.offsetHeight : 0;
+        const left = Math.max(0, Math.min(window.innerWidth  - w, p.left));
+        const top  = Math.max(minTop || 0, Math.min(window.innerHeight - h, p.top));
+        return [left, top];
     } catch {
         return null;
     }

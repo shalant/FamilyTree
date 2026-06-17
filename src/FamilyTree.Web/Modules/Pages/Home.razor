@@ -163,8 +163,6 @@ else
                 _lastHandledFocus = Focus.Value;
                 _focusPerson = _people.FirstOrDefault(p => p.Id == Focus.Value)
                             ?? _people.FirstOrDefault();
-                if (_focusPerson?.Id == Focus.Value)
-                    _detailPerson = _focusPerson;
                 TreeContext.SetContext(_focusPerson, _people.Count, _couples.Count);
                 await PersistFocusAsync(_focusPerson?.Id);
                 _ready = true;
@@ -184,7 +182,7 @@ else
     {
         if (!_ready || _people.Count == 0) return;
 
-        // ?focus= re-centers the tree (shared links, login redirect)
+        // ?focus= re-centers the tree only (shared links, login redirect) — no drawer
         if (Focus.HasValue && Focus.Value != _lastHandledFocus)
         {
             _lastHandledFocus = Focus.Value;
@@ -192,7 +190,6 @@ else
             if (person != null)
             {
                 _focusPerson  = person;
-                _detailPerson = person;
                 await PersistFocusAsync(person.Id);
             }
         }
@@ -225,8 +222,8 @@ else
             _dragModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/ftDrag.js");
             _dotNetRef  = DotNetObjectReference.Create(this);
 
-            var tb = await _dragModule.InvokeAsync<double[]?>("loadPos", "toolbar");
-            var h  = await _dragModule.InvokeAsync<double[]?>("loadPos", "hero");
+            var tb = await _dragModule.InvokeAsync<double[]?>("loadPos", "toolbar", "ft-toolbar", 0);
+            var h  = await _dragModule.InvokeAsync<double[]?>("loadPos", "hero", "ft-hero", 68);
             if (tb != null) _toolbarPos = (tb[0], tb[1]);
             if (h  != null) _heroPos    = (h[0],  h[1]);
 

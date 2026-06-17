@@ -50,8 +50,7 @@ public sealed class ThemeService
         try
         {
             var theme = _isDark ? "dark" : "light";
-            await _js.InvokeVoidAsync("eval",
-                $"document.documentElement.setAttribute('data-theme', '{theme}')");
+            await _js.InvokeVoidAsync("ftSetTheme", theme);
             await _js.InvokeVoidAsync("localStorage.setItem", "ft-theme", theme);
         }
         catch { /* SSR pre-render — skip */ }

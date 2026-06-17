@@ -218,19 +218,13 @@ html, body {
     gap: 6px;
     padding: 18px 24px;
     border-radius: 12px;
-    /*background: rgba(255, 255, 255, 0.55);*/
     background: rgba(245,245,245,0.3);
     backdrop-filter: blur(20px);
-    /*-webkit-backdrop-filter: blur(20px);*/
     -webkit-backdrop-filter: blur(12px);
-    /*border: 1px solid rgba(255, 255, 255, 0.35);*/
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
     color: var(--ft-text-primary);
     font-family: var(--ft-font-display);
-    /*transition: background 0.3s ease, box-shadow 0.3s ease;*/
     transition: all 0.3s ease-in-out;
-    /*fade in*/
-    /*opacity: 0;*/
     animation: heroFadeIn 0.6s ease-out;
 }
 
@@ -245,16 +239,10 @@ html, body {
 
     .hero-glass:hover {
         backdrop-filter: blur(24px);
-        /*transform: translateY(-1px);*/
         transition: all 0.25s ease;
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
     }
 
-    /*.hero-glass.expanded {
-        width: 320px;
-        height: auto;
-        background: rgba(255,255,255,0.65);
-    }*/
     .hero-glass.expanded {
         width: 320px;
         background: rgba(255,255,255,0.65);
@@ -355,58 +343,11 @@ html, body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
-.hero-title {
-    font-size: 22px;
-    font-weight: 600;
-    font-style: italic;
-    color: var(--ft-green-800);
-}
-
-.hero-subtitle {
-    font-size: 13px;
-    color: var(--ft-text-muted);
-}
-
-.login-overlay {
-    position: fixed;
-    inset: 0;
-    background: url('/images/tree-bg.jpg') center/cover no-repeat;
-    backdrop-filter: blur(12px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
-
-.login-glass {
-    background: rgba(255,255,255,0.45);
-    backdrop-filter: blur(20px);
-    border-radius: 20px;
-    padding: 40px 48px;
-    text-align: center;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-    max-width: 400px;
-}
-
-.login-title {
-    font-size: 28px;
-    font-weight: 600;
-    font-style: italic;
-    color: var(--ft-green-800);
-    margin-bottom: 12px;
-}
-
-.login-subtitle {
-    font-size: 14px;
-    color: var(--ft-gray-500);
-    margin-bottom: 24px;
-}
-
 .intro-overlay {
     position: fixed;
     inset: 0;
     backdrop-filter: blur(12px);
-    background: rgba(0,0,0,0.35);
+    background: rgba(100,100,100,0.35);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -417,14 +358,25 @@ html, body {
 }
 
 .intro-glass {
-    background: rgba(255,255,255,0.72);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+    position: relative;
+    isolation: isolate;
+    background: rgba(245,245,245,0.3);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
     border-radius: 20px;
     padding: 40px 36px;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
     animation: introSlideUp 0.5s ease-out;
 }
+
+    .intro-glass::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: radial-gradient(circle at top right, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.1) 70%);
+        z-index: -1;
+    }
 
 .intro-title {
     font-size: 28px;
@@ -447,7 +399,7 @@ html, body {
 /* ── Auth card ────────────────────────────────────────────────────────────── */
 .auth-card {
     width: 100%;
-    max-width: 380px;
+    max-width: 440px;
     text-align: left;
 }
 
@@ -573,7 +525,16 @@ html, body {
 .auth-browse button:hover { color: var(--ft-green-600); }
 
 [data-theme="dark"] .intro-glass {
-    background: rgba(26,29,33,0.82);
+    background: rgba(18, 20, 23, 0.35);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+    [data-theme="dark"] .intro-glass::before {
+        background: radial-gradient(circle at top right, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 70%);
+    }
+
+[data-theme="dark"] .ft-auth-page::before {
+    filter: blur(14px) brightness(0.28);
 }
 
 [data-theme="dark"] .auth-brand-name { color: var(--ft-green-400, #4faa78); }
@@ -827,8 +788,10 @@ html, body {
 }
 /* ── Toolbar ───────────────────────────────────────────────────────────── */
 #toolbar-container {
-    position: absolute;
-    z-index: 1000;
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
     cursor: move;
     transition: top 0.05s linear, left 0.05s linear;
 }
@@ -836,13 +799,6 @@ html, body {
     #toolbar-container.dragging {
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
-
-#toolbar-container {
-    position: fixed;
-    top: 12px;
-    right: 12px;
-    z-index: 10;
-}
 
 .mud-appbar.appbar-background,
 .mud-appbar {
@@ -888,15 +844,54 @@ html, body {
     -webkit-backdrop-filter: blur(24px);
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
 }
+
+/* The light-green gradient underline reads as a subtle accent against the
+   light-mode bg, but the same colors glow as a stray green blob against the
+   near-black dark-mode bg — dim it so it stays a quiet accent in dark mode. */
+[data-theme="dark"] .mud-appbar::after {
+    opacity: 0.35;
+}
+
+/* ── Person detail drawer (glass, matches appbar/hero/toolbar recipe) ───────── */
+.ft-person-drawer.mud-drawer {
+    background: rgba(247,245,240,0.78) !important;
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    border-left: 0.5px solid rgba(255,255,255,0.3);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="dark"] .ft-person-drawer.mud-drawer {
+    background: rgba(18, 20, 23, 0.82) !important;
+    border-left: 0.5px solid rgba(255, 255, 255, 0.08);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
+}
+
 /* ── Auth pages (Register, Login, Forgot password) ───────────────────────────── */
 
 .ft-auth-page {
-    min-height: calc(100vh - 64px);
+    position: relative;
+    min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 32px 16px;
-    background: linear-gradient(180deg, var(--ft-green-50) 0%, var(--ft-surface) 80%);
+    overflow: hidden;
+}
+
+.ft-auth-page::before {
+    content: '';
+    position: absolute;
+    inset: -60px;
+    background: url('/images/tree-canvas-bg.svg') center / cover no-repeat;
+    filter: blur(14px);
+    transform: scale(1.06);
+    z-index: 0;
+}
+
+.ft-auth-page > * {
+    position: relative;
+    z-index: 1;
 }
 
 .auth-password-hint {
@@ -1161,9 +1156,15 @@ html.ft-no-select * {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
 }
 
-/* Auto-collapse the full toolbar on very short viewports (landscape mobile) */
+/* Shrink the full toolbar on short viewports (landscape mobile) so it never
+   needs more vertical room than is available. display:none here would be
+   worse than clipping — the mini pill only exists in the DOM when the
+   component's _collapsed flag is true, so hiding .ft-toolbar-full leaves
+   nothing in its place at all. */
 @media (max-height: 520px) {
-    .ft-toolbar-full { display: none !important; }
+    #ft-toolbar { bottom: 8px; left: 8px; }
+    .ft-toolbar-full { padding: 4px !important; gap: 2px; }
+    .ft-toolbar-full .mud-button-root { min-height: 32px; padding: 2px 10px; }
 }
 
 /* Toolbar drag handle */
@@ -1388,12 +1389,22 @@ html.ft-no-select * {
     display: flex;
     align-items: center;
     margin-right: 12px;
-    padding-top: 14px;
 }
 
 .ft-appbar-logo img {
-    height: 170px;
+    height: 52px;
     display: block;
+}
+
+/* The logo artwork has a tree+roots flourish above/below the wordmark, so the
+   readable "ArborKin" text is only ~28% of the image's own height — sizing by
+   height alone leaves the text looking tiny. The dark, near-black wordmark
+   also has almost no contrast against the dark-mode appbar, so recolor the
+   whole mark to a clean white silhouette there instead of trying to keep the
+   green (inverting would shift green to an off-brand purple). */
+[data-theme="dark"] .ft-appbar-logo img {
+    filter: brightness(0) invert(1);
+    opacity: 0.92;
 }
 
 /* ── AppBar search (desktop only) ────────────────────────────────────────── */
@@ -1402,25 +1413,9 @@ html.ft-no-select * {
     max-width: 420px;
 }
 
-/* Make the MudAutocomplete input blend with the glassmorphism AppBar */
-.ft-search-wrap .mud-input-outlined {
-    background: rgba(255, 255, 255, 0.14) !important;
-    border-radius: 10px !important;
-    transition: background 0.15s;
-}
-.ft-search-wrap .mud-input-outlined:hover,
-.ft-search-wrap .mud-input-outlined.mud-focused {
-    background: rgba(255, 255, 255, 0.24) !important;
-}
-.ft-search-wrap .mud-input-outlined fieldset {
-    border-color: rgba(255, 255, 255, 0.28) !important;
-    border-radius: 10px !important;
-}
-.ft-search-wrap .mud-input-outlined.mud-focused fieldset {
-    border-color: rgba(255, 255, 255, 0.60) !important;
-}
-/* Placeholder and input text color in glassy context */
-.ft-search-wrap .mud-input-slot input::placeholder { color: rgba(60, 80, 60, 0.55); }
+/* Placeholder and input text color (pill background/border are set by the
+   .mud-input-root rules above, which are theme-aware — don't duplicate here) */
+.ft-search-wrap .mud-input-slot input::placeholder { color: var(--ft-text-secondary); }
 .ft-search-wrap .mud-input-slot input { color: var(--ft-text-primary); }
 
 /* ── AppBar family title (mobile only — replaces search) ─────────────────── */

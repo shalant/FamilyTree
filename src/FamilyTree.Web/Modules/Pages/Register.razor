@@ -6,6 +6,7 @@
 @using MudBlazor
 @inject IAuthService AuthService
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Create account — Arborkin</PageTitle>
 
@@ -15,7 +16,7 @@
         @* ── Branding ──────────────────────────────────────────────────────── *@
         <div style="display:flex; justify-content:center; margin-bottom:4px; user-select:none;">
             <img src="/images/arborkin-logo__transparent.png" alt="ArborKin"
-                 style="height:80px;" />
+                 style="width:80%; max-width:320px; height:auto;" />
         </div>
 
         @if (_mode == "Closed")
@@ -32,7 +33,7 @@
                 Back to sign in
             </MudButton>
         }
-        else if (_mode == "InviteOnly" && string.IsNullOrWhiteSpace(InviteToken))
+        else if (_mode == "InviteOnly" && !InviteId.HasValue)
         {
             <div style="font-size:20px; font-weight:600; color:var(--ft-text-primary); margin-bottom:8px;">
                 Invitation required
@@ -202,9 +203,10 @@
 
 @code {
     [SupplyParameterFromQuery(Name = "invite")]
-    public string? InviteToken { get; set; }
+    public Guid? InviteId { get; set; }
 
-    private string _mode      = "Open";
+    private Guid?       _inviteId; // saved from query param before URL strip
+    private string      _mode   = "Open";
     private UserInvite? _invite;
 
     private string _firstName = "";
@@ -229,12 +231,19 @@
     {
         _mode = AuthService.GetRegistrationMode();
 
-        if (!string.IsNullOrWhiteSpace(InviteToken))
+        if (InviteId.HasValue)
         {
-            _invite = await AuthService.ValidateInviteTokenAsync(InviteToken);
+            _inviteId = InviteId;
+            _invite = await AuthService.ValidateInviteAsync(InviteId.Value);
             if (_invite != null)
                 _email = _invite.Email;
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _inviteId.HasValue)
+            await JS.InvokeVoidAsync("history.replaceState", null, "", "/register");
     }
 
     private void SignUpWithGoogle() =>
@@ -271,7 +280,7 @@
         if (!valid) return;
 
         _loading = true;
-        var result = await AuthService.RegisterAsync(_firstName, _lastName, _email, _password, InviteToken);
+        var result = await AuthService.RegisterAsync(_firstName, _lastName, _email, _password, _inviteId);
         _loading = false;
 
         if (!result.Success)
