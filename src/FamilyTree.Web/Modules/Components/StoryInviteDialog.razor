@@ -12,44 +12,58 @@
             We'll email them a link — no account required to write back.
         </div>
 
-        @if (PersonId.HasValue)
+        @if (PersonId.HasValue && !_choosingOther)
         {
             <div class="ft-field-label">Who is the story about?</div>
-            <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined" Dense="true" Class="mb-3">
+            <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined" Dense="true" Class="mb-1">
                 @PersonName
             </MudAlert>
+            <button style="font-size:12px; color:var(--ft-green-600); border:none;
+                background:transparent; cursor:pointer; padding:0 0 12px;
+                font-family:var(--ft-font-body);"
+                    @onclick="@(() => _choosingOther = true)">
+                Not them? Invite about someone else
+            </button>
         }
         else
         {
             <div class="ft-field-label">Who is the story about?</div>
-            <MudAutocomplete @ref="_personAc"
-                              T="PersonDto"
-                              SearchFunc="SearchPeople"
-                              ValueChanged="SelectPerson"
-                              ToStringFunc="@(p => p?.FullName ?? "")"
-                              Placeholder="Search by name…"
-                              Variant="Variant.Outlined"
-                              Margin="Margin.Dense"
-                              Dense="true"
-                              Class="mb-2" />
 
-            @if (_selectedPerson is not null)
+            <MudCheckBox @bind-Value="_isUnlinkedPerson"
+                         Label="They're not in the tree yet"
+                         Dense="true"
+                         Class="mb-2" />
+
+            @if (_isUnlinkedPerson)
             {
-                <MudChip T="string" OnClose="@(() => _selectedPerson = null)"
-                         Style="background:var(--ft-green-50); color:var(--ft-green-800); margin-bottom:8px;">
-                    @_selectedPerson.FullName
-                </MudChip>
-            }
-            else
-            {
-                <div class="ft-field-label" style="margin-top:8px;">
-                    Or, if they're not in the tree yet
-                </div>
                 <MudTextField @bind-Value="_typedName"
                               Placeholder="Type their name"
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
                               Class="mb-3" />
+            }
+            else
+            {
+                <MudAutocomplete @ref="_personAc"
+                                  T="PersonDto"
+                                  SearchFunc="SearchPeople"
+                                  ValueChanged="SelectPerson"
+                                  ToStringFunc="@(p => p?.FullName ?? "")"
+                                  Placeholder="Search by name…"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Dense="true"
+                                  Class="mb-3" />
+            }
+
+            @if (PersonId.HasValue)
+            {
+                <button style="font-size:12px; color:var(--ft-green-600); border:none;
+                    background:transparent; cursor:pointer; padding:0 0 12px;
+                    font-family:var(--ft-font-body);"
+                        @onclick="@(() => { _choosingOther = false; _selectedPerson = null; _typedName = ""; _isUnlinkedPerson = false; })">
+                    Back to @PersonName
+                </button>
             }
         }
 
@@ -98,6 +112,8 @@
     private string _note = "";
     private string? _error;
     private bool _sending;
+    private bool _choosingOther;
+    private bool _isUnlinkedPerson;
 
     private Task<IEnumerable<PersonDto>> SearchPeople(string value, CancellationToken _) =>
         Task.FromResult(AllPeople
@@ -117,10 +133,12 @@
             return;
         }
 
+        var usingPresetPerson = PersonId.HasValue && !_choosingOther;
+
         var dto = new StoryInviteCreateDto
         {
-            PersonId = PersonId ?? _selectedPerson?.Id,
-            UnlinkedPersonName = (PersonId is null && _selectedPerson is null) ? _typedName.Trim() : null,
+            PersonId = usingPresetPerson ? PersonId : (_isUnlinkedPerson ? null : _selectedPerson?.Id),
+            UnlinkedPersonName = (!usingPresetPerson && _isUnlinkedPerson) ? _typedName.Trim() : null,
             InvitedEmail = _email.Trim(),
             PersonalNote = string.IsNullOrWhiteSpace(_note) ? null : _note.Trim(),
         };

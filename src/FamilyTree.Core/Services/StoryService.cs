@@ -81,6 +81,7 @@ public class StoryService(
 
             ctx.Stories.Add(story);
             await ctx.SaveChangesAsync(ct);
+            await ctx.Entry(story).Reference(s => s.Author).LoadAsync(ct);
 
             _ = auditLog.LogAsync("Create", "Story", story.Id, userId: userId);
 
@@ -170,6 +171,126 @@ public class StoryService(
     }
 
     // ─────────────────────────────────────────────────────────────
+    //  GET ALL APPROVED (public feed — excludes hidden)
+    // ─────────────────────────────────────────────────────────────
+    public async Task<ServiceResponse<List<StoryDto>>> GetAllApprovedAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var stories = await ctx.Stories
+                .AsNoTracking()
+                .Include(s => s.Author)
+                .Where(s => s.IsApproved && !s.IsHidden)
+                .OrderBy(s => s.SortOrder)
+                .ThenByDescending(s => s.CreatedAt)
+                .ToListAsync(ct);
+
+            return ServiceResponse<List<StoryDto>>.Ok(stories.Select(MapToDto).ToList());
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading all approved stories");
+            return ServiceResponse<List<StoryDto>>.Fail(
+                "An error occurred loading stories.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  GET ALL (admin management — every status)
+    // ─────────────────────────────────────────────────────────────
+    public async Task<ServiceResponse<List<StoryDto>>> GetAllAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var stories = await ctx.Stories
+                .AsNoTracking()
+                .Include(s => s.Author)
+                .Include(s => s.Person)
+                .OrderBy(s => s.SortOrder)
+                .ThenByDescending(s => s.CreatedAt)
+                .ToListAsync(ct);
+
+            return ServiceResponse<List<StoryDto>>.Ok(stories.Select(MapToDto).ToList());
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading all stories");
+            return ServiceResponse<List<StoryDto>>.Fail(
+                "An error occurred loading stories.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  SET HIDDEN
+    // ─────────────────────────────────────────────────────────────
+    public async Task<ServiceResponse<StoryDto>> SetHiddenAsync(
+        Guid storyId, bool hidden, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var story = await ctx.Stories.FirstOrDefaultAsync(s => s.Id == storyId, ct);
+            if (story is null)
+                return ServiceResponse<StoryDto>.Fail($"Story {storyId} not found.");
+
+            story.IsHidden = hidden;
+            story.UpdatedAt = DateTime.UtcNow;
+            await ctx.SaveChangesAsync(ct);
+
+            _ = auditLog.LogAsync(hidden ? "Hide" : "Unhide", "Story", storyId, userId: currentUser.UserId);
+
+            return ServiceResponse<StoryDto>.Ok(MapToDto(story));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error setting hidden state for story {Id}", storyId);
+            return ServiceResponse<StoryDto>.Fail(
+                "An error occurred updating this story.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  MOVE (reorder relative to display order, -1 = up, +1 = down)
+    // ─────────────────────────────────────────────────────────────
+    public async Task<ServiceResponse> MoveAsync(Guid storyId, int direction, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var ordered = await ctx.Stories
+                .OrderBy(s => s.SortOrder)
+                .ThenByDescending(s => s.CreatedAt)
+                .ToListAsync(ct);
+
+            var index = ordered.FindIndex(s => s.Id == storyId);
+            if (index < 0)
+                return ServiceResponse.Fail($"Story {storyId} not found.");
+
+            var swapIndex = index + direction;
+            if (swapIndex < 0 || swapIndex >= ordered.Count)
+                return ServiceResponse.Ok();
+
+            (ordered[index].SortOrder, ordered[swapIndex].SortOrder) =
+                (ordered[swapIndex].SortOrder, ordered[index].SortOrder);
+
+            await ctx.SaveChangesAsync(ct);
+
+            return ServiceResponse.Ok();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error reordering story {Id}", storyId);
+            return ServiceResponse.Fail("An error occurred reordering this story.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
     //  GET UNLINKED
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse<List<StoryDto>>> GetUnlinkedAsync(CancellationToken ct = default)
@@ -232,33 +353,6 @@ public class StoryService(
     }
 
     // ─────────────────────────────────────────────────────────────
-    //  GET PENDING APPROVAL
-    // ─────────────────────────────────────────────────────────────
-    public async Task<ServiceResponse<List<StoryDto>>> GetPendingApprovalAsync(CancellationToken ct = default)
-    {
-        try
-        {
-            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
-
-            var stories = await ctx.Stories
-                .AsNoTracking()
-                .Include(s => s.Author)
-                .Include(s => s.Person)
-                .Where(s => !s.IsApproved)
-                .OrderByDescending(s => s.CreatedAt)
-                .ToListAsync(ct);
-
-            return ServiceResponse<List<StoryDto>>.Ok(stories.Select(MapToDto).ToList());
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error loading stories pending approval");
-            return ServiceResponse<List<StoryDto>>.Fail(
-                "An error occurred loading stories pending approval.");
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────
     //  APPROVE
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse<StoryDto>> ApproveAsync(Guid storyId, CancellationToken ct = default)
@@ -305,5 +399,7 @@ public class StoryService(
         UpdatedAt = story.UpdatedAt,
         EventId = story.EventId,
         IsApproved = story.IsApproved,
+        IsHidden = story.IsHidden,
+        SortOrder = story.SortOrder,
     };
 }

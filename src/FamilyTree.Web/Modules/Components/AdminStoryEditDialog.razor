@@ -1,0 +1,76 @@
+@using FamilyTree.Core.Services
+@using FamilyTree.Shared.DTOs.Story
+@using MudBlazor
+
+@inject IStoryService StoryService
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_dto.Title"
+                       Label="Title"
+                       MaxLength="300"
+                       Immediate="true"
+                       Class="mb-3" />
+        <MudTextField @bind-Value="_dto.Body"
+                       Label="Story"
+                       Lines="8"
+                       MaxLength="10000"
+                       Immediate="true" />
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3" Dense="true">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton OnClick="Save"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="_saving">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public Guid StoryId { get; set; }
+    [Parameter] public string InitialTitle { get; set; } = "";
+    [Parameter] public string InitialBody { get; set; } = "";
+
+    private readonly StoryUpsertDto _dto = new();
+    private string? _error;
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        _dto.Title = InitialTitle;
+        _dto.Body = InitialBody;
+    }
+
+    private async Task Save()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_dto.Title) || string.IsNullOrWhiteSpace(_dto.Body))
+        {
+            _error = "Title and story are both required.";
+            return;
+        }
+
+        _saving = true;
+        var result = await StoryService.UpdateAsync(StoryId, _dto);
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Message;
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(result.Data));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

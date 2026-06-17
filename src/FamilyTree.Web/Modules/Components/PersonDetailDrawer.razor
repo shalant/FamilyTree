@@ -233,7 +233,7 @@
                                         @story.Body
                                     </p>
                                     <div style="font-size:11px; color:var(--ft-gray-300);">
-                                        @(story.AuthorDisplayName ?? "Unknown")
+                                        @(story.AuthorDisplayName ?? story.AuthorName ?? "Unknown")
                                         · @story.CreatedAt.ToString("d MMM yyyy")
                                     </div>
                                 </div>
@@ -386,7 +386,8 @@
 
         var parameters = new DialogParameters<StoryFormDialog>
         {
-            { d => d.PersonId, Person.Id }
+            { d => d.PersonId, Person.Id },
+            { d => d.PersonName, Person.FullName },
         };
 
         var dialog = await DialogService.ShowAsync<StoryFormDialog>(

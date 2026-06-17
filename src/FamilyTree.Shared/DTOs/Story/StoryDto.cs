@@ -15,4 +15,6 @@ public class StoryDto
     public DateTime? UpdatedAt { get; set; }
     public Guid? EventId { get; set; }
     public bool IsApproved { get; set; }
+    public bool IsHidden { get; set; }
+    public int SortOrder { get; set; }
 }

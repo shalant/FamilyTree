@@ -40,16 +40,24 @@
                 </div>
 
                 <div class="hero-actions">
-                    <MudButton Variant="Variant.Outlined"
+                    <MudButton Variant="Variant.Filled"
                                Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.Edit"
-                               Href="@($"/people/{FocusPerson?.Id}/edit")">
-                        Edit Profile
+                               StartIcon="@Icons.Material.Filled.MailOutline"
+                               OnClick="OnInviteStory">
+                        Invite
                     </MudButton>
 
-                    <MudButton Variant="Variant.Text" OnClick="ToggleExpand">
-                        @(_size == HeroSize.Normal ? "Expand" : "Collapse")
-                    </MudButton>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                   Size="Size.Small"
+                                   title="Edit profile"
+                                   Style="color:var(--ft-text-muted); padding:2px;"
+                                   Href="@($"/people/{FocusPerson?.Id}/edit")" />
+
+                    <MudIconButton Icon="@(_size == HeroSize.Normal ? Icons.Material.Outlined.ExpandMore : Icons.Material.Outlined.ExpandLess)"
+                                   Size="Size.Small"
+                                   title="@(_size == HeroSize.Normal ? "Expand" : "Collapse")"
+                                   Style="color:var(--ft-text-muted); padding:2px;"
+                                   OnClick="ToggleExpand" />
 
                     <MudIconButton Icon="@Icons.Material.Outlined.Remove"
                                    Size="Size.Small"
@@ -69,6 +77,12 @@
                         </div>
 
                         <div class="hero-expanded-actions">
+                            <MudButton Variant="Variant.Text"
+                                       StartIcon="@Icons.Material.Filled.Edit"
+                                       Href="@($"/people/{FocusPerson?.Id}/edit")">
+                                Edit Profile
+                            </MudButton>
+
                             <MudButton Variant="Variant.Text"
                                        StartIcon="@Icons.Material.Filled.CenterFocusStrong"
                                        OnClick="OnCenterTree">
@@ -100,6 +114,7 @@
     [Parameter] public int CoupleCount { get; set; }
     [Parameter] public EventCallback OnCenterTree { get; set; }
     [Parameter] public EventCallback OnShare { get; set; }
+    [Parameter] public EventCallback OnInviteStory { get; set; }
     [Parameter] public bool Visible { get; set; }
     [Parameter] public double? DragLeft { get; set; }
     [Parameter] public double? DragTop  { get; set; }

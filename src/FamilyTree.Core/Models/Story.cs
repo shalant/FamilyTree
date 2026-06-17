@@ -20,6 +20,8 @@ public class Story
 
     public Guid? EventId { get; set; }
     public bool IsApproved { get; set; }
+    public bool IsHidden { get; set; }
+    public int SortOrder { get; set; }
 
     public virtual Person? Person { get; set; }
     public virtual AppUser? Author { get; set; }

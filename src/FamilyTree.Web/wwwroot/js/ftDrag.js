@@ -25,6 +25,38 @@ export function loadPos(key, elId, minTop) {
 export function init(dotNetRef) {
     setup(dotNetRef, 'ft-toolbar', '[data-drag-handle]', 'toolbar', 0);
     setup(dotNetRef, 'ft-hero',    '[data-drag-handle]', 'hero',    68);
+    watchViewport(dotNetRef);
+}
+
+// `init()` runs again every time a Home page instance (re)connects, but the
+// underlying `resize` listener must only be attached once per browser tab —
+// it always reads `_activeDotNetRef`, so a fresh instance simply replaces the
+// target rather than being silently ignored by a stale "already watching" guard
+// (which previously left later page instances with no viewport reports at all).
+let _activeDotNetRef = null;
+let _lastReportedWidth = null;
+let _resizeListenerAttached = false;
+
+function watchViewport(dotNetRef) {
+    _activeDotNetRef = dotNetRef;
+
+    // Always report current width to this (possibly new) ref immediately,
+    // regardless of whether the raw number matches a previous report.
+    _lastReportedWidth = window.innerWidth;
+    dotNetRef.invokeMethodAsync('OnViewportWidthChanged', _lastReportedWidth);
+
+    if (_resizeListenerAttached) return;
+    _resizeListenerAttached = true;
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (window.innerWidth === _lastReportedWidth) return;
+            _lastReportedWidth = window.innerWidth;
+            _activeDotNetRef?.invokeMethodAsync('OnViewportWidthChanged', _lastReportedWidth);
+        }, 120);
+    });
 }
 
 function setup(dotNetRef, elId, handleSel, key, minTop) {

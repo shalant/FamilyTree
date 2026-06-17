@@ -87,7 +87,8 @@ else
                        OnZoomOut="@(async () => { if (_canvas != null) await _canvas.ZoomOut(); })"
                        OnCenterTree="@(async () => { if (_canvas != null) await _canvas.CenterTree(); })"
                        OnReset="HandleReset"
-                       OnExport="HandleExport" />
+                       OnExport="HandleExport"
+                       ForceCollapsed="_isNarrowViewport" />
     </div>
 
     <HeroOverlayComponent FocusPerson="_focusPerson"
@@ -95,6 +96,7 @@ else
                           CoupleCount="_couples.Count"
                           OnCenterTree="CenterTree"
                           OnShare="ShareView"
+                          OnInviteStory="OpenInviteStoryDialog"
                           Visible="(_detailPerson == null)"
                           DragLeft="_heroPos?.Left"
                           DragTop="_heroPos?.Top"
@@ -133,10 +135,13 @@ else
     private DotNetObjectReference<Home>? _dotNetRef;
     private (double Left, double Top)? _toolbarPos;
     private (double Left, double Top)? _heroPos;
+    private bool _isNarrowViewport;
 
-    private string _toolbarStyle => _toolbarPos.HasValue
-        ? $"position:fixed; left:{(int)_toolbarPos.Value.Left}px; top:{(int)_toolbarPos.Value.Top}px; z-index:10000;"
-        : "position:fixed; bottom:24px; left:24px; z-index:10000;";
+    // Mobile/tablet always anchors bottom-left, ignoring any saved drag position from
+    // a wider session — a position dragged-to on desktop may not even be on-screen here.
+    private string _toolbarStyle => _toolbarPos.HasValue && !_isNarrowViewport
+        ? $"position:fixed; left:{(int)_toolbarPos.Value.Left}px; top:{(int)_toolbarPos.Value.Top}px; z-index:1200;"
+        : "position:fixed; bottom:24px; left:24px; z-index:1200;";
 
     protected override async Task OnInitializedAsync()
     {
@@ -243,6 +248,15 @@ else
         if (key == "toolbar") _toolbarPos = (left, top);
         if (key == "hero")    _heroPos    = (left, top);
         StateHasChanged(); // Blazor re-renders with new position — no more JS/Blazor conflict
+    }
+
+    [JSInvokable]
+    public void OnViewportWidthChanged(double width)
+    {
+        var isNarrow = width <= 768;
+        if (isNarrow == _isNarrowViewport) return;
+        _isNarrowViewport = isNarrow;
+        StateHasChanged();
     }
 
     private void OnCenterTreeFromAppBar() => InvokeAsync(CenterTree);
@@ -360,6 +374,25 @@ else
         await DialogService.ShowAsync<ShareDialog>(
             "Share", parameters,
             new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+    }
+
+    private async Task OpenInviteStoryDialog()
+    {
+        if (_focusPerson is null) return;
+
+        var parameters = new DialogParameters<StoryInviteDialog>
+        {
+            { d => d.PersonId,   _focusPerson.Id },
+            { d => d.PersonName, _focusPerson.FullName },
+        };
+
+        var dialog = await DialogService.ShowAsync<StoryInviteDialog>(
+            "Invite someone to share a memory", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            Toast.Success("Invite sent!");
     }
 
     private async Task PromptDelete(PersonDto person)

@@ -23,6 +23,7 @@
 @inject ToastService Toast
 @inject NavigationManager NavManager
 @inject IJSRuntime JS
+@inject IDialogService DialogService
 
 <PageTitle>Admin</PageTitle>
 
@@ -751,27 +752,41 @@
             else
             {
                 <MudText Typo="Typo.subtitle2" Class="mb-2" Style="color:var(--ft-gray-400);">
-                    Pending approval
+                    Manage stories
                 </MudText>
-                @if (_pendingStories.Count == 0)
+                @if (_allStories.Count == 0)
                 {
                     <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4" Dense="true">
-                        No stories awaiting approval.
+                        No stories yet.
                     </MudAlert>
                 }
                 else
                 {
                     <MudPaper Elevation="0" Class="mb-4" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
-                        <MudTable Items="_pendingStories" Hover="true" Dense="true" Style="background:transparent;">
+                        <MudTable Items="_allStories" Hover="true" Dense="true" Style="background:transparent;">
                             <HeaderContent>
+                                <MudTh Style="width:60px;">Order</MudTh>
                                 <MudTh>About</MudTh>
                                 <MudTh>Title</MudTh>
                                 <MudTh>Memory</MudTh>
                                 <MudTh>Submitted by</MudTh>
+                                <MudTh>Status</MudTh>
                                 <MudTh>Date</MudTh>
                                 <MudTh></MudTh>
                             </HeaderContent>
                             <RowTemplate>
+                                <MudTd>
+                                    <div style="display:flex; flex-direction:column;">
+                                        <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowUp"
+                                                       Size="Size.Small"
+                                                       Style="padding:0; min-width:24px; height:20px;"
+                                                       OnClick="@(() => MoveStoryAsync(context.Id, -1))" />
+                                        <MudIconButton Icon="@Icons.Material.Outlined.KeyboardArrowDown"
+                                                       Size="Size.Small"
+                                                       Style="padding:0; min-width:24px; height:20px;"
+                                                       OnClick="@(() => MoveStoryAsync(context.Id, 1))" />
+                                    </div>
+                                </MudTd>
                                 <MudTd Style="font-size:13px;">
                                     @(context.PersonId.HasValue
                                         ? _people.FirstOrDefault(p => p.Id == context.PersonId)?.FullName ?? "—"
@@ -785,16 +800,54 @@
                                 <MudTd Style="font-size:12px; color:var(--ft-gray-400);">
                                     @(context.AuthorDisplayName ?? context.AuthorName ?? "Unknown")
                                 </MudTd>
+                                <MudTd>
+                                    @if (!context.IsApproved)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Pending</MudChip>
+                                    }
+                                    else if (context.IsHidden)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Hidden</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Published</MudChip>
+                                    }
+                                </MudTd>
                                 <MudTd Style="font-size:11px; color:var(--ft-gray-300);">
                                     @context.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")
                                 </MudTd>
                                 <MudTd>
-                                    <MudTooltip Text="Approve">
-                                        <MudIconButton Icon="@Icons.Material.Outlined.CheckCircleOutline"
-                                                       Color="Color.Success"
-                                                       Size="Size.Small"
-                                                       OnClick="@(() => ApproveStoryAsync(context.Id))" />
-                                    </MudTooltip>
+                                    <div style="display:flex; align-items:center;">
+                                        @if (!context.IsApproved)
+                                        {
+                                            <MudTooltip Text="Approve">
+                                                <MudIconButton Icon="@Icons.Material.Outlined.CheckCircleOutline"
+                                                               Color="Color.Success"
+                                                               Size="Size.Small"
+                                                               OnClick="@(() => ApproveStoryAsync(context.Id))" />
+                                            </MudTooltip>
+                                        }
+                                        else
+                                        {
+                                            <MudTooltip Text="@(context.IsHidden ? "Show" : "Hide")">
+                                                <MudIconButton Icon="@(context.IsHidden ? Icons.Material.Outlined.VisibilityOff : Icons.Material.Outlined.Visibility)"
+                                                               Size="Size.Small"
+                                                               OnClick="@(() => ToggleHiddenAsync(context.Id, !context.IsHidden))" />
+                                            </MudTooltip>
+                                        }
+                                        <MudTooltip Text="Edit">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                                           Size="Size.Small"
+                                                           OnClick="@(() => EditStoryAsync(context))" />
+                                        </MudTooltip>
+                                        <MudTooltip Text="Delete">
+                                            <MudIconButton Icon="@Icons.Material.Outlined.DeleteOutline"
+                                                           Color="Color.Error"
+                                                           Size="Size.Small"
+                                                           OnClick="@(() => DeleteStoryAsync(context.Id))" />
+                                        </MudTooltip>
+                                    </div>
                                 </MudTd>
                             </RowTemplate>
                         </MudTable>
@@ -826,12 +879,26 @@
                                 <MudTd>
                                     <MudAutocomplete T="PersonDto"
                                                       SearchFunc="SearchPeopleForLinking"
-                                                      ValueChanged="@(p => _linkSelections[context.Id] = p)"
+                                                      ValueChanged="@(p => HandleLinkSelection(context.Id, context.UnlinkedPersonName, p))"
                                                       ToStringFunc="@(p => p?.FullName ?? "")"
                                                       Placeholder="Search by name…"
                                                       Variant="Variant.Outlined"
                                                       Margin="Margin.Dense"
-                                                      Dense="true" />
+                                                      Dense="true">
+                                        <ItemTemplate Context="p">
+                                            @if (p.Id == Guid.Empty)
+                                            {
+                                                <div style="display:flex; align-items:center; gap:6px; color:var(--ft-green-600);">
+                                                    <MudIcon Icon="@Icons.Material.Outlined.PersonAddAlt" Style="font-size:16px;" />
+                                                    <span>Add someone new…</span>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                @p.FullName
+                                            }
+                                        </ItemTemplate>
+                                    </MudAutocomplete>
                                 </MudTd>
                                 <MudTd>
                                     <MudTooltip Text="Link">
@@ -970,7 +1037,7 @@
 
     // ── Stories ──────────────────────────────────────────────────────────────
     private bool _loadingStories = true;
-    private List<StoryDto> _pendingStories = [];
+    private List<StoryDto> _allStories = [];
     private List<StoryDto> _unlinkedStories = [];
     private readonly Dictionary<Guid, PersonDto> _linkSelections = [];
 
@@ -1182,8 +1249,8 @@
 
     private async Task LoadStoriesAsync()
     {
-        var pending = await StoryService.GetPendingApprovalAsync();
-        if (pending.Success) _pendingStories = pending.Data!;
+        var all = await StoryService.GetAllAsync();
+        if (all.Success) _allStories = all.Data!;
 
         var unlinked = await StoryService.GetUnlinkedAsync();
         if (unlinked.Success) _unlinkedStories = unlinked.Data!;
@@ -1191,24 +1258,119 @@
         _loadingStories = false;
     }
 
-    private Task<IEnumerable<PersonDto>> SearchPeopleForLinking(string value, CancellationToken _) =>
-        Task.FromResult(_people
+    private static readonly PersonDto _addNewPersonOption = new() { Id = Guid.Empty };
+
+    private Task<IEnumerable<PersonDto>> SearchPeopleForLinking(string value, CancellationToken _)
+    {
+        var matches = _people
             .Where(p => string.IsNullOrWhiteSpace(value) ||
                         p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Take(8));
+            .Take(8);
+
+        return Task.FromResult<IEnumerable<PersonDto>>([_addNewPersonOption, .. matches]);
+    }
+
+    private async Task HandleLinkSelection(Guid storyId, string? unlinkedName, PersonDto? person)
+    {
+        if (person is null) return;
+
+        if (person.Id == Guid.Empty)
+        {
+            var url = $"/people/add?name={Uri.EscapeDataString(unlinkedName ?? "")}";
+            await JS.InvokeVoidAsync("open", url, "_blank");
+            return;
+        }
+
+        _linkSelections[storyId] = person;
+    }
 
     private async Task ApproveStoryAsync(Guid storyId)
     {
         var result = await StoryService.ApproveAsync(storyId);
         if (result.Success)
         {
-            _pendingStories.RemoveAll(s => s.Id == storyId);
+            var story = _allStories.FirstOrDefault(s => s.Id == storyId);
+            if (story is not null) story.IsApproved = true;
             Toast.Success("Story approved");
         }
         else
         {
             Toast.Error(result.Message);
         }
+    }
+
+    private async Task ToggleHiddenAsync(Guid storyId, bool hidden)
+    {
+        var result = await StoryService.SetHiddenAsync(storyId, hidden);
+        if (result.Success)
+        {
+            var story = _allStories.FirstOrDefault(s => s.Id == storyId);
+            if (story is not null) story.IsHidden = hidden;
+            Toast.Success(hidden ? "Story hidden" : "Story published");
+        }
+        else
+        {
+            Toast.Error(result.Message);
+        }
+    }
+
+    private async Task EditStoryAsync(StoryDto story)
+    {
+        var parameters = new DialogParameters<AdminStoryEditDialog>
+        {
+            { d => d.StoryId,      story.Id },
+            { d => d.InitialTitle, story.Title },
+            { d => d.InitialBody,  story.Body },
+        };
+
+        var dialog = await DialogService.ShowAsync<AdminStoryEditDialog>(
+            "Edit story", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false, Data: StoryDto updated })
+        {
+            story.Title = updated.Title;
+            story.Body = updated.Body;
+            Toast.Success("Story updated");
+        }
+    }
+
+    private async Task DeleteStoryAsync(Guid storyId)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { d => d.Message, "Delete this story? This cannot be undone." }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete story", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        var deleteResult = await StoryService.DeleteAsync(storyId);
+        if (deleteResult.Success)
+        {
+            _allStories.RemoveAll(s => s.Id == storyId);
+            _unlinkedStories.RemoveAll(s => s.Id == storyId);
+            Toast.Success("Story deleted");
+        }
+        else
+        {
+            Toast.Error(deleteResult.Message);
+        }
+    }
+
+    private async Task MoveStoryAsync(Guid storyId, int direction)
+    {
+        var result = await StoryService.MoveAsync(storyId, direction);
+        if (!result.Success)
+        {
+            Toast.Error(result.Message);
+            return;
+        }
+
+        var refreshed = await StoryService.GetAllAsync();
+        if (refreshed.Success) _allStories = refreshed.Data!;
     }
 
     private async Task LinkStoryAsync(Guid storyId)
