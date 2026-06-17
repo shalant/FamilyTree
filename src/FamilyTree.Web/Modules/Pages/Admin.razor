@@ -415,7 +415,7 @@
                             <MudTooltip Text="Copy invite link">
                                 <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
                                                Size="Size.Small"
-                                               OnClick="@(() => CopyTokenLink(inv.Token))" />
+                                               OnClick="@(() => CopyInviteLinkFor(inv.Id))" />
                             </MudTooltip>
                             <MudTooltip Text="Cancel invite">
                                 <MudIconButton Icon="@Icons.Material.Outlined.Cancel"
@@ -1032,7 +1032,7 @@
     private async Task CopyResetLink(PasswordResetRequest req)
     {
         var baseUri = NavManager.BaseUri.TrimEnd('/');
-        var link = $"{baseUri}/reset-password?email={Uri.EscapeDataString(req.Email)}&token={Uri.EscapeDataString(req.Token)}";
+        var link = $"{baseUri}/reset-password?id={req.Id}";
         await JS.InvokeVoidAsync("navigator.clipboard.writeText", link);
         Toast.Success("Reset link copied.");
     }
@@ -1091,14 +1091,14 @@
         var result = await AuthService.CreateInviteAsync(_inviteEmail.Trim());
         _creatingInvite = false;
 
-        if (!result.Success && result.Token is null)
+        if (!result.Success && result.Id is null)
         {
             _inviteError = result.Error;
             return;
         }
 
         var baseUri = NavManager.BaseUri.TrimEnd('/');
-        _inviteLink = $"{baseUri}/register?invite={result.Token}";
+        _inviteLink = $"{baseUri}/register?invite={result.Id}";
         _inviteEmail = "";
 
         await LoadPendingInvitesAsync();
@@ -1128,11 +1128,11 @@
             await JS.InvokeVoidAsync("navigator.clipboard.writeText", _inviteLink);
     }
 
-    private async Task CopyTokenLink(string token)
+    private async Task CopyInviteLinkFor(Guid inviteId)
     {
         var baseUri = NavManager.BaseUri.TrimEnd('/');
         await JS.InvokeVoidAsync("navigator.clipboard.writeText",
-            $"{baseUri}/register?invite={token}");
+            $"{baseUri}/register?invite={inviteId}");
     }
 
     private async Task LoadActivityAsync()

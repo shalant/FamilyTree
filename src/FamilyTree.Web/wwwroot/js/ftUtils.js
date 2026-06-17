@@ -36,6 +36,9 @@ window.ftSubmitLogout = () => {
 window.ftOpenUrl = (url) =>
     window.open(url, '_blank', 'noopener,noreferrer');
 
+window.ftSetTheme = (theme) =>
+    document.documentElement.setAttribute('data-theme', theme);
+
 // Compresses an image from <input id=inputId> at fileIndex.
 // Returns base64-encoded JPEG, or null if not an image / compression fails.
 window.ftCompressImage = (inputId, fileIndex, maxPx, quality) => {

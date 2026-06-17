@@ -17,7 +17,7 @@ public class AuthService(
 
     public async Task<AuthResult> RegisterAsync(
         string firstName, string lastName, string email, string password,
-        string? inviteToken = null)
+        Guid? inviteId = null)
     {
         var mode = GetRegistrationMode();
 
@@ -27,12 +27,12 @@ public class AuthService(
         UserInvite? matchedInvite = null;
         if (mode == "InviteOnly")
         {
-            if (string.IsNullOrWhiteSpace(inviteToken))
+            if (!inviteId.HasValue)
                 return new AuthResult(false, "An invitation is required. Ask the administrator for an invite link.");
 
             await using var ctx = await dbFactory.CreateDbContextAsync();
             matchedInvite = await ctx.UserInvites.FirstOrDefaultAsync(i =>
-                i.Token == inviteToken
+                i.Id == inviteId.Value
                 && i.Email.ToLower() == email.ToLower()
                 && i.AcceptedAt == null
                 && i.CancelledAt == null
@@ -100,7 +100,7 @@ public class AuthService(
         if (existing != null)
             return new InviteResult(false,
                 "An active invite already exists for this email — use the existing link below.",
-                existing.Token);
+                existing.Id);
 
         var family = await ctx.Families.FirstOrDefaultAsync();
         if (family == null)
@@ -114,7 +114,7 @@ public class AuthService(
                 System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
             .Replace("+", "-").Replace("/", "_").TrimEnd('=');
 
-        ctx.UserInvites.Add(new UserInvite
+        var invite = new UserInvite
         {
             Id          = Guid.NewGuid(),
             Email       = email.Trim().ToLower(),
@@ -123,10 +123,11 @@ public class AuthService(
             Token       = token,
             ExpiresAt   = DateTime.UtcNow.AddDays(ttlDays),
             CreatedAt   = DateTime.UtcNow,
-        });
+        };
+        ctx.UserInvites.Add(invite);
         await ctx.SaveChangesAsync();
 
-        return new InviteResult(true, Token: token);
+        return new InviteResult(true, Id: invite.Id);
     }
 
     public async Task<List<UserInvite>> GetPendingInvitesAsync()
@@ -149,11 +150,11 @@ public class AuthService(
         return new AuthResult(true);
     }
 
-    public async Task<UserInvite?> ValidateInviteTokenAsync(string token)
+    public async Task<UserInvite?> ValidateInviteAsync(Guid inviteId)
     {
         await using var ctx = await dbFactory.CreateDbContextAsync();
         return await ctx.UserInvites.FirstOrDefaultAsync(i =>
-            i.Token == token
+            i.Id == inviteId
             && i.AcceptedAt == null
             && i.CancelledAt == null
             && i.ExpiresAt > DateTime.UtcNow);

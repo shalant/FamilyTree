@@ -11,12 +11,13 @@
            Anchor="Anchor.End"
            Elevation="2"
            Variant="DrawerVariant.Temporary"
+           Class="ft-person-drawer"
            Width="300px">
 
     @if (Person is not null)
     {
         <div style="display:flex; flex-direction:column; height:100%;
-            background:var(--ft-surface); font-family:var(--ft-font-body);z-index:6000;">
+            background:transparent; font-family:var(--ft-font-body); z-index:6000;">
 
             @* ── Header ─────────────────────────────────────────────────── *@
             <div style="display:flex; align-items:center; justify-content:space-between;
