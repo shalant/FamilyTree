@@ -28,12 +28,17 @@ Submitted stories feed directly into the existing `Stories` table and the admin 
 |--------|------|-------|
 | `Id` | `Guid` | PK |
 | `Token` | `string(128)` | URL-safe random token; unique index |
-| `PersonId` | `Guid` | FK → `Persons` — the person the story is about |
+| `PersonId` | `Guid?` | FK → `Persons` — the person the story is about; **nullable**, see "Inviting about someone not yet in the tree" below |
+| `UnlinkedPersonName` | `string(200)?` | Free-text name when `PersonId` is null — what the inviter typed the family member's name as |
 | `InvitedEmail` | `string(256)` | Recipient's email address |
 | `InvitedByUserId` | `Guid` | FK → `AspNetUsers` — who sent the invite |
 | `CreatedAt` | `DateTime` | UTC |
 | `ExpiresAt` | `DateTime` | UTC — token is invalid after this |
 | `IsUsed` | `bool` | Set to true when a story is submitted |
+
+**Inviting about someone not yet in the tree**
+
+The inviter doesn't have to pick from the existing people list. If the family member the invite is about isn't in the system yet, the inviter can just type a name instead — `PersonId` stays null and `UnlinkedPersonName` carries the typed name through the whole flow (email subject/body, the respondent's writing page, and the resulting `Story` row's own `UnlinkedPersonName`). The admin links the story to a real `Person` later, same as any other unlinked story (see `stories-table.md`).
 
 **Changes to `Stories` table** (additive — see `stories-table.md`):
 
@@ -49,23 +54,24 @@ Submitted stories feed directly into the existing `Stories` table and the admin 
 ## Flow Detail
 
 ### Sending the invite
-1. User clicks **"Invite someone to share a memory"** on a person's detail view
-2. A dialog collects: recipient email, optional personal note
-3. App creates a `StoryInvite` row and sends a beautiful HTML email (same SMTP infrastructure as `story-invite-email.md`)
+1. User clicks **"Invite someone to share a memory"** — either from a person's detail view (pre-fills that person) or from a standalone "Invite" entry point
+2. A dialog collects: recipient email, optional personal note, and **who the story is about** — either pick an existing person, or type a name free-text if they aren't in the tree yet
+3. App creates a `StoryInvite` row (`PersonId` set, or `UnlinkedPersonName` set if typed free-text) and sends a beautiful HTML email (same SMTP infrastructure as `story-invite-email.md`)
 4. Token expiry: **30 days**
 
 ### The email
 - Beautiful, minimal — ArborKin green header, circular photo or initials of the featured person, their name and life dates
-- Subject: *"[InviterName] would love to hear your memory of [PersonName]"*
+- Subject: *"[InviterName] would love to hear your memory of [PersonName]"* — `[PersonName]` is `Person.FullName` or `UnlinkedPersonName`, whichever applies
 - Body: warm, personal tone; one CTA button — **"Share your memory →"**
+- If `PersonId` is null, the photo/life-dates block is simply omitted (there's nothing to show yet) — the rest of the email reads the same
 - No mention of creating an account
 
 ### The storytelling interface (`/story/respond/{token}`)
 - Unauthenticated route — no login required
-- Shows the featured person's name, photo, and dates for context
+- Shows the featured person's name, photo, and dates for context — or just the typed name if `PersonId` is null
 - Two fields: **Title** (optional) and **Your memory** (required, large textarea)
 - Submit button: **"Share this memory"**
-- On submit: create `Story` row (`IsApproved = false`, `InviteId` set, `AuthorName` from a name field on the form), mark `StoryInvite.IsUsed = true`
+- On submit: create `Story` row (`IsApproved = false`, `InviteId` set, `AuthorName` from a name field on the form, and `PersonId`/`UnlinkedPersonName` copied straight from the `StoryInvite`), mark `StoryInvite.IsUsed = true`
 
 ### The conversion screen (post-submit)
 - Shown immediately after successful submission — same page, no redirect
@@ -95,8 +101,8 @@ Submitted stories feed directly into the existing `Stories` table and the admin 
 | `src/FamilyTree.Web/Services/StoryInviteEmailBuilder.cs` | **New** — builds HTML email (same pattern as planned `InviteEmailBuilder.cs`) |
 | `src/FamilyTree.Web/Modules/Pages/StoryRespond.razor` | **New** — unauthenticated storytelling page at `/story/respond/{token}` |
 | `src/FamilyTree.Web/Program.cs` | Exclude `/story/respond/{token}` from auth policy |
-| `src/FamilyTree.Web/Modules/Pages/Admin.razor` | Surface pending (unapproved) stories in moderation queue |
-| `src/FamilyTree.Web/Modules/Components/` (TBD) | "Invite someone" button + dialog on person detail |
+| `src/FamilyTree.Web/Modules/Pages/Admin.razor` | Surface pending (unapproved) stories in moderation queue, and unlinked stories in the linking queue (shared with `stories-table.md`) |
+| `src/FamilyTree.Web/Modules/Components/` (TBD) | "Invite someone" button + dialog on person detail, and an "existing person or type a name" picker inside it |
 
 **No changes to:** `AuthService.cs`, `IAuthService.cs`, `UserInvites` table, registration flow.
 
@@ -109,6 +115,7 @@ Submitted stories feed directly into the existing `Stories` table and the admin 
 - The conversion CTA links to `/register` — it does not auto-populate the email or pre-link the story to the new account (keep it simple; admin can manually link later if needed)
 - `StoryRespond.razor` should be visually distinct from the main app — full-bleed, minimal nav, focus entirely on the writing experience
 - Keep `BiographyNotes` out of the storytelling interface entirely; this page is about the *recipient's* memory, not existing data
+- The "existing person or type a name" picker in the invite dialog should default to the search/autocomplete that's already used elsewhere in the app, with a clear "they're not in the tree yet" escape hatch into a plain text field
 
 ---
 
@@ -121,3 +128,5 @@ Submitted stories feed directly into the existing `Stories` table and the admin 
 5. Open the token link again → confirm "already submitted" message
 6. Let a token expire → confirm graceful expired page
 7. Confirm submitted story appears in Admin moderation queue
+8. Send an invite about a typed name (not an existing person) → confirm email, respond page, and resulting `Story` row all carry `UnlinkedPersonName` correctly and `PersonId` stays null throughout
+9. Link that unlinked story to a real `Person` from the admin queue → confirm `PersonId` is set and `UnlinkedPersonName` is cleared
