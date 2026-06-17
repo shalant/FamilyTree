@@ -1,0 +1,60 @@
+@using FamilyTree.Core.Models
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        @if (Entries.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                No matching audit entries found.
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="Entries" Dense="true" Hover="true" Style="background:transparent;">
+                <HeaderContent>
+                    <MudTh>Time</MudTh>
+                    <MudTh>Action</MudTh>
+                    <MudTh>Entity</MudTh>
+                    <MudTh>Entity ID</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <MudText Typo="Typo.caption">
+                            @context.Timestamp.ToLocalTime().ToString("h:mm:ss tt")
+                        </MudText>
+                    </MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@ChipColor(context.Action)">
+                            @context.Action
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>@context.EntityType</MudTd>
+                    <MudTd>
+                        <MudText Typo="Typo.caption" Style="font-family:monospace;">
+                            @(context.EntityId.HasValue ? context.EntityId.Value.ToString()[..8] + "…" : "—")
+                        </MudText>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Close())">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public List<AuditLog> Entries { get; set; } = [];
+
+    private static Color ChipColor(string action) => action switch
+    {
+        "Create"  => Color.Success,
+        "Update"  => Color.Info,
+        "Delete"  => Color.Error,
+        "Restore" => Color.Warning,
+        _         => Color.Default
+    };
+}

@@ -133,6 +133,12 @@
             return;
         }
 
+        if (!IsValidEmailFormat(_email))
+        {
+            _error = "That doesn't look like a valid email address.";
+            return;
+        }
+
         var usingPresetPerson = PersonId.HasValue && !_choosingOther;
 
         var dto = new StoryInviteCreateDto
@@ -163,4 +169,17 @@
     }
 
     private void Cancel() => MudDialog.Cancel();
+
+    private static bool IsValidEmailFormat(string email)
+    {
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email.Trim());
+            return addr.Host.Contains('.');
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
 }

@@ -7,6 +7,7 @@
 @using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Shared.DTOs.Story
+@using FamilyTree.Shared.DTOs.StoryInvite
 @using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Services
 @using Microsoft.AspNetCore.Identity
@@ -18,6 +19,7 @@
 @inject IImportService ImportService
 @inject IUserMessageService MessageService
 @inject IStoryService StoryService
+@inject IStoryInviteService StoryInviteService
 @inject IDbContextFactory<AppDbContext> DbFactory
 @inject UserManager<AppUser> UserManager
 @inject ToastService Toast
@@ -47,6 +49,7 @@
     </div>
 
     <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="true"
+             Position="Position.Left" Class="ft-admin-tabs"
              @bind-ActivePanelIndex="_activeTab">
 
         @* ═══════════════════════════════════════════════════════════════════
@@ -253,6 +256,42 @@
                             <div>
                                 <div style="font-size:13px; color:var(--ft-gray-700);">Activity</div>
                                 <div style="font-size:11px; color:var(--ft-gray-300);">Daily action counts</div>
+                            </div>
+                        </div>
+
+                        <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                            padding:10px 8px;" @onclick='() => GoToTab(5)'>
+                            <MudIcon Icon="@Icons.Material.Outlined.Upload"
+                                     Style="font-size:20px; color:var(--ft-gray-400);" />
+                            <div>
+                                <div style="font-size:13px; color:var(--ft-gray-700);">Imports</div>
+                                <div style="font-size:11px; color:var(--ft-gray-300);">
+                                    @(_importBatches.Count == 0 ? "Nothing imported" : $"{_importBatches.Count} batches")
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                            padding:10px 8px;" @onclick='() => GoToTab(6)'>
+                            <MudIcon Icon="@Icons.Material.Outlined.AutoStories"
+                                     Style="font-size:20px; color:var(--ft-gray-400);" />
+                            <div>
+                                <div style="font-size:13px; color:var(--ft-gray-700);">Stories</div>
+                                <div style="font-size:11px; color:var(--ft-gray-300);">
+                                    @(_allStories.Count == 0 ? "No stories yet" : $"{_allStories.Count} total")
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                            padding:10px 8px;" @onclick='() => GoToTab(7)'>
+                            <MudIcon Icon="@Icons.Material.Outlined.MailOutline"
+                                     Style="font-size:20px; color:var(--ft-gray-400);" />
+                            <div>
+                                <div style="font-size:13px; color:var(--ft-gray-700);">Messages</div>
+                                <div style="font-size:11px; color:var(--ft-gray-300);">
+                                    @(_messages.Count == 0 ? "Nothing submitted" : $"{_messages.Count} total")
+                                </div>
                             </div>
                         </div>
 
@@ -658,8 +697,9 @@
             }
             else
             {
-                <MudTable Items="_activity" Hover="true" Dense="true"
-                          Style="background:var(--ft-surface-card);">
+                <MudTable Items="_activity" T="UserActivity" Hover="true" Dense="true"
+                          OnRowClick="@(e => ShowActivityDetailAsync(e.Item!))"
+                          Style="background:var(--ft-surface-card); cursor:pointer;">
                     <HeaderContent>
                         <MudTh>Date</MudTh>
                         <MudTh>User</MudTh>
@@ -912,6 +952,58 @@
                         </MudTable>
                     </MudPaper>
                 }
+
+                <MudText Typo="Typo.subtitle2" Class="mb-2" Style="color:var(--ft-gray-400);">
+                    Story invites
+                </MudText>
+                @if (_storyInvites.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                        No story invites sent yet.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudPaper Elevation="0" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+                        <MudTable Items="_storyInvites" Hover="true" Dense="true" Style="background:transparent;">
+                            <HeaderContent>
+                                <MudTh>Invited email</MudTh>
+                                <MudTh>About</MudTh>
+                                <MudTh>Sent</MudTh>
+                                <MudTh>Status</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd Style="font-size:13px;">@context.InvitedEmail</MudTd>
+                                <MudTd Style="font-size:13px;">@(context.PersonName ?? context.UnlinkedPersonName ?? "—")</MudTd>
+                                <MudTd Style="font-size:11px; color:var(--ft-gray-300);">
+                                    @context.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")
+                                </MudTd>
+                                <MudTd>
+                                    @if (context.SendFailed)
+                                    {
+                                        <MudTooltip Text="@(context.SendError ?? "Send failed")">
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined">
+                                                Couldn't reach that address
+                                            </MudChip>
+                                        </MudTooltip>
+                                    }
+                                    else if (context.IsUsed)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Responded</MudChip>
+                                    }
+                                    else if (context.ExpiresAt < DateTime.UtcNow)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Expired</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">Pending</MudChip>
+                                    }
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudPaper>
+                }
             }
         </MudTabPanel>
 
@@ -1039,6 +1131,7 @@
     private bool _loadingStories = true;
     private List<StoryDto> _allStories = [];
     private List<StoryDto> _unlinkedStories = [];
+    private List<StoryInviteAdminDto> _storyInvites = [];
     private readonly Dictionary<Guid, PersonDto> _linkSelections = [];
 
     // ── Invite creation ──────────────────────────────────────────────────────
@@ -1254,6 +1347,9 @@
 
         var unlinked = await StoryService.GetUnlinkedAsync();
         if (unlinked.Success) _unlinkedStories = unlinked.Data!;
+
+        var invites = await StoryInviteService.GetAllAsync();
+        if (invites.Success) _storyInvites = invites.Data!;
 
         _loadingStories = false;
     }
@@ -1476,6 +1572,31 @@
         }
         catch { }
         _loadingActivity = false;
+    }
+
+    private async Task ShowActivityDetailAsync(UserActivity activity)
+    {
+        // UserActivity.Date is bucketed by UTC day (see AuditLogService.LogAsync) —
+        // match against the raw (UTC) Timestamp, not a local-time conversion of it.
+        var entries = _auditLogs
+            .Where(a => a.UserId == activity.UserId &&
+                        DateOnly.FromDateTime(a.Timestamp) == activity.Date)
+            .OrderByDescending(a => a.Timestamp)
+            .ToList();
+
+        var user = activity.UserId.HasValue
+            ? _users.FirstOrDefault(u => u.Id == activity.UserId)
+            : null;
+        var who = user?.Email ?? (activity.UserId.HasValue ? activity.UserId.Value.ToString()[..8] + "…" : "Unknown user");
+
+        var parameters = new DialogParameters<ActivityDetailDialog>
+        {
+            { d => d.Entries, entries },
+        };
+
+        await DialogService.ShowAsync<ActivityDetailDialog>(
+            $"{who} — {activity.Date:MMM d, yyyy}", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
     }
 
     // ── Actions ──────────────────────────────────────────────────────────────

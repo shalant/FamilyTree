@@ -301,6 +301,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(i => i.UnlinkedPersonName).HasMaxLength(200);
             e.Property(i => i.InvitedEmail).HasMaxLength(256).IsRequired();
             e.Property(i => i.PersonalNote).HasMaxLength(1000);
+            e.Property(i => i.SendError).HasMaxLength(1000);
 
             e.Property(i => i.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 

@@ -88,11 +88,24 @@ public class StoryInviteService(
                 personalNote: dto.PersonalNote,
                 respondLink: link);
 
-            _ = emailSender.SendAsync(
-                invite.InvitedEmail,
-                $"{inviterName ?? "Someone"} would love to hear your memory of {personName}",
-                html,
-                ct);
+            try
+            {
+                await emailSender.SendAsync(
+                    invite.InvitedEmail,
+                    $"{inviterName ?? "Someone"} would love to hear your memory of {personName}",
+                    html,
+                    ct);
+            }
+            catch (Exception sendEx)
+            {
+                // The invite row + token are still valid even if the email itself failed
+                // to send (e.g. malformed/dead domain rejected at SMTP time) — record the
+                // failure for admin visibility rather than losing it in a fire-and-forget call.
+                invite.SendFailed = true;
+                invite.SendError = sendEx.Message;
+                await ctx.SaveChangesAsync(ct);
+                logger.LogWarning(sendEx, "Failed to send story invite email to {Email}", invite.InvitedEmail);
+            }
 
             return ServiceResponse.Ok();
         }
@@ -100,6 +113,47 @@ public class StoryInviteService(
         {
             logger.LogError(ex, "Error creating story invite");
             return ServiceResponse.Fail("An error occurred sending this invite.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  GET ALL (admin)
+    // ─────────────────────────────────────────────────────────────
+    public async Task<ServiceResponse<List<StoryInviteAdminDto>>> GetAllAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var invites = await ctx.StoryInvites
+                .AsNoTracking()
+                .Include(i => i.Person)
+                .Include(i => i.InvitedByUser)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync(ct);
+
+            var result = invites.Select(i => new StoryInviteAdminDto
+            {
+                Id = i.Id,
+                InvitedEmail = i.InvitedEmail,
+                PersonId = i.PersonId,
+                PersonName = i.Person is not null ? $"{i.Person.FirstName} {i.Person.LastName}".Trim() : null,
+                UnlinkedPersonName = i.UnlinkedPersonName,
+                InvitedByDisplayName = i.InvitedByUser?.DisplayName,
+                CreatedAt = i.CreatedAt,
+                ExpiresAt = i.ExpiresAt,
+                IsUsed = i.IsUsed,
+                SendFailed = i.SendFailed,
+                SendError = i.SendError,
+            }).ToList();
+
+            return ServiceResponse<List<StoryInviteAdminDto>>.Ok(result);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading story invites");
+            return ServiceResponse<List<StoryInviteAdminDto>>.Fail(
+                "An error occurred loading story invites.");
         }
     }
 

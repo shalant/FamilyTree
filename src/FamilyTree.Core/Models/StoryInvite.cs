@@ -16,6 +16,8 @@ public class StoryInvite
     public DateTime CreatedAt { get; set; }
     public DateTime ExpiresAt { get; set; }
     public bool IsUsed { get; set; }
+    public bool SendFailed { get; set; }
+    public string? SendError { get; set; }
 
     public virtual Person? Person { get; set; }
     public virtual AppUser? InvitedByUser { get; set; }

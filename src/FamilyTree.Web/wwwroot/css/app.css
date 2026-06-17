@@ -1686,6 +1686,16 @@ html.ft-no-select * {
 
 /* Tree scroll lock is now injected by TreeLayout.razor via <HeadContent>. */
 
+/* ── Admin nav rail (desktop) ─────────────────────────────────────────────── */
+/* MudTabs Position="Left" gives a vertical tab list for free, but its default
+   tab styling (centered, fixed-width-100%) is built for a horizontal strip —
+   left-align the icon+label and give the rail a fixed column width instead of
+   stretching to fill whatever space MudTabs hands it. */
+.ft-admin-tabs .mud-tabs-tabbar { width: 200px; flex-shrink: 0; }
+.ft-admin-tabs .mud-tab { justify-content: flex-start; text-align: left; }
+.ft-admin-nav-row { cursor: pointer; border-radius: 8px; transition: background-color 0.1s; }
+.ft-admin-nav-row:hover { background: var(--ft-green-50); }
+
 /* ── Mobile baseline (≤ 768px) ────────────────────────────────────────────── */
 @media (max-width: 768px) {
 
@@ -1759,6 +1769,15 @@ html.ft-no-select * {
         padding: 10px 6px !important;
     }
     .ft-toolbar-grip { display: none; }
+
+    /* Admin nav rail: revert to the original horizontal scrolling tab strip at
+       mobile width rather than introducing a second off-canvas drawer pattern
+       alongside the main AppBar's hamburger — this is the same layout the page
+       already used (and still works) before the desktop rail was added. */
+    .ft-admin-tabs .mud-tabs-vertical { flex-direction: column !important; }
+    .ft-admin-tabs .mud-tabs-tabbar { width: 100% !important; }
+    .ft-admin-tabs .mud-tabs-tabbar-inner { flex-direction: row !important; }
+    .ft-admin-tabs .mud-tab { justify-content: center; text-align: center; }
 }
 
 .ft-toast-x {
