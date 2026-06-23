@@ -90,6 +90,16 @@ Most responsive behavior (AppBar swapping search for a hamburger + centered user
 - **Toolbar default state**: `CustomToolbar` doesn't know the viewport size itself. `ftDrag.js`'s `watchViewport()` reports `window.innerWidth` to `Home.razor` via `[JSInvokable] OnViewportWidthChanged`, which sets `_isNarrowViewport` and passes it down as `CustomToolbar.ForceCollapsed`. `ForceCollapsed` only seeds the *default* `_collapsed` state when it changes (crossing the breakpoint) — it doesn't permanently lock out the user's own expand/collapse toggle. `watchViewport()` always re-targets the latest `dotNetRef` and forces one immediate report per call rather than gating on a "already watching" flag — a stale reference there previously meant later page instances (after a reconnect/navigation) silently never got notified.
 - **Expanded toolbar mobile styling**: `.ft-toolbar-full` (not `.ft-toolbar-mini`) sets its own `position: fixed` inside the mobile media query to dock as a full-width footer, independent of whatever position the parent `#ft-toolbar` div (used for the collapsed pill) has.
 
+### Document Import Pipeline
+Every import format normalizes to plain text and funnels through one Claude extraction prompt (`ClaudeImportService.ExtractFromTextAsync`), so all formats get identical preview/approve/commit/rollback behavior for free:
+- **Paste text** tab calls `ExtractFromTextAsync` directly.
+- **PDF / Document** tab calls `ExtractFromDocumentAsync(bytes, fileName)`, which extracts text first (iText7 for `.pdf`, raw UTF-8 decode for `.txt`) then hands off to the same `ExtractFromTextAsync` path. `.doc`/`.docx` aren't supported yet — throws `NotSupportedException` telling the user to paste text instead.
+- **GEDCOM** and **Excel/CSV** tabs are still UI stubs (`ProceedAsync` just shows a toast) — no extraction wired up.
+
+Approval and rollback: `CommitAsync` only persists people the user left checked in the preview, and tags every created `Person` with an `ImportBatchId`. `RollbackBatchAsync` soft-deletes (`DeletedAt`) every person in that batch plus any relationship where *both* sides were in the batch — nothing is hard-deleted, so an import is always reversible from the batch list.
+
+**Security note:** `UglyToad.PdfPig` was the initial choice for PDF text extraction but was rejected — its NuGet version history jumps straight from `0.1.9-alpha001-patch1` to a non-standard `1.7.0-custom-5` prerelease, a pattern consistent with a hijacked maintainer account pushing a malicious release. Check any package's version history before adding it if something about the version number looks off.
+
 **Known gotcha — MudBlazor drawer width overrides:** `MudDrawer`'s closed state is `right: calc(-1 * var(--mud-drawer-width))`, not `width: 0`. Overriding the rendered `width` alone (e.g. `.ft-person-drawer { width: 100% !important; }`) leaves the *closed-state offset* still using the original `Width="…"` Razor parameter, so the drawer only shifts off-screen by its old width while actually rendering at the new one — leaving the difference visible as a blank box. Always override the CSS variable MudBlazor itself reads (`--mud-drawer-width`), not the raw `width` property.
 
 ### Blazor Component Responsibilities
@@ -114,10 +124,12 @@ Most responsive behavior (AppBar swapping search for a hamburger + centered user
 | `StoryInviteDialog` | Email someone a token link to write a story about a person; same locked-vs-picker pattern as `StoryFormDialog`, plus a "Not them? Invite about someone else" override even when a person is preset |
 | `StoryRespond.razor` | Unauthenticated `/story/respond/{token}` page where invite recipients submit their memory; ends in an account-creation CTA |
 | `AdminStoryEditDialog` | Admin-only title/body edit for an existing story |
+| `Import.razor` | `/import` — thin page wrapper around `ImportFormPanel` |
+| `ImportFormPanel` | Tabbed import UI (GEDCOM/PDF/Excel/paste-text) shared by `/import` and the Admin Imports tab; owns the extract→preview→approve→commit state machine and the import-batch history table |
 
 ## Domain Model
 
-**Core entities:** `Person`, `Relationship`, `Medium`, `Family`, `Story`, `StoryInvite`
+**Core entities:** `Person`, `Relationship`, `Medium`, `Family`, `Story`, `StoryInvite`, `ImportBatch`
 
 - `Family`: tenant/group container (`Id`, `Name`); all persons belong to one family via nullable `FamilyId` FK
 - `Person`: name fields, dates/places, `Gender` enum, `BiographyNotes` (5000 chars), `ProfilePhotoUrl` (500 chars), `FamilyId` (nullable), audit fields, SQL `RowVersion`
@@ -126,6 +138,7 @@ Most responsive behavior (AppBar swapping search for a hamburger + centered user
 - `Story`: prose narrative about a `Person` (nullable `PersonId` — see below) or a free-text `UnlinkedPersonName`. `AuthorId` (nullable, set null on user delete) for self-authored stories; `AuthorName` free-text fallback for anonymous invite-flow submissions. `IsApproved` gates the public `/stories` feed (always `true` for self-authored via `StoryService.CreateAsync`, always `false` for invite responses pending moderation). `IsHidden` lets an admin take an already-approved story down without losing its approval state. `SortOrder` (admin up/down reorder, swaps with the adjacent row in current display order) plus `CreatedAt` as the tiebreak define `/stories` ordering.
 - `StoryInvite`: token-based invite (URL-safe 64-byte random token, 30-day default TTL via `Stories:InviteTtlDays`) emailing someone a no-login link to write a `Story` about a `Person` or free-text name. `IsUsed` makes `SubmitResponseAsync` idempotent on the token.
 - **Unlinked stories**: both `Story` and `StoryInvite` allow `PersonId == null` with `UnlinkedPersonName` set instead — the subject doesn't have to exist in the tree yet. Admin's Stories tab has a dedicated linking queue with a "+ Add someone new…" option in the person-search dropdown that opens `/people/add?name=<typed name>` in a new tab, pre-filling the name.
+- `ImportBatch`: groups every `Person` created by one AI-assisted import run (`PersonCount`/`RelationshipCount` totals, `RolledBackAt` when undone). See [Document Import Pipeline](#document-import-pipeline) above.
 
 **DTOs (in `FamilyTree.Shared`):**
 - `PersonDto` — read model; `FullName`, `Age`, `IsDeceased` computed; derived ID lists `ParentIds`, `ChildIds`, `SpouseIds`, `FormerSpouseIds`, `SiblingIds` populated by `PersonMapper`
