@@ -65,7 +65,7 @@
 }
 
 @* ── PDF / Document tab ────────────────────────────────────────────────────── *@
-@if (_activeTab == "pdf")
+@if (_activeTab == "pdf" && _flowState == DocImportState.Idle)
 {
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">
         <div>
@@ -79,10 +79,17 @@
                 </div>
             </div>
             <div style="font-size:13px; color:var(--ft-gray-400); line-height:1.7; margin-bottom:20px;">
-                Upload any PDF, Word doc, or scanned document containing family information.
+                Upload a PDF or plain-text document containing family information.
                 Our AI reads it and extracts names, dates, places, and relationships — even
-                from handwritten-style or informal formats.
+                from handwritten-style or informal formats. (Word docs aren't supported yet —
+                paste the text instead.)
             </div>
+            @if (!ImportService.IsConfigured)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                    AI import requires an Anthropic API key. Set <code>AI__AnthropicApiKey</code> in App Service config or user secrets (<code>dotnet user-secrets set "AI:AnthropicApiKey" "sk-ant-..."</code>).
+                </MudAlert>
+            }
             <MediaUploadZone Accept=".pdf,.doc,.docx,.txt"
                              Label="Drop your document here"
                              Hint=".pdf, .doc, .docx, .txt supported"
@@ -92,6 +99,10 @@
                 <MudAlert Severity="Severity.Info" Class="mt-3">
                     <strong>@_documentFile.Name</strong> ready for extraction
                 </MudAlert>
+            }
+            @if (!string.IsNullOrWhiteSpace(_extractError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@_extractError</MudAlert>
             }
         </div>
         <div>
@@ -116,8 +127,8 @@
                     </div>
                 }
             </MudPaper>
-            <MudAlert Severity="Severity.Warning" Dense="true">
-                AI extraction is in development. Preview will show results before anything is saved.
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Nothing is saved until you review and confirm the extracted people on the next screen.
             </MudAlert>
         </div>
     </div>
@@ -173,10 +184,8 @@
 }
 
 @* ── Paste text tab ────────────────────────────────────────────────────────── *@
-@if (_activeTab == "text")
+@if (_activeTab == "text" && _flowState == DocImportState.Idle)
 {
-    @if (_textState == TextImportState.Idle)
-    {
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">
             <div>
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
@@ -208,6 +217,10 @@
                 <div style="font-size:11px; color:var(--ft-gray-300); margin-top:6px;">
                     @_pasteText.Length / 50,000 characters
                 </div>
+                @if (!string.IsNullOrWhiteSpace(_extractError))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-3">@_extractError</MudAlert>
+                }
             </div>
             <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-focus-ring); border-radius:var(--ft-radius-card);">
                 <div style="font-size:12px; font-weight:600; text-transform:uppercase;
@@ -229,8 +242,12 @@
                 }
             </MudPaper>
         </div>
-    }
-    else if (_textState == TextImportState.Extracting)
+}
+
+@* ── Shared extract/preview/import workflow (text + pdf tabs) ───────────────── *@
+@if ((_activeTab == "text" || _activeTab == "pdf") && _flowState != DocImportState.Idle)
+{
+    @if (_flowState == DocImportState.Extracting)
     {
         <div style="text-align:center; padding:60px 0;">
             <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
@@ -242,7 +259,7 @@
             </div>
         </div>
     }
-    else if (_textState == TextImportState.Preview && _preview != null)
+    else if (_flowState == DocImportState.Preview && _preview != null)
     {
         <div style="margin-bottom:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
             <div style="font-size:15px; font-weight:600; color:var(--ft-gray-700);">
@@ -311,7 +328,7 @@
             }
         </div>
     }
-    else if (_textState == TextImportState.Importing)
+    else if (_flowState == DocImportState.Importing)
     {
         <div style="text-align:center; padding:60px 0;">
             <MudProgressCircular Indeterminate="true" Color="Color.Success" Size="Size.Large" />
@@ -320,7 +337,7 @@
             </div>
         </div>
     }
-    else if (_textState == TextImportState.Done && _importResult != null)
+    else if (_flowState == DocImportState.Done && _importResult != null)
     {
         <div style="text-align:center; padding:48px 0;">
             <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline"
@@ -339,10 +356,10 @@
 <div style="margin-top:32px; padding-top:20px; border-top:0.5px solid var(--ft-line-border);
     display:flex; justify-content:space-between; align-items:center;">
 
-    @if (_activeTab == "text" && _textState == TextImportState.Preview)
+    @if ((_activeTab == "text" || _activeTab == "pdf") && _flowState == DocImportState.Preview)
     {
         <MudButton Variant="Variant.Text" Style="color:var(--ft-gray-400);"
-                   OnClick="@(() => _textState = TextImportState.Idle)">
+                   OnClick="@(() => _flowState = DocImportState.Idle)">
             ← Back
         </MudButton>
         <MudButton Variant="Variant.Filled"
@@ -353,13 +370,18 @@
             Import @(_preview?.People.Count(p => p.Selected) ?? 0) people
         </MudButton>
     }
-    else if (_activeTab == "text" && _textState == TextImportState.Done)
+    else if ((_activeTab == "text" || _activeTab == "pdf") && _flowState == DocImportState.Done)
     {
         <span />
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    OnClick='() => Nav.NavigateTo("/")'>
             Go to tree
         </MudButton>
+    }
+    else if ((_activeTab == "text" || _activeTab == "pdf") && _flowState is DocImportState.Extracting or DocImportState.Importing)
+    {
+        <span />
+        <span />
     }
     else
     {
@@ -379,7 +401,7 @@
                    Style="background:var(--ft-green-600); color:#fff; min-width:160px;"
                    StartIcon="@Icons.Material.Outlined.Visibility"
                    OnClick="ProceedAsync">
-            @(_activeTab == "text" ? "Extract people" : "Preview import")
+            @(_activeTab is "text" or "pdf" ? "Extract people" : "Preview import")
         </MudButton>
     }
 </div>
@@ -387,7 +409,7 @@
 @code {
     [Parameter] public string? BackUrl { get; set; }
 
-    private enum TextImportState { Idle, Extracting, Preview, Importing, Done }
+    private enum DocImportState { Idle, Extracting, Preview, Importing, Done }
 
     private string _activeTab = "gedcom";
     private string _pasteText = "";
@@ -396,10 +418,12 @@
     private IBrowserFile? _documentFile;
     private IBrowserFile? _spreadsheetFile;
 
-    private TextImportState _textState    = TextImportState.Idle;
+    private DocImportState _flowState     = DocImportState.Idle;
     private ImportPreview?  _preview;
     private ImportResult?   _importResult;
     private string?         _extractError;
+
+    private const long MaxDocumentBytes = 20 * 1024 * 1024;
 
     private readonly Dictionary<string, (string Label, string Icon)> _tabs = new()
     {
@@ -412,7 +436,7 @@
     private bool CanProceed => _activeTab switch
     {
         "gedcom" => _gedcomFile != null,
-        "pdf"    => _documentFile != null,
+        "pdf"    => _documentFile != null && ImportService.IsConfigured,
         "excel"  => _spreadsheetFile != null,
         "text"   => _pasteText.Trim().Length > 20 && ImportService.IsConfigured,
         _        => false
@@ -424,44 +448,56 @@
 
     private async Task ProceedAsync()
     {
-        if (_activeTab != "text")
+        if (_activeTab is not ("text" or "pdf"))
         {
             Toast.Info("File received — non-text import pipeline coming soon.");
             return;
         }
 
         _extractError = null;
-        _textState    = TextImportState.Extracting;
+        _flowState    = DocImportState.Extracting;
         StateHasChanged();
 
         try
         {
-            _preview   = await ImportService.ExtractFromTextAsync(_pasteText);
-            _textState = TextImportState.Preview;
+            _preview = _activeTab == "text"
+                ? await ImportService.ExtractFromTextAsync(_pasteText)
+                : await ExtractFromUploadedDocumentAsync();
+            _flowState = DocImportState.Preview;
         }
         catch (Exception ex)
         {
             _extractError = ex.Message;
-            _textState    = TextImportState.Idle;
+            _flowState    = DocImportState.Idle;
         }
+    }
+
+    private async Task<ImportPreview> ExtractFromUploadedDocumentAsync()
+    {
+        var file = _documentFile ?? throw new InvalidOperationException("No document selected.");
+
+        using var ms = new MemoryStream();
+        await file.OpenReadStream(MaxDocumentBytes).CopyToAsync(ms);
+
+        return await ImportService.ExtractFromDocumentAsync(ms.ToArray(), file.Name);
     }
 
     private async Task CommitImportAsync()
     {
         if (_preview == null) return;
 
-        _textState = TextImportState.Importing;
+        _flowState = DocImportState.Importing;
         StateHasChanged();
 
         try
         {
             _importResult = await ImportService.CommitAsync(_preview);
-            _textState    = TextImportState.Done;
+            _flowState    = DocImportState.Done;
         }
         catch (Exception ex)
         {
             _extractError = ex.Message;
-            _textState    = TextImportState.Preview;
+            _flowState    = DocImportState.Preview;
         }
     }
 

@@ -7,6 +7,8 @@ using FamilyTree.Core.Data;
 using FamilyTree.Core.Models;
 using FamilyTree.Shared.DTOs.Import;
 using FamilyTree.Shared.Enums;
+using iText.Kernel.Pdf;
+using iText.Kernel.Pdf.Canvas.Parser;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -63,6 +65,15 @@ public class ClaudeImportService(
             ?? throw new InvalidOperationException("Unexpected response shape from Claude API.");
 
         return ParseClaudeResponse(rawText);
+    }
+
+    public async Task<ImportPreview> ExtractFromDocumentAsync(byte[] fileBytes, string fileName, CancellationToken ct = default)
+    {
+        var text = ExtractTextFromDocument(fileBytes, fileName);
+        if (string.IsNullOrWhiteSpace(text))
+            throw new InvalidOperationException("No extractable text was found in this document.");
+
+        return await ExtractFromTextAsync(text, ct);
     }
 
     public async Task<ImportResult> CommitAsync(ImportPreview preview, CancellationToken ct = default)
@@ -201,6 +212,31 @@ public class ClaudeImportService(
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    internal static string ExtractTextFromDocument(byte[] fileBytes, string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return ext switch
+        {
+            ".pdf" => ExtractTextFromPdf(fileBytes),
+            ".txt" => Encoding.UTF8.GetString(fileBytes),
+            _ => throw new NotSupportedException(
+                $"'{ext}' files aren't supported yet — try a PDF or .txt file, or paste the text directly.")
+        };
+    }
+
+    private static string ExtractTextFromPdf(byte[] fileBytes)
+    {
+        using var ms = new MemoryStream(fileBytes);
+        using var reader = new PdfReader(ms);
+        using var doc = new PdfDocument(reader);
+
+        var sb = new StringBuilder();
+        for (var i = 1; i <= doc.GetNumberOfPages(); i++)
+            sb.AppendLine(PdfTextExtractor.GetTextFromPage(doc.GetPage(i)));
+
+        return sb.ToString();
+    }
 
     private static ImportPreview ParseClaudeResponse(string raw)
     {
