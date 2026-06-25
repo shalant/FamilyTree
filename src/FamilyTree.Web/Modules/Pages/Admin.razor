@@ -340,6 +340,7 @@
             else
             {
                 <MudTable Items="_deleted" Hover="true" Dense="true"
+                          @bind-RowsPerPage="_deletedRowsPerPage"
                           Style="background:var(--ft-surface-card);">
                     <HeaderContent>
                         <MudTh>Name</MudTh>
@@ -369,6 +370,9 @@
                             </MudButton>
                         </MudTd>
                     </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new[]{ 25, 50, 100 }" />
+                    </PagerContent>
                 </MudTable>
             }
         </MudTabPanel>
@@ -760,15 +764,23 @@
                                     }
                                 </MudTd>
                                 <MudTd>
-                                    @if (!context.RolledBackAt.HasValue)
-                                    {
-                                        <MudButton Variant="Variant.Outlined" Size="Size.Small"
-                                                   Color="Color.Error"
-                                                   StartIcon="@Icons.Material.Outlined.Undo"
-                                                   OnClick="@(() => ConfirmRollbackAsync(context))">
-                                            Roll back
+                                    <div style="display:flex; gap:6px; justify-content:flex-end;">
+                                        <MudButton Variant="Variant.Text" Size="Size.Small"
+                                                   StartIcon="@Icons.Material.Outlined.Description"
+                                                   Disabled="@string.IsNullOrEmpty(context.Report)"
+                                                   OnClick="@(() => ShowReport(context))">
+                                            Report
                                         </MudButton>
-                                    }
+                                        @if (!context.RolledBackAt.HasValue)
+                                        {
+                                            <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                                                       Color="Color.Error"
+                                                       StartIcon="@Icons.Material.Outlined.Undo"
+                                                       OnClick="@(() => ConfirmRollbackAsync(context))">
+                                                Roll back
+                                            </MudButton>
+                                        }
+                                    </div>
                                 </MudTd>
                             </RowTemplate>
                         </MudTable>
@@ -778,6 +790,20 @@
                     </MudAlert>
                 </div>
             }
+
+            <MudDialog @bind-Visible="_reportVisible"
+                       Options="new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true }">
+                <TitleContent>Import report</TitleContent>
+                <DialogContent>
+                    <pre style="white-space:pre-wrap; word-break:break-word; font-size:12px;
+                        font-family:ui-monospace, monospace; max-height:60vh; overflow:auto;
+                        margin:0; padding:8px;">@_reportText</pre>
+                </DialogContent>
+                <DialogActions>
+                    <MudButton OnClick="DownloadReport" StartIcon="@Icons.Material.Outlined.Download">Download</MudButton>
+                    <MudButton OnClick="@(() => _reportVisible = false)">Close</MudButton>
+                </DialogActions>
+            </MudDialog>
         </MudTabPanel>
 
         @* ═══════════════════════════════════════════════════════════════════
@@ -1116,6 +1142,7 @@
 
     // ── Tab data ─────────────────────────────────────────────────────────────
     private List<DeletedPersonRow>         _deleted           = [];
+    private int                            _deletedRowsPerPage = 25;
     private List<AuditLog>                 _auditLogs         = [];
     private List<AppUser>                  _users             = [];
     private List<UserActivity>             _activity          = [];
@@ -1484,6 +1511,25 @@
         {
             Toast.Error(result.Message);
         }
+    }
+
+    private bool _reportVisible;
+    private string _reportText = "";
+    private Guid _reportBatchId;
+
+    private void ShowReport(ImportBatch batch)
+    {
+        _reportBatchId = batch.Id;
+        _reportText    = string.IsNullOrEmpty(batch.Report)
+            ? "(No report was captured for this import.)"
+            : batch.Report;
+        _reportVisible = true;
+    }
+
+    private async Task DownloadReport()
+    {
+        var name = $"import-report-{_reportBatchId.ToString()[..8]}.md";
+        await JS.InvokeVoidAsync("ftDownloadFile", name, _reportText, "text/markdown");
     }
 
     private async Task ConfirmRollbackAsync(ImportBatch batch)

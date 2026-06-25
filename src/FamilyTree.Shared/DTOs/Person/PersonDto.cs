@@ -43,6 +43,10 @@ public class PersonDto
     public List<Guid>? FormerSpouseIds { get; set; }
     public List<Guid>? SiblingIds { get; set; }
 
+    // Marriage start/end dates keyed by spouse Guid — used by CoupleHelper to
+    // populate connector labels on the canvas.
+    public Dictionary<Guid, SpouseMarriageDates>? SpouseDates { get; set; }
+
     // Set at render time by FamilyTreeCanvas — not persisted
     [JsonIgnore]
     public int GenerationDepth { get; set; }
@@ -63,3 +67,5 @@ public class PersonDto
     // Computed properties are fine here because this DTO is only used for reads.
 
 }
+
+public record SpouseMarriageDates(DateOnly? StartDate, DateOnly? EndDate);

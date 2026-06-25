@@ -23,6 +23,12 @@ public partial class Relationship
     public Guid? DeletedBy { get; set; }
     public byte[]? RowVersion { get; set; }
 
+    // Tags relationships created by an AI-assisted import run so rollback can remove
+    // them all — including "bridging" links to pre-existing people (which the
+    // both-endpoints-in-batch sweep would otherwise miss).
+    public Guid? ImportBatchId { get; set; }
+    public virtual ImportBatch? ImportBatch { get; set; }
+
     public virtual Person PersonA { get; set; } = null!;
     public virtual Person PersonB { get; set; } = null!;
 }

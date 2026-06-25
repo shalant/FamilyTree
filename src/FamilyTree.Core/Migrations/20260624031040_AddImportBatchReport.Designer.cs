@@ -4,6 +4,7 @@ using FamilyTree.Core.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FamilyTree.Core.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260624031040_AddImportBatchReport")]
+    partial class AddImportBatchReport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -491,8 +494,7 @@ namespace FamilyTree.Core.Migrations
                     b.HasIndex("PersonBId");
 
                     b.HasIndex("PersonAId", "PersonBId", "Type")
-                        .IsUnique()
-                        .HasFilter("[DeletedAt] IS NULL");
+                        .IsUnique();
 
                     b.ToTable("Relationships");
                 });

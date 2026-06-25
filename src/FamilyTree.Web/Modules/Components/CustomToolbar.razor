@@ -65,6 +65,26 @@ else
 
         <MudDivider Vertical="true" FlexItem="true" Style="height:28px; margin:0 4px;" />
 
+        @* Degrees-of-separation filter *@
+        <MudTooltip Text="Show all people within N relationship hops of focus person" Placement="Placement.Top">
+            <div style="display:flex; align-items:center; gap:2px;">
+                @foreach (var deg in new[] { 0, 2, 3, 4 })
+                {
+                    var label = deg == 0 ? "All" : $"{deg}°";
+                    var active = MaxDegrees == deg;
+                    <button @onclick="@(() => OnDegreesChanged.InvokeAsync(deg))"
+                            style="font-size:11px; font-weight:@(active ? "700" : "400");
+                                   padding:2px 6px; border-radius:6px; border:none; cursor:pointer;
+                                   background:@(active ? "var(--ft-green-600)" : "transparent");
+                                   color:@(active ? "#fff" : "var(--ft-gray-600)");">
+                        @label
+                    </button>
+                }
+            </div>
+        </MudTooltip>
+
+        <MudDivider Vertical="true" FlexItem="true" Style="height:28px; margin:0 4px;" />
+
         <MudTooltip Text="Export family data" Placement="Placement.Top">
             <MudIconButton Icon="@Icons.Material.Outlined.FileDownload" Size="Size.Small" OnClick="OnExport" />
         </MudTooltip>
@@ -89,6 +109,8 @@ else
     [Parameter] public EventCallback OnReset { get; set; }
     [Parameter] public EventCallback OnExport { get; set; }
     [Parameter] public bool ForceCollapsed { get; set; }
+    [Parameter] public int MaxDegrees { get; set; } = 0;
+    [Parameter] public EventCallback<int> OnDegreesChanged { get; set; }
 
     private bool _collapsed = false;
     private bool? _lastForceCollapsed;

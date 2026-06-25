@@ -89,7 +89,12 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(r => r.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             e.Property(r => r.RowVersion).IsRowVersion();
 
-            e.HasIndex(r => new { r.PersonAId, r.PersonBId, r.Type }).IsUnique();
+            // Filtered on DeletedAt so a SOFT-DELETED relationship (e.g. one removed by
+            // an import rollback) no longer occupies the unique slot — otherwise
+            // re-importing the same couple collides with the rolled-back ghost row.
+            e.HasIndex(r => new { r.PersonAId, r.PersonBId, r.Type })
+                .IsUnique()
+                .HasFilter("[DeletedAt] IS NULL");
 
             e.HasOne(r => r.PersonA)
                 .WithMany(p => p.RelationshipPersonAs)
@@ -257,6 +262,14 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasOne(p => p.ImportBatch)
                 .WithMany()
                 .HasForeignKey(p => p.ImportBatchId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Relationship>(e =>
+        {
+            e.HasOne(r => r.ImportBatch)
+                .WithMany()
+                .HasForeignKey(r => r.ImportBatchId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 

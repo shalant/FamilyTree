@@ -1,6 +1,7 @@
 ﻿using FamilyTree.Core.Models;
 using FamilyTree.Shared.DTOs.Person;
 using FamilyTree.Shared.Enums;
+using FamilyTree.Shared.Enums;
 
 namespace FamilyTree.Core.Mappers;
 
@@ -37,17 +38,25 @@ public static class PersonMapper
             .Where(r => r.Type == RelationshipType.Spouse &&
                        (r.PersonAId == person.Id || r.PersonBId == person.Id));
 
-        var spouseIds = spouseRels
+        var spouseRelsList = spouseRels.ToList();
+
+        var spouseIds = spouseRelsList
             .Where(r => r.EndDate == null)
             .Select(r => r.PersonAId == person.Id ? r.PersonBId : r.PersonAId)
             .Distinct()
             .ToList();
 
-        var formerSpouseIds = spouseRels
+        var formerSpouseIds = spouseRelsList
             .Where(r => r.EndDate != null)
             .Select(r => r.PersonAId == person.Id ? r.PersonBId : r.PersonAId)
             .Distinct()
             .ToList();
+
+        var spouseDates = spouseRelsList
+            .GroupBy(r => r.PersonAId == person.Id ? r.PersonBId : r.PersonAId)
+            .ToDictionary(
+                g => g.Key,
+                g => { var r = g.First(); return new SpouseMarriageDates(r.StartDate, r.EndDate); });
 
         // ─────────────────────────────────────────────────────────────
         // SIBLINGS — EXPLICIT (RelationshipType.Sibling)
@@ -106,7 +115,8 @@ public static class PersonMapper
             ChildIds = childIds,
             SpouseIds = spouseIds,
             FormerSpouseIds = formerSpouseIds,
-            SiblingIds = siblingIds
+            SiblingIds = siblingIds,
+            SpouseDates = spouseDates
         };
     }
 }

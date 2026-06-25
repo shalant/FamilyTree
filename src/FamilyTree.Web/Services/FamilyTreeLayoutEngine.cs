@@ -1,5 +1,6 @@
 using FamilyTree.Shared.DTOs;
 using FamilyTree.Shared.DTOs.Person;
+using FamilyTree.Shared.Enums;
 
 namespace FamilyTree.Web.Services;
 
@@ -36,8 +37,16 @@ public class FamilyTreeLayoutEngine
     private const int Gen1Size = 70;        // diameter for immediate relatives (±1 depth)
     private const int DefaultSize = 60;     // diameter for everyone else
 
-    // pixels per year — controls vertical compression of the timeline
+    // pixels per year — controls vertical compression of the timeline (legacy mode)
     private const double PxPerYear = 6.5;
+
+    // ── ADR 002: generation-row layout ───────────────────────────────────────
+    // When true (default), Y encodes GENERATION (each generation shares one row),
+    // making couples flat and sibling bars clean — the existing orthogonal
+    // connectors then render without slant/raggedness. When false, Y falls back to
+    // the birth-year timeline (PxPerYear). See docs/architecture-decisions/002.
+    private const bool UseGenerationRows = true;
+    private const int RowHeight = 160;      // vertical distance between generation rows
 
     // extra spacing for couples so the U‑arc has room to breathe
     //private const int SpouseSpacingX = 160;
@@ -85,6 +94,11 @@ public class FamilyTreeLayoutEngine
             ? fd
             : 0;
 
+        // Generation rows: depth is normalized so 0 = youngest descendants, max = oldest
+        // ancestors. We want the oldest at the TOP, so rowIndex = maxDepth - depth.
+        var maxDepth = depths.Count > 0 ? depths.Values.Max() : 0;
+        int RowIndexOf(Guid id) => maxDepth - depths.GetValueOrDefault(id, 0);
+
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 2: Compute birth years (absolute timeline positions)
         // ─────────────────────────────────────────────────────────────────────
@@ -101,7 +115,9 @@ public class FamilyTreeLayoutEngine
         var minYear = (birthYears.Values.Min() / 10) * 10;
         var maxYear = ((birthYears.Values.Max() + 9) / 10) * 10;
         var yearRange = maxYear - minYear + 1;
-        var canvasHeight = (int)(yearRange * PxPerYear + PaddingY * 2);
+        var canvasHeight = UseGenerationRows
+            ? PaddingY * 2 + (maxDepth + 1) * RowHeight
+            : (int)(yearRange * PxPerYear + PaddingY * 2);
 
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 3: Identify connected components (separate family trees)
@@ -261,9 +277,28 @@ public class FamilyTreeLayoutEngine
                 var size     = isFocus ? FocusSize
                              : Math.Abs(relDepth) <= 1 ? Gen1Size
                              : DefaultSize;
-                var year = birthYears.GetValueOrDefault(id, minYear);
-                var y    = PaddingY + (int)((year - minYear) * PxPerYear);
+                int y;
+                if (UseGenerationRows)
+                {
+                    // Center the node within its generation row.
+                    y = PaddingY + RowIndexOf(id) * RowHeight + RowHeight / 2;
+                }
+                else
+                {
+                    var year = birthYears.GetValueOrDefault(id, minYear);
+                    y = PaddingY + (int)((year - minYear) * PxPerYear);
+                }
                 nodeMap[id] = new LayoutNode(person, (int)Math.Round(x), y, depth, isFocus, size);
+            }
+
+            // Returns (leftId, rightId) — husband left, wife right.
+            // Falls back to (A, B) ordering when genders are equal or unknown.
+            (Guid leftId, Guid rightId) OrderCouple(Guid aId, Guid bId)
+            {
+                var aFemale = personById.TryGetValue(aId, out var pA) && pA.Gender == Gender.Female;
+                var bFemale = personById.TryGetValue(bId, out var pB) && pB.Gender == Gender.Female;
+                // Only swap when we are certain A is wife and B is husband.
+                return (aFemale && !bFemale) ? (bId, aId) : (aId, bId);
             }
 
             // ── Top-down placement ────────────────────────────────────────────
@@ -271,8 +306,9 @@ public class FamilyTreeLayoutEngine
             {
                 if (g.ParentAId.HasValue && g.ParentBId.HasValue)
                 {
-                    SetNode(g.ParentAId.Value, anchorX - SpouseSpacingX / 2.0);
-                    SetNode(g.ParentBId.Value, anchorX + SpouseSpacingX / 2.0);
+                    var (leftId, rightId) = OrderCouple(g.ParentAId.Value, g.ParentBId.Value);
+                    SetNode(leftId,  anchorX - SpouseSpacingX / 2.0);
+                    SetNode(rightId, anchorX + SpouseSpacingX / 2.0);
                 }
                 else if (g.ParentAId.HasValue)
                 {
@@ -344,7 +380,92 @@ public class FamilyTreeLayoutEngine
             xOffset = (int)Math.Ceiling(curX) + PaddingX;
         }
 
-        var canvasWidth = xOffset;
+        // ── Satellite-spouse adjacency (ADR 002) ──────────────────────────────
+        // A childless second/former marriage where one partner is anchored in the
+        // main tree (first spouse + kids) leaves the OTHER partner parked in a distant
+        // root slot, so the marriage connector spans the whole canvas. Pull that
+        // isolated partner up next to their anchored partner. Runs before connectors
+        // are built (which read nodeMap), so the line is drawn at the new position.
+        int Degree(PersonDto p) =>
+            (p.ParentIds?.Count ?? 0) + (p.ChildIds?.Count ?? 0) +
+            (p.SpouseIds?.Count ?? 0) + (p.FormerSpouseIds?.Count ?? 0);
+
+        foreach (var couple in couples)
+        {
+            // Only childless couples can be cleanly relocated this way.
+            if (couple.ChildIds.Any(personById.ContainsKey)) continue;
+            if (!nodeMap.TryGetValue(couple.PersonAId, out var nodeA) ||
+                !nodeMap.TryGetValue(couple.PersonBId, out var nodeB)) continue;
+
+            // Already adjacent? leave it.
+            if (Math.Abs(nodeA.X - nodeB.X) <= SpouseSpacingX * 2) continue;
+
+            if (!personById.TryGetValue(couple.PersonAId, out var pA) ||
+                !personById.TryGetValue(couple.PersonBId, out var pB)) continue;
+
+            // The satellite is the more isolated partner; only relocate if it's
+            // genuinely a pendant (degree 1 = connected solely by this marriage).
+            var (anchored, satellite) = Degree(pA) >= Degree(pB) ? (nodeA, nodeB) : (nodeB, nodeA);
+            var satellitePerson = satellite.Person.Id == couple.PersonAId ? pA : pB;
+            if (Degree(satellitePerson) > 1) continue;
+
+            // Place the satellite on the OPPOSITE side from the already-placed primary
+            // spouse, so the anchored person ends up in the middle:
+            //   [Bud] ─❤─ [Florence] ─❤─ [Harvey]
+            // rather than both husbands on the same side. Defaults to right if no
+            // other spouse is found yet.
+            var anchoredDto = anchored.Person;
+            var allSpouseIds = (anchoredDto.SpouseIds ?? [])
+                .Concat(anchoredDto.FormerSpouseIds ?? []);
+
+            double satelliteDir = 1.0;  // +1 = right, -1 = left
+            foreach (var sid in allSpouseIds)
+            {
+                if (sid == satellite.Person.Id) continue;
+                if (nodeMap.TryGetValue(sid, out var existingSpouseNode))
+                {
+                    satelliteDir = existingSpouseNode.X < anchored.X ? 1.0 : -1.0;
+                    break;
+                }
+            }
+
+            nodeMap[satellite.Person.Id] = satellite with
+            {
+                X = anchored.X + (int)(satelliteDir * SpouseSpacingX),
+                Y = anchored.Y,
+            };
+        }
+
+        // ── Per-row collision resolution (ADR 002 — coordinate assignment) ────
+        // Subtree-centering, cross-root handling, and satellite placement can each
+        // drop two nodes at overlapping X within one generation (a person's first and
+        // second spouse, two independent subtrees, etc.). Sweep each generation row
+        // left-to-right and enforce a minimum center-to-center gap so nodes and their
+        // labels never overlap. Couples (≥ SpouseSpacingX apart) are untouched; only
+        // genuinely-colliding nodes move, and only as far as needed. Connectors are
+        // built afterward from final positions, so they stay attached.
+        if (UseGenerationRows)
+        {
+            const int MinGap = 116;   // ≈ node + label clearance
+            foreach (var row in nodeMap.Values.GroupBy(n => n.Y))
+            {
+                var ordered = row.OrderBy(n => n.X).ToList();
+                for (int i = 1; i < ordered.Count; i++)
+                {
+                    var minX = ordered[i - 1].X + MinGap;
+                    if (ordered[i].X < minX)
+                    {
+                        var bumped = ordered[i] with { X = minX };
+                        ordered[i] = bumped;
+                        nodeMap[bumped.Person.Id] = bumped;
+                    }
+                }
+            }
+        }
+
+        var canvasWidth = nodeMap.Count > 0
+            ? Math.Max(xOffset, nodeMap.Values.Max(n => n.X + n.Size / 2) + PaddingX)
+            : xOffset;
 
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 5: Create visual bands (decade markers with time gradient)
@@ -352,14 +473,26 @@ public class FamilyTreeLayoutEngine
         //
         // Bands are decade‑sized horizontal strips that help the eye read the
         // temporal distribution of the tree at a glance.
-        var bandHeight = (int)(PxPerYear * 10);  // one band per decade
-        if (bandHeight < 80) bandHeight = 80;
-
         var bands = new List<GenerationBand>();
-        for (int year = minYear; year <= maxYear; year += 10)
+        if (UseGenerationRows)
         {
-            var bandTop = PaddingY + (int)((year - minYear) * PxPerYear);
-            bands.Add(new GenerationBand(year, bandTop, bandHeight));
+            // One band per generation row; label is the generation ordinal (1 = oldest).
+            for (int r = 0; r <= maxDepth; r++)
+            {
+                var bandTop = PaddingY + r * RowHeight;
+                bands.Add(new GenerationBand(r + 1, bandTop, RowHeight));
+            }
+        }
+        else
+        {
+            var bandHeight = (int)(PxPerYear * 10);  // one band per decade
+            if (bandHeight < 80) bandHeight = 80;
+
+            for (int year = minYear; year <= maxYear; year += 10)
+            {
+                var bandTop = PaddingY + (int)((year - minYear) * PxPerYear);
+                bands.Add(new GenerationBand(year, bandTop, bandHeight));
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -405,67 +538,48 @@ public class FamilyTreeLayoutEngine
     private Dictionary<Guid, int> ComputeDepths(List<PersonDto> people)
     {
         var depths = new Dictionary<Guid, int>();
-        var focus = people.FirstOrDefault();
-        if (focus == null) return depths;
+        var byId   = people.ToDictionary(p => p.Id);
 
-        depths[focus.Id] = 0;
-
-        // Pass 1: Walk upward through parents (BFS).
-        var queue = new Queue<PersonDto>();
-        queue.Enqueue(focus);
-
-        while (queue.Count > 0)
+        // BFS each connected component from an arbitrary seed, assigning a relative
+        // generation to EVERY reachable person across all edge types:
+        //   parent → +1 (ancestors above)   child → −1 (descendants below)
+        //   spouse / former-spouse / sibling → same generation
+        // First-reached wins (cross-generation marriages keep their parent-chain
+        // generation — a known least-bad case, see ADR 002). Running per component
+        // guarantees no person is left without a depth, which the row layout requires.
+        foreach (var seed in people)
         {
-            var current = queue.Dequeue();
+            if (depths.ContainsKey(seed.Id)) continue;
 
-            foreach (var parentId in current.ParentIds ?? [])
+            depths[seed.Id] = 0;
+            var queue = new Queue<Guid>();
+            queue.Enqueue(seed.Id);
+
+            while (queue.Count > 0)
             {
-                var parent = people.FirstOrDefault(p => p.Id == parentId);
-                if (parent != null && !depths.ContainsKey(parent.Id))
+                var id = queue.Dequeue();
+                if (!byId.TryGetValue(id, out var cur)) continue;
+                var d = depths[id];
+
+                void Visit(Guid other, int depth)
                 {
-                    depths[parent.Id] = depths[current.Id] + 1;
-                    queue.Enqueue(parent);
-                }
-            }
-        }
-
-        // Pass 2: Push depths downward through children.
-        foreach (var person in people)
-        {
-            foreach (var parentId in person.ParentIds ?? [])
-            {
-                if (depths.TryGetValue(parentId, out var pd) &&
-                    !depths.ContainsKey(person.Id))
-                {
-                    depths[person.Id] = pd - 1;
-                }
-            }
-        }
-
-        // Pass 3: Propagate through spouses (iterate until stable).
-        bool changed = true;
-        while (changed)
-        {
-            changed = false;
-
-            foreach (var person in people)
-            {
-                if (!depths.TryGetValue(person.Id, out var personDepth))
-                    continue;
-
-                foreach (var spouseId in person.SpouseIds ?? [])
-                {
-                    if (!depths.ContainsKey(spouseId))
+                    if (byId.ContainsKey(other) && !depths.ContainsKey(other))
                     {
-                        depths[spouseId] = personDepth;
-                        changed = true;
+                        depths[other] = depth;
+                        queue.Enqueue(other);
                     }
                 }
+
+                foreach (var pid in cur.ParentIds ?? []) Visit(pid, d + 1);
+                foreach (var cid in cur.ChildIds ?? []) Visit(cid, d - 1);
+                foreach (var sid in cur.SpouseIds ?? []) Visit(sid, d);
+                foreach (var sid in cur.FormerSpouseIds ?? []) Visit(sid, d);
+                foreach (var sib in cur.SiblingIds ?? []) Visit(sib, d);
             }
         }
 
-        // Normalize: shift so min depth = 0.
-        if (depths.Any())
+        // Normalize: shift so min depth = 0 (youngest descendants = 0, oldest = max).
+        if (depths.Count > 0)
         {
             var minDepth = depths.Values.Min();
             foreach (var key in depths.Keys.ToList())
@@ -696,7 +810,8 @@ public class FamilyTreeLayoutEngine
             foreach (var c in children)
                 routedChildren.Add(c.Person.Id);
 
-            var coupleUnits = BuildCoupleFamilyUnits(a, b, children, couple.IsFormer);
+            var coupleUnits = BuildCoupleFamilyUnits(a, b, children, couple.IsFormer,
+                couple.MarriageStart, couple.MarriageEnd);
             families.AddRange(coupleUnits);
         }
 
@@ -749,7 +864,9 @@ public class FamilyTreeLayoutEngine
         LayoutNode partnerA,
         LayoutNode partnerB,
         List<LayoutNode> children,
-        bool isFormer = false)
+        bool isFormer = false,
+        DateOnly? marriageStart = null,
+        DateOnly? marriageEnd = null)
     {
         var families = new List<FamilyUnit>();
 
@@ -763,10 +880,12 @@ public class FamilyTreeLayoutEngine
         var arc = new CoupleArc(
             partnerA.X, lineY,
             partnerB.X, lineY,
-            lineY,  // PeakY kept for record compat — equals lineY (no curve)
+            lineY,
             midX,
-            lineY,  // HeartY at the connector level
-            isFormer);
+            lineY,
+            isFormer,
+            marriageStart,
+            marriageEnd);
 
         if (!children.Any())
         {
@@ -885,7 +1004,9 @@ public class FamilyTreeLayoutEngine
         double PeakY,
         double MidX,
         double HeartY,
-        bool IsFormer = false);
+        bool IsFormer = false,
+        DateOnly? MarriageStart = null,
+        DateOnly? MarriageEnd = null);
 
     /// <summary>
     /// A vertical line from a couple/parent down toward children.

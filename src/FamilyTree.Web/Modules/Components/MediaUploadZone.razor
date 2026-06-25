@@ -11,6 +11,10 @@
 
 <div style="display:flex; flex-direction:column; gap:8px;">
 
+    @* The invisible InputFile below covers the whole zone and natively accepts a
+       dropped file (it fires OnChange → HandleInputChange). We must NOT preventDefault
+       the drop here — doing so cancels that native behaviour and the file never lands.
+       The drag handlers below are purely for the visual highlight. *@
     <label class="@ZoneClass"
            role="button"
            aria-label="@(Label)"
@@ -18,9 +22,8 @@
            style="position:relative;"
            @ondragenter="OnDragEnter"
            @ondragleave="OnDragLeave"
-           @ondragover:preventDefault="true"
-           @ondrop:preventDefault="true"
-           @ondrop="OnDrop">
+           @ondragend="OnDragLeave"
+           @ondrop="OnDragLeave">
 
         @* Invisible InputFile covers the entire zone *@
         <InputFile id="@_inputId"
@@ -163,7 +166,6 @@
 
     private void OnDragEnter() => _dragging = true;
     private void OnDragLeave() => _dragging = false;
-    private void OnDrop() => _dragging = false;
 
     private async Task HandleInputChange(InputFileChangeEventArgs e)
     {

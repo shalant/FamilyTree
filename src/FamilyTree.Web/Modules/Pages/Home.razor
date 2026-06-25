@@ -75,8 +75,8 @@ else if (!_people.Any())
 else
 {
     <FamilyTreeCanvas @ref="_canvas"
-                      People="_people"
-                      Couples="_couples"
+                      People="@VisiblePeople"
+                      Couples="@VisibleCouples"
                       FocusId="_focusPerson?.Id"
                       OnPersonSelected="HandlePersonSelected" />
 
@@ -88,7 +88,9 @@ else
                        OnCenterTree="@(async () => { if (_canvas != null) await _canvas.CenterTree(); })"
                        OnReset="HandleReset"
                        OnExport="HandleExport"
-                       ForceCollapsed="_isNarrowViewport" />
+                       ForceCollapsed="_isNarrowViewport"
+                       MaxDegrees="_maxDegrees"
+                       OnDegreesChanged="@(d => { _maxDegrees = d; StateHasChanged(); })" />
     </div>
 
     <HeroOverlayComponent FocusPerson="_focusPerson"
@@ -121,6 +123,22 @@ else
 
     private List<PersonDto> _people = [];
     private List<CoupleDto> _couples = [];
+    private int _maxDegrees = 0;  // 0 = show all
+
+    // Computed from _maxDegrees + _focusPerson; feeds the canvas instead of the raw lists.
+    private List<PersonDto> VisiblePeople => _maxDegrees > 0 && _focusPerson != null
+        ? TreeFilterService.WithinDegrees(_people, _focusPerson.Id, _maxDegrees)
+        : _people;
+
+    private List<CoupleDto> VisibleCouples
+    {
+        get
+        {
+            if (_maxDegrees == 0 || _focusPerson == null) return _couples;
+            var ids = VisiblePeople.Select(p => p.Id).ToHashSet();
+            return TreeFilterService.FilterCouples(_couples, ids);
+        }
+    }
     private PersonDto? _focusPerson;
     private PersonDto? _detailPerson;
     private bool _loading = true;

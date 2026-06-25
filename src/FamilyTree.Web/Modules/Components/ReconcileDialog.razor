@@ -1,0 +1,154 @@
+@using FamilyTree.Shared.DTOs.Import
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Core.Services
+@inject IPersonService PersonService
+
+<MudDialog>
+    <TitleContent>
+        <div style="font-size:16px; font-weight:600;">
+            Reconcile: @Imported.FirstName @Imported.LastName
+        </div>
+        <div style="font-size:12px; color:var(--ft-gray-400);">
+            Matches your existing <strong>@CandidateName</strong>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <div style="text-align:center; padding:24px;">
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            </div>
+        }
+        else if (_existing == null)
+        {
+            <MudAlert Severity="Severity.Error">Couldn't load the existing record.</MudAlert>
+        }
+        else if (_fields.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">
+                The import has nothing extra to add — link to keep your record as-is.
+            </MudAlert>
+        }
+        else
+        {
+            <div style="font-size:12px; color:var(--ft-gray-500); margin-bottom:8px;">
+                Check the fields you want to pull in from the import. Blanks in your record are
+                pre-checked; conflicting values are left off so nothing is overwritten by accident.
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                <thead>
+                    <tr style="text-align:left; color:var(--ft-gray-400); font-size:11px; text-transform:uppercase;">
+                        <th style="padding:4px 8px;">Field</th>
+                        <th style="padding:4px 8px;">Your record</th>
+                        <th style="padding:4px 8px;">Import</th>
+                        <th style="padding:4px 8px; text-align:center;">Apply</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in _fields)
+                    {
+                        <tr style="border-top:0.5px solid var(--ft-line-border);">
+                            <td style="padding:6px 8px; font-weight:500;">@f.Label</td>
+                            <td style="padding:6px 8px; color:@(string.IsNullOrEmpty(f.ExistingDisplay) ? "var(--ft-gray-300)" : "var(--ft-gray-700)");">
+                                @(string.IsNullOrEmpty(f.ExistingDisplay) ? "—" : f.ExistingDisplay)
+                            </td>
+                            <td style="padding:6px 8px; color:var(--ft-green-700);">@f.ImportDisplay</td>
+                            <td style="padding:6px 8px; text-align:center;">
+                                @if (f.Same)
+                                {
+                                    <span style="font-size:11px; color:var(--ft-gray-300);">same</span>
+                                }
+                                else
+                                {
+                                    <MudCheckBox @bind-Value="f.Apply" Size="Size.Small" Dense="true" />
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Style="color:var(--ft-gray-400);">Cancel</MudButton>
+        <MudButton OnClick="CreateNew" Variant="Variant.Text">Create new instead</MudButton>
+        <MudButton OnClick="LinkAsIs" Variant="Variant.Outlined">Link as-is</MudButton>
+        <MudButton OnClick="LinkAndApply" Variant="Variant.Filled"
+                   Style="background:var(--ft-green-600); color:#fff;"
+                   Disabled="@(!_fields.Any(f => f.Apply))">
+            Link &amp; apply (@_fields.Count(f => f.Apply))
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public ImportPersonDto Imported { get; set; } = null!;
+    [Parameter] public Guid CandidateId { get; set; }
+    [Parameter] public string CandidateName { get; set; } = "";
+
+    public record ReconcileResult(Guid? LinkToId, List<string> MergeFields, bool CreateNew);
+
+    private bool _loading = true;
+    private PersonDto? _existing;
+    private readonly List<FieldRow> _fields = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var resp = await PersonService.GetByIdAsync(CandidateId);
+        if (resp.Success) { _existing = resp.Data; BuildFields(); }
+        _loading = false;
+    }
+
+    private void BuildFields()
+    {
+        if (_existing is null) return;
+
+        AddRow(ImportMergeFields.BirthDate,  "Birth date", _existing.BirthDate?.ToString("yyyy-MM-dd"), Imported.BirthDate);
+        AddRow(ImportMergeFields.DeathDate,  "Death date", _existing.DeathDate?.ToString("yyyy-MM-dd"), Imported.DeathDate);
+        AddRow(ImportMergeFields.MiddleName, "Middle name", _existing.MiddleName, Imported.MiddleName);
+        AddRow(ImportMergeFields.MaidenName, "Maiden name", _existing.MaidenName, Imported.MaidenName);
+        AddRow(ImportMergeFields.Gender,     "Gender",
+            _existing.Gender?.ToString(),
+            string.Equals(Imported.Gender, "Unknown", StringComparison.OrdinalIgnoreCase) ? null : Imported.Gender);
+        AddRow(ImportMergeFields.BiographyNotes, "Notes", _existing.BiographyNotes, Imported.Notes);
+    }
+
+    private void AddRow(string key, string label, string? existing, string? import)
+    {
+        if (string.IsNullOrWhiteSpace(import)) return;   // nothing to contribute
+
+        var same = string.Equals((existing ?? "").Trim(), import.Trim(), StringComparison.OrdinalIgnoreCase);
+        _fields.Add(new FieldRow
+        {
+            Key             = key,
+            Label           = label,
+            ExistingDisplay = existing ?? "",
+            ImportDisplay   = import.Trim(),
+            Same            = same,
+            // Pre-check only when filling a blank (never overwrite by default).
+            Apply           = !same && string.IsNullOrWhiteSpace(existing),
+        });
+    }
+
+    private void LinkAndApply()
+    {
+        var fields = _fields.Where(f => f.Apply).Select(f => f.Key).ToList();
+        MudDialog.Close(DialogResult.Ok(new ReconcileResult(CandidateId, fields, false)));
+    }
+
+    private void LinkAsIs()   => MudDialog.Close(DialogResult.Ok(new ReconcileResult(CandidateId, [], false)));
+    private void CreateNew()  => MudDialog.Close(DialogResult.Ok(new ReconcileResult(null, [], true)));
+    private void Cancel()     => MudDialog.Cancel();
+
+    private sealed class FieldRow
+    {
+        public string Key = "";
+        public string Label = "";
+        public string ExistingDisplay = "";
+        public string ImportDisplay = "";
+        public bool Same;
+        public bool Apply;
+    }
+}

@@ -93,7 +93,9 @@ else
     builder.Services.AddScoped<IEmailSender, LogEmailSender>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IImportService, ClaudeImportService>();
-builder.Services.AddHttpClient("anthropic");
+// Long timeout: large-document extraction can run several minutes while Claude
+// streams back up to max_tokens of JSON. The default 100s cancels mid-extraction.
+builder.Services.AddHttpClient("anthropic", c => c.Timeout = TimeSpan.FromMinutes(10));
 builder.Services.AddScoped<IPersonService, PersonService>();
 builder.Services.AddScoped<IRelationshipService, RelationshipService>();
 builder.Services.AddScoped<IMediumService, MediumService>();

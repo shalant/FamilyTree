@@ -5,6 +5,7 @@
 @inject NavigationManager Nav
 @inject ToastService Toast
 @inject IImportService ImportService
+@inject IDialogService DialogService
 
 @* ── Format tabs ──────────────────────────────────────────────────────────── *@
 <div style="display:flex; border-bottom:1px solid var(--ft-line-border);
@@ -65,7 +66,7 @@
 }
 
 @* ── PDF / Document tab ────────────────────────────────────────────────────── *@
-@if (_activeTab == "pdf" && _flowState == DocImportState.Idle)
+@if (_activeTab == "smart" && _flowState == DocImportState.Idle)
 {
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">
         <div>
@@ -91,14 +92,45 @@
                 </MudAlert>
             }
             <MediaUploadZone Accept=".pdf,.doc,.docx,.txt"
-                             Label="Drop your document here"
-                             Hint=".pdf, .doc, .docx, .txt supported"
+                             Label="Drop a file here"
+                             Hint=".pdf or .txt — or paste text below"
                              OnFilesSelected="OnDocumentSelected" />
-            @if (_documentFile != null)
+
+            <div style="display:flex; align-items:center; gap:10px; margin:14px 0 10px;">
+                <div style="flex:1; height:1px; background:var(--ft-line-border);"></div>
+                <span style="font-size:11px; color:var(--ft-gray-300); text-transform:uppercase; letter-spacing:0.06em;">or paste text</span>
+                <div style="flex:1; height:1px; background:var(--ft-line-border);"></div>
+            </div>
+
+            <MudTextField @bind-Value="_pasteText"
+                          Placeholder="Paste genealogy text, family history, letters…"
+                          Lines="6"
+                          Variant="Variant.Outlined"
+                          FullWidth="true"
+                          Style="font-size:13px; font-family:monospace;" />
+            <div style="font-size:11px; color:var(--ft-gray-300); margin-top:4px;">
+                @_pasteText.Length / 50,000 characters
+            </div>
+            @if (_documentName != null)
             {
                 <MudAlert Severity="Severity.Info" Class="mt-3">
-                    <strong>@_documentFile.Name</strong> ready for extraction
+                    <strong>@_documentName</strong>@(_documentPageCount > 0 ? $" · {_documentPageCount} page{(_documentPageCount == 1 ? "" : "s")}" : "") ready for extraction
                 </MudAlert>
+                @if (_documentPageCount > 1)
+                {
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap;">
+                        <span style="font-size:13px; color:var(--ft-gray-500);">Extract pages</span>
+                        <MudNumericField @bind-Value="_startPage" Min="1" Max="_documentPageCount"
+                                         Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:88px;" />
+                        <span style="font-size:13px; color:var(--ft-gray-500);">to</span>
+                        <MudNumericField @bind-Value="_endPage" Min="1" Max="_documentPageCount"
+                                         Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:88px;" />
+                        <span style="font-size:12px; color:var(--ft-gray-300);">
+                            of @_documentPageCount — leave the full range to import the whole document.
+                            Smaller ranges are faster and cheaper.
+                        </span>
+                    </div>
+                }
             }
             @if (!string.IsNullOrWhiteSpace(_extractError))
             {
@@ -184,7 +216,7 @@
 }
 
 @* ── Paste text tab ────────────────────────────────────────────────────────── *@
-@if (_activeTab == "text" && _flowState == DocImportState.Idle)
+@if (_activeTab == "smart" && _flowState == DocImportState.Idle && _documentBytes == null)
 {
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;">
             <div>
@@ -245,17 +277,28 @@
 }
 
 @* ── Shared extract/preview/import workflow (text + pdf tabs) ───────────────── *@
-@if ((_activeTab == "text" || _activeTab == "pdf") && _flowState != DocImportState.Idle)
+@if (_activeTab == "smart" && _flowState != DocImportState.Idle)
 {
     @if (_flowState == DocImportState.Extracting)
     {
-        <div style="text-align:center; padding:60px 0;">
-            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
-            <div style="margin-top:20px; font-size:14px; color:var(--ft-gray-500);">
-                Analyzing document with Claude AI…
+        <div style="padding:48px 0 60px;">
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary"
+                               Style="border-radius:4px; margin-bottom:20px;" />
+            <div style="text-align:center; font-size:14px; color:var(--ft-gray-600); font-weight:500;">
+                @_importProgress.Stage
             </div>
-            <div style="margin-top:6px; font-size:12px; color:var(--ft-gray-300);">
-                This usually takes 15–30 seconds for large documents.
+            @if (_importProgress.PeopleFoundSoFar > 0)
+            {
+                <div style="text-align:center; margin-top:10px; font-size:22px; font-weight:700;
+                    color:var(--ft-green-700);">
+                    @_importProgress.PeopleFoundSoFar
+                    <span style="font-size:14px; font-weight:400; color:var(--ft-gray-400);">
+                        people found so far…
+                    </span>
+                </div>
+            }
+            <div style="text-align:center; margin-top:10px; font-size:11px; color:var(--ft-gray-300);">
+                Large documents can take a couple of minutes — please keep this tab open.
             </div>
         </div>
     }
@@ -268,6 +311,13 @@
             <div style="font-size:12px; color:var(--ft-gray-400);">
                 · @_preview.Relationships.Count relationships detected
             </div>
+            @{ var linkCount = _preview.People.Count(p => p.MatchedExistingId != null); }
+            @if (linkCount > 0)
+            {
+                <div style="font-size:12px; font-weight:600; color:var(--ft-green-700);">
+                    · @linkCount linking to existing
+                </div>
+            }
             <MudButton Variant="Variant.Text" Size="Size.Small"
                        Style="color:var(--ft-green-600); margin-left:auto;"
                        OnClick="@(() => _preview.People.ForEach(p => p.Selected = true))">
@@ -323,6 +373,45 @@
                                 <span> · also @string.Join(", ", person.Aliases)</span>
                             }
                         </div>
+                        @if (person.Candidates?.Count > 0)
+                        {
+                            var linked = person.MatchedExistingId is { } mid
+                                ? person.Candidates.FirstOrDefault(c => c.PersonId == mid)
+                                : null;
+                            <div style="display:flex; align-items:center; gap:8px; margin-top:5px; flex-wrap:wrap;">
+                                @if (linked != null)
+                                {
+                                    <span style="font-size:11px; font-weight:600; color:var(--ft-green-700);">
+                                        ✓ Linking to @linked.DisplayName@(linked.BirthYear is int ly ? $" ({ly})" : "")@(person.MergeFieldNames is { Count: > 0 } mf ? $" · merging {mf.Count} field{(mf.Count == 1 ? "" : "s")}" : "")
+                                    </span>
+                                    <MudButton Variant="Variant.Text" Size="Size.Small"
+                                               Style="color:var(--ft-green-700);"
+                                               OnClick="@(() => OpenReconcileAsync(person))">
+                                        Edit…
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" Style="color:var(--ft-gray-400);"
+                                               OnClick="@(() => { person.MatchedExistingId = null; person.MergeFieldNames = null; })">
+                                        Create new instead
+                                    </MudButton>
+                                }
+                                else
+                                {
+                                    var top = person.Candidates[0];
+                                    <span style="font-size:11px; font-weight:500; color:var(--ft-green-700);">
+                                        ↔ Possible match: @top.DisplayName@(top.BirthYear is int ty ? $" ({ty})" : "")
+                                    </span>
+                                    <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                                               Style="color:var(--ft-green-700); border-color:var(--ft-green-700);"
+                                               OnClick="@(() => OpenReconcileAsync(person))">
+                                        Review &amp; link…
+                                    </MudButton>
+                                    @if (person.Candidates.Count > 1)
+                                    {
+                                        <span style="font-size:10px; color:var(--ft-gray-300);">+@(person.Candidates.Count - 1) other possible</span>
+                                    }
+                                }
+                            </div>
+                        }
                     </div>
                 </div>
             }
@@ -346,7 +435,7 @@
                 Import complete!
             </div>
             <div style="font-size:14px; color:var(--ft-gray-400);">
-                @_importResult.PeopleCreated people added · @_importResult.RelationshipsCreated relationships created
+                @_importResult.PeopleCreated people added · @_importResult.RelationshipsCreated relationships created@(_importResult.LinkedToExisting > 0 ? $" · {_importResult.LinkedToExisting} linked to existing" : "")
             </div>
         </div>
     }
@@ -356,7 +445,7 @@
 <div style="margin-top:32px; padding-top:20px; border-top:0.5px solid var(--ft-line-border);
     display:flex; justify-content:space-between; align-items:center;">
 
-    @if ((_activeTab == "text" || _activeTab == "pdf") && _flowState == DocImportState.Preview)
+    @if (_activeTab == "smart" && _flowState == DocImportState.Preview)
     {
         <MudButton Variant="Variant.Text" Style="color:var(--ft-gray-400);"
                    OnClick="@(() => _flowState = DocImportState.Idle)">
@@ -370,7 +459,7 @@
             Import @(_preview?.People.Count(p => p.Selected) ?? 0) people
         </MudButton>
     }
-    else if ((_activeTab == "text" || _activeTab == "pdf") && _flowState == DocImportState.Done)
+    else if (_activeTab == "smart" && _flowState == DocImportState.Done)
     {
         <span />
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
@@ -378,7 +467,7 @@
             Go to tree
         </MudButton>
     }
-    else if ((_activeTab == "text" || _activeTab == "pdf") && _flowState is DocImportState.Extracting or DocImportState.Importing)
+    else if (_activeTab == "smart" && _flowState is DocImportState.Extracting or DocImportState.Importing)
     {
         <span />
         <span />
@@ -401,7 +490,7 @@
                    Style="background:var(--ft-green-600); color:#fff; min-width:160px;"
                    StartIcon="@Icons.Material.Outlined.Visibility"
                    OnClick="ProceedAsync">
-            @(_activeTab is "text" or "pdf" ? "Extract people" : "Preview import")
+            @(_activeTab == "smart" ? "Extract people" : "Preview import")
         </MudButton>
     }
 </div>
@@ -415,8 +504,17 @@
     private string _pasteText = "";
 
     private IBrowserFile? _gedcomFile;
-    private IBrowserFile? _documentFile;
     private IBrowserFile? _spreadsheetFile;
+
+    // Document bytes are read once at upload time and cached. The IBrowserFile
+    // reference goes stale after the first OpenReadStream / a re-render, so we
+    // never read it lazily at extract time — that broke retries with a
+    // "_blazorFilesById" null error.
+    private byte[]? _documentBytes;
+    private string? _documentName;
+    private int     _documentPageCount;   // 0 for non-PDF / unknown
+    private int     _startPage = 1;
+    private int     _endPage   = 1;
 
     private DocImportState _flowState     = DocImportState.Idle;
     private ImportPreview?  _preview;
@@ -427,42 +525,102 @@
 
     private readonly Dictionary<string, (string Label, string Icon)> _tabs = new()
     {
-        ["gedcom"] = ("GEDCOM",        "📋"),
-        ["pdf"]    = ("PDF / Document","🤖"),
-        ["excel"]  = ("Excel / CSV",   "📊"),
-        ["text"]   = ("Paste text",    "✍️"),
+        ["gedcom"] = ("GEDCOM",       "📋"),
+        ["smart"]  = ("Import",       "✨"),
+        ["excel"]  = ("Excel / CSV",  "📊"),
     };
 
     private bool CanProceed => _activeTab switch
     {
         "gedcom" => _gedcomFile != null,
-        "pdf"    => _documentFile != null && ImportService.IsConfigured,
+        "smart"  => (_documentBytes != null || _pasteText.Trim().Length > 20) && ImportService.IsConfigured,
         "excel"  => _spreadsheetFile != null,
-        "text"   => _pasteText.Trim().Length > 20 && ImportService.IsConfigured,
         _        => false
     };
 
+    // Live progress during Claude extraction
+    private ImportProgress _importProgress = new("Analyzing document with Claude AI…");
+
     private void OnGedcomSelected(IReadOnlyList<IBrowserFile> files)      => _gedcomFile      = files.FirstOrDefault();
-    private void OnDocumentSelected(IReadOnlyList<IBrowserFile> files)    => _documentFile    = files.FirstOrDefault();
     private void OnSpreadsheetSelected(IReadOnlyList<IBrowserFile> files) => _spreadsheetFile = files.FirstOrDefault();
+
+    private async Task OnDocumentSelected(IReadOnlyList<IBrowserFile> files)
+    {
+        _extractError      = null;
+        _documentBytes     = null;
+        _documentName      = null;
+        _documentPageCount = 0;
+        _pasteText         = "";   // file takes precedence; clear paste text
+
+        var file = files.FirstOrDefault();
+        if (file == null) return;
+
+        if (file.Size > MaxDocumentBytes)
+        {
+            _extractError = $"File is too large ({FormatSize(file.Size)}). Maximum is 20 MB.";
+            return;
+        }
+
+        try
+        {
+            using var ms = new MemoryStream();
+            await file.OpenReadStream(MaxDocumentBytes).CopyToAsync(ms);
+            _documentBytes = ms.ToArray();
+            _documentName  = file.Name;
+        }
+        catch (Exception ex)
+        {
+            _extractError = $"Couldn't read the file: {ex.Message}";
+            return;
+        }
+
+        // For PDFs, read the page count up front so we can offer page-range selection.
+        if (Path.GetExtension(_documentName).ToLowerInvariant() == ".pdf")
+        {
+            try
+            {
+                _documentPageCount = ImportService.GetPdfPageCount(_documentBytes);
+                _startPage = 1;
+                _endPage   = _documentPageCount;
+            }
+            catch (Exception ex)
+            {
+                _extractError  = $"Couldn't read the PDF: {ex.Message}";
+                _documentBytes = null;
+                _documentName  = null;
+            }
+        }
+    }
 
     private async Task ProceedAsync()
     {
-        if (_activeTab is not ("text" or "pdf"))
+        if (_activeTab != "smart")
         {
             Toast.Info("File received — non-text import pipeline coming soon.");
             return;
         }
 
-        _extractError = null;
-        _flowState    = DocImportState.Extracting;
+        _extractError    = null;
+        _importProgress  = new ImportProgress("Starting…");
+        _flowState       = DocImportState.Extracting;
         StateHasChanged();
+
+        // Progress callback: fires on the streaming thread; must re-render on Blazor's
+        // sync context via InvokeAsync.
+        var progress = new Progress<ImportProgress>(p =>
+        {
+            _importProgress = p;
+            _ = InvokeAsync(StateHasChanged);
+        });
 
         try
         {
-            _preview = _activeTab == "text"
-                ? await ImportService.ExtractFromTextAsync(_pasteText)
-                : await ExtractFromUploadedDocumentAsync();
+            _preview = _documentBytes != null
+                ? await ExtractFromUploadedDocumentAsync(progress)
+                : await ImportService.ExtractFromTextAsync(_pasteText, progress);
+            _importProgress = new ImportProgress("Finding matches in your tree…");
+            StateHasChanged();
+            _preview = await ImportService.AnnotateMatchesAsync(_preview);
             _flowState = DocImportState.Preview;
         }
         catch (Exception ex)
@@ -472,14 +630,46 @@
         }
     }
 
-    private async Task<ImportPreview> ExtractFromUploadedDocumentAsync()
+    private async Task OpenReconcileAsync(ImportPersonDto person)
     {
-        var file = _documentFile ?? throw new InvalidOperationException("No document selected.");
+        // Reconcile against the best candidate (the one shown in the badge).
+        var top = person.MatchedExistingId is { } mid
+            ? person.Candidates?.FirstOrDefault(c => c.PersonId == mid)
+            : person.Candidates?.FirstOrDefault();
+        if (top == null) return;
 
-        using var ms = new MemoryStream();
-        await file.OpenReadStream(MaxDocumentBytes).CopyToAsync(ms);
+        var parameters = new DialogParameters
+        {
+            ["Imported"]      = person,
+            ["CandidateId"]   = top.PersonId,
+            ["CandidateName"] = top.DisplayName,
+        };
+        var dialog = await DialogService.ShowAsync<ReconcileDialog>("Reconcile", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
 
-        return await ImportService.ExtractFromDocumentAsync(ms.ToArray(), file.Name);
+        if (result.Data is ReconcileDialog.ReconcileResult rr)
+        {
+            person.MatchedExistingId = rr.CreateNew ? null : rr.LinkToId;
+            person.MergeFieldNames   = rr.CreateNew ? null : rr.MergeFields;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<ImportPreview> ExtractFromUploadedDocumentAsync(IProgress<ImportProgress>? progress = null)
+    {
+        if (_documentBytes == null || _documentName == null)
+            throw new InvalidOperationException("No document selected.");
+
+        int? start = null, end = null;
+        if (_documentPageCount > 1)
+        {
+            start = Math.Min(_startPage, _endPage);
+            end   = Math.Max(_startPage, _endPage);
+        }
+
+        return await ImportService.ExtractFromDocumentAsync(_documentBytes, _documentName, start, end, progress);
     }
 
     private async Task CommitImportAsync()

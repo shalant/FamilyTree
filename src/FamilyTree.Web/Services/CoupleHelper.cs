@@ -61,6 +61,8 @@ public static class CoupleHelper
             }
         }
 
+        var byId = people.ToDictionary(p => p.Id);
+
         return coupleMap.Select(kvp =>
         {
             var isFormer = !activeSpousePairs.Contains(kvp.Key) &&
@@ -68,12 +70,21 @@ public static class CoupleHelper
                                (p.Id == kvp.Key.Item1 && (p.FormerSpouseIds?.Contains(kvp.Key.Item2) == true)) ||
                                (p.Id == kvp.Key.Item2 && (p.FormerSpouseIds?.Contains(kvp.Key.Item1) == true)));
 
+            // Pull marriage dates from whichever person has them.
+            SpouseMarriageDates? dates = null;
+            if (byId.TryGetValue(kvp.Key.Item1, out var pA))
+                pA.SpouseDates?.TryGetValue(kvp.Key.Item2, out dates);
+            if (dates == null && byId.TryGetValue(kvp.Key.Item2, out var pB))
+                pB.SpouseDates?.TryGetValue(kvp.Key.Item1, out dates);
+
             return new CoupleDto
             {
-                PersonAId = kvp.Key.Item1,
-                PersonBId = kvp.Key.Item2,
-                ChildIds = kvp.Value,
-                IsFormer = isFormer
+                PersonAId    = kvp.Key.Item1,
+                PersonBId    = kvp.Key.Item2,
+                ChildIds     = kvp.Value,
+                IsFormer     = isFormer,
+                MarriageStart = dates?.StartDate,
+                MarriageEnd   = dates?.EndDate,
             };
         }).ToList();
     }

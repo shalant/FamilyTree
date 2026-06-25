@@ -7,6 +7,7 @@
 
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Services
+@using FamilyTree.Web.Modules.Components
 @using MudBlazor
 @using System.Security.Claims
 @inject IPersonService PersonService
@@ -120,6 +121,9 @@
             <MudIconButton Icon="@Icons.Material.Outlined.Upload"
                            Style="color:var(--ft-gray-400);"
                            OnClick='() => Nav.NavigateTo("/import")' />
+            @* <MudIconButton Icon="@CustomIcons.Import"
+                           Style="color:var(--ft-gray-400);"
+                           OnClick='() => Nav.NavigateTo("/import")' /> *@
         </MudTooltip>
 
         <MudTooltip Text="Stories" Placement="Placement.Bottom">

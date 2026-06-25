@@ -62,6 +62,12 @@
                             <svg:text x="@F(arc.MidX)" y="@F(arc.HeartY - 4)"
                                       font-size="9" fill="var(--ft-line-couple)"
                                       text-anchor="middle">❤</svg:text>
+                            @if (MarriageDateLabel(arc) is { } dateLabel)
+                            {
+                                <svg:text x="@F(arc.MidX)" y="@F(arc.HeartY + 8)"
+                                          font-size="8" fill="var(--ft-line-couple)"
+                                          text-anchor="middle" opacity="0.75">@dateLabel</svg:text>
+                            }
                         }
                     }
 
@@ -234,4 +240,14 @@
     }
 
     private static string F(double v) => v.ToString("F1");
+
+    private static string? MarriageDateLabel(FamilyTreeLayoutEngine.CoupleArc arc)
+    {
+        var start = arc.MarriageStart?.Year;
+        var end   = arc.MarriageEnd?.Year;
+        if (start == null && end == null) return null;
+        if (start != null && end != null)  return $"{start}–{end}";
+        if (start != null)                 return $"m. {start}";
+        return null;
+    }
 }
