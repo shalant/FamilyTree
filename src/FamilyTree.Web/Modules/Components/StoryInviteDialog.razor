@@ -1,10 +1,12 @@
 @using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Shared.DTOs.StoryInvite
+@using FamilyTree.Web.Services
 @using MudBlazor
 
 @inject IStoryInviteService StoryInviteService
 @inject NavigationManager Nav
+@inject ToastService Toast
 
 <MudDialog>
     <DialogContent>
@@ -130,12 +132,14 @@
         if (string.IsNullOrWhiteSpace(_email))
         {
             _error = "An email address is required.";
+            StateHasChanged();
             return;
         }
 
         if (!IsValidEmailFormat(_email))
         {
             _error = "That doesn't look like a valid email address.";
+            StateHasChanged();
             return;
         }
 
@@ -152,20 +156,24 @@
         if (dto.PersonId is null && string.IsNullOrWhiteSpace(dto.UnlinkedPersonName))
         {
             _error = "Choose an existing person or type a name.";
+            StateHasChanged();
             return;
         }
 
         _sending = true;
+        StateHasChanged();
         var result = await StoryInviteService.CreateInviteAsync(dto, Nav.BaseUri);
         _sending = false;
 
         if (!result.Success)
         {
             _error = result.Message;
+            StateHasChanged();
             return;
         }
 
-        MudDialog.Close(DialogResult.Ok(true));
+        Toast.Success("Invite sent!");
+        MudDialog.Close();
     }
 
     private void Cancel() => MudDialog.Cancel();

@@ -2,6 +2,13 @@
 
 ---
 
+## Bugs noticed in testing on 28June
+- story invite lacks a correct register link
+- how should stories appear for a typical user? in the detail panel, the plain text is probably not great --> should be a list
+- can photos tag multiple people?
+- should someone be able to add a photo to a story?
+
+
 ## In Progress / Up Next
 
 - [x] **Deploy** — pushed to production; user testing in progress at arborkin-erbufqfkhzcka4cb.centralus-01.azurewebsites.net
@@ -78,7 +85,7 @@
 ---
 
 ### Phase 2 — Personalization & storytelling
-| Area | Features |
+| Area | Features 
 |------|----------|
 | Profile cards | Biography, photos, life events |
 | Events table | Structured life events per person (bar mitzvah, immigration, military, etc.) — see `FutureFeatures/events-table.md` |

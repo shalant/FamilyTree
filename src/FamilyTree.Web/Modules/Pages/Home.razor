@@ -387,13 +387,10 @@ else
             { d => d.AllPeople,  _people },
         };
 
-        var dialog = await DialogService.ShowAsync<StoryInviteDialog>(
-            "Invite someone to share a memory", parameters,
+        await DialogService.ShowAsync<StoryInviteDialog>(
+            "Invite someone to share a memory", 
+            parameters,
             new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
-        var result = await dialog.Result;
-
-        if (result is { Canceled: false })
-            Toast.Success("Invite sent!");
     }
 
     private async Task PromptDelete(PersonDto person)

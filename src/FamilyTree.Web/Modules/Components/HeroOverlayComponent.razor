@@ -109,16 +109,16 @@
 }
 
 @code {
-    [Parameter] public PersonDto? FocusPerson { get; set; }
-    [Parameter] public int PeopleCount { get; set; }
-    [Parameter] public int CoupleCount { get; set; }
     [Parameter] public EventCallback OnCenterTree { get; set; }
     [Parameter] public EventCallback OnShare { get; set; }
     [Parameter] public EventCallback OnInviteStory { get; set; }
+    [Parameter] public EventCallback OnPositionReset { get; set; }
     [Parameter] public bool Visible { get; set; }
     [Parameter] public double? DragLeft { get; set; }
     [Parameter] public double? DragTop  { get; set; }
-    [Parameter] public EventCallback OnPositionReset { get; set; }
+    [Parameter] public PersonDto? FocusPerson { get; set; }
+    [Parameter] public int PeopleCount { get; set; }
+    [Parameter] public int CoupleCount { get; set; }
 
     private string _posStyle => (DragLeft.HasValue && DragTop.HasValue)
         ? $"left:{(int)DragLeft}px; top:{(int)DragTop}px; right:auto; bottom:auto;"
