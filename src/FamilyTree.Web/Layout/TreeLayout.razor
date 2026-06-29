@@ -5,6 +5,7 @@
 @inherits LayoutComponentBase
 @rendermode InteractiveServer
 
+@using FamilyTree.Web.Modules.Components
 @using MudBlazor
 @using FamilyTree.Web.Services
 
@@ -26,6 +27,7 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 <MudPopoverProvider />
+<ToastContainer />
 
 <CustomAppBar @bind-IsDark="_isDark" />
 

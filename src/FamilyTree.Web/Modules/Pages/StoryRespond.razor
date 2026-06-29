@@ -74,10 +74,15 @@
                 <p style="font-size:14px; color:var(--ft-text-muted); margin-bottom:24px; line-height:1.6;">
                     Want to see the full family tree, add photos, and explore the rest of the story?
                 </p>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                @* <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
                            OnClick='() => Nav.NavigateTo("/register")'>
                     Create a free account
+                </MudButton> *@
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           Href="/register">
+                    Create a free account
                 </MudButton>
+
                 <button class="auth-browse" style="margin-top:14px;"
                         @onclick='() => Nav.NavigateTo("/")'>
                     No thanks, I'm done →
