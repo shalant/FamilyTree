@@ -5,7 +5,7 @@ using FamilyTree.Web.Modules.Pages;   // for HeroOverlayComponent, FamilyTreeCan
 
 namespace FamilyTree.Web.Tests.ComponentTests;
 
-public class StoryRespondComponentTests : TestContext
+public class StoryRespondComponentTests : ComponentTestBase
 {
     [Fact]
     public void ShouldRenderLoadingState()

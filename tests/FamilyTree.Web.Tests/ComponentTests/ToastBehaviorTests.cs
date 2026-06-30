@@ -6,7 +6,7 @@ using Xunit;
 
 namespace FamilyTree.Web.Tests.ComponentTests;
 
-public class ToastBehaviorTests : TestContext
+public class ToastBehaviorTests : ComponentTestBase
 {
     [Fact]
     public void ShouldShowToast_WhenErrorOccurs()

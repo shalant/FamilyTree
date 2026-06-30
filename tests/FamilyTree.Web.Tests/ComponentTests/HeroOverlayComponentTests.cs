@@ -5,13 +5,13 @@ using FamilyTree.Web.Modules.Components;   // for HeroOverlayComponent, FamilyTr
 
 namespace FamilyTree.Web.Tests.ComponentTests;
 
-public class HeroOverlayComponentTests : TestContext
+public class HeroOverlayComponentTests : ComponentTestBase
 {
     [Fact]
     public void ShouldShowOverlay_WhenVisible()
     {
         var cut = RenderComponent<HeroOverlayComponent>(p => p.Add(x => x.Visible, true));
 
-        cut.Markup.Should().Contain("OnShare");
+        cut.Markup.Should().Contain("hero-overlay");
     }
 }

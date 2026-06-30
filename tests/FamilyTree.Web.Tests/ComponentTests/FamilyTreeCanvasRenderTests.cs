@@ -5,7 +5,7 @@ using FamilyTree.Web.Modules.Components;   // for HeroOverlayComponent, FamilyTr
 
 namespace FamilyTree.Web.Tests.ComponentTests;
 
-public class FamilyTreeCanvasRenderTests : TestContext
+public class FamilyTreeCanvasRenderTests : ComponentTestBase
 {
     [Fact]
     public void ShouldRenderCanvas()

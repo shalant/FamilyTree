@@ -1,13 +1,21 @@
 ﻿using Bunit;
 using FamilyTree.Shared.DTOs.Person;
-using FluentAssertions;
-using Xunit;
 using FamilyTree.Web.Modules.Components;   // for HeroOverlayComponent, FamilyTreeCanvas, PersonDetailDrawer
+using FamilyTree.Web.Services;
+using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace FamilyTree.Web.Tests.ComponentTests;
 
-public class PersonDetailDrawerTests : TestContext
+public class PersonDetailDrawerTests : ComponentTestBase
 {
+    public PersonDetailDrawerTests()
+    {
+        Services.AddSingleton<ToastService>();
+        Services.AddSingleton<FamilyTreeLayoutEngine>();
+    }
+
     [Fact]
     public void ShouldRenderPersonName()
     {
