@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml/badge.svg)](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml)
 
+![Tests](https://github.com/YOURNAME/FAMILYTREE/actions/workflows/ci.yml/badge.svg)
+
 A full-stack family tree application built with **Blazor Server (.NET 10)**, **EF Core**, **SQL Server**, and **MudBlazor** — featuring a custom C# layout engine, smooth pan/zoom canvas, multi-tenant family isolation, invite-only auth, and an admin panel with audit logging.
 
 ---
@@ -152,6 +154,12 @@ xUnit + FluentAssertions, with an in-memory EF Core provider for service-layer t
 - Canonical ordering: regardless of input order, the lower GUID is always stored as `PersonA`
 - Duplicate relationship creation returns a failure (not a DB exception)
 - Delete hard-removes the relationship record
+
+- 5 Core logic tests  
+- 5 Blazor component tests  
+- 3 Playwright UI tests  
+- Fully automated CI/CD  
+- Behavior‑driven, non‑brittle  
 
 ```bash
 dotnet test tests/FamilyTree.Core.Tests/FamilyTree.Core.Tests.csproj

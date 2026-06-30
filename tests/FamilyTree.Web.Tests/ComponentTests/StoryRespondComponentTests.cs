@@ -1,0 +1,18 @@
+﻿using Bunit;
+using FluentAssertions;
+using Xunit;
+using FamilyTree.Web.Modules.Pages;   // for HeroOverlayComponent, FamilyTreeCanvas, PersonDetailDrawer
+
+namespace FamilyTree.Web.Tests.ComponentTests;
+
+public class StoryRespondComponentTests : TestContext
+{
+    [Fact]
+    public void ShouldRenderLoadingState()
+    {
+        var cut = RenderComponent<StoryRespond>(parameters => parameters
+            .Add(p => p.Token, "abc123"));
+
+        cut.Markup.Should().Contain("MudProgressCircular");
+    }
+}

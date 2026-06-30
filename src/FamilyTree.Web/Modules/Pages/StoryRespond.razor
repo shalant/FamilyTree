@@ -89,11 +89,13 @@
                            Href="/register">
                     Create a free account
                 </MudButton> *@
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                @if (_story is not null)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
                            Href="@($"/register?invite={_story.UserInviteId}")">
                     Create a free account
                 </MudButton>
-
+                }
                 <button class="auth-browse" style="margin-top:14px;"
                         @onclick='() => Nav.NavigateTo("/")'>
                     No thanks, I'm done →
