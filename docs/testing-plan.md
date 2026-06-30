@@ -19,6 +19,7 @@ on:
   pull_request:
     branches: [master, main]
 
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -169,3 +170,25 @@ Success Criteria
 ✅ Artifacts uploaded for review
 
 
+
+
+
+StoryInviteTests.cs
+
+StoryRespondComponentTests.cs (bUnit)
+
+PlaywrightStoryFlowTests.cs
+
+
+✔ Core logic tests
+Focus resolution
+Story invite validation
+Story submission rules
+
+✔ Component tests
+StoryRespond.razor
+HeroOverlayComponent
+PersonDetailDrawer
+
+✔ UI tests
+Playwright flows for story submission and navigation
