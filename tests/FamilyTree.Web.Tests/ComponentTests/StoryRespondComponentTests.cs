@@ -1,7 +1,7 @@
 ﻿using Bunit;
 using FluentAssertions;
 using Xunit;
-using FamilyTree.Web.Modules.Pages;   // for HeroOverlayComponent, FamilyTreeCanvas, PersonDetailDrawer
+using FamilyTree.Web.Modules.Pages;
 
 namespace FamilyTree.Web.Tests.ComponentTests;
 

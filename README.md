@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml/badge.svg)](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml)
 
-![Tests](https://github.com/YOURNAME/FAMILYTREE/actions/workflows/ci.yml/badge.svg)
+![Tests](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml/badge.svg)
 
 A full-stack family tree application built with **Blazor Server (.NET 10)**, **EF Core**, **SQL Server**, and **MudBlazor** — featuring a custom C# layout engine, smooth pan/zoom canvas, multi-tenant family isolation, invite-only auth, and an admin panel with audit logging.
 

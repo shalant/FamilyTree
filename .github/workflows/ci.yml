@@ -24,11 +24,16 @@ jobs:
       - name: Build
         run: dotnet build FamilyTree.sln --no-restore -c Release
 
+      - name: Install Playwright dependencies
+        run: sudo npx playwright install-deps
+
       - name: Install Playwright Browsers
         run: pwsh ./tests/FamilyTree.Web.Tests/bin/Release/net10.0/playwright.ps1 install
 
       - name: Start Blazor Server
-        run: dotnet run --project src/FamilyTree.Web --urls "http://localhost:5000" &
+        run: |
+          dotnet run --project src/FamilyTree.Web --urls "http://localhost:5000" &
+          sleep 15
 
       - name: Test
         run: dotnet test FamilyTree.sln --no-build -c Release --logger "trx;LogFileName=test_results.trx"
