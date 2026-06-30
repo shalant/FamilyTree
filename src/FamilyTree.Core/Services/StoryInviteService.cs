@@ -3,6 +3,7 @@ using FamilyTree.Core.Models;
 using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Story;
 using FamilyTree.Shared.DTOs.StoryInvite;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -15,7 +16,8 @@ public class StoryInviteService(
     IAuditLogService auditLog,
     ICurrentUserService currentUser,
     IEmailSender emailSender,
-    IConfiguration config) : IStoryInviteService
+    IConfiguration config,
+    UserManager<AppUser> userManager) : IStoryInviteService
 {
     // ─────────────────────────────────────────────────────────────
     //  CREATE INVITE
@@ -257,13 +259,37 @@ public class StoryInviteService(
 
             _ = auditLog.LogAsync("Create", "Story", story.Id, userId: null);
 
+            var userInviteId = (Guid?)null;
+
+            try
+            {
+                // Auto‑generate an account invite for the guest’s email
+                if (!string.IsNullOrWhiteSpace(invite.InvitedEmail))
+                {
+                    var authService = new AuthService(userManager, config, dbFactory, emailSender);
+                    var inviteResult = await authService.CreateInviteAsync(invite.InvitedEmail);
+
+                    if (inviteResult.Success)
+                    {
+                        // Optionally store the token so the UI can link to /register?invite=<token>
+                        //story.InviteId = inviteResult.Id.ToString();
+                        userInviteId = inviteResult.Id;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to auto‑generate user invite for {Email}", invite.InvitedEmail);
+            }
+
             return ServiceResponse<StoryDto>.Ok(new StoryDto
             {
                 Id = story.Id,
                 PersonId = story.PersonId,
                 UnlinkedPersonName = story.UnlinkedPersonName,
                 AuthorName = story.AuthorName,
-                InviteId = story.InviteId,
+                InviteId = story.InviteId,  // Story invite ID
+                UserInviteId = userInviteId,
                 Title = story.Title,
                 Body = story.Body,
                 CreatedAt = story.CreatedAt,
