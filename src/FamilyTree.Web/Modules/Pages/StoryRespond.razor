@@ -2,11 +2,14 @@
 @rendermode InteractiveServer
 
 @using FamilyTree.Core.Services
+@using FamilyTree.Web.Services
 @using FamilyTree.Shared.DTOs.StoryInvite
+@using FamilyTree.Shared.DTOs.Story
 @using MudBlazor
 
 @inject IStoryInviteService StoryInviteService
 @inject NavigationManager Nav
+@inject ToastService ToastService
 
 <PageTitle>Share a memory — ArborKin</PageTitle>
 
@@ -40,6 +43,10 @@
                     <p style="font-size:14px; color:var(--ft-text-muted); line-height:1.6;">
                         A memory has already been submitted for this invite. Thank you!
                     </p>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                               Href="@($"/?focus={_validation?.PersonId}")">
+                        See @_validation?.DisplayName's tree →
+                    </MudButton>
                 }
                 else if (_validation.IsExpired)
                 {
@@ -78,8 +85,12 @@
                            OnClick='() => Nav.NavigateTo("/register")'>
                     Create a free account
                 </MudButton> *@
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                @* <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
                            Href="/register">
+                    Create a free account
+                </MudButton> *@
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           Href="@($"/register?invite={_story.UserInviteId}")">
                     Create a free account
                 </MudButton>
 
@@ -174,6 +185,7 @@
     private string? _error;
     private StoryInviteValidationDto? _validation;
     private readonly StoryInviteResponseDto _response = new();
+    private StoryDto? _story;
 
     protected override async Task OnInitializedAsync()
     {
@@ -202,9 +214,14 @@
         if (!result.Success)
         {
             _error = result.Message;
+            ToastService.Error(result.Message ?? "Something went wrong while saving your memory.");
             return;
         }
-
-        _submitted = true;
+        else
+        {
+            _submitted = true;
+            _story = result.Data;
+            ToastService.Success($"Your memory of {_validation?.DisplayName} has been saved!");
+        }
     }
 }

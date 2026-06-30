@@ -2,7 +2,7 @@
 
 ---
 
-## Bugs noticed in testing on 28June
+## Bugs noticed in testing on 28-June
 - story invite lacks a correct register link
 - how should stories appear for a typical user? in the detail panel, the plain text is probably not great --> should be a list
 - can photos tag multiple people?
@@ -146,3 +146,7 @@
 - **Photo avatars** — circular crops with soft shadows replacing initials
 - **GEDCOM import/export** — interoperability with standard genealogy tools
 - **AI-assisted suggestions** — relationship completion from biography text
+
+
+
+- Introductory demo

@@ -17,4 +17,5 @@ public class StoryDto
     public bool IsApproved { get; set; }
     public bool IsHidden { get; set; }
     public int SortOrder { get; set; }
+    public Guid? UserInviteId { get; set; }
 }

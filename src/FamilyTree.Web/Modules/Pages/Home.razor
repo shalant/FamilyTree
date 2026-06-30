@@ -72,6 +72,27 @@ else if (!_people.Any())
         </MudButton>
     </div>
 }
+else if (_focusPerson == null && _people.Any())
+{
+    <div style="position:fixed; inset:0; display:flex; flex-direction:column;
+        align-items:center; justify-content:center; text-align:center; padding:0 24px; z-index:10;">
+        <div style="font-size:28px; font-weight:500; font-style:italic;
+            font-family:Georgia,serif; color:var(--ft-green-800); margin-bottom:12px;">
+            Choose your starting point
+        </div>
+        <div style="font-size:14px; color:var(--ft-gray-400);
+            max-width:360px; line-height:1.7; margin-bottom:28px;">
+            Select a person to center your tree. You can change this anytime.
+        </div>
+
+        <MudButton Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.CenterFocusStrong"
+                   Href="/people"
+                   Style="background:var(--ft-green-700); color:#fff;">
+            Set focus person →
+        </MudButton>
+    </div>
+}
 else
 {
     <FamilyTreeCanvas @ref="_canvas"
@@ -136,6 +157,7 @@ else
     private (double Left, double Top)? _toolbarPos;
     private (double Left, double Top)? _heroPos;
     private bool _isNarrowViewport;
+    private bool _showTreeHint = false;
 
     // Mobile/tablet always anchors bottom-left, ignoring any saved drag position from
     // a wider session — a position dragged-to on desktop may not even be on-screen here.
@@ -180,6 +202,15 @@ else
             _ready = true;
         }
         _loading = false;
+
+        if (_currentUserId.HasValue && !_people.Any())
+        {
+            Toast.Info("Welcome! Start by adding your first family member.");
+        }
+        // else if (_currentUserId.HasValue && _people.Any() && _focusPerson == null)
+        // {
+        //     Toast.Info("Choose a person to center your tree.");
+        // }
     }
 
     // Handles same-page navigation (query param changes without full reload).
@@ -220,6 +251,11 @@ else
             StateHasChanged();
         }
 
+        if (_ready && _people.Any() && _focusPerson == null)
+        {
+            Toast.Info("Choose a person to center your tree.");
+        }
+
         // Load the drag module once; call init on every render so that
         // elements appearing after initial load (toolbar/hero) get wired up.
         if (_dragModule == null)
@@ -240,6 +276,21 @@ else
         }
 
         await _dragModule.InvokeVoidAsync("init", _dotNetRef);
+
+        if (_ready && _people.Any() && _focusPerson != null && !_showTreeHint)
+        {
+            try
+            {
+                var seen = await JS.InvokeAsync<string?>("localStorage.getItem", "ft-treehint");
+                if (seen != "1")
+                {
+                    _showTreeHint = true;
+                    Toast.Info("Tip: Drag to explore the tree. Scroll to zoom.");
+                    await JS.InvokeVoidAsync("localStorage.setItem", "ft-treehint", "1");
+                }
+            }
+            catch { }
+        }
     }
 
     [JSInvokable]

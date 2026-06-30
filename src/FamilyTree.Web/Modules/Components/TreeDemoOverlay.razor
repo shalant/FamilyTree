@@ -1,0 +1,21 @@
+﻿@if (Visible)
+{
+    <div class="ft-demo-overlay">
+        <div class="ft-demo-tip">
+            <MudIcon Icon="@Icons.Material.Filled.TouchApp" Color="Color.Primary" />
+            <span>Drag to explore the tree</span>
+        </div>
+        <div class="ft-demo-tip">
+            <MudIcon Icon="@Icons.Material.Filled.ZoomIn" Color="Color.Primary" />
+            <span>Scroll to zoom</span>
+        </div>
+        <div class="ft-demo-tip">
+            <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" />
+            <span>Tap a person to see details</span>
+        </div>
+    </div>
+}
+
+@code {
+    private bool Visible { get; set; } = true;
+}
