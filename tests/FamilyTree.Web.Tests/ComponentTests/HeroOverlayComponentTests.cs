@@ -15,6 +15,7 @@ public class HeroOverlayComponentTests : ComponentTestBase
             .Add(x => x.FocusPerson, new PersonDto { FirstName = "Doug" })
             .Add(x => x.PeopleCount, 10)
             .Add(x => x.CoupleCount, 5)
+            .Add(x => x.Visible, true)
         );
 
         cut.Markup.Should().Contain("hero-overlay");

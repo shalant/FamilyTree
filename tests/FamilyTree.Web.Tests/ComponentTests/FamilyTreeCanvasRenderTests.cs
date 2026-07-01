@@ -10,8 +10,9 @@ public class FamilyTreeCanvasRenderTests : ComponentTestBase
     [Fact]
     public void ShouldRenderCanvas()
     {
+        JSInterop.SetupModule("/js/canvas-interaction.js").SetupVoid("init", _ => true);
         var cut = RenderComponent<FamilyTreeCanvas>();
 
-        cut.Markup.Should().Contain("canvas");
+        cut.Markup.Should().Contain("ft-viewport");
     }
 }

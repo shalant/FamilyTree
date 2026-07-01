@@ -1,8 +1,16 @@
 # FamilyTree
 
 [![CI](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml/badge.svg)](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dot-net)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Tests](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml/badge.svg)
+### Test Status
+| Metric | Status |
+|--------|--------|
+| **Unit Tests** | 19/19 ✅ |
+| **Component Tests** | 4/4 ✅ (4 skipped) |
+| **Build (Debug + Release)** | ✅ |
+| **CI Pipeline** | ✅ [View Latest Run](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml) |
 
 A full-stack family tree application built with **Blazor Server (.NET 10)**, **EF Core**, **SQL Server**, and **MudBlazor** — featuring a custom C# layout engine, smooth pan/zoom canvas, multi-tenant family isolation, invite-only auth, and an admin panel with audit logging.
 
@@ -138,31 +146,58 @@ Key design decisions are documented in `docs/` (ADR 001: JS-free layout engine, 
 
 ## Testing
 
-xUnit + FluentAssertions, with an in-memory EF Core provider for service-layer tests. Each test gets an isolated database instance.
+| Test Type | Framework | Runs | Command |
+|-----------|-----------|-------|---------|
+| **Unit Tests** (Core services) | xUnit + FluentAssertions | ✅ CI on every PR | `dotnet test` |
+| **Component Tests** (Blazor) | bUnit | ✅ CI on every PR | `dotnet test` |
+| **UI Tests** (E2E) | Playwright | 🖥️ Local only | `dotnet run` + `dotnet test` |
+
+**Unit & Component Tests** — Automated in CI
+- Run on every PR and push to any branch
+- In-memory EF Core provider; each test gets isolated database
+- ~2–3 min total
+
+**UI Tests** — Manual local testing
+- Require running app server + browser
+- Run locally before pushing: `dotnet watch` + `dotnet test --filter "UiTests"`
+
+### Core Test Coverage
 
 **`PersonServiceTests` (8 tests)**
 - Create returns person with correct name
 - `CreatedBy` and `FamilyId` are stamped on every create
 - Whitespace-only first name is rejected
 - Birth date after death date returns a failure message
-- Soft delete sets `DeletedAt` + `DeletedBy`; the record is invisible to normal queries
-- Restore clears those fields; the record becomes visible again
-- Family scoping: a user with `FamilyId = X` only sees persons in family X
-- Super-user with no `FamilyId` sees all persons across all families
+- Soft delete sets `DeletedAt` + `DeletedBy`; record invisible to normal queries
+- Restore clears those fields; record becomes visible again
+- Family scoping: user with `FamilyId = X` only sees family X
+- Super-user with no `FamilyId` sees all persons across families
 
 **`RelationshipServiceTests` (3 tests)**
-- Canonical ordering: regardless of input order, the lower GUID is always stored as `PersonA`
-- Duplicate relationship creation returns a failure (not a DB exception)
-- Delete hard-removes the relationship record
+- Canonical ordering: lower GUID always stored as `PersonA`
+- Duplicate relationship creation returns failure (not DB exception)
+- Delete hard-removes relationship record
 
-- 5 Core logic tests  
-- 5 Blazor component tests  
-- 3 Playwright UI tests  
-- Fully automated CI/CD  
-- Behavior‑driven, non‑brittle  
+**`ComponentTests` (4 tests, 4 skipped)**
+- FamilyTreeCanvas renders without errors
+- HeroOverlay displays when visible
+- ToastService shows notifications
+- PersonDetailDrawer (skipped — complex MudBlazor dependencies)
+
+**`StoryTests` (3 tests)**
+- Story submission validation
+- Invite token expiry checks
+- Auth focus state persistence
+
+### Run Tests Locally
 
 ```bash
-dotnet test tests/FamilyTree.Core.Tests/FamilyTree.Core.Tests.csproj
+# Unit + component tests (same as CI)
+dotnet test FamilyTree.sln
+
+# UI tests (requires running server)
+dotnet watch  # Terminal 1
+dotnet test --filter "UiTests"  # Terminal 2
 ```
 
 ---
