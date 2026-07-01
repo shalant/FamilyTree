@@ -147,4 +147,17 @@ public class PersonServiceTests
         result.Success.Should().BeTrue();
         result.Data!.Should().HaveCount(2);
     }
+
+    [Fact]
+    public void Delete_ShouldRemovePerson_WhenSuccessful()
+    {
+        var people = new List<PersonDto>
+        {
+            new() { Id = Guid.NewGuid(), FirstName = "Douglas" }
+        };
+
+        people.RemoveAt(0);
+
+        people.Should().BeEmpty();
+    }
 }

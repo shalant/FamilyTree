@@ -2,13 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [master, main]
+    branches: ['**']
   pull_request:
-    branches: [master, main]
+    branches: ['**']
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
       - uses: actions/checkout@v4
 
@@ -20,8 +22,18 @@ jobs:
       - name: Restore
         run: dotnet restore FamilyTree.sln
 
-      - name: Build
+      - name: Build Debug
+        run: dotnet build FamilyTree.sln --no-restore -c Debug
+
+      - name: Build Release
         run: dotnet build FamilyTree.sln --no-restore -c Release
 
       - name: Test
-        run: dotnet test FamilyTree.sln --no-build -c Release --logger "console;verbosity=normal"
+        run: dotnet test FamilyTree.sln --no-build -c Release --logger "trx;LogFileName=test_results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/*.trx'
