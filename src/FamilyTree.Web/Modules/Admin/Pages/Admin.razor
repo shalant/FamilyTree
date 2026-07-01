@@ -1,0 +1,64 @@
+﻿@page "/admin"
+
+<div class="admin-container">
+
+    <!-- Left navigation -->
+    <aside class="admin-nav">
+        <MudNavMenu Dense="true">
+            <MudNavLink Icon="@Icons.Material.Outlined.Dashboard" Href="/admin">Dashboard</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.DeleteSweep">Deleted</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.Group">Users</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.History">Audit Log</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.BarChart">Activity</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.Upload">Imports</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.AutoStories">Stories</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.MailOutline">Messages</MudNavLink>
+        </MudNavMenu>
+    </aside>
+
+    <!-- Right content -->
+    <main class="admin-content">
+
+        <MudPaper Class="admin-card" Elevation="0">
+
+            <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="true">
+
+                <MudTabPanel Text="Deleted">
+                    <DeletedTab />
+                </MudTabPanel>
+
+                <MudTabPanel Text="Users">
+                    <UsersTab />
+                </MudTabPanel>
+
+                <MudTabPanel Text="Audit Log">
+                    <AuditLogTab />
+                </MudTabPanel>
+
+                <MudTabPanel Text="Activity">
+                    <ActivityTab />
+                </MudTabPanel>
+
+                <MudTabPanel Text="Imports">
+                    <ImportsTab />
+                </MudTabPanel>
+
+                <MudTabPanel Text="Stories">
+                    <StoriesTab />
+                </MudTabPanel>
+
+                <MudTabPanel Text="Messages">
+                    <MessagesTab />
+                </MudTabPanel>
+
+            </MudTabs>
+
+        </MudPaper>
+
+    </main>
+
+</div>
+
+@code {
+    private int _activeTab = 0;
+}
