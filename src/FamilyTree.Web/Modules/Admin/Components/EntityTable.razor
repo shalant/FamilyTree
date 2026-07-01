@@ -1,0 +1,46 @@
+﻿@typeparam TItem
+
+<div class="admin-table-wrap">
+
+    @if (Loading)
+    {
+        <div class="admin-table-loading">
+            <MudProgressCircular Color="Color.Primary" Size="36" />
+        </div>
+    }
+    else
+    {
+        <MudTable Items="Items"
+                  Hover="true"
+                  Dense="true"
+                  Elevation="0"
+                  Class="admin-table">
+
+            <HeaderContent>
+                @HeaderTemplate
+            </HeaderContent>
+
+            <RowTemplate>
+                @RowTemplate
+            </RowTemplate>
+
+        </MudTable>
+    }
+
+    <div class="admin-table-actions">
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Primary"
+                   OnClick="OnRefresh">
+            Refresh
+        </MudButton>
+    </div>
+
+</div>
+
+@code {
+    [Parameter] public IEnumerable<TItem>? Items { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public RenderFragment? HeaderTemplate { get; set; }
+    [Parameter] public RenderFragment<TItem>? RowTemplate { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+}

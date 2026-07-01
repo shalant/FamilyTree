@@ -19,8 +19,4 @@
     <ProjectReference Include="..\FamilyTree.Core\FamilyTree.Core.csproj" />
     <ProjectReference Include="..\FamilyTree.Shared\FamilyTree.Shared.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Modules\Admin\Components\" />
-  </ItemGroup>
 </Project>

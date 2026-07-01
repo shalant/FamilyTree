@@ -1,0 +1,97 @@
+/* ────────────────────────────────────────────────
+   Admin.razor.css
+   Purpose: Layout and spacing for Admin module.
+   Scope: Modules/Admin only.
+   Dependencies: design-tokens.css, app.css
+──────────────────────────────────────────────── */
+
+/* ── Layout container ─────────────────────────── */
+
+.admin-container {
+    display: flex;
+    min-height: 100vh;
+    background: var(--ft-surface);
+    color: var(--ft-text-primary);
+}
+
+/* ── Left navigation ─────────────────────────── */
+
+.admin-nav {
+    flex: 0 0 240px;
+    padding: 16px;
+    background: var(--ft-surface-card);
+    border-right: 1px solid var(--ft-line-border);
+    box-shadow: var(--ft-shadow-sm);
+}
+
+    .admin-nav .mud-nav-link {
+        margin-bottom: 6px;
+    }
+
+/* ── Right content area ───────────────────────── */
+
+.admin-content {
+    flex: 1;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    overflow-x: hidden;
+}
+
+/* ── Card canvas (all tab content lives inside this) ───────────────────────── */
+
+.admin-card {
+    width: 100%;
+    max-width: 1200px;
+    background: var(--ft-surface-card);
+    border-radius: var(--ft-radius-card);
+    box-shadow: var(--ft-shadow-sm);
+    padding: 24px;
+}
+
+/* ── Tab header spacing ───────────────────────── */
+
+.admin-header {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* ── Table consistency ───────────────────────── */
+
+.admin-table {
+    width: 100%;
+    background: transparent;
+}
+
+    .admin-table .mud-table-cell {
+        font-size: 13px;
+    }
+
+/* ── Responsive behavior ───────────────────────── */
+
+@media (max-width: 768px) {
+
+    .admin-container {
+        flex-direction: column;
+    }
+
+    .admin-nav {
+        flex: 1 1 auto;
+        border-right: none;
+        border-bottom: 1px solid var(--ft-line-border);
+        padding: 12px;
+    }
+
+    .admin-content {
+        padding: 12px;
+    }
+
+    .admin-card {
+        padding: 16px;
+        border-radius: 0;
+        box-shadow: none;
+    }
+}

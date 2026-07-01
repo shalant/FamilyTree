@@ -1,0 +1,51 @@
+/* ────────────────────────────────────────────────
+   DeletedTab.razor.css
+   Purpose: Styles specific to the Deleted tab.
+   Scope: Modules/Admin only.
+   Dependencies: design-tokens.css, app.css
+──────────────────────────────────────────────── */
+
+/* Header */
+.deleted-header {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Restore button */
+.deleted-restore-btn {
+    color: var(--ft-green-600);
+    font-weight: 500;
+}
+
+    .deleted-restore-btn:hover {
+        color: var(--ft-green-800);
+    }
+
+/* Table row hover */
+.deleted-row:hover {
+    background: var(--ft-surface-card);
+    box-shadow: var(--ft-shadow-sm);
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Year column */
+.deleted-year {
+    color: var(--ft-text-secondary);
+    font-size: 13px;
+}
+
+/* Name column */
+.deleted-name {
+    font-weight: 500;
+    color: var(--ft-text-primary);
+}
+
+/* Empty state */
+.deleted-empty {
+    padding: 24px 0;
+    text-align: center;
+    color: var(--ft-text-muted);
+    font-size: 14px;
+}

@@ -1,0 +1,72 @@
+﻿@using FamilyTree.Shared.DTOs.Person
+@inherits DeletedTabBase
+@inject IPersonService PersonService
+@inject ToastService ToastService
+
+<div class="admin-header">
+    <MudText Typo="Typo.h6">Deleted People</MudText>
+</div>
+
+<EntityTable Items="_deletedPeople"
+             Loading="_loading"
+             OnRefresh="LoadDeletedAsync">
+    <HeaderTemplate>
+        <MudTh>Name</MudTh>
+        <MudTh>Year</MudTh>
+        <MudTh></MudTh>
+    </HeaderTemplate>
+
+    <RowTemplate Context="person">
+        <MudTd>@person.FullName</MudTd>
+        <MudTd>@person.Year</MudTd>
+        <MudTd>
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Text"
+                       OnClick="@(() => RestorePersonAsync(person.Id))">
+                Restore
+            </MudButton>
+        </MudTd>
+    </RowTemplate>
+</EntityTable>
+
+@code {
+    private bool _loading;
+    private List<PersonDto> _deletedPeople = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDeletedAsync();
+    }
+
+    private async Task LoadDeletedAsync()
+    {
+        _loading = true;
+
+        var result = await PersonService.GetDeletedAsync();
+
+        if (result.Success)
+        {
+            _deletedPeople = result.Data ?? new();
+        }
+        else
+        {
+            ToastService.Error(result.Message ?? "Failed to load deleted people.");
+        }
+
+        _loading = false;
+    }
+
+    private async Task RestorePersonAsync(Guid personId)
+    {
+        var result = await PersonService.RestoreAsync(personId);
+
+        if (result.Success)
+        {
+            await LoadDeletedAsync();
+        }
+        else
+        {
+            ToastService.Error(result.Message ?? "Failed to restore person.");
+        }
+    }
+}
