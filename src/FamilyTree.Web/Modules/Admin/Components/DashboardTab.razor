@@ -1,5 +1,8 @@
+@inherits BaseComponent
+
 @using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Dashboard
+@using FamilyTree.Web.Components
 @inject IDashboardService DashboardService
 @inject NavigationManager NavManager
 
@@ -222,17 +225,27 @@ else
 
     private async Task LoadDashboardAsync()
     {
-        var stats = await DashboardService.GetDashboardStatsAsync();
-        _totalPeople = stats.TotalPeople;
-        _deletedCount = stats.DeletedCount;
-        _totalRelationships = stats.TotalRelationships;
-        _familyCount = stats.FamilyCount;
-        _userCount = stats.UserCount;
-        _pendingInvites = stats.PendingInvites;
-        _totalAuditEntries = stats.TotalAuditEntries;
-        _auditEntriesToday = stats.AuditEntriesToday;
-        _recentAudit = stats.RecentAudit;
-        _loading = false;
+        try
+        {
+            var stats = await DashboardService.GetDashboardStatsAsync();
+            _totalPeople = stats.TotalPeople;
+            _deletedCount = stats.DeletedCount;
+            _totalRelationships = stats.TotalRelationships;
+            _familyCount = stats.FamilyCount;
+            _userCount = stats.UserCount;
+            _pendingInvites = stats.PendingInvites;
+            _totalAuditEntries = stats.TotalAuditEntries;
+            _auditEntriesToday = stats.AuditEntriesToday;
+            _recentAudit = stats.RecentAudit;
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Failed to load dashboard: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private static string AuditIcon(string action) => action switch

@@ -224,6 +224,7 @@
     private bool _showConfirm;
     private bool _loading;
     private bool _registered;
+    private bool _welcomeToastShown;
 
     private string? _error;
     private string _firstNameError = "";
@@ -249,8 +250,9 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_inviteId.HasValue && _invite != null)
+        if (firstRender && _inviteId.HasValue && _invite != null && !_welcomeToastShown)
         {
+            _welcomeToastShown = true;
             ToastService.Success("Welcome! Your memory has been saved — now create your free ArborKin account.");
         }
         if (firstRender && _inviteId.HasValue)
@@ -301,7 +303,7 @@
         else
         {
             _registered = true;
-            ToastService.Success("Welcome to ArborKin — your story is now part of the family tree.");
+            ToastService.Success("Account created — explore your family tree!");
         }
     }
 }

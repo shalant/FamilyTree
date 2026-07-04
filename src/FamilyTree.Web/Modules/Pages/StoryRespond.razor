@@ -1,15 +1,16 @@
 @page "/story/respond/{Token}"
 @rendermode InteractiveServer
+@inherits BaseComponent
 
 @using FamilyTree.Core.Services
 @using FamilyTree.Web.Services
+@using FamilyTree.Web.Components
 @using FamilyTree.Shared.DTOs.StoryInvite
 @using FamilyTree.Shared.DTOs.Story
 @using MudBlazor
 
 @inject IStoryInviteService StoryInviteService
 @inject NavigationManager Nav
-@inject ToastService ToastService
 
 <PageTitle>Share a memory — ArborKin</PageTitle>
 
@@ -191,10 +192,13 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var result = await StoryInviteService.ValidateTokenAsync(Token);
-        _validation = result.Success
-            ? result.Data
-            : new StoryInviteValidationDto { IsValid = false };
+        _validation = await TryAsync(
+            () => StoryInviteService.ValidateTokenAsync(Token),
+            "Loading invite details");
+
+        if (_validation == null)
+            _validation = new StoryInviteValidationDto { IsValid = false };
+
         _loading = false;
     }
 
@@ -210,20 +214,21 @@
 
         _saving = true;
         _response.Token = Token;
-        var result = await StoryInviteService.SubmitResponseAsync(_response);
+        _story = await TryAsync(
+            () => StoryInviteService.SubmitResponseAsync(_response),
+            "Saving your memory");
         _saving = false;
 
-        if (!result.Success)
-        {
-            _error = result.Message;
-            ToastService.Error(result.Message ?? "Something went wrong while saving your memory.");
-            return;
-        }
-        else
+        if (_story != null)
         {
             _submitted = true;
-            _story = result.Data;
             ToastService.Success($"Your memory of {_validation?.DisplayName} has been saved!");
+
+            // Redirect to registration with invite token if available
+            if (_story.UserInviteId.HasValue)
+                Nav.NavigateTo($"/register?invite={_story.UserInviteId}");
+            else
+                Nav.NavigateTo("/register");
         }
     }
 }
