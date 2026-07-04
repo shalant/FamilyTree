@@ -14,7 +14,7 @@
                 @HeaderTemplate
             </HeaderContent>
             <RowTemplate Context="item">
-                @RowTemplate(item)
+                @RowTemplate?.Invoke(item)
             </RowTemplate>
         </MudTable>
     }

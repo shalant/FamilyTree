@@ -1,4 +1,5 @@
 @using FamilyTree.Core.Models
+@using FamilyTree.Web.Modules.Components
 @inject IImportService ImportService
 @inject ToastService Toast
 @inject IJSRuntime JS
@@ -13,7 +14,7 @@
             Import history
         </div>
         <MudPaper Elevation="0" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
-            <MudTable Items="_importBatches" Hover="true" Dense="true" Pageable="true" PageSize="10"
+            <MudTable Items="_importBatches" Hover="true" Dense="true"
                       Style="background:transparent;">
                 <HeaderContent>
                     <MudTh>Date</MudTh>

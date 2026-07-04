@@ -17,7 +17,7 @@ else if (_activity.Count == 0)
 }
 else
 {
-    <MudTable Items="_activity" T="UserActivity" Hover="true" Dense="true" Pageable="true" PageSize="10"
+    <MudTable Items="_activity" T="UserActivity" Hover="true" Dense="true"
               OnRowClick="@(e => ShowActivityDetailAsync(e.Item!))"
               Style="background:var(--ft-surface-card); cursor:pointer;">
         <HeaderContent>
