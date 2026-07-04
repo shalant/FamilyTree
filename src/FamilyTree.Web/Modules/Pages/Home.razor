@@ -4,6 +4,8 @@
 @implements IAsyncDisposable
 
 @using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Identity
+@using FamilyTree.Core.Models
 @using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Shared.DTOs
@@ -14,12 +16,14 @@
 
 @inject IPersonService PersonService
 @inject IAuthService AuthService
+@inject IStoryService StoryService
 @inject NavigationManager Nav
 @inject IDialogService DialogService
 @inject ToastService Toast
 @inject IJSRuntime JS
 @inject AuthenticationStateProvider AuthStateProvider
 @inject TreeContextService TreeContext
+@inject UserManager<AppUser> UserManager
 
 <PageTitle>ArborKin</PageTitle>
 
@@ -108,6 +112,7 @@ else
                        OnZoomOut="@(async () => { if (_canvas != null) await _canvas.ZoomOut(); })"
                        OnCenterTree="@(async () => { if (_canvas != null) await _canvas.CenterTree(); })"
                        OnReset="HandleReset"
+                       OnRefresh="RefreshDataAsync"
                        OnExport="HandleExport"
                        ForceCollapsed="_isNarrowViewport" />
     </div>
@@ -158,6 +163,7 @@ else
     private (double Left, double Top)? _heroPos;
     private bool _isNarrowViewport;
     private bool _showTreeHint = false;
+    private bool _linkingModalChecked = false;
 
     // Mobile/tablet always anchors bottom-left, ignoring any saved drag position from
     // a wider session — a position dragged-to on desktop may not even be on-screen here.
@@ -207,10 +213,80 @@ else
         {
             Toast.Info("Welcome! Start by adding your first family member.");
         }
-        // else if (_currentUserId.HasValue && _people.Any() && _focusPerson == null)
-        // {
-        //     Toast.Info("Choose a person to center your tree.");
-        // }
+    }
+
+    private async Task CheckAndShowLinkingModalIfNeededAsync()
+    {
+        if (!_currentUserId.HasValue) return;
+
+        try
+        {
+            var user = await UserManager.FindByIdAsync(_currentUserId.Value.ToString());
+            if (user != null && !user.PersonId.HasValue && _people.Any())
+            {
+                await ShowLinkingModalAsync(user, isRecovery: true);
+
+                // After modal completes, reload user to get updated PersonId and refresh focus
+                user = await UserManager.FindByIdAsync(_currentUserId.Value.ToString());
+                if (user?.PersonId.HasValue == true)
+                {
+                    var linkedPerson = _people.FirstOrDefault(p => p.Id == user.PersonId.Value);
+                    if (linkedPerson != null)
+                    {
+                        _focusPerson = linkedPerson;
+                        TreeContext.SetContext(_focusPerson, _people.Count, _couples.Count);
+                        await PersistFocusAsync(_focusPerson.Id);
+                        StateHasChanged();
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.Error($"Error checking profile link: {ex.Message}");
+        }
+    }
+
+    private async Task ShowLinkingModalAsync(AppUser user, bool isRecovery = false)
+    {
+        var names = user.DisplayName?.Split(' ') ?? new[] { "", "" };
+        var firstName = names.Length > 0 ? names[0] : "";
+        var lastName = names.Length > 1 ? string.Join(" ", names.Skip(1)) : "";
+
+        // Only an anonymous invite-response story (AuthorId == null) qualifies as a
+        // "subject to onboard first" — a self-authored story (this user, already signed
+        // in, writing about themselves under a free-text name) must never drive the
+        // subject-first flow, or the modal ends up asking "is Tom related to anyone?"
+        // about Tom while Tom is the one answering.
+        string? storySubjectName = null;
+        Guid? storyId = null;
+        if (!string.IsNullOrWhiteSpace(user.Email))
+        {
+            var storiesResult = await StoryService.GetByAuthorEmailAsync(user.Email);
+            var pending = storiesResult.Success
+                ? storiesResult.Data?.Where(s => s.PersonId == null && s.AuthorId == null &&
+                                                   !string.IsNullOrWhiteSpace(s.UnlinkedPersonName))
+                              .OrderByDescending(s => s.CreatedAt)
+                              .FirstOrDefault()
+                : null;
+            storySubjectName = pending?.UnlinkedPersonName;
+            storyId = pending?.Id;
+        }
+
+        var parameters = new DialogParameters<LinkToTreeModal>
+        {
+            { x => x.UserId, user.Id },
+            { x => x.UserFirstName, firstName },
+            { x => x.UserLastName, lastName },
+            { x => x.IsRecovery, isRecovery },
+            { x => x.StorySubjectName, storySubjectName },
+            { x => x.StoryId, storyId },
+        };
+
+        var dialog = await DialogService.ShowAsync<LinkToTreeModal>(
+            isRecovery ? "Complete your profile" : "Link to your family tree",
+            parameters);
+        await dialog.Result;
     }
 
     // Handles same-page navigation (query param changes without full reload).
@@ -242,6 +318,12 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender && !_linkingModalChecked && _currentUserId.HasValue && _people.Any())
+        {
+            _linkingModalChecked = true;
+            await CheckAndShowLinkingModalIfNeededAsync();
+        }
+
         // Resolve focus once JS is available (only when not set by URL param)
         if (!_ready && _people.Count > 0)
         {
@@ -397,6 +479,32 @@ else
         catch { }
         if (_canvas != null) await _canvas.ResetView();
         StateHasChanged();
+    }
+
+    // A Blazor Server circuit loads _people once and keeps it in memory — edits made
+    // elsewhere (another tab, the Admin panel, another user) never show up until this
+    // is re-fetched. This re-pulls people + relationships from the server without a
+    // full page reload, so a stale in-tab view (e.g. a person deleted in another tab)
+    // can't be mistaken for a rendering bug.
+    private async Task RefreshDataAsync()
+    {
+        var result = await PersonService.GetAllAsync();
+        if (!result.Success)
+        {
+            Toast.Error(result.Message);
+            return;
+        }
+
+        _people = result.Data!;
+        _couples = CoupleHelper.Derive(_people);
+
+        _focusPerson = _focusPerson != null
+            ? _people.FirstOrDefault(p => p.Id == _focusPerson.Id) ?? _people.FirstOrDefault()
+            : _people.FirstOrDefault();
+
+        TreeContext.SetContext(_focusPerson, _people.Count, _couples.Count);
+        StateHasChanged();
+        Toast.Success("Tree refreshed.");
     }
 
     private async Task HandleExport()

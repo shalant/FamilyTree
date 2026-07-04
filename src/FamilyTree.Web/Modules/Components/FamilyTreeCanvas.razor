@@ -92,6 +92,16 @@
                               stroke-width="1.2" />
                     }
                 }
+
+                @* Sibling-only connectors — no shared parent on the tree yet *@
+                @foreach (var link in _layout.SiblingLinks)
+                {
+                    <path d="M @F(link.AX) @F(link.AY) L @F(link.BX) @F(link.BY)"
+                          fill="none"
+                          stroke="var(--ft-gray-400)"
+                          stroke-width="1.2"
+                          stroke-dasharray="4 3" />
+                }
             </svg>
 
             @* Person nodes *@

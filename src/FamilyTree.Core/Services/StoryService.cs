@@ -316,6 +316,32 @@ public class StoryService(
         }
     }
 
+    public async Task<ServiceResponse<List<StoryDto>>> GetByAuthorEmailAsync(string email, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var normalized = email.Trim().ToLower();
+            var stories = await ctx.Stories
+                .AsNoTracking()
+                .Include(s => s.Author)
+                .Include(s => s.Invite)
+                .Where(s => (s.Author != null && s.Author.Email != null && s.Author.Email.ToLower() == normalized)
+                         || (s.Invite != null && s.Invite.InvitedEmail.ToLower() == normalized))
+                .OrderByDescending(s => s.CreatedAt)
+                .ToListAsync(ct);
+
+            return ServiceResponse<List<StoryDto>>.Ok(stories.Select(MapToDto).ToList());
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading stories by author email");
+            return ServiceResponse<List<StoryDto>>.Fail(
+                "An error occurred loading stories.");
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────
     //  LINK TO PERSON
     // ─────────────────────────────────────────────────────────────

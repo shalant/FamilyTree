@@ -246,8 +246,26 @@ public class PersonService(
                 return ServiceResponse.Fail($"Person {id} not found.");
 
             var userId = currentUser.UserId;
-            person.DeletedAt = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
+
+            person.DeletedAt = now;
             person.DeletedBy = userId;
+
+            // Cascade soft-delete this person's own relationships so they don't linger
+            // as dangling rows once the person disappears from every query (they're
+            // already excluded from GetAllAsync's relationship list, but leaving them
+            // live in the DB is needless clutter). Tagged with the exact same timestamp
+            // so RestoreAsync can tell these apart from relationships that were already
+            // independently removed before this delete.
+            var relationships = await ctx.Relationships
+                .Where(r => r.PersonAId == id || r.PersonBId == id)
+                .ToListAsync(ct);
+            foreach (var rel in relationships)
+            {
+                rel.DeletedAt = now;
+                rel.DeletedBy = userId;
+            }
+
             await ctx.SaveChangesAsync(ct);
 
             _ = auditLog.LogAsync("Delete", "Person", id, userId: userId);
@@ -282,8 +300,24 @@ public class PersonService(
             if (person.DeletedAt is null)
                 return ServiceResponse.Fail("Person is not deleted.");
 
+            var deletedAt = person.DeletedAt.Value;
+
             person.DeletedAt = null;
             person.DeletedBy = null;
+
+            // Restore only relationships that were cascade-deleted alongside this exact
+            // person deletion (same timestamp) — a relationship the user had already
+            // removed independently, before this person was deleted, stays deleted.
+            var relationships = await ctx.Relationships
+                .IgnoreQueryFilters()
+                .Where(r => (r.PersonAId == id || r.PersonBId == id) && r.DeletedAt == deletedAt)
+                .ToListAsync(ct);
+            foreach (var rel in relationships)
+            {
+                rel.DeletedAt = null;
+                rel.DeletedBy = null;
+            }
+
             await ctx.SaveChangesAsync(ct);
 
             _ = auditLog.LogAsync("Restore", "Person", id, userId: currentUser.UserId);

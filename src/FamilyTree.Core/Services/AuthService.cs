@@ -1,5 +1,6 @@
 using FamilyTree.Core.Data;
 using FamilyTree.Core.Models;
+using FamilyTree.Shared.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -350,4 +351,142 @@ public class AuthService(
             await ctx.SaveChangesAsync();
         }
     }
+
+    public async Task<AuthResult> LinkUserToTreeAsync(
+        Guid userId,
+        Guid? personId,
+        string? firstName,
+        string? lastName,
+        Guid? connectedPersonId = null,
+        string? relationshipType = null)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return new AuthResult(false, "User not found.");
+
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+
+        if (personId.HasValue)
+        {
+            var existingPerson = await ctx.People.FindAsync(personId.Value);
+            if (existingPerson is null)
+                return new AuthResult(false, "Selected person not found.");
+
+            user.PersonId = personId.Value;
+            var result = await userManager.UpdateAsync(user);
+            return result.Succeeded
+                ? new AuthResult(true, PersonId: personId.Value)
+                : new AuthResult(false, result.Errors.First().Description);
+        }
+
+        if (!connectedPersonId.HasValue || string.IsNullOrWhiteSpace(relationshipType))
+            return new AuthResult(false, "Invalid link parameters.");
+
+        var connectedPerson = await ctx.People.FindAsync(connectedPersonId.Value);
+        if (connectedPerson is null)
+            return new AuthResult(false, "Connected person not found.");
+
+        if (!IsValidRelationshipToken(relationshipType))
+            return new AuthResult(false, $"Invalid relationship type: {relationshipType}");
+
+        var newPerson = new Person
+        {
+            Id = Guid.NewGuid(),
+            FirstName = firstName?.Trim() ?? "Unknown",
+            LastName = lastName?.Trim() ?? "",
+            FamilyId = connectedPerson.FamilyId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId,
+        };
+
+        ctx.People.Add(newPerson);
+        await ctx.SaveChangesAsync();
+
+        user.PersonId = newPerson.Id;
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+            return new AuthResult(false, updateResult.Errors.First().Description);
+
+        var (personAId, personBId, finalType) =
+            ResolveRelationshipDirection(newPerson.Id, connectedPersonId.Value, relationshipType);
+
+        ctx.Relationships.Add(new Relationship
+        {
+            Id = Guid.NewGuid(),
+            PersonAId = personAId,
+            PersonBId = personBId,
+            Type = finalType,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId,
+        });
+        await ctx.SaveChangesAsync();
+
+        return new AuthResult(true, PersonId: newPerson.Id);
+    }
+
+    public async Task<AuthResult> CreateUnlinkedPersonAsync(
+        string? firstName,
+        string? lastName,
+        Guid connectedPersonId,
+        string relationshipType,
+        Guid createdByUserId)
+    {
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+
+        var connectedPerson = await ctx.People.FindAsync(connectedPersonId);
+        if (connectedPerson is null)
+            return new AuthResult(false, "Connected person not found.");
+
+        if (!IsValidRelationshipToken(relationshipType))
+            return new AuthResult(false, $"Invalid relationship type: {relationshipType}");
+
+        var newPerson = new Person
+        {
+            Id = Guid.NewGuid(),
+            FirstName = firstName?.Trim() ?? "Unknown",
+            LastName = lastName?.Trim() ?? "",
+            FamilyId = connectedPerson.FamilyId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = createdByUserId,
+        };
+
+        ctx.People.Add(newPerson);
+        await ctx.SaveChangesAsync();
+
+        var (personAId, personBId, finalType) =
+            ResolveRelationshipDirection(newPerson.Id, connectedPersonId, relationshipType);
+
+        ctx.Relationships.Add(new Relationship
+        {
+            Id = Guid.NewGuid(),
+            PersonAId = personAId,
+            PersonBId = personBId,
+            Type = finalType,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = createdByUserId,
+        });
+        await ctx.SaveChangesAsync();
+
+        return new AuthResult(true, PersonId: newPerson.Id);
+    }
+
+    // "subject" is whichever person was just created (Willa or Bill); "connected" is the
+    // existing tree member they're being linked to. Parent direction is explicit in the
+    // token because Relationship rows encode PersonAId = parent, PersonBId = child.
+    private static bool IsValidRelationshipToken(string token) =>
+        token is "ParentOfConnected" or "ChildOfConnected" or "Spouse" or "Sibling";
+
+    private static (Guid PersonAId, Guid PersonBId, RelationshipType Type) ResolveRelationshipDirection(
+        Guid subjectId, Guid connectedPersonId, string relationshipType) => relationshipType switch
+    {
+        "ParentOfConnected" => (subjectId, connectedPersonId, RelationshipType.Parent),
+        "ChildOfConnected"  => (connectedPersonId, subjectId, RelationshipType.Parent),
+        "Spouse" => subjectId < connectedPersonId
+            ? (subjectId, connectedPersonId, RelationshipType.Spouse)
+            : (connectedPersonId, subjectId, RelationshipType.Spouse),
+        "Sibling" => subjectId < connectedPersonId
+            ? (subjectId, connectedPersonId, RelationshipType.Sibling)
+            : (connectedPersonId, subjectId, RelationshipType.Sibling),
+        _ => throw new ArgumentException($"Invalid relationship type: {relationshipType}")
+    };
 }

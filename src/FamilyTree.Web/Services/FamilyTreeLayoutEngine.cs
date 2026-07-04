@@ -124,6 +124,7 @@ public class FamilyTreeLayoutEngine
         var personById = people.ToDictionary(p => p.Id);
         var nuclearGroups = BuildNuclearGroups(people, couples);
         var nodeMap = new Dictionary<Guid, LayoutNode>();
+        var siblingLinks = new List<SiblingLink>();
         var xOffset = PaddingX;
 
         foreach (var component in components)
@@ -305,6 +306,17 @@ public class FamilyTreeLayoutEngine
             }
 
             // ── Place roots left to right ─────────────────────────────────────
+            // Deliberately NOT reordered by sibling relationships. An earlier version
+            // tried to reorder/cluster root groups so a newly-added sibling (e.g. "Bill"
+            // or "Morton") would render immediately adjacent to their sibling — but that
+            // meant every new addition could reshuffle X positions of people who were
+            // already placed, and it broke down as soon as one of the siblings was
+            // married (their spouse is an atomic part of the same couple unit, so a
+            // sibling connector routed to them visually passes through/near the spouse).
+            // Simpler and more stable: roots are placed in their natural order and never
+            // move once placed; a new sibling just lands wherever it naturally falls.
+            // The dashed sibling connector below still shows the relationship even when
+            // the two ends aren't adjacent.
             double curX = xOffset;
 
             foreach (var rg in rootGroups)
@@ -338,6 +350,22 @@ public class FamilyTreeLayoutEngine
                 {
                     SetNode(person.Id, curX + NodeSpacingX / 2.0);
                     curX += NodeSpacingX;
+                }
+            }
+
+            // A sibling relationship with no shared parent on the tree has no
+            // couple/parent connector to hang off of — draw a simple line between
+            // wherever the two ended up, even if they're not adjacent.
+            var drawnSiblingPairs = new HashSet<(Guid, Guid)>();
+            foreach (var person in component)
+            {
+                if (!nodeMap.TryGetValue(person.Id, out var nodeA)) continue;
+                foreach (var sibId in person.SiblingIds ?? [])
+                {
+                    var key = person.Id.CompareTo(sibId) < 0 ? (person.Id, sibId) : (sibId, person.Id);
+                    if (!drawnSiblingPairs.Add(key)) continue;
+                    if (nodeMap.TryGetValue(sibId, out var nodeB))
+                        siblingLinks.Add(new SiblingLink(nodeA.X, nodeA.Y, nodeB.X, nodeB.Y));
                 }
             }
 
@@ -380,6 +408,7 @@ public class FamilyTreeLayoutEngine
             nodeMap.Values.ToList(),
             bands,
             connectors,
+            siblingLinks,
             canvasWidth,
             canvasHeight,
             focusDepth);
@@ -396,7 +425,8 @@ public class FamilyTreeLayoutEngine
     ///   1. Pick an arbitrary focus person (first in list)
     ///   2. BFS upward through parents (ancestors get positive depth)
     ///   3. Push depths downward through children (descendants get negative depth)
-    ///   4. Propagate through spouses (same depth as partner)
+    ///   4. Propagate through spouses and siblings (same depth), re-checking children
+    ///      as new depths arrive so a sibling-derived depth can cascade to their kids
     ///   5. Normalize so the oldest ancestor has depth 0
     ///
     /// This produces a stable relative depth map that works even when birth
@@ -429,24 +459,27 @@ public class FamilyTreeLayoutEngine
             }
         }
 
-        // Pass 2: Push depths downward through children.
-        foreach (var person in people)
-        {
-            foreach (var parentId in person.ParentIds ?? [])
-            {
-                if (depths.TryGetValue(parentId, out var pd) &&
-                    !depths.ContainsKey(person.Id))
-                {
-                    depths[person.Id] = pd - 1;
-                }
-            }
-        }
-
-        // Pass 3: Propagate through spouses (iterate until stable).
+        // Pass 2/3 combined: push depths downward through children, and propagate
+        // through spouses and siblings — iterated together until stable, since a
+        // sibling picking up a depth (e.g. "Bill" from "Ray") can unlock a further
+        // child-depth inference (e.g. "Willa" from "Bill") in a later round.
         bool changed = true;
         while (changed)
         {
             changed = false;
+
+            foreach (var person in people)
+            {
+                foreach (var parentId in person.ParentIds ?? [])
+                {
+                    if (depths.TryGetValue(parentId, out var pd) &&
+                        !depths.ContainsKey(person.Id))
+                    {
+                        depths[person.Id] = pd - 1;
+                        changed = true;
+                    }
+                }
+            }
 
             foreach (var person in people)
             {
@@ -458,6 +491,17 @@ public class FamilyTreeLayoutEngine
                     if (!depths.ContainsKey(spouseId))
                     {
                         depths[spouseId] = personDepth;
+                        changed = true;
+                    }
+                }
+
+                // Siblings share a generation even when linked only by an explicit
+                // Sibling relationship with no shared parent on the tree.
+                foreach (var siblingId in person.SiblingIds ?? [])
+                {
+                    if (!depths.ContainsKey(siblingId))
+                    {
+                        depths[siblingId] = personDepth;
                         changed = true;
                     }
                 }
@@ -486,8 +530,10 @@ public class FamilyTreeLayoutEngine
     /// Strategy:
     ///   1. Use PersonDto.BirthDate if available
     ///   2. Infer from children: parent_year ≈ avg(child_years) - 25
-    ///   3. Infer from parents: child_year ≈ avg(parent_years) + 25
-    ///   4. Default remaining unknowns to the median year
+    ///   3. Infer from siblings: sibling_year ≈ avg(known sibling years)
+    ///   4. Infer from spouses: spouse_year ≈ avg(known spouse/former-spouse years)
+    ///   5. Infer from parents: child_year ≈ avg(parent_years) + 25
+    ///   6. Default remaining unknowns to the median year
     ///
     /// This multi‑pass approach converges on a consistent temporal model even
     /// when data is incomplete.
@@ -500,7 +546,14 @@ public class FamilyTreeLayoutEngine
         foreach (var person in people.Where(p => p.BirthDate.HasValue))
             years[person.Id] = person.BirthDate!.Value.Year;
 
-        // Pass 1: Infer parents from children.
+        // Pass 1: Infer parents from children, children from parents, and siblings
+        // from each other — iterated together until stable. Combining these lets a
+        // sibling picked up from another sibling (e.g. "Bill" from "Ray", who have
+        // no shared parent on the tree) unlock a further child-year inference
+        // (e.g. "Willa" from "Bill") in a later round. Without this, two people
+        // with no birth date and no inferable link (like a newly-added sibling and
+        // their child) would both fall through to the same default median year and
+        // render on top of each other.
         bool changed = true;
         while (changed)
         {
@@ -519,15 +572,39 @@ public class FamilyTreeLayoutEngine
                 {
                     years[person.Id] = (int)childYears.Average() - 25;
                     changed = true;
+                    continue;
+                }
+
+                var siblingYears = (person.SiblingIds ?? [])
+                    .Where(sid => years.ContainsKey(sid))
+                    .Select(sid => years[sid])
+                    .ToList();
+
+                if (siblingYears.Any())
+                {
+                    years[person.Id] = (int)siblingYears.Average();
+                    changed = true;
+                    continue;
+                }
+
+                // Spouses are treated as roughly the same generation. Without this, a
+                // spouse with no parent/child/sibling link of their own (e.g. someone
+                // who married into the family with no other recorded relatives) never
+                // gets an inferred year at all and falls straight to the "default to
+                // median" fallback below — landing decades away from their actual
+                // partner and making the couple connector look broken.
+                var spouseYears = (person.SpouseIds ?? [])
+                    .Concat(person.FormerSpouseIds ?? [])
+                    .Where(sid => years.ContainsKey(sid))
+                    .Select(sid => years[sid])
+                    .ToList();
+
+                if (spouseYears.Any())
+                {
+                    years[person.Id] = (int)spouseYears.Average();
+                    changed = true;
                 }
             }
-        }
-
-        // Pass 2: Infer children from parents.
-        changed = true;
-        while (changed)
-        {
-            changed = false;
 
             foreach (var person in people)
             {
@@ -602,6 +679,7 @@ public class FamilyTreeLayoutEngine
                 relatedIds.UnionWith(current.ParentIds ?? []);
                 relatedIds.UnionWith(current.ChildIds ?? []);
                 relatedIds.UnionWith(current.SpouseIds ?? []);
+                relatedIds.UnionWith(current.SiblingIds ?? []);
 
                 foreach (var relatedId in relatedIds.Where(id => !visited.Contains(id)))
                 {
@@ -903,6 +981,13 @@ public class FamilyTreeLayoutEngine
     public record ChildDrop(double CenterX, double BotY);
 
     /// <summary>
+    /// A direct line between two siblings who have no shared parent on the tree
+    /// (e.g. a newly-added sibling like "Bill" linked only to "Ray") — there is no
+    /// parent/couple group to hang a normal stem+span+drop connector off of.
+    /// </summary>
+    public record SiblingLink(double AX, double AY, double BX, double BY);
+
+    /// <summary>
     /// A nuclear family group used internally during X-axis layout.
     /// Distinct from <see cref="FamilyUnit"/>, which is the SVG connector output.
     /// </summary>
@@ -926,9 +1011,10 @@ public record FamilyTreeLayout(
     List<FamilyTreeLayoutEngine.LayoutNode> Nodes,
     List<FamilyTreeLayoutEngine.GenerationBand> Bands,
     List<FamilyTreeLayoutEngine.FamilyUnit> Connectors,
+    List<FamilyTreeLayoutEngine.SiblingLink> SiblingLinks,
     int CanvasWidth,
     int CanvasHeight,
     int FocusDepth)
 {
-    public static FamilyTreeLayout Empty => new([], [], [], 900, 600, 0);
+    public static FamilyTreeLayout Empty => new([], [], [], [], 900, 600, 0);
 }

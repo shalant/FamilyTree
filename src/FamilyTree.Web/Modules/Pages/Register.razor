@@ -4,8 +4,11 @@
 @using FamilyTree.Core.Models
 @using FamilyTree.Core.Services
 @using FamilyTree.Web.Services
+@using FamilyTree.Web.Modules.Components
 @using MudBlazor
 @inject IAuthService AuthService
+@inject IStoryService StoryService
+@inject IDialogService DialogService
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ToastService ToastService
@@ -163,13 +166,12 @@
                     </div>
 
                     <p style="font-size:14px; color:var(--ft-text-muted); margin-bottom:24px; line-height:1.6;">
-                        Welcome, @_firstName — your ArborKin account is ready. Continue to your family tree to explore stories,
-                        add photos, and see your memory in context.
+                        Welcome, @_firstName — your ArborKin account is ready. Let's link you to your family tree.
                     </p>
 
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                               Href="/home">
-                        Continue to your tree →
+                               OnClick="ShowLinkModal">
+                        Link to your tree →
                     </MudButton>
                 </div>
             }
@@ -225,6 +227,7 @@
     private bool _loading;
     private bool _registered;
     private bool _welcomeToastShown;
+    private Guid? _registeredUserId;
 
     private string? _error;
     private string _firstNameError = "";
@@ -232,6 +235,9 @@
     private string _emailError = "";
     private string _passwordError = "";
     private string _confirmError = "";
+
+    private string? _storySubjectName;
+    private Guid? _storyId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -244,7 +250,31 @@
             if (_invite != null)
             {
                 _email = _invite.Email;
+                await LoadPendingStorySubjectAsync(_invite.Email);
             }
+        }
+    }
+
+    // Finds the story this invite is following up on (if any) so the linking modal can
+    // walk the user through adding the story's subject to the tree first. Only an
+    // anonymous invite-response story (AuthorId == null) qualifies — a self-authored
+    // story (someone already signed in, writing about themselves under a free-text
+    // name) must never drive the subject-first flow, or the modal ends up asking
+    // "is Tom related to anyone?" about Tom while Tom is the one answering.
+    private async Task LoadPendingStorySubjectAsync(string email)
+    {
+        var result = await StoryService.GetByAuthorEmailAsync(email);
+        var pending = result.Success
+            ? result.Data?.Where(s => s.PersonId == null && s.AuthorId == null &&
+                                       !string.IsNullOrWhiteSpace(s.UnlinkedPersonName))
+                          .OrderByDescending(s => s.CreatedAt)
+                          .FirstOrDefault()
+            : null;
+
+        if (pending != null)
+        {
+            _storySubjectName = pending.UnlinkedPersonName;
+            _storyId = pending.Id;
         }
     }
 
@@ -302,8 +332,43 @@
         }
         else
         {
+            _registeredUserId = result.UserId;
             _registered = true;
-            ToastService.Success("Account created — explore your family tree!");
+            ToastService.Success("Account created — let's link you to your tree!");
         }
+    }
+
+    private async Task ShowLinkModal()
+    {
+        if (!_registeredUserId.HasValue)
+            return;
+
+        var parameters = new DialogParameters<LinkToTreeModal>
+        {
+            { x => x.UserId, _registeredUserId.Value },
+            { x => x.UserFirstName, _firstName },
+            { x => x.UserLastName, _lastName },
+            { x => x.StorySubjectName, _storySubjectName },
+            { x => x.StoryId, _storyId },
+        };
+
+        var dialog = await DialogService.ShowAsync<LinkToTreeModal>(
+            "Link to your family tree", parameters);
+        var result = await dialog.Result;
+
+        // Explicitly persist FocusPersonId rather than relying on /auth/do-login's
+        // FocusPersonId ?? PersonId fallback — that fallback depends on the linking
+        // write being visible to a separate request, and if it comes up empty,
+        // ResolveFocusAsync falls through to the browser's shared "ft-focus"
+        // localStorage key, which could still hold whoever was previously signed in
+        // on this device (e.g. the developer's own account during testing).
+        if (!result.Canceled && result.Data is Guid linkedPersonId)
+            await AuthService.SaveFocusPersonAsync(_registeredUserId.Value, linkedPersonId);
+
+        // Registering only creates the account — it doesn't authenticate this browser.
+        // Submit a real POST to /auth/do-login (native form, sets the auth cookie) so the
+        // new user actually lands on their own home page instead of whoever was previously
+        // signed in on this device.
+        await JS.InvokeVoidAsync("ftSubmitLogin", _email, _password);
     }
 }
