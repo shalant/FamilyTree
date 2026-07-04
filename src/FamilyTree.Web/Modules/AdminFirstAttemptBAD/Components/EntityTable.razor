@@ -1,40 +1,29 @@
 ﻿@typeparam TItem
 
 <div class="admin-table-wrap">
-
     @if (Loading)
     {
         <div class="admin-table-loading">
-            <MudProgressCircular Color="Color.Primary" Size="36" />
+            <MudProgressCircular Color="Color.Primary" Size="Size.Large" />
         </div>
     }
     else
     {
-        <MudTable Items="Items"
-                  Hover="true"
-                  Dense="true"
-                  Elevation="0"
-                  Class="admin-table">
-
+        <MudTable Items="Items" Hover="true" Dense="true" Elevation="0" Class="admin-table">
             <HeaderContent>
                 @HeaderTemplate
             </HeaderContent>
-
-            <RowTemplate>
-                @RowTemplate
+            <RowTemplate Context="item">
+                @RowTemplate(item)
             </RowTemplate>
-
         </MudTable>
     }
 
     <div class="admin-table-actions">
-        <MudButton Variant="Variant.Text"
-                   Color="Color.Primary"
-                   OnClick="OnRefresh">
+        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="OnRefresh">
             Refresh
         </MudButton>
     </div>
-
 </div>
 
 @code {

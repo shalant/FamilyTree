@@ -1,0 +1,425 @@
+@using FamilyTree.Core.Data
+@using FamilyTree.Core.Models
+@using FamilyTree.Shared.DTOs.Person
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject IAuthService AuthService
+@inject UserManager<AppUser> UserManager
+@inject IPersonService PersonService
+@inject ToastService Toast
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+
+<MudPaper Elevation="0" Class="pa-4 mb-4"
+          Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+    <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+        letter-spacing:.1em; color:var(--ft-green-600); margin-bottom:14px;">
+        Invite someone
+    </div>
+
+    <div style="max-width:520px;">
+        <div style="font-size:12px; color:var(--ft-text-muted); margin-bottom:6px;">
+            Email address
+        </div>
+        <div style="display:flex; gap:10px; align-items:stretch;">
+            <MudTextField @bind-Value="_inviteEmail"
+                          Placeholder="user@example.com"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.None"
+                          InputType="InputType.Email"
+                          Style="flex:1;"
+                          Disabled="_creatingInvite" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Outlined.Send"
+                       Style="flex-shrink:0;"
+                       OnClick="CreateInviteAsync"
+                       Disabled="@(_creatingInvite || string.IsNullOrWhiteSpace(_inviteEmail))">
+                Generate link
+            </MudButton>
+        </div>
+    </div>
+
+    @if (_inviteError is not null)
+    {
+        <div style="font-size:13px; color:var(--mud-palette-error); margin-top:8px;">
+            @_inviteError
+        </div>
+    }
+
+    @if (_inviteLink is not null)
+    {
+        <div style="margin-top:12px; padding:12px; border-radius:8px;
+            background:rgba(76,175,80,0.08); border:1px solid rgba(76,175,80,0.25);">
+            <div style="font-size:11px; color:var(--ft-gray-400); margin-bottom:6px;">
+                Send this link to @_inviteEmail — expires in 7 days
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <code style="font-size:12px; color:var(--ft-green-800); word-break:break-all; flex:1;">
+                    @_inviteLink
+                </code>
+                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
+                               Size="Size.Small"
+                               OnClick="CopyInviteLink"
+                               Style="flex-shrink:0;" />
+            </div>
+        </div>
+    }
+</MudPaper>
+
+@if (_pendingInvitesList.Count > 0)
+{
+    <MudPaper Elevation="0" Class="pa-4 mb-4"
+              Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+            letter-spacing:.1em; color:var(--ft-green-600); margin-bottom:14px;">
+            Pending invites
+        </div>
+        @foreach (var inv in _pendingInvitesList)
+        {
+            <div style="display:flex; align-items:center; gap:8px; padding:8px 0;
+                border-bottom:.5px solid var(--ft-line-border); max-width:520px;">
+                <div style="min-width:0; flex:1;">
+                    <div style="font-size:13px; color:var(--ft-gray-700); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">@inv.Email</div>
+                    <div style="font-size:11px; color:var(--ft-gray-300);">
+                        Expires @inv.ExpiresAt.ToLocalTime().ToString("MMM d, yyyy")
+                    </div>
+                </div>
+                <MudTooltip Text="Copy invite link">
+                    <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
+                                   Size="Size.Small"
+                                   OnClick="@(() => CopyInviteLinkFor(inv.Id))" />
+                </MudTooltip>
+                <MudTooltip Text="Cancel invite">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Cancel"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   OnClick="@(() => CancelInviteAsync(inv.Id))" />
+                </MudTooltip>
+            </div>
+        }
+    </MudPaper>
+}
+
+@if (_pendingResets.Count > 0)
+{
+    <MudPaper Elevation="0" Class="pa-4 mb-4"
+              Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+            letter-spacing:.1em; color:var(--mud-palette-warning-text); margin-bottom:14px;">
+            Pending password resets
+        </div>
+        @foreach (var req in _pendingResets)
+        {
+            <div style="display:flex; align-items:center; gap:8px; padding:8px 0;
+                border-bottom:.5px solid var(--ft-line-border); max-width:520px;">
+                <div style="min-width:0; flex:1;">
+                    <div style="font-size:13px; color:var(--ft-gray-700);">@req.Email</div>
+                    <div style="font-size:11px; color:var(--ft-gray-300);">
+                        Requested @req.CreatedAt.ToLocalTime().ToString("MMM d, h:mm tt") · expires @req.ExpiresAt.ToLocalTime().ToString("h:mm tt")
+                    </div>
+                </div>
+                <MudTooltip Text="Copy reset link">
+                    <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy"
+                                   Size="Size.Small"
+                                   OnClick="@(() => CopyResetLink(req))" />
+                </MudTooltip>
+                <MudTooltip Text="Dismiss">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                                   Size="Size.Small"
+                                   OnClick="@(() => DismissResetAsync(req.Id))" />
+                </MudTooltip>
+            </div>
+        }
+    </MudPaper>
+}
+
+@if (_loadingUsers)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_users.Count == 0)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+        No users yet. User accounts will appear here once authentication is enabled.
+    </MudAlert>
+}
+else
+{
+    <MudPaper Elevation="0" Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+        <MudTable Items="_users" Hover="true" Dense="true" Pageable="true" PageSize="10"
+                  Style="background:transparent;">
+            <HeaderContent>
+                <MudTh>Email</MudTh>
+                <MudTh>Display name</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>Linked person</MudTh>
+                <MudTh>Last login</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Email</MudTd>
+                <MudTd Style="min-width:200px;">
+                    @if (_editingUserId == context.Id)
+                    {
+                        <div style="display:flex; align-items:center; gap:4px;">
+                            <MudTextField @bind-Value="_editingDisplayName"
+                                          Variant="Variant.Text"
+                                          Margin="Margin.Dense"
+                                          Style="font-size:13px;"
+                                          @onkeydown="@(async e => { if (e.Key == "Enter") await SaveDisplayNameAsync(context.Id); if (e.Key == "Escape") _editingUserId = null; })" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Check"
+                                           Size="Size.Small" Color="Color.Success"
+                                           OnClick="@(() => SaveDisplayNameAsync(context.Id))" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Close"
+                                           Size="Size.Small"
+                                           OnClick="@(() => _editingUserId = null)" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="display:flex; align-items:center; gap:4px; cursor:default;">
+                            <span>@(context.DisplayName ?? "—")</span>
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
+                                           Size="Size.Small"
+                                           Style="opacity:0.4;"
+                                           OnClick="@(() => { _editingUserId = context.Id; _editingDisplayName = context.DisplayName ?? ""; })" />
+                        </div>
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.IsSuperUser)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error">Super-user</MudChip>
+                    }
+                    else
+                    {
+                        <MudSelect T="string"
+                                   Value="@GetPrimaryRole(context)"
+                                   ValueChanged="@(v => SetRoleAsync(context, v))"
+                                   Dense="true"
+                                   Margin="Margin.Dense"
+                                   Variant="Variant.Text"
+                                   Style="font-size:13px; min-width:90px;">
+                            <MudSelectItem Value="@("Member")">Member</MudSelectItem>
+                            <MudSelectItem Value="@("Admin")">Admin</MudSelectItem>
+                        </MudSelect>
+                    }
+                </MudTd>
+                <MudTd Style="min-width:200px;">
+                    <MudSelect T="Guid?"
+                               Value="_personLinks.GetValueOrDefault(context.Id)"
+                               ValueChanged="@(v => SetPersonLink(context.Id, v))"
+                               Dense="true"
+                               Margin="Margin.Dense"
+                               Variant="Variant.Text"
+                               Placeholder="— Unlinked —"
+                               Style="font-size:13px;">
+                        <MudSelectItem T="Guid?" Value="@((Guid?)null)">— Unlinked —</MudSelectItem>
+                        @foreach (var p in _people.OrderBy(p => p.FullName))
+                        {
+                            <MudSelectItem T="Guid?" Value="@((Guid?)p.Id)">@p.FullName</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudTd>
+                <MudTd>
+                    <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                        @(context.LastLoginAt?.ToString("MMM d, yyyy") ?? "—")
+                    </MudText>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    private bool _loadingUsers = true;
+    private List<AppUser> _users = [];
+    private List<PersonDto> _people = [];
+    private Dictionary<Guid, Guid?> _personLinks = new();
+    private Dictionary<Guid, List<string>> _userRoles = new();
+    private List<UserInvite> _pendingInvitesList = [];
+    private List<PasswordResetRequest> _pendingResets = [];
+
+    private string _inviteEmail = "";
+    private string? _inviteLink;
+    private string? _inviteError;
+    private bool _creatingInvite;
+
+    private Guid? _editingUserId;
+    private string _editingDisplayName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadUsersAsync(), LoadPeopleAsync(), LoadPendingInvitesAsync(), LoadPendingResetsAsync());
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            _users = await ctx.AppUsers
+                .AsNoTracking()
+                .OrderBy(u => u.Email)
+                .ToListAsync();
+            _personLinks = _users.ToDictionary(u => u.Id, u => u.PersonId);
+
+            var roleData = await ctx.UserRoles
+                .Join(ctx.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Name })
+                .ToListAsync();
+            _userRoles = roleData
+                .GroupBy(x => x.UserId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.Name ?? "").ToList());
+        }
+        catch { }
+        _loadingUsers = false;
+    }
+
+    private async Task LoadPeopleAsync()
+    {
+        var result = await PersonService.GetAllAsync();
+        if (result.Success)
+            _people = result.Data ?? [];
+    }
+
+    private async Task LoadPendingInvitesAsync()
+    {
+        _pendingInvitesList = await AuthService.GetPendingInvitesAsync();
+    }
+
+    private async Task LoadPendingResetsAsync()
+    {
+        _pendingResets = await AuthService.GetPendingResetRequestsAsync();
+    }
+
+    private string GetPrimaryRole(AppUser user)
+    {
+        if (user.IsSuperUser) return "SuperUser";
+        var roles = _userRoles.GetValueOrDefault(user.Id) ?? [];
+        return roles.Contains("Admin") ? "Admin" : "Member";
+    }
+
+    private async Task SetRoleAsync(AppUser user, string newRole)
+    {
+        if (user.IsSuperUser) return;
+        var current = await UserManager.GetRolesAsync(user);
+        if (current.Count > 0)
+            await UserManager.RemoveFromRolesAsync(user, current);
+        var result = await UserManager.AddToRoleAsync(user, newRole);
+        if (result.Succeeded)
+        {
+            _userRoles[user.Id] = [newRole];
+            Toast.Success($"Role set to {newRole}.");
+        }
+        else
+        {
+            Toast.Error("Failed to update role.");
+        }
+    }
+
+    private async Task SaveDisplayNameAsync(Guid userId)
+    {
+        var user = await UserManager.FindByIdAsync(userId.ToString());
+        if (user == null) return;
+
+        user.DisplayName = _editingDisplayName.Trim();
+        var result = await UserManager.UpdateAsync(user);
+
+        if (result.Succeeded)
+        {
+            var row = _users.FirstOrDefault(u => u.Id == userId);
+            if (row != null) row.DisplayName = user.DisplayName;
+            Toast.Success("Display name updated.");
+        }
+        else
+        {
+            Toast.Error("Failed to update display name.");
+        }
+        _editingUserId = null;
+    }
+
+    private async Task SetPersonLink(Guid userId, Guid? personId)
+    {
+        _personLinks[userId] = personId;
+        var result = await AuthService.LinkPersonAsync(userId, personId);
+        if (result.Success)
+        {
+            var personName = personId.HasValue
+                ? _people.FirstOrDefault(p => p.Id == personId.Value)?.FullName ?? "person"
+                : null;
+            Toast.Success(personName is null ? "Link cleared." : $"Linked to {personName}.");
+        }
+        else
+        {
+            Toast.Error(result.Error ?? "Failed to link person.");
+        }
+    }
+
+    private async Task CreateInviteAsync()
+    {
+        _inviteError = null;
+        _inviteLink = null;
+        _creatingInvite = true;
+
+        var result = await AuthService.CreateInviteAsync(_inviteEmail.Trim());
+        _creatingInvite = false;
+
+        if (!result.Success && result.Id is null)
+        {
+            _inviteError = result.Error;
+            return;
+        }
+
+        var baseUri = NavigationManager.BaseUri.TrimEnd('/');
+        _inviteLink = $"{baseUri}/register?invite={result.Id}";
+        _inviteEmail = "";
+
+        await LoadPendingInvitesAsync();
+    }
+
+    private async Task CancelInviteAsync(Guid inviteId)
+    {
+        var result = await AuthService.CancelInviteAsync(inviteId);
+        if (result.Success)
+        {
+            Toast.Success("Invite cancelled.");
+            await LoadPendingInvitesAsync();
+            if (_inviteLink?.Contains(inviteId.ToString()) == true)
+                _inviteLink = null;
+        }
+        else
+        {
+            Toast.Error(result.Error ?? "Failed to cancel invite.");
+        }
+    }
+
+    private async Task CopyInviteLink()
+    {
+        if (_inviteLink is not null)
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _inviteLink);
+    }
+
+    private async Task CopyInviteLinkFor(Guid inviteId)
+    {
+        var baseUri = NavigationManager.BaseUri.TrimEnd('/');
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText",
+            $"{baseUri}/register?invite={inviteId}");
+    }
+
+    private async Task CopyResetLink(PasswordResetRequest req)
+    {
+        var baseUri = NavigationManager.BaseUri.TrimEnd('/');
+        var link = $"{baseUri}/reset-password?id={req.Id}";
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", link);
+        Toast.Success("Reset link copied.");
+    }
+
+    private async Task DismissResetAsync(Guid id)
+    {
+        await AuthService.DismissResetRequestAsync(id);
+        _pendingResets.RemoveAll(r => r.Id == id);
+    }
+}

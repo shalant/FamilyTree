@@ -1,0 +1,118 @@
+@using FamilyTree.Core.Data
+@using FamilyTree.Core.Models
+@using FamilyTree.Web.Modules.Components
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AppDbContext> DbFactory
+@inject IDialogService DialogService
+
+@if (_loadingActivity)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_activity.Count == 0)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+        No activity recorded yet. Daily action counts per user will appear here once users are active.
+    </MudAlert>
+}
+else
+{
+    <MudTable Items="_activity" T="UserActivity" Hover="true" Dense="true" Pageable="true" PageSize="10"
+              OnRowClick="@(e => ShowActivityDetailAsync(e.Item!))"
+              Style="background:var(--ft-surface-card); cursor:pointer;">
+        <HeaderContent>
+            <MudTh>Date</MudTh>
+            <MudTh>User</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Date.ToString("MMM d, yyyy")</MudTd>
+            <MudTd>
+                <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                    @(context.UserId.HasValue ? context.UserId.Value.ToString()[..8] + "…" : "—")
+                </MudText>
+            </MudTd>
+            <MudTd>@context.ActionCount</MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private bool _loadingActivity = true;
+    private List<UserActivity> _activity = [];
+    private List<AuditLog> _auditLogs = [];
+    private List<AppUser> _users = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadActivityAsync(), LoadAuditAsync(), LoadUsersAsync());
+    }
+
+    private async Task LoadActivityAsync()
+    {
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            _activity = await ctx.UserActivities
+                .AsNoTracking()
+                .OrderByDescending(a => a.Date)
+                .Take(200)
+                .ToListAsync();
+        }
+        catch { }
+        _loadingActivity = false;
+    }
+
+    private async Task LoadAuditAsync()
+    {
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            _auditLogs = await ctx.AuditLogs
+                .AsNoTracking()
+                .OrderByDescending(a => a.Timestamp)
+                .Take(500)
+                .ToListAsync();
+        }
+        catch { }
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            _users = await ctx.AppUsers
+                .AsNoTracking()
+                .OrderBy(u => u.Email)
+                .ToListAsync();
+        }
+        catch { }
+    }
+
+    private async Task ShowActivityDetailAsync(UserActivity activity)
+    {
+        var entries = _auditLogs
+            .Where(a => a.UserId == activity.UserId &&
+                        DateOnly.FromDateTime(a.Timestamp) == activity.Date)
+            .OrderByDescending(a => a.Timestamp)
+            .ToList();
+
+        var user = activity.UserId.HasValue
+            ? _users.FirstOrDefault(u => u.Id == activity.UserId)
+            : null;
+        var who = user?.Email ?? (activity.UserId.HasValue ? activity.UserId.Value.ToString()[..8] + "…" : "Unknown user");
+
+        var parameters = new DialogParameters<ActivityDetailDialog>
+        {
+            { d => d.Entries, entries },
+        };
+
+        await DialogService.ShowAsync<ActivityDetailDialog>(
+            $"{who} — {activity.Date:MMM d, yyyy}", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+}

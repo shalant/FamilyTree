@@ -1,64 +1,67 @@
-﻿@page "/admin"
+@page "/admin"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin,SuperUser")]
 
-<div class="admin-container">
+<PageTitle>Admin</PageTitle>
 
-    <!-- Left navigation -->
-    <aside class="admin-nav">
-        <MudNavMenu Dense="true">
-            <MudNavLink Icon="@Icons.Material.Outlined.Dashboard" Href="/admin">Dashboard</MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Outlined.DeleteSweep">Deleted</MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Outlined.Group">Users</MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Outlined.History">Audit Log</MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Outlined.BarChart">Activity</MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Outlined.Upload">Imports</MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Outlined.AutoStories">Stories</MudNavLink>
-            <MudNavLink Icon="@Icons.Material.Outlined.MailOutline">Messages</MudNavLink>
-        </MudNavMenu>
-    </aside>
+<style>
+    .ft-admin-stat { transition: box-shadow 0.15s; cursor: default; }
+    .ft-admin-stat:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important; }
+    .ft-admin-nav-row { transition: background 0.1s; border-radius: 8px; cursor: pointer; }
+    .ft-admin-nav-row:hover { background: var(--ft-green-50) !important; }
+</style>
 
-    <!-- Right content -->
-    <main class="admin-content">
+<div style="padding:24px; max-width:1100px; margin:auto;">
 
-        <MudPaper Class="admin-card" Elevation="0">
+    <div style="margin-bottom:24px;">
+        <div style="font-size:22px; font-weight:600; font-style:italic;
+            font-family:var(--ft-font-display); color:var(--ft-green-800); line-height:1.2;">
+            Admin
+        </div>
+        <div style="font-size:13px; color:var(--ft-gray-400); margin-top:2px;">
+            Arborkin system management
+        </div>
+    </div>
 
-            <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="true">
+    <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="true"
+             Position="Position.Left" Class="ft-admin-tabs"
+             @bind-ActivePanelIndex="_activeTab">
 
-                <MudTabPanel Text="Deleted">
-                    <DeletedTab />
-                </MudTabPanel>
+        <MudTabPanel Text="Dashboard" Icon="@Icons.Material.Outlined.SpaceDashboard">
+            <DashboardTab />
+        </MudTabPanel>
 
-                <MudTabPanel Text="Users">
-                    <UsersTab />
-                </MudTabPanel>
+        <MudTabPanel Text="Deleted" Icon="@Icons.Material.Outlined.DeleteSweep">
+            <DeletedTab />
+        </MudTabPanel>
 
-                <MudTabPanel Text="Audit Log">
-                    <AuditLogTab />
-                </MudTabPanel>
+        <MudTabPanel Text="Users" Icon="@Icons.Material.Outlined.Group">
+            <UsersTab />
+        </MudTabPanel>
 
-                <MudTabPanel Text="Activity">
-                    <ActivityTab />
-                </MudTabPanel>
+        <MudTabPanel Text="Audit log" Icon="@Icons.Material.Outlined.History">
+            <AuditLogTab />
+        </MudTabPanel>
 
-                <MudTabPanel Text="Imports">
-                    <ImportsTab />
-                </MudTabPanel>
+        <MudTabPanel Text="Activity" Icon="@Icons.Material.Outlined.BarChart">
+            <ActivityTab />
+        </MudTabPanel>
 
-                <MudTabPanel Text="Stories">
-                    <StoriesTab />
-                </MudTabPanel>
+        <MudTabPanel Text="Imports" Icon="@Icons.Material.Outlined.Upload">
+            <ImportsTab />
+        </MudTabPanel>
 
-                <MudTabPanel Text="Messages">
-                    <MessagesTab />
-                </MudTabPanel>
+        <MudTabPanel Text="Stories" Icon="@Icons.Material.Outlined.AutoStories">
+            <StoriesTab />
+        </MudTabPanel>
 
-            </MudTabs>
+        <MudTabPanel Text="Messages" Icon="@Icons.Material.Outlined.MailOutline">
+            <MessagesTab />
+        </MudTabPanel>
 
-        </MudPaper>
-
-    </main>
-
+    </MudTabs>
 </div>
 
 @code {
-    private int _activeTab = 0;
+    private int _activeTab;
 }

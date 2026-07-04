@@ -1,0 +1,67 @@
+﻿@page "/adminBAD"
+
+<div class="admin-container">
+
+    <!-- Left navigation -->
+    <aside class="admin-nav">
+        <MudNavMenu Dense="true">
+            <MudNavLink Icon="@Icons.Material.Outlined.Dashboard" OnClick="@(() => SetTab(0))">Dashboard</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.DeleteSweep" OnClick="@(() => SetTab(1))">Deleted</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.Group" OnClick="@(() => SetTab(2))">Users</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.History" OnClick="@(() => SetTab(3))">Audit Log</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.BarChart" OnClick="@(() => SetTab(4))">Activity</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.Upload" OnClick="@(() => SetTab(5))">Imports</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.AutoStories" OnClick="@(() => SetTab(6))">Stories</MudNavLink>
+            <MudNavLink Icon="@Icons.Material.Outlined.MailOutline" OnClick="@(() => SetTab(7))">Messages</MudNavLink>
+        </MudNavMenu>
+    </aside>
+
+    <!-- Right content -->
+    <main class="admin-content">
+        <MudPaper Class="admin-card" Elevation="0">
+            @switch (_activeTab)
+            {
+                case 1:
+                    <DeletedTab />
+                    break;
+                case 2:
+                    @* <UsersTab /> *@
+                    break;
+                case 3:
+                    @* <AuditLogTab /> *@
+                    break;
+                case 4:
+                    @* <ActivityTab /> *@
+                    break;
+                case 5:
+                    @* <ImportsTab /> *@
+                    break;
+                case 6:
+                    @* <StoriesTab /> *@
+                    break;
+                case 7:
+                    @* <MessagesTab /> *@
+                    break;
+                default:
+                    <div style="padding: 24px;">
+                        <MudText Typo="Typo.h5">Dashboard</MudText>
+                        <MudText Typo="Typo.body2" Class="mt-4">
+                            Dashboard content coming soon.
+                        </MudText>
+                    </div>
+                    break;
+            }
+        </MudPaper>
+    </main>
+
+</div>
+
+@code {
+    private int _activeTab = 0;
+
+    private void SetTab(int tab)
+    {
+        _activeTab = tab;
+        StateHasChanged();
+    }
+}

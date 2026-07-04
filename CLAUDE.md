@@ -139,6 +139,7 @@ Most responsive behavior (AppBar swapping search for a hamburger + centered user
 - All service methods return `ServiceResponse<T>` — check `.Success` before using `.Data`
 - Use `ServiceResponse.Ok(data)` / `ServiceResponse.Fail(message)` static factories
 - `IDbContextFactory<AppDbContext>` is used for scoped, thread-safe contexts (not a singleton DbContext)
+- **Frontend components (Blazor pages, admin tabs) must NOT directly use `DbContext` or `IDbContextFactory`. All database queries must go through the service layer.** Create new service interfaces and implementations as needed to expose domain operations.
 - `PersonMapper` enriches `PersonDto` with derived relationship ID lists — not persisted
 - `PersonService.SyncRelationshipsDiffAsync` handles create/update/delete of all relationship types including spouse ↔ former-spouse transitions
 

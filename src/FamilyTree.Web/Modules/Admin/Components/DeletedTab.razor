@@ -1,37 +1,59 @@
-﻿@using FamilyTree.Shared.DTOs.Person
-@inherits DeletedTabBase
+@using FamilyTree.Shared.DTOs.Person
 @inject IPersonService PersonService
-@inject ToastService ToastService
+@inject ToastService Toast
 
-<div class="admin-header">
-    <MudText Typo="Typo.h6">Deleted People</MudText>
-</div>
-
-<EntityTable Items="_deletedPeople"
-             Loading="_loading"
-             OnRefresh="LoadDeletedAsync">
-    <HeaderTemplate>
-        <MudTh>Name</MudTh>
-        <MudTh>Year</MudTh>
-        <MudTh></MudTh>
-    </HeaderTemplate>
-
-    <RowTemplate Context="person">
-        <MudTd>@person.FullName</MudTd>
-        <MudTd>@person.Year</MudTd>
-        <MudTd>
-            <MudButton Color="Color.Primary"
-                       Variant="Variant.Text"
-                       OnClick="@(() => RestorePersonAsync(person.Id))">
-                Restore
-            </MudButton>
-        </MudTd>
-    </RowTemplate>
-</EntityTable>
+@if (_loadingDeleted)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_deleted.Count == 0)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+        No deleted people. Soft-deleted records will appear here for review and restore.
+    </MudAlert>
+}
+else
+{
+    <MudTable Items="_deleted" Hover="true" Dense="true"
+              Virtualize="false" Pageable="true" PageSize="10"
+              Style="background:var(--ft-surface-card);">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Deleted</MudTh>
+            <MudTh>Born</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.FullName</MudTd>
+            <MudTd>
+                <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                    @context.DeletedAt?.ToString("MMM d, yyyy h:mm tt")
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.caption">
+                    @(context.BirthDate?.ToString("yyyy") ?? "—")
+                </MudText>
+            </MudTd>
+            <MudTd Style="text-align:right;">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Success"
+                           Size="Size.Small"
+                           StartIcon="@Icons.Material.Outlined.RestoreFromTrash"
+                           OnClick="@(() => RestorePersonAsync(context))">
+                    Restore
+                </MudButton>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudTable>
+}
 
 @code {
-    private bool _loading;
-    private List<PersonDto> _deletedPeople = new();
+    private bool _loadingDeleted = true;
+    private List<DeletedPersonRow> _deleted = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -40,33 +62,31 @@
 
     private async Task LoadDeletedAsync()
     {
-        _loading = true;
-
         var result = await PersonService.GetDeletedAsync();
-
         if (result.Success)
-        {
-            _deletedPeople = result.Data ?? new();
-        }
-        else
-        {
-            ToastService.Error(result.Message ?? "Failed to load deleted people.");
-        }
-
-        _loading = false;
+            _deleted = result.Data!.Select(d => new DeletedPersonRow(d)).ToList();
+        _loadingDeleted = false;
     }
 
-    private async Task RestorePersonAsync(Guid personId)
+    private async Task RestorePersonAsync(DeletedPersonRow row)
     {
-        var result = await PersonService.RestoreAsync(personId);
-
+        var result = await PersonService.RestoreAsync(row.Id);
         if (result.Success)
         {
-            await LoadDeletedAsync();
+            _deleted.Remove(row);
+            Toast.Success($"{row.FullName} restored.");
         }
         else
         {
-            ToastService.Error(result.Message ?? "Failed to restore person.");
+            Toast.Error(result.Message);
         }
+    }
+
+    private sealed class DeletedPersonRow(PersonDto dto)
+    {
+        public Guid Id { get; } = dto.Id;
+        public string FullName { get; } = dto.FullName;
+        public DateTime? DeletedAt { get; } = dto.DeletedAt;
+        public DateOnly? BirthDate { get; } = dto.BirthDate;
     }
 }

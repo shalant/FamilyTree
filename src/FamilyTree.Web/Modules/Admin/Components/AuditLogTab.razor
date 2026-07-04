@@ -1,0 +1,119 @@
+@using FamilyTree.Core.Data
+@using FamilyTree.Core.Models
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+@if (_loadingAudit)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_auditLogs.Count == 0)
+{
+    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+        No audit log entries yet. Create, update, and delete actions will be recorded here.
+    </MudAlert>
+}
+else
+{
+    <div style="display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; align-items:center;">
+        <MudSelect T="string" Label="Action" @bind-Value="_auditActionFilter"
+                   Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                   Style="max-width:160px;" Clearable="true">
+            <MudSelectItem Value="@("Create")">Create</MudSelectItem>
+            <MudSelectItem Value="@("Update")">Update</MudSelectItem>
+            <MudSelectItem Value="@("Delete")">Delete</MudSelectItem>
+            <MudSelectItem Value="@("Restore")">Restore</MudSelectItem>
+            <MudSelectItem Value="@("Login")">Login</MudSelectItem>
+            <MudSelectItem Value="@("RoleChange")">Role change</MudSelectItem>
+        </MudSelect>
+        <MudSelect T="string" Label="Entity" @bind-Value="_auditEntityFilter"
+                   Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                   Style="max-width:160px;" Clearable="true">
+            <MudSelectItem Value="@("Person")">Person</MudSelectItem>
+            <MudSelectItem Value="@("Relationship")">Relationship</MudSelectItem>
+            <MudSelectItem Value="@("Medium")">Medium</MudSelectItem>
+            <MudSelectItem Value="@("User")">User</MudSelectItem>
+        </MudSelect>
+        <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted); margin-left:auto;">
+            @FilteredAuditLogs.Count of @_auditLogs.Count entries
+        </MudText>
+    </div>
+
+    <MudTable Items="FilteredAuditLogs" Hover="true" Dense="true" Pageable="true" PageSize="10"
+              Style="background:var(--ft-surface-card);">
+        <HeaderContent>
+            <MudTh>Timestamp</MudTh>
+            <MudTh>Action</MudTh>
+            <MudTh>Entity</MudTh>
+            <MudTh>Entity ID</MudTh>
+            <MudTh>User</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <MudText Typo="Typo.caption">
+                    @context.Timestamp.ToLocalTime().ToString("MMM d, yyyy h:mm tt")
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="@AuditChipColor(context.Action)">
+                    @context.Action
+                </MudChip>
+            </MudTd>
+            <MudTd>@context.EntityType</MudTd>
+            <MudTd>
+                <MudText Typo="Typo.caption" Style="font-family:monospace;">
+                    @(context.EntityId.HasValue ? context.EntityId.Value.ToString()[..8] + "…" : "—")
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                    @(context.UserId.HasValue ? context.UserId.Value.ToString()[..8] + "…" : "—")
+                </MudText>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private bool _loadingAudit = true;
+    private List<AuditLog> _auditLogs = [];
+    private string? _auditActionFilter;
+    private string? _auditEntityFilter;
+
+    private List<AuditLog> FilteredAuditLogs => _auditLogs
+        .Where(a => string.IsNullOrEmpty(_auditActionFilter) || a.Action == _auditActionFilter)
+        .Where(a => string.IsNullOrEmpty(_auditEntityFilter) || a.EntityType == _auditEntityFilter)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAuditAsync();
+    }
+
+    private async Task LoadAuditAsync()
+    {
+        try
+        {
+            await using var ctx = await DbFactory.CreateDbContextAsync();
+            _auditLogs = await ctx.AuditLogs
+                .AsNoTracking()
+                .OrderByDescending(a => a.Timestamp)
+                .Take(500)
+                .ToListAsync();
+        }
+        catch { }
+        _loadingAudit = false;
+    }
+
+    private static Color AuditChipColor(string action) => action switch
+    {
+        "Create"  => Color.Success,
+        "Update"  => Color.Info,
+        "Delete"  => Color.Error,
+        "Restore" => Color.Warning,
+        _         => Color.Default
+    };
+}
