@@ -1,8 +1,10 @@
-@using FamilyTree.Core.Data
+@inherits BaseComponent
+
 @using FamilyTree.Core.Models
+@using FamilyTree.Core.Services
+@using FamilyTree.Web.Components
 @using FamilyTree.Web.Modules.Components
-@using Microsoft.EntityFrameworkCore
-@inject IDbContextFactory<AppDbContext> DbFactory
+@inject IAdminActivityService AdminActivityService
 @inject IDialogService DialogService
 
 @if (_loadingActivity)
@@ -44,67 +46,34 @@ else
     private bool _loadingActivity = true;
     private List<UserActivity> _activity = [];
     private List<AuditLog> _auditLogs = [];
-    private List<AppUser> _users = [];
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadActivityAsync(), LoadAuditAsync(), LoadUsersAsync());
+        await LoadActivityAsync();
     }
 
     private async Task LoadActivityAsync()
     {
-        try
-        {
-            await using var ctx = await DbFactory.CreateDbContextAsync();
-            _activity = await ctx.UserActivities
-                .AsNoTracking()
-                .OrderByDescending(a => a.Date)
-                .Take(200)
-                .ToListAsync();
-        }
-        catch { }
+        _activity = await TryAsync(
+            () => AdminActivityService.GetRecentActivityAsync(200),
+            "Loading activity") ?? [];
+
+        _auditLogs = await TryAsync(
+            () => AdminActivityService.GetActivityAuditLogsAsync(null, DateOnly.FromDateTime(DateTime.Today)),
+            "Loading audit logs") ?? [];
+
         _loadingActivity = false;
-    }
-
-    private async Task LoadAuditAsync()
-    {
-        try
-        {
-            await using var ctx = await DbFactory.CreateDbContextAsync();
-            _auditLogs = await ctx.AuditLogs
-                .AsNoTracking()
-                .OrderByDescending(a => a.Timestamp)
-                .Take(500)
-                .ToListAsync();
-        }
-        catch { }
-    }
-
-    private async Task LoadUsersAsync()
-    {
-        try
-        {
-            await using var ctx = await DbFactory.CreateDbContextAsync();
-            _users = await ctx.AppUsers
-                .AsNoTracking()
-                .OrderBy(u => u.Email)
-                .ToListAsync();
-        }
-        catch { }
     }
 
     private async Task ShowActivityDetailAsync(UserActivity activity)
     {
-        var entries = _auditLogs
-            .Where(a => a.UserId == activity.UserId &&
-                        DateOnly.FromDateTime(a.Timestamp) == activity.Date)
-            .OrderByDescending(a => a.Timestamp)
-            .ToList();
+        var entries = await TryAsync(
+            () => AdminActivityService.GetActivityAuditLogsAsync(activity.UserId, activity.Date),
+            "Loading activity details") ?? [];
 
-        var user = activity.UserId.HasValue
-            ? _users.FirstOrDefault(u => u.Id == activity.UserId)
-            : null;
-        var who = user?.Email ?? (activity.UserId.HasValue ? activity.UserId.Value.ToString()[..8] + "…" : "Unknown user");
+        var who = activity.UserId.HasValue
+            ? activity.UserId.Value.ToString()[..8] + "…"
+            : "Unknown user";
 
         var parameters = new DialogParameters<ActivityDetailDialog>
         {

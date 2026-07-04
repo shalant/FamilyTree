@@ -1,13 +1,14 @@
-@using FamilyTree.Core.Data
+@inherits BaseComponent
+
 @using FamilyTree.Core.Models
+@using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
 @using Microsoft.AspNetCore.Identity
-@using Microsoft.EntityFrameworkCore
-@inject IDbContextFactory<AppDbContext> DbFactory
+@using FamilyTree.Web.Components
+@inject IAdminUserService AdminUserService
 @inject IAuthService AuthService
 @inject UserManager<AppUser> UserManager
 @inject IPersonService PersonService
-@inject ToastService Toast
 @inject IJSRuntime JS
 @inject NavigationManager NavigationManager
 
@@ -166,10 +167,10 @@ else
                                           Variant="Variant.Text"
                                           Margin="Margin.Dense"
                                           Style="font-size:13px;"
-                                          @onkeydown="@(async e => { if (e.Key == "Enter") await SaveDisplayNameAsync(context.Id); if (e.Key == "Escape") _editingUserId = null; })" />
+                                          @onkeydown="@(async e => { if (e.Key == "Enter") await SaveDisplayNameAsync(context); if (e.Key == "Escape") _editingUserId = null; })" />
                             <MudIconButton Icon="@Icons.Material.Outlined.Check"
                                            Size="Size.Small" Color="Color.Success"
-                                           OnClick="@(() => SaveDisplayNameAsync(context.Id))" />
+                                           OnClick="@(() => SaveDisplayNameAsync(context))" />
                             <MudIconButton Icon="@Icons.Material.Outlined.Close"
                                            Size="Size.Small"
                                            OnClick="@(() => _editingUserId = null)" />
@@ -194,7 +195,7 @@ else
                     else
                     {
                         <MudSelect T="string"
-                                   Value="@GetPrimaryRole(context)"
+                                   Value="@GetPrimaryRole(context.Id)"
                                    ValueChanged="@(v => SetRoleAsync(context, v))"
                                    Dense="true"
                                    Margin="Margin.Dense"
@@ -236,12 +237,12 @@ else
 
 @code {
     private bool _loadingUsers = true;
-    private List<AppUser> _users = [];
+    private List<AdminUserDto> _users = [];
     private List<PersonDto> _people = [];
     private Dictionary<Guid, Guid?> _personLinks = new();
     private Dictionary<Guid, List<string>> _userRoles = new();
-    private List<UserInvite> _pendingInvitesList = [];
-    private List<PasswordResetRequest> _pendingResets = [];
+    private List<AdminInviteDto> _pendingInvitesList = [];
+    private List<AdminPasswordResetDto> _pendingResets = [];
 
     private string _inviteEmail = "";
     private string? _inviteLink;
@@ -258,85 +259,90 @@ else
 
     private async Task LoadUsersAsync()
     {
-        try
-        {
-            await using var ctx = await DbFactory.CreateDbContextAsync();
-            _users = await ctx.AppUsers
-                .AsNoTracking()
-                .OrderBy(u => u.Email)
-                .ToListAsync();
-            _personLinks = _users.ToDictionary(u => u.Id, u => u.PersonId);
+        _users = await TryAsync(
+            () => AdminUserService.GetAllUsersAsync(),
+            "Loading users") ?? [];
 
-            var roleData = await ctx.UserRoles
-                .Join(ctx.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Name })
-                .ToListAsync();
-            _userRoles = roleData
-                .GroupBy(x => x.UserId)
-                .ToDictionary(g => g.Key, g => g.Select(x => x.Name ?? "").ToList());
-        }
-        catch { }
+        _personLinks = _users.ToDictionary(u => u.Id, u => u.PersonId);
         _loadingUsers = false;
     }
 
     private async Task LoadPeopleAsync()
     {
-        var result = await PersonService.GetAllAsync();
-        if (result.Success)
-            _people = result.Data ?? [];
+        _people = await TryAsync(
+            () => PersonService.GetAllAsync(),
+            "Loading people") ?? [];
     }
 
     private async Task LoadPendingInvitesAsync()
     {
-        _pendingInvitesList = await AuthService.GetPendingInvitesAsync();
+        _pendingInvitesList = await TryAsync(
+            () => AdminUserService.GetPendingInvitesAsync(),
+            "Loading pending invites") ?? [];
     }
 
     private async Task LoadPendingResetsAsync()
     {
-        _pendingResets = await AuthService.GetPendingResetRequestsAsync();
+        _pendingResets = await TryAsync(
+            () => AdminUserService.GetPendingPasswordResetsAsync(),
+            "Loading password resets") ?? [];
     }
 
-    private string GetPrimaryRole(AppUser user)
+    private string GetPrimaryRole(Guid userId)
     {
-        if (user.IsSuperUser) return "SuperUser";
-        var roles = _userRoles.GetValueOrDefault(user.Id) ?? [];
+        var user = _users.FirstOrDefault(u => u.Id == userId);
+        if (user?.IsSuperUser == true) return "SuperUser";
+        var roles = _userRoles.GetValueOrDefault(userId) ?? [];
         return roles.Contains("Admin") ? "Admin" : "Member";
     }
 
-    private async Task SetRoleAsync(AppUser user, string newRole)
+    private async Task SetRoleAsync(AdminUserDto user, string newRole)
     {
         if (user.IsSuperUser) return;
-        var current = await UserManager.GetRolesAsync(user);
+
+        var appUser = await UserManager.FindByIdAsync(user.Id.ToString());
+        if (appUser == null)
+        {
+            ToastService.Error("User not found.");
+            return;
+        }
+
+        var current = await UserManager.GetRolesAsync(appUser);
         if (current.Count > 0)
-            await UserManager.RemoveFromRolesAsync(user, current);
-        var result = await UserManager.AddToRoleAsync(user, newRole);
+            await UserManager.RemoveFromRolesAsync(appUser, current);
+
+        var result = await UserManager.AddToRoleAsync(appUser, newRole);
         if (result.Succeeded)
         {
             _userRoles[user.Id] = [newRole];
-            Toast.Success($"Role set to {newRole}.");
+            ToastService.Success($"Role set to {newRole}.");
         }
         else
         {
-            Toast.Error("Failed to update role.");
+            ToastService.Error("Failed to update role.");
         }
     }
 
-    private async Task SaveDisplayNameAsync(Guid userId)
+    private async Task SaveDisplayNameAsync(AdminUserDto user)
     {
-        var user = await UserManager.FindByIdAsync(userId.ToString());
-        if (user == null) return;
+        var appUser = await UserManager.FindByIdAsync(user.Id.ToString());
+        if (appUser == null)
+        {
+            ToastService.Error("User not found.");
+            return;
+        }
 
-        user.DisplayName = _editingDisplayName.Trim();
-        var result = await UserManager.UpdateAsync(user);
+        appUser.DisplayName = _editingDisplayName.Trim();
+        var result = await UserManager.UpdateAsync(appUser);
 
         if (result.Succeeded)
         {
-            var row = _users.FirstOrDefault(u => u.Id == userId);
-            if (row != null) row.DisplayName = user.DisplayName;
-            Toast.Success("Display name updated.");
+            user.DisplayName = appUser.DisplayName;
+            ToastService.Success("Display name updated.");
         }
         else
         {
-            Toast.Error("Failed to update display name.");
+            ToastService.Error("Failed to update display name.");
         }
         _editingUserId = null;
     }
@@ -350,11 +356,11 @@ else
             var personName = personId.HasValue
                 ? _people.FirstOrDefault(p => p.Id == personId.Value)?.FullName ?? "person"
                 : null;
-            Toast.Success(personName is null ? "Link cleared." : $"Linked to {personName}.");
+            ToastService.Success(personName is null ? "Link cleared." : $"Linked to {personName}.");
         }
         else
         {
-            Toast.Error(result.Error ?? "Failed to link person.");
+            ToastService.Error(result.Error ?? "Failed to link person.");
         }
     }
 
@@ -385,14 +391,14 @@ else
         var result = await AuthService.CancelInviteAsync(inviteId);
         if (result.Success)
         {
-            Toast.Success("Invite cancelled.");
+            ToastService.Success("Invite cancelled.");
             await LoadPendingInvitesAsync();
             if (_inviteLink?.Contains(inviteId.ToString()) == true)
                 _inviteLink = null;
         }
         else
         {
-            Toast.Error(result.Error ?? "Failed to cancel invite.");
+            ToastService.Error(result.Error ?? "Failed to cancel invite.");
         }
     }
 
@@ -409,12 +415,12 @@ else
             $"{baseUri}/register?invite={inviteId}");
     }
 
-    private async Task CopyResetLink(PasswordResetRequest req)
+    private async Task CopyResetLink(AdminPasswordResetDto req)
     {
         var baseUri = NavigationManager.BaseUri.TrimEnd('/');
         var link = $"{baseUri}/reset-password?id={req.Id}";
         await JS.InvokeVoidAsync("navigator.clipboard.writeText", link);
-        Toast.Success("Reset link copied.");
+        ToastService.Success("Reset link copied.");
     }
 
     private async Task DismissResetAsync(Guid id)

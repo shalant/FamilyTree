@@ -1,7 +1,9 @@
-@using FamilyTree.Core.Data
+@inherits BaseComponent
+
 @using FamilyTree.Core.Models
-@using Microsoft.EntityFrameworkCore
-@inject IDbContextFactory<AppDbContext> DbFactory
+@using FamilyTree.Core.Services
+@using FamilyTree.Web.Components
+@inject IAdminAuditService AdminAuditService
 
 @if (_loadingAudit)
 {
@@ -95,16 +97,10 @@ else
 
     private async Task LoadAuditAsync()
     {
-        try
-        {
-            await using var ctx = await DbFactory.CreateDbContextAsync();
-            _auditLogs = await ctx.AuditLogs
-                .AsNoTracking()
-                .OrderByDescending(a => a.Timestamp)
-                .Take(500)
-                .ToListAsync();
-        }
-        catch { }
+        _auditLogs = await TryAsync(
+            () => AdminAuditService.GetAllAuditLogsAsync(500),
+            "Loading audit logs") ?? [];
+
         _loadingAudit = false;
     }
 
