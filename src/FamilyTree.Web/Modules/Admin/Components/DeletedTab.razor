@@ -1,6 +1,8 @@
+@inherits BaseComponent
+
 @using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Components
 @inject IPersonService PersonService
-@inject ToastService Toast
 
 @if (_loadingDeleted)
 {
@@ -62,23 +64,26 @@ else
 
     private async Task LoadDeletedAsync()
     {
-        var result = await PersonService.GetDeletedAsync();
-        if (result.Success)
-            _deleted = result.Data!.Select(d => new DeletedPersonRow(d)).ToList();
+        var data = await TryAsync(
+            () => PersonService.GetDeletedAsync(),
+            "Loading deleted persons");
+
+        if (data != null)
+            _deleted = data.Select(d => new DeletedPersonRow(d)).ToList();
+
         _loadingDeleted = false;
     }
 
     private async Task RestorePersonAsync(DeletedPersonRow row)
     {
-        var result = await PersonService.RestoreAsync(row.Id);
-        if (result.Success)
+        var success = await TryAsync(
+            () => PersonService.RestoreAsync(row.Id),
+            $"Restoring {row.FullName}");
+
+        if (success)
         {
             _deleted.Remove(row);
-            Toast.Success($"{row.FullName} restored.");
-        }
-        else
-        {
-            Toast.Error(result.Message);
+            ToastService.Success($"{row.FullName} restored.");
         }
     }
 

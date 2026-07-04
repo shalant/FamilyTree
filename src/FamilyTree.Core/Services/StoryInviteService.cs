@@ -17,7 +17,7 @@ public class StoryInviteService(
     ICurrentUserService currentUser,
     IEmailSender emailSender,
     IConfiguration config,
-    UserManager<AppUser> userManager) : IStoryInviteService
+    IAuthService authService) : IStoryInviteService
 {
     // ─────────────────────────────────────────────────────────────
     //  CREATE INVITE
@@ -266,13 +266,12 @@ public class StoryInviteService(
                 // Auto‑generate an account invite for the guest’s email
                 if (!string.IsNullOrWhiteSpace(invite.InvitedEmail))
                 {
-                    var authService = new AuthService(userManager, config, dbFactory, emailSender);
                     var inviteResult = await authService.CreateInviteAsync(invite.InvitedEmail);
 
-                    if (inviteResult.Success)
+                    // CreateInviteAsync returns Success=false but a valid Id when an active
+                    // invite already exists for this email — that existing Id is still usable.
+                    if (inviteResult.Id is not null)
                     {
-                        // Optionally store the token so the UI can link to /register?invite=<token>
-                        //story.InviteId = inviteResult.Id.ToString();
                         userInviteId = inviteResult.Id;
                     }
                 }
