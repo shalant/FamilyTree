@@ -1,0 +1,38 @@
+/* ────────────────────────────────────────────────
+   EntityTable.razor.css
+   Purpose: Shared table wrapper for Admin module.
+   Scope: Modules/Admin only.
+   Dependencies: design-tokens.css, app.css
+──────────────────────────────────────────────── */
+
+/* Wrapper */
+.admin-table-wrap {
+    width: 100%;
+    margin-top: 12px;
+}
+
+/* Table */
+.admin-table {
+    width: 100%;
+    background: transparent;
+    border-radius: var(--ft-radius-card);
+}
+
+    .admin-table .mud-table-cell {
+        padding: 12px 16px;
+        font-size: 13px;
+    }
+
+/* Loading state */
+.admin-table-loading {
+    display: flex;
+    justify-content: center;
+    padding: 40px 0;
+}
+
+/* Actions */
+.admin-table-actions {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+}

@@ -1,0 +1,67 @@
+@page "/admin"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin,SuperUser")]
+
+<PageTitle>Admin</PageTitle>
+
+<style>
+    .ft-admin-stat { transition: box-shadow 0.15s; cursor: default; }
+    .ft-admin-stat:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important; }
+    .ft-admin-nav-row { transition: background 0.1s; border-radius: 8px; cursor: pointer; }
+    .ft-admin-nav-row:hover { background: var(--ft-green-50) !important; }
+</style>
+
+<div style="padding:24px; max-width:1100px; margin:auto;">
+
+    <div style="margin-bottom:24px;">
+        <div style="font-size:22px; font-weight:600; font-style:italic;
+            font-family:var(--ft-font-display); color:var(--ft-green-800); line-height:1.2;">
+            Admin
+        </div>
+        <div style="font-size:13px; color:var(--ft-gray-400); margin-top:2px;">
+            Arborkin system management
+        </div>
+    </div>
+
+    <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="true"
+             Position="Position.Left" Class="ft-admin-tabs"
+             @bind-ActivePanelIndex="_activeTab">
+
+        <MudTabPanel Text="Dashboard" Icon="@Icons.Material.Outlined.SpaceDashboard">
+            <DashboardTab />
+        </MudTabPanel>
+
+        <MudTabPanel Text="Deleted" Icon="@Icons.Material.Outlined.DeleteSweep">
+            <DeletedTab />
+        </MudTabPanel>
+
+        <MudTabPanel Text="Users" Icon="@Icons.Material.Outlined.Group">
+            <UsersTab />
+        </MudTabPanel>
+
+        <MudTabPanel Text="Audit log" Icon="@Icons.Material.Outlined.History">
+            <AuditLogTab />
+        </MudTabPanel>
+
+        <MudTabPanel Text="Activity" Icon="@Icons.Material.Outlined.BarChart">
+            <ActivityTab />
+        </MudTabPanel>
+
+        <MudTabPanel Text="Imports" Icon="@Icons.Material.Outlined.Upload">
+            <ImportsTab />
+        </MudTabPanel>
+
+        <MudTabPanel Text="Stories" Icon="@Icons.Material.Outlined.AutoStories">
+            <StoriesTab />
+        </MudTabPanel>
+
+        <MudTabPanel Text="Messages" Icon="@Icons.Material.Outlined.MailOutline">
+            <MessagesTab />
+        </MudTabPanel>
+
+    </MudTabs>
+</div>
+
+@code {
+    private int _activeTab;
+}

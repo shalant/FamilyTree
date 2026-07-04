@@ -1,0 +1,12 @@
+.ft-admin-tabs {
+    min-height: calc(100vh - 200px);
+}
+
+.ft-admin-tabs :deep(.mud-tabs-content {
+    width: 100%;
+}
+
+.ft-admin-tabs :deep(.mud-tab-panel {
+    width: 100%;
+    padding: 24px;
+}

@@ -1,0 +1,265 @@
+@using FamilyTree.Core.Services
+@using FamilyTree.Shared.DTOs.Dashboard
+@inject IDashboardService DashboardService
+@inject NavigationManager NavManager
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Success" Class="mb-4" />
+}
+else
+{
+    @* ── Stat cards ────────────────────────────────────────────── *@
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px;">
+
+        <div class="ft-admin-stat" style="padding:18px 20px; border-radius:10px;
+            background:var(--ft-surface-card);" @onclick='() => NavManager.NavigateTo("/admin", forceLoad: true)'>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <MudIcon Icon="@Icons.Material.Outlined.People"
+                         Style="font-size:18px; color:var(--ft-green-600);" />
+                <span style="font-size:11px; color:var(--ft-gray-400); text-transform:uppercase; letter-spacing:.06em;">
+                    People
+                </span>
+            </div>
+            <div style="font-size:28px; font-weight:700; color:var(--ft-green-800); line-height:1;">
+                @_totalPeople
+            </div>
+            @if (_deletedCount > 0)
+            {
+                <div style="font-size:11px; color:var(--mud-palette-warning); margin-top:4px;">
+                    @_deletedCount deleted
+                </div>
+            }
+            else
+            {
+                <div style="font-size:11px; color:var(--ft-gray-300); margin-top:4px;">
+                    none deleted
+                </div>
+            }
+        </div>
+
+        <div class="ft-admin-stat" style="padding:18px 20px; border-radius:10px;
+            background:var(--ft-surface-card);">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <MudIcon Icon="@Icons.Material.Outlined.History"
+                         Style="font-size:18px; color:var(--ft-green-600);" />
+                <span style="font-size:11px; color:var(--ft-gray-400); text-transform:uppercase; letter-spacing:.06em;">
+                    Audit entries
+                </span>
+            </div>
+            <div style="font-size:28px; font-weight:700; color:var(--ft-green-800); line-height:1;">
+                @_totalAuditEntries
+            </div>
+            <div style="font-size:11px; color:var(--ft-gray-300); margin-top:4px;">
+                @_auditEntriesToday today
+            </div>
+        </div>
+
+        <div class="ft-admin-stat" style="padding:18px 20px; border-radius:10px;
+            background:var(--ft-surface-card);">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <MudIcon Icon="@Icons.Material.Outlined.Group"
+                         Style="font-size:18px; color:var(--ft-green-600);" />
+                <span style="font-size:11px; color:var(--ft-gray-400); text-transform:uppercase; letter-spacing:.06em;">
+                    Users
+                </span>
+            </div>
+            <div style="font-size:28px; font-weight:700; color:var(--ft-green-800); line-height:1;">
+                @_userCount
+            </div>
+            <div style="font-size:11px; color:var(--ft-gray-300); margin-top:4px;">
+                @_pendingInvites pending invite@(_pendingInvites == 1 ? "" : "s")
+            </div>
+        </div>
+
+        <div class="ft-admin-stat" style="padding:18px 20px; border-radius:10px;
+            background:var(--ft-surface-card);">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <MudIcon Icon="@Icons.Material.Outlined.FamilyRestroom"
+                         Style="font-size:18px; color:var(--ft-green-600);" />
+                <span style="font-size:11px; color:var(--ft-gray-400); text-transform:uppercase; letter-spacing:.06em;">
+                    Families
+                </span>
+            </div>
+            <div style="font-size:28px; font-weight:700; color:var(--ft-green-800); line-height:1;">
+                @_familyCount
+            </div>
+            <div style="font-size:11px; color:var(--ft-gray-300); margin-top:4px;">
+                @_totalRelationships relationships
+            </div>
+        </div>
+
+    </div>
+
+    @* ── Two-column body ───────────────────────────────────────── *@
+    <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px;">
+
+        @* Recent activity *@
+        <MudPaper Elevation="0" Class="pa-4"
+                  Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+                    letter-spacing:.1em; color:var(--ft-green-600);">
+                    Recent activity
+                </div>
+            </div>
+
+            @if (_recentAudit.Count == 0)
+            {
+                <div style="text-align:center; padding:24px 0;
+                    font-size:13px; color:var(--ft-gray-300);">
+                    No activity yet.
+                </div>
+            }
+            else
+            {
+                @foreach (var entry in _recentAudit)
+                {
+                    <div style="display:flex; align-items:center; gap:10px;
+                        padding:8px 0; border-bottom:.5px solid var(--ft-line-border);">
+                        <div style="width:28px; height:28px; border-radius:50%; flex-shrink:0;
+                            background:@AuditChipBg(entry.Action);
+                            display:flex; align-items:center; justify-content:center;">
+                            <MudIcon Icon="@AuditIcon(entry.Action)"
+                                     Style="@($"font-size:14px; color:{AuditIconColor(entry.Action)};")" />
+                        </div>
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:13px; color:var(--ft-gray-700);">
+                                <strong>@entry.Action</strong>
+                                <span style="color:var(--ft-gray-400);"> · </span>
+                                @entry.EntityType
+                            </div>
+                            <div style="font-size:11px; color:var(--ft-gray-300);">
+                                @entry.Timestamp.ToLocalTime().ToString("MMM d, h:mm tt")
+                            </div>
+                        </div>
+                        <div style="font-size:11px; font-family:monospace; color:var(--ft-gray-300);">
+                            @(entry.EntityId.HasValue ? entry.EntityId.Value.ToString()[..6] : "—")
+                        </div>
+                    </div>
+                }
+            }
+        </MudPaper>
+
+        @* Quick navigation *@
+        <MudPaper Elevation="0" Class="pa-4"
+                  Style="background:var(--ft-surface-card); border-radius:var(--ft-radius-card);">
+            <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+                letter-spacing:.1em; color:var(--ft-green-600); margin-bottom:16px;">
+                Manage
+            </div>
+
+            <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                padding:10px 8px;">
+                <MudIcon Icon="@Icons.Material.Outlined.DeleteSweep"
+                         Style="font-size:20px; color:var(--ft-gray-400);" />
+                <div>
+                    <div style="font-size:13px; color:var(--ft-gray-700);">Deleted people</div>
+                    <div style="font-size:11px; color:var(--ft-gray-300);">
+                        @(_deletedCount > 0 ? $"{_deletedCount} awaiting review" : "Nothing deleted")
+                    </div>
+                </div>
+                @if (_deletedCount > 0)
+                {
+                    <MudBadge Content="@_deletedCount" Color="Color.Warning"
+                              Style="margin-left:auto;" />
+                }
+            </div>
+
+            <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                padding:10px 8px;">
+                <MudIcon Icon="@Icons.Material.Outlined.Group"
+                         Style="font-size:20px; color:var(--ft-gray-400);" />
+                <div>
+                    <div style="font-size:13px; color:var(--ft-gray-700);">Users</div>
+                    <div style="font-size:11px; color:var(--ft-gray-300);">
+                        @(_userCount == 0 ? "Ready for auth" : $"{_userCount} registered")
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top:20px; padding-top:16px;
+                border-top:.5px solid var(--ft-line-border);">
+                <div style="font-size:11px; font-weight:700; text-transform:uppercase;
+                    letter-spacing:.1em; color:var(--ft-green-600); margin-bottom:12px;">
+                    Navigate
+                </div>
+                <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                    padding:10px 8px;" @onclick='() => NavManager.NavigateTo("/")'>
+                    <MudIcon Icon="@Icons.Material.Outlined.AccountTree"
+                             Style="font-size:20px; color:var(--ft-gray-400);" />
+                    <div style="font-size:13px; color:var(--ft-gray-700);">Back to tree</div>
+                </div>
+                <div class="ft-admin-nav-row" style="display:flex; align-items:center; gap:10px;
+                    padding:10px 8px;" @onclick='() => NavManager.NavigateTo("/dashboard")'>
+                    <MudIcon Icon="@Icons.Material.Outlined.SpaceDashboard"
+                             Style="font-size:20px; color:var(--ft-gray-400);" />
+                    <div style="font-size:13px; color:var(--ft-gray-700);">Family dashboard</div>
+                </div>
+            </div>
+        </MudPaper>
+
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+
+    private int _totalPeople;
+    private int _deletedCount;
+    private int _totalRelationships;
+    private int _familyCount;
+    private int _userCount;
+    private int _pendingInvites;
+    private int _totalAuditEntries;
+    private int _auditEntriesToday;
+    private List<AuditEntryDto> _recentAudit = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardAsync();
+    }
+
+    private async Task LoadDashboardAsync()
+    {
+        var stats = await DashboardService.GetDashboardStatsAsync();
+        _totalPeople = stats.TotalPeople;
+        _deletedCount = stats.DeletedCount;
+        _totalRelationships = stats.TotalRelationships;
+        _familyCount = stats.FamilyCount;
+        _userCount = stats.UserCount;
+        _pendingInvites = stats.PendingInvites;
+        _totalAuditEntries = stats.TotalAuditEntries;
+        _auditEntriesToday = stats.AuditEntriesToday;
+        _recentAudit = stats.RecentAudit;
+        _loading = false;
+    }
+
+    private static string AuditIcon(string action) => action switch
+    {
+        "Create"  => Icons.Material.Outlined.Add,
+        "Update"  => Icons.Material.Outlined.Edit,
+        "Delete"  => Icons.Material.Outlined.Delete,
+        "Restore" => Icons.Material.Outlined.RestoreFromTrash,
+        "Login"   => Icons.Material.Outlined.Login,
+        _         => Icons.Material.Outlined.Circle
+    };
+
+    private static string AuditChipBg(string action) => action switch
+    {
+        "Create"  => "rgba(76,175,80,0.12)",
+        "Update"  => "rgba(33,150,243,0.12)",
+        "Delete"  => "rgba(244,67,54,0.12)",
+        "Restore" => "rgba(255,152,0,0.12)",
+        _         => "var(--ft-green-50)"
+    };
+
+    private static string AuditIconColor(string action) => action switch
+    {
+        "Create"  => "#4caf50",
+        "Update"  => "#2196f3",
+        "Delete"  => "#f44336",
+        "Restore" => "#ff9800",
+        _         => "var(--ft-gray-400)"
+    };
+}

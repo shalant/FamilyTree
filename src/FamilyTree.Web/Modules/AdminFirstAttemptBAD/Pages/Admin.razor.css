@@ -1,0 +1,56 @@
+/* Admin.razor.css */
+
+.admin-container {
+    display: flex;
+    min-height: 100vh;
+    background: var(--ft-surface);
+}
+
+/* Left nav */
+.admin-nav {
+    flex: 0 0 220px;
+    background: var(--ft-surface-card);
+    border-right: 1px solid var(--ft-line-border);
+    padding: 24px 16px;
+    box-shadow: var(--ft-shadow-sm);
+}
+
+/* Right content */
+.admin-content {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 24px 32px;
+}
+
+/* Card */
+.admin-card {
+    width: 100%;
+    background: var(--ft-surface-card);
+    border-radius: var(--ft-radius-card);
+    box-shadow: var(--ft-shadow-md);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Tab header */
+.admin-tab-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+/* Tab content */
+.admin-tab-content {
+    flex: 1;
+}
+
+/* Tab footer (pagination) */
+.admin-tab-footer {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+}
