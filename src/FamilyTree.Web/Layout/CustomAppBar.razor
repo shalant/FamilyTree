@@ -1,7 +1,7 @@
 @* ═══════════════════════════════════════════════════════════════════════════
    AppHeader — top navigation bar.
 
-   Desktop: logo | search | [add · people · import · dashboard · dark · chip · avatar]
+   Desktop: logo | search | [add · people · stories · dashboard · dark · chip · avatar]
    Mobile:  logo | search | [hamburger]  →  slide-in drawer with full nav
    ═══════════════════════════════════════════════════════════════════════════ *@
 
@@ -114,12 +114,6 @@
             <MudIconButton Icon="@Icons.Material.Outlined.People"
                            Style="color:var(--ft-gray-400);"
                            OnClick='() => Nav.NavigateTo("/people")' />
-        </MudTooltip>
-
-        <MudTooltip Text="Import data" Placement="Placement.Bottom">
-            <MudIconButton Icon="@Icons.Material.Outlined.Upload"
-                           Style="color:var(--ft-gray-400);"
-                           OnClick='() => Nav.NavigateTo("/import")' />
         </MudTooltip>
 
         <MudTooltip Text="Stories" Placement="Placement.Bottom">
@@ -260,10 +254,6 @@
             <div class="ft-drawer-item" @onclick="@(() => NavTo("/people"))">
                 <MudIcon Icon="@Icons.Material.Outlined.People" Class="ft-drawer-icon" />
                 <span>People list</span>
-            </div>
-            <div class="ft-drawer-item" @onclick="@(() => NavTo("/import"))">
-                <MudIcon Icon="@Icons.Material.Outlined.Upload" Class="ft-drawer-icon" />
-                <span>Import data</span>
             </div>
             <div class="ft-drawer-item" @onclick="@(() => NavTo("/stories"))">
                 <MudIcon Icon="@Icons.Material.Outlined.AutoStories" Class="ft-drawer-icon" />

@@ -283,6 +283,57 @@ If this feature is rejected:
 
 ---
 
+## Scope Boundary: Story Invites Require an Existing Person (decided 2026-07-04)
+
+**Decision:** a story invite can only be sent about someone **already on the tree**.
+`StoryInviteDialog.razor` no longer has a "they're not in the tree yet" free-text
+option — the sender must search for and select an existing person, or pick
+"Add someone new…" (which opens `/people/add?name=<typed text>` in a new tab, the same
+pattern already used by the Admin unlinked-stories linking queue) to create that person
+first, then come back and select them. `StoryInviteCreateDto.PersonId` is non-nullable
+and `StoryInviteService.CreateInviteAsync` rejects `Guid.Empty` outright.
+
+This supersedes the original "one-hop self-service linking" version of this decision
+(also written 2026-07-04, superseded same day): rather than letting the *invited*
+person's linking wizard resolve one hop to the tree on their own, the *inviter* — who
+already understands the family structure — now resolves that hop themselves, before the
+invite ever goes out. By the time the invited person (e.g. Willa) completes her story
+and registers, `Story.PersonId` is already set to an existing Person (e.g. Bill), so the
+linking modal never needs its "subject-first" flow (ask about Bill, maybe create him) at
+all — she only ever answers "how are you related to Bill," a much simpler, better-tested
+path.
+
+**Why:** the layout-engine work this session (see `Commentary/UnlinkedInviteProblem.md`
+and the `FamilyTreeLayoutEngineTests` regression suite) showed that even a *single* hop
+outside the normal parent→child recursive structure (an explicit sibling relationship
+with no shared parent) touched connected-component detection, generational depth,
+birth-year inference, and connector rendering — and took several rounds to get right.
+Letting a stranger who doesn't know the tree drive that same fragile machinery through a
+self-service wizard was judged not worth it, especially given the product's low
+tolerance for rough edges in real family members' hands (see the
+`feedback_quality_bar_arborkin` memory note from this same conversation).
+
+**What this means for existing code:**
+- `LinkToTreeModal`'s subject-first flow (`Stage.IsSubjectOnTree` through
+  `Stage.SubjectRelationToConnection`, `AuthService.CreateUnlinkedPersonAsync`) is
+  **not removed** — it's still exercised by `StoryPendingLinkingSubjectTests` and is
+  harmless, tested code — but it should now be effectively unreachable via the normal
+  invite path, since `Story.PersonId` is always set at invite-creation time going
+  forward. It only matters for **pre-existing** unlinked invites/stories created before
+  this change.
+- The layout-engine fixes (sibling component detection, depth propagation, birth-year
+  inference through siblings/spouses, the dashed `SiblingLink` connector) remain fully
+  necessary — an admin can still create an orphan-sibling structure directly via
+  "Add Person," and the tree needs to render that correctly regardless of how it got
+  there.
+
+**If this needs to change later:** watch for senders finding "Add someone new…" too
+much friction for a quick invite. If that happens, the original one-hop wizard version
+of this decision is still intact in the code and could be re-enabled by relaxing the
+`StoryInviteCreateDto.PersonId` requirement again.
+
+---
+
 ## Success Metrics (for future, not MVP)
 
 - % of invited users complete modal (goal: >70%)

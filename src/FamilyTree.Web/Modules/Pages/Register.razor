@@ -1,4 +1,5 @@
 @page "/register"
+@layout AuthLayout
 @rendermode InteractiveServer
 
 @using FamilyTree.Core.Models
@@ -256,22 +257,11 @@
     }
 
     // Finds the story this invite is following up on (if any) so the linking modal can
-    // walk the user through adding the story's subject to the tree first. Only an
-    // anonymous invite-response story (AuthorId == null) qualifies — a self-authored
-    // story (someone already signed in, writing about themselves under a free-text
-    // name) must never drive the subject-first flow, or the modal ends up asking
-    // "is Tom related to anyone?" about Tom while Tom is the one answering.
+    // walk the user through adding the story's subject to the tree first.
     private async Task LoadPendingStorySubjectAsync(string email)
     {
-        var result = await StoryService.GetByAuthorEmailAsync(email);
-        var pending = result.Success
-            ? result.Data?.Where(s => s.PersonId == null && s.AuthorId == null &&
-                                       !string.IsNullOrWhiteSpace(s.UnlinkedPersonName))
-                          .OrderByDescending(s => s.CreatedAt)
-                          .FirstOrDefault()
-            : null;
-
-        if (pending != null)
+        var result = await StoryService.GetPendingLinkingSubjectAsync(email);
+        if (result.Success && result.Data is { } pending)
         {
             _storySubjectName = pending.UnlinkedPersonName;
             _storyId = pending.Id;
@@ -362,7 +352,7 @@
         // ResolveFocusAsync falls through to the browser's shared "ft-focus"
         // localStorage key, which could still hold whoever was previously signed in
         // on this device (e.g. the developer's own account during testing).
-        if (!result.Canceled && result.Data is Guid linkedPersonId)
+        if (result is { Canceled: false, Data: Guid linkedPersonId })
             await AuthService.SaveFocusPersonAsync(_registeredUserId.Value, linkedPersonId);
 
         // Registering only creates the account — it doesn't authenticate this browser.

@@ -67,6 +67,8 @@ class FakeStoryService : IStoryService
         => throw new NotImplementedException();
     public Task<ServiceResponse<List<StoryDto>>> GetByAuthorEmailAsync(string email, CancellationToken ct = default)
         => Task.FromResult(ServiceResponse<List<StoryDto>>.Ok(new List<StoryDto>()));
+    public Task<ServiceResponse<StoryDto?>> GetPendingLinkingSubjectAsync(string email, CancellationToken ct = default)
+        => Task.FromResult(ServiceResponse<StoryDto?>.Ok(null));
     public Task<ServiceResponse<StoryDto>> LinkToPersonAsync(Guid storyId, Guid personId, CancellationToken ct = default)
         => throw new NotImplementedException();
     public Task<ServiceResponse<StoryDto>> ApproveAsync(Guid storyId, CancellationToken ct = default)

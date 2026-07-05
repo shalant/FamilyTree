@@ -2,11 +2,13 @@
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Shared.DTOs.StoryInvite
 @using FamilyTree.Web.Services
+@using Microsoft.JSInterop
 @using MudBlazor
 
 @inject IStoryInviteService StoryInviteService
 @inject NavigationManager Nav
 @inject ToastService Toast
+@inject IJSRuntime JS
 
 <MudDialog>
     <DialogContent>
@@ -31,31 +33,43 @@
         {
             <div class="ft-field-label">Who is the story about?</div>
 
-            <MudCheckBox @bind-Value="_isUnlinkedPerson"
-                         Label="They're not in the tree yet"
-                         Dense="true"
-                         Class="mb-2" />
-
-            @if (_isUnlinkedPerson)
-            {
-                <MudTextField @bind-Value="_typedName"
-                              Placeholder="Type their name"
+            <MudAutocomplete @ref="_personAc"
+                              T="PersonDto"
+                              SearchFunc="SearchPeople"
+                              ValueChanged="SelectPerson"
+                              ToStringFunc="@(p => p?.FullName ?? "")"
+                              Placeholder="Search by name…"
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
-                              Class="mb-3" />
+                              Dense="true"
+                              Class="mb-1">
+                <ItemTemplate Context="p">
+                    @if (p.Id == Guid.Empty)
+                    {
+                        <div style="display:flex; align-items:center; gap:6px; color:var(--ft-green-600);">
+                            <MudIcon Icon="@Icons.Material.Outlined.PersonAddAlt" Style="font-size:16px;" />
+                            <span>Add someone new…</span>
+                        </div>
+                    }
+                    else
+                    {
+                        @p.FullName
+                    }
+                </ItemTemplate>
+            </MudAutocomplete>
+
+            @if (_selectedPerson is null)
+            {
+                <div style="font-size:12px; color:var(--ft-gray-400); line-height:1.5; margin-bottom:12px;">
+                    They need to be on the tree first — search above, or pick
+                    "Add someone new…" to add them, then come back and search for them here.
+                </div>
             }
             else
             {
-                <MudAutocomplete @ref="_personAc"
-                                  T="PersonDto"
-                                  SearchFunc="SearchPeople"
-                                  ValueChanged="SelectPerson"
-                                  ToStringFunc="@(p => p?.FullName ?? "")"
-                                  Placeholder="Search by name…"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense"
-                                  Dense="true"
-                                  Class="mb-3" />
+                <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined" Dense="true" Class="mb-3">
+                    @_selectedPerson.FullName
+                </MudAlert>
             }
 
             @if (PersonId.HasValue)
@@ -63,7 +77,7 @@
                 <button style="font-size:12px; color:var(--ft-green-600); border:none;
                     background:transparent; cursor:pointer; padding:0 0 12px;
                     font-family:var(--ft-font-body);"
-                        @onclick="@(() => { _choosingOther = false; _selectedPerson = null; _typedName = ""; _isUnlinkedPerson = false; })">
+                        @onclick="@(() => { _choosingOther = false; _selectedPerson = null; })">
                     Back to @PersonName
                 </button>
             }
@@ -107,23 +121,40 @@
     [Parameter] public string? PersonName { get; set; }
     [Parameter] public List<PersonDto> AllPeople { get; set; } = [];
 
+    private static readonly PersonDto _addNewPersonOption = new() { Id = Guid.Empty };
+
     private MudAutocomplete<PersonDto>? _personAc;
     private PersonDto? _selectedPerson;
-    private string _typedName = "";
+    private string _lastSearchText = "";
     private string _email = "";
     private string _note = "";
     private string? _error;
     private bool _sending;
     private bool _choosingOther;
-    private bool _isUnlinkedPerson;
 
-    private Task<IEnumerable<PersonDto>> SearchPeople(string value, CancellationToken _) =>
-        Task.FromResult(AllPeople
+    private Task<IEnumerable<PersonDto>> SearchPeople(string value, CancellationToken _)
+    {
+        _lastSearchText = value;
+        var matches = AllPeople
             .Where(p => string.IsNullOrWhiteSpace(value) ||
                         p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Take(8));
+            .Take(8);
+        return Task.FromResult<IEnumerable<PersonDto>>([_addNewPersonOption, .. matches]);
+    }
 
-    private void SelectPerson(PersonDto? person) => _selectedPerson = person;
+    private async Task SelectPerson(PersonDto? person)
+    {
+        if (person is null) return;
+
+        if (person.Id == Guid.Empty)
+        {
+            var url = $"/people/add?name={Uri.EscapeDataString(_lastSearchText)}";
+            await JS.InvokeVoidAsync("open", url, "_blank");
+            return;
+        }
+
+        _selectedPerson = person;
+    }
 
     private async Task Send()
     {
@@ -144,21 +175,22 @@
         }
 
         var usingPresetPerson = PersonId.HasValue && !_choosingOther;
+        var personId = usingPresetPerson ? PersonId : _selectedPerson?.Id;
 
-        var dto = new StoryInviteCreateDto
+        if (personId is null)
         {
-            PersonId = usingPresetPerson ? PersonId : (_isUnlinkedPerson ? null : _selectedPerson?.Id),
-            UnlinkedPersonName = (!usingPresetPerson && _isUnlinkedPerson) ? _typedName.Trim() : null,
-            InvitedEmail = _email.Trim(),
-            PersonalNote = string.IsNullOrWhiteSpace(_note) ? null : _note.Trim(),
-        };
-
-        if (dto.PersonId is null && string.IsNullOrWhiteSpace(dto.UnlinkedPersonName))
-        {
-            _error = "Choose an existing person or type a name.";
+            _error = "Please select who this story is about — if they're not listed, add them to the tree first via \"Add someone new…\".";
+            Toast.Error("Add this person to the tree first, then search for them here.");
             StateHasChanged();
             return;
         }
+
+        var dto = new StoryInviteCreateDto
+        {
+            PersonId = personId.Value,
+            InvitedEmail = _email.Trim(),
+            PersonalNote = string.IsNullOrWhiteSpace(_note) ? null : _note.Trim(),
+        };
 
         _sending = true;
         StateHasChanged();

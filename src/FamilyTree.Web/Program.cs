@@ -389,6 +389,7 @@ if (!devAuthEnabled)
         if (!created.Succeeded)
             return Results.LocalRedirect("/?loginError=google_error");
 
+        await authService.EnsureUserFamilyAsync(newUser.Id);
         await userManager.AddLoginAsync(newUser, info);
         await signInManager.SignInAsync(newUser, isPersistent: true);
         return Results.LocalRedirect("/");

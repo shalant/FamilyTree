@@ -69,7 +69,10 @@ public class ClaudeImportService(
     {
         await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-        var family = await ctx.Families.FirstOrDefaultAsync(ct);
+        // Deterministically the oldest family — with more than one Family row now
+        // possible (e.g. a separate test/demo family), an unordered FirstOrDefault
+        // would pick an arbitrary one instead of the original/primary family.
+        var family = await ctx.Families.OrderBy(f => f.CreatedAt).FirstOrDefaultAsync(ct);
         var familyId = family?.Id;
 
         var selected = preview.People.Where(p => p.Selected).ToList();

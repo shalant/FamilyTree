@@ -59,18 +59,69 @@ public class AuthService(
         if (!result.Succeeded)
             return new AuthResult(false, result.Errors.First().Description);
 
-        if (matchedInvite != null)
+        // Every registered user needs a UserFamily row, or every family-scoping check
+        // in the app (PersonService.GetAllAsync etc.) treats them as having no FamilyId
+        // claim at all — indistinguishable from a broken account, so they'd see nothing.
+        await using (var ctx = await dbFactory.CreateDbContextAsync())
         {
-            await using var ctx = await dbFactory.CreateDbContextAsync();
-            var invite = await ctx.UserInvites.FindAsync(matchedInvite.Id);
-            if (invite != null)
+            Guid familyId;
+            if (matchedInvite != null)
             {
-                invite.AcceptedAt = DateTime.UtcNow;
-                await ctx.SaveChangesAsync();
+                var invite = await ctx.UserInvites.FindAsync(matchedInvite.Id);
+                if (invite != null)
+                    invite.AcceptedAt = DateTime.UtcNow;
+                familyId = invite?.FamilyId ?? await GetOrCreateDefaultFamilyIdAsync(ctx);
             }
+            else
+            {
+                familyId = await GetOrCreateDefaultFamilyIdAsync(ctx);
+            }
+
+            ctx.UserFamilies.Add(new UserFamily
+            {
+                UserId = user.Id,
+                FamilyId = familyId,
+                Role = "Member",
+                JoinedAt = DateTime.UtcNow,
+            });
+
+            await ctx.SaveChangesAsync();
         }
 
         return new AuthResult(true, UserId: user.Id);
+    }
+
+    public async Task EnsureUserFamilyAsync(Guid userId)
+    {
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+
+        var alreadyAssigned = await ctx.UserFamilies.AnyAsync(uf => uf.UserId == userId);
+        if (alreadyAssigned) return;
+
+        var familyId = await GetOrCreateDefaultFamilyIdAsync(ctx);
+        ctx.UserFamilies.Add(new UserFamily
+        {
+            UserId = userId,
+            FamilyId = familyId,
+            Role = "Member",
+            JoinedAt = DateTime.UtcNow,
+        });
+        await ctx.SaveChangesAsync();
+    }
+
+    private static async Task<Guid> GetOrCreateDefaultFamilyIdAsync(AppDbContext ctx)
+    {
+        // Deterministically the oldest family — with more than one Family row now
+        // possible (e.g. a separate test/demo family), an unordered FirstOrDefault
+        // would pick an arbitrary one instead of the original/primary family.
+        var family = await ctx.Families.OrderBy(f => f.CreatedAt).FirstOrDefaultAsync();
+        if (family == null)
+        {
+            family = new Family { Name = "My Family", CreatedAt = DateTime.UtcNow };
+            ctx.Families.Add(family);
+            await ctx.SaveChangesAsync();
+        }
+        return family.Id;
     }
 
     public async Task<AuthResult> LinkPersonAsync(Guid userId, Guid? personId)
@@ -103,13 +154,7 @@ public class AuthService(
                 "An active invite already exists for this email — use the existing link below.",
                 existing.Id);
 
-        var family = await ctx.Families.FirstOrDefaultAsync();
-        if (family == null)
-        {
-            family = new Family { Name = "My Family", CreatedAt = DateTime.UtcNow };
-            ctx.Families.Add(family);
-            await ctx.SaveChangesAsync();
-        }
+        var familyId = await GetOrCreateDefaultFamilyIdAsync(ctx);
 
         var token = Convert.ToBase64String(
                 System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
@@ -119,7 +164,7 @@ public class AuthService(
         {
             Id          = Guid.NewGuid(),
             Email       = email.Trim().ToLower(),
-            FamilyId    = family.Id,
+            FamilyId    = familyId,
             RoleToGrant = "Member",
             Token       = token,
             ExpiresAt   = DateTime.UtcNow.AddDays(ttlDays),

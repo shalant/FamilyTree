@@ -253,24 +253,16 @@ else
         var firstName = names.Length > 0 ? names[0] : "";
         var lastName = names.Length > 1 ? string.Join(" ", names.Skip(1)) : "";
 
-        // Only an anonymous invite-response story (AuthorId == null) qualifies as a
-        // "subject to onboard first" — a self-authored story (this user, already signed
-        // in, writing about themselves under a free-text name) must never drive the
-        // subject-first flow, or the modal ends up asking "is Tom related to anyone?"
-        // about Tom while Tom is the one answering.
         string? storySubjectName = null;
         Guid? storyId = null;
         if (!string.IsNullOrWhiteSpace(user.Email))
         {
-            var storiesResult = await StoryService.GetByAuthorEmailAsync(user.Email);
-            var pending = storiesResult.Success
-                ? storiesResult.Data?.Where(s => s.PersonId == null && s.AuthorId == null &&
-                                                   !string.IsNullOrWhiteSpace(s.UnlinkedPersonName))
-                              .OrderByDescending(s => s.CreatedAt)
-                              .FirstOrDefault()
-                : null;
-            storySubjectName = pending?.UnlinkedPersonName;
-            storyId = pending?.Id;
+            var storiesResult = await StoryService.GetPendingLinkingSubjectAsync(user.Email);
+            if (storiesResult.Success && storiesResult.Data is { } pending)
+            {
+                storySubjectName = pending.UnlinkedPersonName;
+                storyId = pending.Id;
+            }
         }
 
         var parameters = new DialogParameters<LinkToTreeModal>

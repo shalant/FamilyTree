@@ -114,6 +114,104 @@ public class PersonServiceTests
     }
 
     [Fact]
+    public async Task DeleteAsync_CascadeSoftDeletesOwnRelationships()
+    {
+        var userId = Guid.NewGuid();
+        var (service, factory, _) = CreateSut(userId);
+        var alice = await service.CreateAsync(new PersonUpsertDto { FirstName = "Alice", LastName = "One" });
+        var bob = await service.CreateAsync(new PersonUpsertDto { FirstName = "Bob", LastName = "Two" });
+        Guid relationshipId;
+        await using (var ctx = factory.CreateDbContext())
+        {
+            var rel = new FamilyTree.Core.Models.Relationship
+            {
+                Id = Guid.NewGuid(),
+                PersonAId = alice.Data!.Id,
+                PersonBId = bob.Data!.Id,
+                Type = FamilyTree.Shared.Enums.RelationshipType.Sibling,
+                CreatedAt = DateTime.UtcNow,
+            };
+            ctx.Relationships.Add(rel);
+            await ctx.SaveChangesAsync();
+            relationshipId = rel.Id;
+        }
+
+        await service.DeleteAsync(alice.Data!.Id);
+
+        await using var checkCtx = factory.CreateDbContext();
+        var rel2 = checkCtx.Relationships.IgnoreQueryFilters().Single(r => r.Id == relationshipId);
+        rel2.DeletedAt.Should().NotBeNull(
+            "deleting a person should cascade to their own relationships so they don't linger as dangling rows");
+    }
+
+    [Fact]
+    public async Task RestoreAsync_RestoresRelationshipsCascadeDeletedAtTheSameTime()
+    {
+        var userId = Guid.NewGuid();
+        var (service, factory, _) = CreateSut(userId);
+        var alice = await service.CreateAsync(new PersonUpsertDto { FirstName = "Alice", LastName = "One" });
+        var bob = await service.CreateAsync(new PersonUpsertDto { FirstName = "Bob", LastName = "Two" });
+        Guid relationshipId;
+        await using (var ctx = factory.CreateDbContext())
+        {
+            var rel = new FamilyTree.Core.Models.Relationship
+            {
+                Id = Guid.NewGuid(),
+                PersonAId = alice.Data!.Id,
+                PersonBId = bob.Data!.Id,
+                Type = FamilyTree.Shared.Enums.RelationshipType.Sibling,
+                CreatedAt = DateTime.UtcNow,
+            };
+            ctx.Relationships.Add(rel);
+            await ctx.SaveChangesAsync();
+            relationshipId = rel.Id;
+        }
+        await service.DeleteAsync(alice.Data!.Id);
+
+        await service.RestoreAsync(alice.Data!.Id);
+
+        await using var checkCtx = factory.CreateDbContext();
+        var rel2 = checkCtx.Relationships.Single(r => r.Id == relationshipId);
+        rel2.DeletedAt.Should().BeNull(
+            "restoring a person should bring back exactly the relationships that were cascade-deleted alongside them");
+    }
+
+    [Fact]
+    public async Task RestoreAsync_DoesNotResurrectRelationshipsDeletedIndependently()
+    {
+        var userId = Guid.NewGuid();
+        var (service, factory, _) = CreateSut(userId);
+        var alice = await service.CreateAsync(new PersonUpsertDto { FirstName = "Alice", LastName = "One" });
+        var bob = await service.CreateAsync(new PersonUpsertDto { FirstName = "Bob", LastName = "Two" });
+        Guid relationshipId;
+        await using (var ctx = factory.CreateDbContext())
+        {
+            var rel = new FamilyTree.Core.Models.Relationship
+            {
+                Id = Guid.NewGuid(),
+                PersonAId = alice.Data!.Id,
+                PersonBId = bob.Data!.Id,
+                Type = FamilyTree.Shared.Enums.RelationshipType.Sibling,
+                CreatedAt = DateTime.UtcNow,
+                // Deliberately soft-deleted well before the person is, simulating the
+                // user having removed this specific relationship on its own earlier.
+                DeletedAt = DateTime.UtcNow.AddDays(-1),
+            };
+            ctx.Relationships.Add(rel);
+            await ctx.SaveChangesAsync();
+            relationshipId = rel.Id;
+        }
+
+        await service.DeleteAsync(alice.Data!.Id);
+        await service.RestoreAsync(alice.Data!.Id);
+
+        await using var checkCtx = factory.CreateDbContext();
+        var rel2 = checkCtx.Relationships.IgnoreQueryFilters().Single(r => r.Id == relationshipId);
+        rel2.DeletedAt.Should().NotBeNull(
+            "a relationship removed independently, before the person was deleted, must stay removed — restoring the person shouldn't resurrect it");
+    }
+
+    [Fact]
     public async Task GetAllAsync_FamilyScopingFiltersToMatchingFamily()
     {
         var family1 = Guid.NewGuid();
@@ -133,7 +231,29 @@ public class PersonServiceTests
     }
 
     [Fact]
-    public async Task GetAllAsync_NoFamilyId_ReturnsAllPeople()
+    public async Task GetAllAsync_NoFamilyIdAndNotSuperUser_ReturnsNoPeople()
+    {
+        // A regular user with no FamilyId claim (e.g. a broken/missing UserFamily
+        // assignment) must see NOTHING — not be silently treated as a super-user and
+        // shown every family's data. This was the actual security bug: the bypass
+        // condition only checked "FamilyId is null," which is also true for a
+        // misconfigured regular account, not just genuine super-users.
+        var (service, _, fakeUser) = CreateSut(familyId: Guid.NewGuid());
+
+        await service.CreateAsync(new PersonUpsertDto { FirstName = "Alice", LastName = "Smith" });
+        fakeUser.FamilyId = Guid.NewGuid();
+        await service.CreateAsync(new PersonUpsertDto { FirstName = "Bob", LastName = "Jones" });
+
+        fakeUser.FamilyId = null;
+        fakeUser.IsSuperUser = false;
+        var result = await service.GetAllAsync();
+
+        result.Success.Should().BeTrue();
+        result.Data.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_SuperUser_ReturnsAllPeopleAcrossFamilies()
     {
         var (service, _, fakeUser) = CreateSut(familyId: Guid.NewGuid());
 
@@ -142,10 +262,34 @@ public class PersonServiceTests
         await service.CreateAsync(new PersonUpsertDto { FirstName = "Bob", LastName = "Jones" });
 
         fakeUser.FamilyId = null;
+        fakeUser.IsSuperUser = true;
         var result = await service.GetAllAsync();
 
         result.Success.Should().BeTrue();
         result.Data!.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task CreateAsync_SuperUserWithNoFamilyId_AssignsNonNullFamilyId_AndReusesSameFamily()
+    {
+        // A super-user creating a person directly (e.g. via "Add Person") has no
+        // FamilyId claim by design — without a fallback, the new person would end up
+        // ownerless (FamilyId == null) and invisible to every regular family member.
+        // Two creates in a row should also land in the SAME fallback family, not each
+        // spin up a brand new one.
+        var (service, factory, fakeUser) = CreateSut();
+        fakeUser.IsSuperUser = true;
+
+        await service.CreateAsync(new PersonUpsertDto { FirstName = "Bill", LastName = "Small" });
+        await service.CreateAsync(new PersonUpsertDto { FirstName = "Morton", LastName = "Small" });
+
+        await using var ctx = factory.CreateDbContext();
+        var bill = ctx.People.Single(p => p.FirstName == "Bill");
+        var morton = ctx.People.Single(p => p.FirstName == "Morton");
+
+        bill.FamilyId.Should().NotBeNull("a super-user creating a person should never leave them ownerless");
+        morton.FamilyId.Should().Be(bill.FamilyId,
+            "repeated super-user creates should reuse the same fallback family, not create a new one each time");
     }
 
     [Fact]

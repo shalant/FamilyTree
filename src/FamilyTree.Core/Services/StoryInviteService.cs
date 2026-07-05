@@ -31,8 +31,12 @@ public class StoryInviteService(
             if (!dtoValidation.Success)
                 return ServiceResponse.Fail(dtoValidation.Message);
 
-            if (dto.PersonId is null && string.IsNullOrWhiteSpace(dto.UnlinkedPersonName))
-                return ServiceResponse.Fail("Either an existing person or a person's name is required.");
+            // A story invite can only be sent about someone already on the tree — see
+            // docs/FEATURE_PLAN_INVITE_LINKING_MODAL.md, "Scope Boundary: One-Hop
+            // Self-Service Linking." If the subject isn't there yet, the sender adds
+            // them first via "Add Person."
+            if (dto.PersonId == Guid.Empty)
+                return ServiceResponse.Fail("Please add this person to the tree first, then send the invite about them.");
 
             var invitedByUserId = currentUser.UserId;
             if (invitedByUserId is null)
@@ -40,13 +44,9 @@ public class StoryInviteService(
 
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            Person? person = null;
-            if (dto.PersonId.HasValue)
-            {
-                person = await ctx.People.FirstOrDefaultAsync(p => p.Id == dto.PersonId, ct);
-                if (person is null)
-                    return ServiceResponse.Fail($"Person {dto.PersonId} not found.");
-            }
+            var person = await ctx.People.FirstOrDefaultAsync(p => p.Id == dto.PersonId, ct);
+            if (person is null)
+                return ServiceResponse.Fail($"Person {dto.PersonId} not found.");
 
             var ttlDays = config.GetValue("Stories:InviteTtlDays", 30);
             var token = Convert.ToBase64String(
@@ -58,7 +58,6 @@ public class StoryInviteService(
                 Id = Guid.NewGuid(),
                 Token = token,
                 PersonId = dto.PersonId,
-                UnlinkedPersonName = dto.PersonId.HasValue ? null : dto.UnlinkedPersonName,
                 InvitedEmail = dto.InvitedEmail.Trim(),
                 InvitedByUserId = invitedByUserId.Value,
                 PersonalNote = dto.PersonalNote,
@@ -76,9 +75,7 @@ public class StoryInviteService(
                 .Select(u => u.DisplayName)
                 .FirstOrDefaultAsync(ct);
 
-            var personName = person is not null
-                ? $"{person.FirstName} {person.LastName}".Trim()
-                : dto.UnlinkedPersonName ?? "a family member";
+            var personName = $"{person.FirstName} {person.LastName}".Trim();
 
             var link = $"{baseUrl.TrimEnd('/')}/story/respond/{token}";
             var html = StoryInviteEmailBuilder.Build(

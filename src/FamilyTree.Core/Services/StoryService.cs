@@ -110,11 +110,11 @@ public class StoryService(
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
 
-            // TODO: Remove this guard when full family scoping is implemented via UserFamily membership.
             var story = await ctx.Stories.FirstOrDefaultAsync(s => s.Id == id &&
-                (!familyId.HasValue || !s.PersonId.HasValue ||
-                 ctx.People.Any(p => p.Id == s.PersonId && p.FamilyId == familyId)), ct);
+                (isSuperUser || !s.PersonId.HasValue ||
+                 (familyId.HasValue && ctx.People.Any(p => p.Id == s.PersonId && p.FamilyId == familyId))), ct);
             if (story is null)
                 return ServiceResponse<StoryDto>.Fail($"Story {id} not found.");
 
@@ -147,11 +147,11 @@ public class StoryService(
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
 
-            // TODO: Remove this guard when full family scoping is implemented via UserFamily membership.
             var story = await ctx.Stories.FirstOrDefaultAsync(s => s.Id == id &&
-                (!familyId.HasValue || !s.PersonId.HasValue ||
-                 ctx.People.Any(p => p.Id == s.PersonId && p.FamilyId == familyId)), ct);
+                (isSuperUser || !s.PersonId.HasValue ||
+                 (familyId.HasValue && ctx.People.Any(p => p.Id == s.PersonId && p.FamilyId == familyId))), ct);
             if (story is null)
                 return ServiceResponse.Fail($"Story {id} not found.");
 
@@ -339,6 +339,38 @@ public class StoryService(
             logger.LogError(ex, "Error loading stories by author email");
             return ServiceResponse<List<StoryDto>>.Fail(
                 "An error occurred loading stories.");
+        }
+    }
+
+    public async Task<ServiceResponse<StoryDto?>> GetPendingLinkingSubjectAsync(string email, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var normalized = email.Trim().ToLower();
+
+            // Deliberately AuthorId == null (never a self-authored story) — someone
+            // writing about themselves under a free-text name must never drive the
+            // "subject-first" flow, or the modal ends up asking "is Tom related to
+            // anyone?" about Tom while Tom is the one answering.
+            var story = await ctx.Stories
+                .AsNoTracking()
+                .Include(s => s.Invite)
+                .Where(s => s.PersonId == null
+                         && s.AuthorId == null
+                         && !string.IsNullOrWhiteSpace(s.UnlinkedPersonName)
+                         && s.Invite != null
+                         && s.Invite.InvitedEmail.ToLower() == normalized)
+                .OrderByDescending(s => s.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            return ServiceResponse<StoryDto?>.Ok(story is null ? null : MapToDto(story));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading pending linking subject for email");
+            return ServiceResponse<StoryDto?>.Fail("An error occurred loading the pending story.");
         }
     }
 

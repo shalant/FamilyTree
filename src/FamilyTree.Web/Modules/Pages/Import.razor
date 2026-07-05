@@ -1,31 +1,33 @@
 @page "/import"
 @rendermode InteractiveServer
 
-@using FamilyTree.Web.Modules.Components
-
 @inject NavigationManager Nav
 
 <PageTitle>Import data</PageTitle>
 
-<div style="max-width:860px; margin:0 auto; padding:28px 24px 64px;
+@* Bulk import is deactivated for now — the layout engine's fragility with
+   hand-entered edge cases (siblings without a shared parent, cross-root couples,
+   etc.) this session made clear that arbitrary bulk-imported genealogy data would
+   surface many of those same issues at once, with much less chance to catch and
+   fix them one at a time. See docs/FutureFeatures/bulk-import-deactivated.md.
+   ImportFormPanel/ClaudeImportService/ImportsTab are left in place, unreferenced,
+   for whenever this gets revisited (likely alongside dropping the birth-year-based
+   Y-axis in favor of pure generational depth). *@
+<div style="max-width:640px; margin:80px auto; padding:0 24px; text-align:center;
     font-family:var(--ft-font-body);">
-
-    @* ── Back + header ────────────────────────────────────────────────────── *@
-    <div style="display:flex; align-items:center; gap:8px; margin-bottom:28px;">
-        <MudIconButton Icon="@Icons.Material.Outlined.ArrowBack"
-                       Style="color:var(--ft-gray-500);"
-                       OnClick='() => Nav.NavigateTo("/dashboard")' />
-        <div>
-            <div style="font-size:12px; color:var(--ft-gray-300); letter-spacing:0.04em; margin-bottom:1px;">
-                Dashboard
-            </div>
-            <div style="font-size:22px; font-weight:600; font-style:italic;
-                font-family:var(--ft-font-display); color:var(--ft-green-800); line-height:1.1;">
-                Import family data
-            </div>
-        </div>
+    <MudIcon Icon="@Icons.Material.Outlined.Construction"
+             Style="font-size:40px; color:var(--ft-gray-300); margin-bottom:12px;" />
+    <div style="font-size:20px; font-weight:600; font-style:italic;
+        font-family:var(--ft-font-display); color:var(--ft-green-800); margin-bottom:8px;">
+        Bulk import is temporarily unavailable
     </div>
-
-    <ImportFormPanel BackUrl="/dashboard" />
-
+    <p style="font-size:14px; color:var(--ft-gray-400); line-height:1.6; margin-bottom:24px;">
+        We're holding off on bulk import while we make sure the family tree renders
+        correctly for hand-entered data first. Add people one at a time for now —
+        we'll bring bulk import back once it's ready.
+    </p>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               OnClick='() => Nav.NavigateTo("/dashboard")'>
+        Back to dashboard
+    </MudButton>
 </div>

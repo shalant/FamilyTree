@@ -26,10 +26,15 @@ public class PersonService(
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
 
+            // A super-user (no FamilyId claim, by design) sees everything, including
+            // legacy FamilyId == null records. A regular user with no FamilyId claim —
+            // e.g. a broken/missing UserFamily assignment — must see NOTHING rather than
+            // being accidentally treated the same as a super-user.
             var people = await ctx.People
                 .AsNoTracking()
-                .Where(p => !familyId.HasValue || p.FamilyId == familyId)
+                .Where(p => isSuperUser || (familyId.HasValue && p.FamilyId == familyId))
                 .OrderBy(p => p.LastName)
                 .ThenBy(p => p.FirstName)
                 .ToListAsync(ct);
@@ -70,11 +75,12 @@ public class PersonService(
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
 
-            // TODO: Remove this guard when full family scoping is implemented via UserFamily membership.
             var person = await ctx.People
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == id && (!familyId.HasValue || p.FamilyId == familyId), ct);
+                .FirstOrDefaultAsync(p => p.Id == id &&
+                    (isSuperUser || (familyId.HasValue && p.FamilyId == familyId)), ct);
 
             if (person is null)
                 return ServiceResponse<PersonDto>.Fail($"Person {id} not found.");
@@ -121,6 +127,7 @@ public class PersonService(
 
             var now = DateTime.UtcNow;
             var userId = currentUser.UserId;
+            var familyId = await ResolveFamilyIdForCreateAsync(ctx, ct);
 
             var person = new Person
             {
@@ -135,7 +142,7 @@ public class PersonService(
                 Gender = dto.Gender,
                 BiographyNotes = dto.BiographyNotes?.Trim(),
                 ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim(),
-                FamilyId = currentUser.FamilyId,
+                FamilyId = familyId,
                 CreatedAt = now,
                 CreatedBy = userId,
                 UpdatedAt = now,
@@ -162,6 +169,37 @@ public class PersonService(
             return ServiceResponse<PersonDto>.Fail(
                 "An error occurred creating this person.");
         }
+    }
+
+    // A super-user has no FamilyId claim by design (they see every family), so creating
+    // a person directly as a super-user would otherwise leave it ownerless (FamilyId ==
+    // null) — invisible to every regular user, including whichever family it should
+    // actually belong to. Falls back to the single family this deployment currently has
+    // (creating it if truly missing, mirroring AuthService.CreateInviteAsync's same
+    // get-or-create pattern). Also covers the defensive case of a regular user whose
+    // UserFamily assignment is missing — better to land in the existing family than to
+    // create yet another ownerless record.
+    private async Task<Guid> ResolveFamilyIdForCreateAsync(AppDbContext ctx, CancellationToken ct)
+    {
+        if (currentUser.FamilyId.HasValue) return currentUser.FamilyId.Value;
+
+        // Deterministically the oldest family — with more than one Family row now
+        // possible (e.g. a separate test/demo family), an unordered FirstOrDefault
+        // would pick an arbitrary one instead of the original/primary family.
+        var family = await ctx.Families.OrderBy(f => f.CreatedAt).FirstOrDefaultAsync(ct);
+        if (family is null)
+        {
+            family = new Family { Id = Guid.NewGuid(), Name = "My Family", CreatedAt = DateTime.UtcNow };
+            ctx.Families.Add(family);
+            await ctx.SaveChangesAsync(ct);
+        }
+
+        if (!currentUser.IsSuperUser)
+            logger.LogWarning(
+                "User {UserId} has no FamilyId claim when creating a person; defaulting to family {FamilyId}",
+                currentUser.UserId, family.Id);
+
+        return family.Id;
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -342,12 +380,13 @@ public class PersonService(
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
 
             var people = await ctx.People
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .Where(p => p.DeletedAt != null &&
-                            (!familyId.HasValue || p.FamilyId == familyId))
+                            (isSuperUser || (familyId.HasValue && p.FamilyId == familyId)))
                 .OrderByDescending(p => p.DeletedAt)
                 .ToListAsync(ct);
 

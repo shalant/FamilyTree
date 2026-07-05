@@ -93,6 +93,9 @@ When a new user signs up after being invited to write a story about someone who 
 
 **Auto sign-in**: `AuthService.RegisterAsync` only creates the account — Blazor Server can't set an auth cookie from within a SignalR circuit. After the modal completes, `Register.razor` calls the existing `window.ftSubmitLogin(email, password)` JS helper (a real hidden-form POST to `/auth/do-login`, the same endpoint `LoginOverlay` uses) so the browser actually becomes authenticated as the new user — otherwise whichever account was previously logged in in that browser stays active and the hero overlay/tree keep showing the old user.
 
+### Pre-Auth Pages Use `AuthLayout`, Not `MainLayout`
+`Register.razor`, `ForgotPassword.razor`, `ResetPassword.razor`, and `StoryRespond.razor` all use `@layout AuthLayout` instead of the default `MainLayout`. `MainLayout` always renders `CustomAppBar` (search, add-person, people list, stories, dashboard icons) — fine for `Home.razor`, where an unauthenticated user sees `LoginOverlay` as a full-viewport cover that hides the AppBar entirely, but these four pages just render a centered auth card with no full-screen cover, so the AppBar would show through around it — giving someone mid-signup a false "I'm already in the app" signal. `AuthLayout` (in `Layout/AuthLayout.razor`) carries the same Mud providers/theme setup as `MainLayout`/`TreeLayout` but omits `CustomAppBar` entirely. `About.razor`/`Faq.razor` deliberately keep `MainLayout` — they're also linked from within the authenticated app via `CustomAppBar`, so losing navigation there would be a regression for logged-in users reading them.
+
 ### SSR Flash Prevention
 `Home.razor` uses a `_ready` flag to suppress tree rendering until after `OnAfterRenderAsync` reads `localStorage`. During SSR (no JS), the flag stays false and a spinner shows. After SignalR connects, `OnAfterRenderAsync` reads `ft-focus` from localStorage, sets the correct focus person, flips `_ready = true`, and calls `StateHasChanged()`. This prevents the brief flash of an alphabetically-first person before the user's saved focus loads.
 
@@ -103,6 +106,25 @@ Most responsive behavior (AppBar swapping search for a hamburger + centered user
 - **Expanded toolbar mobile styling**: `.ft-toolbar-full` (not `.ft-toolbar-mini`) sets its own `position: fixed` inside the mobile media query to dock as a full-width footer, independent of whatever position the parent `#ft-toolbar` div (used for the collapsed pill) has.
 
 **Known gotcha — MudBlazor drawer width overrides:** `MudDrawer`'s closed state is `right: calc(-1 * var(--mud-drawer-width))`, not `width: 0`. Overriding the rendered `width` alone (e.g. `.ft-person-drawer { width: 100% !important; }`) leaves the *closed-state offset* still using the original `Width="…"` Razor parameter, so the drawer only shifts off-screen by its old width while actually rendering at the new one — leaving the difference visible as a blank box. Always override the CSS variable MudBlazor itself reads (`--mud-drawer-width`), not the raw `width` property.
+
+### Bulk Import — Deactivated (2026-07-04)
+`/import` (GEDCOM/PDF/CSV/paste-text) is disabled — the route renders a "temporarily
+unavailable" placeholder instead of `ImportFormPanel`, and every UI entry point
+(AppBar icon + mobile drawer item, Dashboard quick action, Admin's "Imports" tab) has
+been removed. **Not deleted** — `ImportFormPanel`, `ClaudeImportService`, `ImportsTab`,
+and the `ImportBatch` model are all left in place, just unreferenced, so the feature
+can come back later without a rebuild from scratch.
+
+**Why:** hand-entering a few edge-case people (an orphan sibling, a married orphan
+sibling, a 3-way sibling cluster) surfaced several rounds of layout-engine bugs this
+session (see `Commentary/UnlinkedInviteProblem.md` and the `FamilyTreeLayoutEngineTests`
+regression suite) — each fixable one at a time because a human could see and report
+each broken rendering as it happened. A bulk GEDCOM import can contain dozens of those
+same edge cases (plus others: multiple marriages, adopted children, unknown parents,
+disconnected branches) arriving all at once, with no per-item feedback loop. See
+`docs/FutureFeatures/bulk-import-deactivated.md` for the planned path back — most
+likely dropping the birth-year-based Y-axis timeline in favor of pure generational
+depth, which would remove the fragile birth-year inference machinery entirely.
 
 ### Blazor Component Responsibilities
 | Component | Role |

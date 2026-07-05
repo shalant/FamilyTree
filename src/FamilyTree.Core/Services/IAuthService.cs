@@ -7,6 +7,14 @@ public interface IAuthService
     Task<AuthResult> RegisterAsync(string firstName, string lastName, string email, string password, Guid? inviteId = null);
     Task<AuthResult> LinkPersonAsync(Guid userId, Guid? personId);
 
+    /// <summary>
+    /// Ensures a user has a UserFamily row, defaulting to the single family this
+    /// deployment currently has (creating it if missing) if they don't already have
+    /// one. No-op if the user is already assigned. Used for registration paths that
+    /// don't go through RegisterAsync (e.g. the Google OAuth new-account branch).
+    /// </summary>
+    Task EnsureUserFamilyAsync(Guid userId);
+
     Task<InviteResult>                  CreateInviteAsync(string email);
     Task<List<UserInvite>>              GetPendingInvitesAsync();
     Task<AuthResult>                    CancelInviteAsync(Guid inviteId);

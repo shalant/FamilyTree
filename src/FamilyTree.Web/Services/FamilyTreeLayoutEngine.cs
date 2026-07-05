@@ -203,14 +203,25 @@ public class FamilyTreeLayoutEngine
                         primaryGroup.Remove(cg.ParentBId.Value);
                 }
 
-                // 2. Sort root groups: rootA (ParentA's group) left of rootB.
-                var rootGroupScore = rootGroups.ToDictionary(rg => rg, _ => 0);
+                // 2. Make each cross-root pair adjacent (rgA immediately left of rgB)
+                // without disturbing the relative order of any OTHER root group. A
+                // global score-based sort here previously could push rgB (or rgA) past
+                // unrelated root groups that have nothing to do with this couple — e.g.
+                // a newly-added orphan-sibling group (Bill) ending up displaced past its
+                // natural position just because an unrelated pre-existing cross-root
+                // couple (Marc + Ellen) needed Ray/Rose's group pushed rightward.
                 foreach (var (_, rgA, rgB) in crossRootInfo)
                 {
-                    rootGroupScore[rgA] -= 1;
-                    rootGroupScore[rgB] += 1;
+                    var idxA = rootGroups.IndexOf(rgA);
+                    var idxB = rootGroups.IndexOf(rgB);
+                    if (idxA < 0 || idxB < 0 || idxB == idxA + 1) continue; // already adjacent, correct order
+
+                    var moving = rootGroups[idxB];
+                    var withoutB = rootGroups.Where((_, i) => i != idxB).ToList();
+                    idxA = withoutB.IndexOf(rgA);
+                    withoutB.Insert(idxA + 1, moving);
+                    rootGroups = withoutB;
                 }
-                rootGroups = [.. rootGroups.OrderBy(rg => rootGroupScore[rg])];
 
                 // 3. Sort children: cross-root ParentA → rightmost, ParentB → leftmost.
                 var crossEdge = new Dictionary<Guid, bool>(); // true = isParentA (right edge)
@@ -355,7 +366,11 @@ public class FamilyTreeLayoutEngine
 
             // A sibling relationship with no shared parent on the tree has no
             // couple/parent connector to hang off of — draw a simple line between
-            // wherever the two ended up, even if they're not adjacent.
+            // wherever the two ended up, even if they're not adjacent. PersonDto.SiblingIds
+            // merges explicit Sibling relationships with siblings inferred from a shared
+            // parent (see PersonMapper) — skip pairs that DO share a parent, since those
+            // already render via the normal stem/T-bar/drop connector and would otherwise
+            // get a redundant second line drawn directly between them.
             var drawnSiblingPairs = new HashSet<(Guid, Guid)>();
             foreach (var person in component)
             {
@@ -364,8 +379,14 @@ public class FamilyTreeLayoutEngine
                 {
                     var key = person.Id.CompareTo(sibId) < 0 ? (person.Id, sibId) : (sibId, person.Id);
                     if (!drawnSiblingPairs.Add(key)) continue;
-                    if (nodeMap.TryGetValue(sibId, out var nodeB))
-                        siblingLinks.Add(new SiblingLink(nodeA.X, nodeA.Y, nodeB.X, nodeB.Y));
+                    if (!nodeMap.TryGetValue(sibId, out var nodeB)) continue;
+
+                    var sibling = personById.GetValueOrDefault(sibId);
+                    var sharesParent = sibling is not null &&
+                        (person.ParentIds ?? []).Intersect(sibling.ParentIds ?? []).Any();
+                    if (sharesParent) continue;
+
+                    siblingLinks.Add(new SiblingLink(nodeA.X, nodeA.Y, nodeB.X, nodeB.Y));
                 }
             }
 
