@@ -71,3 +71,38 @@ internal sealed class FakeEmailSender : IEmailSender
     public Task SendAsync(string to, string subject, string htmlBody, CancellationToken ct = default)
         => Task.CompletedTask;
 }
+
+// Only UserExistsAsync/CreateInviteAsync are exercised (by StoryInviteService); every
+// other member throws so a test relying on unstubbed behavior fails loudly instead of
+// silently returning a default value.
+internal sealed class FakeAuthService : IAuthService
+{
+    public bool UserExistsResult { get; set; }
+    public InviteResult CreateInviteResult { get; set; } = new(true, Id: Guid.NewGuid());
+    public int CreateInviteCallCount { get; private set; }
+
+    public Task<bool> UserExistsAsync(string email) => Task.FromResult(UserExistsResult);
+
+    public Task<InviteResult> CreateInviteAsync(string email)
+    {
+        CreateInviteCallCount++;
+        return Task.FromResult(CreateInviteResult);
+    }
+
+    public Task<AuthResult> RegisterAsync(string firstName, string lastName, string email, string password, Guid? inviteId = null) => throw new NotImplementedException();
+    public Task<AuthResult> LinkPersonAsync(Guid userId, Guid? personId) => throw new NotImplementedException();
+    public Task EnsureUserFamilyAsync(Guid userId) => throw new NotImplementedException();
+    public Task<List<UserInvite>> GetPendingInvitesAsync() => throw new NotImplementedException();
+    public Task<AuthResult> CancelInviteAsync(Guid inviteId) => throw new NotImplementedException();
+    public Task<UserInvite?> ValidateInviteAsync(Guid inviteId) => throw new NotImplementedException();
+    public string GetRegistrationMode() => throw new NotImplementedException();
+    public Task SaveFocusPersonAsync(Guid userId, Guid? personId) => throw new NotImplementedException();
+    public Task<Guid?> GetFocusPersonIdAsync(Guid userId) => throw new NotImplementedException();
+    public Task<AuthResult> RequestPasswordResetAsync(string email, string? baseUrl = null) => throw new NotImplementedException();
+    public Task<bool> IsResetRequestValidAsync(Guid requestId) => throw new NotImplementedException();
+    public Task<AuthResult> ResetPasswordAsync(Guid requestId, string newPassword) => throw new NotImplementedException();
+    public Task<List<PasswordResetRequest>> GetPendingResetRequestsAsync() => throw new NotImplementedException();
+    public Task DismissResetRequestAsync(Guid id) => throw new NotImplementedException();
+    public Task<AuthResult> LinkUserToTreeAsync(Guid userId, Guid? personId, string? firstName, string? lastName, Guid? connectedPersonId = null, string? relationshipType = null) => throw new NotImplementedException();
+    public Task<AuthResult> CreateUnlinkedPersonAsync(string? firstName, string? lastName, Guid connectedPersonId, string relationshipType, Guid createdByUserId) => throw new NotImplementedException();
+}

@@ -1,3 +1,4 @@
+using FamilyTree.Core.Models;
 using FamilyTree.Core.Services;
 using FamilyTree.Core.Tests.Helpers;
 using Xunit;
@@ -267,6 +268,44 @@ public class PersonServiceTests
 
         result.Success.Should().BeTrue();
         result.Data!.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetAllForUserAsync_ReturnsOnlyThatUsersOwnFamily()
+    {
+        // Regression for 2026-07-06: LinkToTreeModal's person picker came up empty during
+        // fresh registration, because it called the ambient-scoped GetAllAsync() before the
+        // browser was authenticated (login is deferred until after the modal closes).
+        // GetAllForUserAsync resolves the family from the user's own UserFamily row instead.
+        var (service, factory, _) = CreateSut();
+        var userId = Guid.NewGuid();
+        var myFamily = Guid.NewGuid();
+        var otherFamily = Guid.NewGuid();
+        await using (var ctx = factory.CreateDbContext())
+        {
+            ctx.Families.Add(new Family { Id = myFamily, Name = "Mine", CreatedAt = DateTime.UtcNow });
+            ctx.Families.Add(new Family { Id = otherFamily, Name = "Theirs", CreatedAt = DateTime.UtcNow });
+            ctx.People.Add(new FamilyTree.Core.Models.Person { FirstName = "Rose", LastName = "Small", FamilyId = myFamily, CreatedAt = DateTime.UtcNow });
+            ctx.People.Add(new FamilyTree.Core.Models.Person { FirstName = "Stranger", LastName = "Person", FamilyId = otherFamily, CreatedAt = DateTime.UtcNow });
+            ctx.UserFamilies.Add(new UserFamily { UserId = userId, FamilyId = myFamily, Role = "Member", JoinedAt = DateTime.UtcNow });
+            await ctx.SaveChangesAsync();
+        }
+
+        var result = await service.GetAllForUserAsync(userId);
+
+        result.Success.Should().BeTrue();
+        result.Data.Should().ContainSingle(p => p.FirstName == "Rose");
+    }
+
+    [Fact]
+    public async Task GetAllForUserAsync_NoUserFamilyRow_ReturnsEmpty()
+    {
+        var (service, _, _) = CreateSut();
+
+        var result = await service.GetAllForUserAsync(Guid.NewGuid());
+
+        result.Success.Should().BeTrue();
+        result.Data.Should().BeEmpty();
     }
 
     [Fact]

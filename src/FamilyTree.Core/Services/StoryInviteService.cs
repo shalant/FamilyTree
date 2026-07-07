@@ -257,25 +257,33 @@ public class StoryInviteService(
             _ = auditLog.LogAsync("Create", "Story", story.Id, userId: null);
 
             var userInviteId = (Guid?)null;
+            var recipientHasAccount = false;
 
-            try
+            if (!string.IsNullOrWhiteSpace(invite.InvitedEmail))
             {
-                // Auto‑generate an account invite for the guest’s email
-                if (!string.IsNullOrWhiteSpace(invite.InvitedEmail))
+                try
                 {
-                    var inviteResult = await authService.CreateInviteAsync(invite.InvitedEmail);
+                    // If this email already has an account, the response page should
+                    // offer "sign in" instead of minting yet another registration
+                    // invite that would just fail with "account already exists."
+                    recipientHasAccount = await authService.UserExistsAsync(invite.InvitedEmail);
 
-                    // CreateInviteAsync returns Success=false but a valid Id when an active
-                    // invite already exists for this email — that existing Id is still usable.
-                    if (inviteResult.Id is not null)
+                    if (!recipientHasAccount)
                     {
-                        userInviteId = inviteResult.Id;
+                        var inviteResult = await authService.CreateInviteAsync(invite.InvitedEmail);
+
+                        // CreateInviteAsync returns Success=false but a valid Id when an active
+                        // invite already exists for this email — that existing Id is still usable.
+                        if (inviteResult.Id is not null)
+                        {
+                            userInviteId = inviteResult.Id;
+                        }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to auto‑generate user invite for {Email}", invite.InvitedEmail);
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to auto‑generate user invite for {Email}", invite.InvitedEmail);
+                }
             }
 
             return ServiceResponse<StoryDto>.Ok(new StoryDto
@@ -286,6 +294,8 @@ public class StoryInviteService(
                 AuthorName = story.AuthorName,
                 InviteId = story.InviteId,  // Story invite ID
                 UserInviteId = userInviteId,
+                RecipientHasAccount = recipientHasAccount,
+                RecipientEmail = invite.InvitedEmail,
                 Title = story.Title,
                 Body = story.Body,
                 CreatedAt = story.CreatedAt,

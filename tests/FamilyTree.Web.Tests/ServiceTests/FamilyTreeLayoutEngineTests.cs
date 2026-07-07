@@ -175,6 +175,106 @@ public class FamilyTreeLayoutEngineTests
     }
 
     [Fact]
+    public void MarryingAnOrphanSiblingRoot_DoesNotJumpTheirGroupPastUnrelatedRootsByAlphabeticalAccident()
+    {
+        // Reproduces a real bug (2026-07-06): marrying "Bill" (an orphan-sibling root
+        // individual) to a new spouse sent his ENTIRE nuclear group to the far left of
+        // the tree, past Bud+Florence — instead of Morton (Bill's actual neighbor)
+        // simply being pushed right. Root cause: root-group order used to come from
+        // CoupleHelper.Derive's dictionary insertion order, which is triggered by
+        // whichever CHILD's shared-parent check runs first — Willa's last name ("Kuh")
+        // sorts alphabetically before "Rosenberg"/"Small", so the instant she gained a
+        // second parent (Gish), Bill+Gish's couple jumped to the front of the ordering.
+        // Nothing genealogical about it — purely an artifact of dictionary iteration order.
+        var ray = Guid.NewGuid(); var rose = Guid.NewGuid();
+        var ellen = Guid.NewGuid(); var sarah = Guid.NewGuid();
+        var bill = Guid.NewGuid(); var willa = Guid.NewGuid(); var gish = Guid.NewGuid();
+        var morton = Guid.NewGuid();
+        var bud = Guid.NewGuid(); var florence = Guid.NewGuid(); var marc = Guid.NewGuid();
+
+        List<PersonDto> BuildScenario(bool billMarriesGish)
+        {
+            var people = BuildFamily(ray, rose, ellen, sarah);
+            people.First(p => p.Id == ray).SiblingIds = [bill, morton];
+            people.Add(new PersonDto
+            {
+                Id = bill, FirstName = "Bill", LastName = "Small",
+                ParentIds = [], ChildIds = [willa], SpouseIds = billMarriesGish ? [gish] : [],
+                SiblingIds = [ray, morton]
+            });
+            people.Add(new PersonDto
+            {
+                Id = morton, FirstName = "Morton", LastName = "Small",
+                ParentIds = [], ChildIds = [], SpouseIds = [], SiblingIds = [ray, bill]
+            });
+            people.Add(new PersonDto
+            {
+                Id = willa, FirstName = "Willa", LastName = "Kuh",
+                ParentIds = billMarriesGish ? [bill, gish] : [bill], ChildIds = [], SpouseIds = []
+            });
+            if (billMarriesGish)
+                people.Add(new PersonDto
+                {
+                    Id = gish, FirstName = "Gish", LastName = "Small",
+                    ParentIds = [], ChildIds = [willa], SpouseIds = [bill]
+                });
+            people.Add(new PersonDto
+            {
+                Id = bud, FirstName = "Bud", LastName = "Rosenberg",
+                ParentIds = [], ChildIds = [marc], SpouseIds = [florence]
+            });
+            people.Add(new PersonDto
+            {
+                Id = florence, FirstName = "Florence", LastName = "Rosenberg",
+                ParentIds = [], ChildIds = [marc], SpouseIds = [bud]
+            });
+            people.First(p => p.Id == ellen).SpouseIds = [marc];
+            people.Add(new PersonDto
+            {
+                Id = marc, FirstName = "Marc", LastName = "Rosenberg",
+                ParentIds = [bud, florence], ChildIds = [], SpouseIds = [ellen]
+            });
+
+            // Production (PersonService.GetAllAsync) always orders people alphabetically
+            // by (LastName, FirstName) before the layout engine ever sees them — the bug
+            // this test reproduces depends entirely on that ordering (Willa's last name
+            // "Kuh" sorting before "Rosenberg"/"Small"), so the test must match it exactly
+            // rather than relying on incidental .Add() call order.
+            return people.OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToList();
+        }
+
+        var before = BuildScenario(billMarriesGish: false);
+        var layoutBefore = _engine.ComputeLayout(before, CoupleHelper.Derive(before), ray);
+        var budBefore = layoutBefore.Nodes.Single(n => n.Person.Id == bud);
+        var florenceBefore = layoutBefore.Nodes.Single(n => n.Person.Id == florence);
+        var rayBefore = layoutBefore.Nodes.Single(n => n.Person.Id == ray);
+        var roseBefore = layoutBefore.Nodes.Single(n => n.Person.Id == rose);
+        var mortonBefore = layoutBefore.Nodes.Single(n => n.Person.Id == morton);
+
+        var after = BuildScenario(billMarriesGish: true);
+        var layoutAfter = _engine.ComputeLayout(after, CoupleHelper.Derive(after), ray);
+        var budAfter = layoutAfter.Nodes.Single(n => n.Person.Id == bud);
+        var florenceAfter = layoutAfter.Nodes.Single(n => n.Person.Id == florence);
+        var rayAfter = layoutAfter.Nodes.Single(n => n.Person.Id == ray);
+        var roseAfter = layoutAfter.Nodes.Single(n => n.Person.Id == rose);
+        var billAfter = layoutAfter.Nodes.Single(n => n.Person.Id == bill);
+        var mortonAfter = layoutAfter.Nodes.Single(n => n.Person.Id == morton);
+
+        (budAfter.X, budAfter.Y).Should().Be((budBefore.X, budBefore.Y),
+            "marrying Bill must not move Bud+Florence's already-placed group");
+        (florenceAfter.X, florenceAfter.Y).Should().Be((florenceBefore.X, florenceBefore.Y));
+        (rayAfter.X, rayAfter.Y).Should().Be((rayBefore.X, rayBefore.Y),
+            "marrying Bill must not move Ray+Rose's already-placed group");
+        (roseAfter.X, roseAfter.Y).Should().Be((roseBefore.X, roseBefore.Y));
+
+        billAfter.X.Should().BeGreaterThan(
+            Math.Max(budAfter.X, Math.Max(florenceAfter.X, Math.Max(rayAfter.X, roseAfter.X))),
+            "Bill's own group must still land after Bud+Florence and Ray+Rose, not jump to the front of the tree");
+        mortonAfter.X.Should().BeGreaterThan(mortonBefore.X,
+            "Bill's subtree is wider now that he has a spouse — Morton (his actual neighbor) should get pushed right");
+    }
+
+    [Fact]
     public void OrphanSiblingConnector_IsDrawnBetweenActualPositions()
     {
         var ray = Guid.NewGuid();
@@ -375,6 +475,96 @@ public class FamilyTreeLayoutEngineTests
         duplicateCoordinates.Should().BeEmpty(
             "two distinct people rendered at the exact same coordinates look like one person merged with themselves");
     }
+
+    [Fact]
+    public void SiblingWithNoParentLink_LandsNearTheirSiblings_NotFarAcrossTheWholeSubtree()
+    {
+        // Reproduces a real bug (2026-07-06): "test rosenberg" had explicit Sibling
+        // relationships to Douglas and Lauren — both several generations deep inside an
+        // existing Marc+Ellen tree, not roots themselves — but no ParentIds of his own.
+        // The "root individual" fallback (people in no NuclearGroup at all) doesn't
+        // consult SiblingIds — it just appends after every root group's ENTIRE subtree
+        // has been placed, landing him past Lauren's spouse and child, well outside the
+        // visual "umbrella" of the family he's actually linked into.
+        var (marc, ellen, douglas, lauren, omar, amelia, newby) =
+            (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        var people = BuildNestedSiblingFamily(marc, ellen, douglas, lauren, omar, amelia);
+        people.First(p => p.Id == douglas).SiblingIds = [lauren, newby];
+        people.First(p => p.Id == lauren).SiblingIds = [douglas, newby];
+        people.Add(new PersonDto
+        {
+            Id = newby, FirstName = "Newby", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [], SpouseIds = [], SiblingIds = [douglas, lauren]
+        });
+
+        var layout = _engine.ComputeLayout(people, CoupleHelper.Derive(people), marc);
+
+        var douglasNode = layout.Nodes.Single(n => n.Person.Id == douglas);
+        var laurenNode = layout.Nodes.Single(n => n.Person.Id == lauren);
+        var omarNode = layout.Nodes.Single(n => n.Person.Id == omar);
+        var newbyNode = layout.Nodes.Single(n => n.Person.Id == newby);
+
+        var siblingGroupRightEdge = Math.Max(douglasNode.X, Math.Max(laurenNode.X, omarNode.X));
+
+        (newbyNode.X - siblingGroupRightEdge).Should().BeLessOrEqualTo(150,
+            "a person whose only connection is a Sibling relationship to people deep inside an " +
+            "existing nuclear family should land right next to them, not far across the whole subtree");
+    }
+
+    [Fact]
+    public void AddingASiblingWithNoParentLink_DoesNotMoveAnyPreviouslyPlacedPerson()
+    {
+        var (marc, ellen, douglas, lauren, omar, amelia, newby) =
+            (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        var before = BuildNestedSiblingFamily(marc, ellen, douglas, lauren, omar, amelia);
+        var layoutBefore = _engine.ComputeLayout(before, CoupleHelper.Derive(before), marc);
+        var positionsBefore = layoutBefore.Nodes.ToDictionary(n => n.Person.Id, n => (n.X, n.Y));
+
+        var after = BuildNestedSiblingFamily(marc, ellen, douglas, lauren, omar, amelia);
+        after.First(p => p.Id == douglas).SiblingIds = [lauren, newby];
+        after.First(p => p.Id == lauren).SiblingIds = [douglas, newby];
+        after.Add(new PersonDto
+        {
+            Id = newby, FirstName = "Newby", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [], SpouseIds = [], SiblingIds = [douglas, lauren]
+        });
+
+        var layoutAfter = _engine.ComputeLayout(after, CoupleHelper.Derive(after), marc);
+
+        foreach (var (id, pos) in positionsBefore)
+        {
+            var node = layoutAfter.Nodes.Single(n => n.Person.Id == id);
+            (node.X, node.Y).Should().Be(pos,
+                "adding a parentless sibling must never move anyone who was already positioned");
+        }
+    }
+
+    // Marc+Ellen (root couple) → Douglas (full sibling, no spouse) and Lauren (full
+    // sibling, married to Omar with child Amelia) — mirrors the real family shape:
+    // a nested (non-root) sibling pair, one of them with their own nested couple+child.
+    private static List<PersonDto> BuildNestedSiblingFamily(
+        Guid marc, Guid ellen, Guid douglas, Guid lauren, Guid omar, Guid amelia) =>
+    [
+        new() { Id = marc, FirstName = "Marc", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [douglas, lauren], SpouseIds = [ellen], SiblingIds = [],
+            BirthDate = new DateOnly(1948, 1, 1) },
+        new() { Id = ellen, FirstName = "Ellen", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [douglas, lauren], SpouseIds = [marc], SiblingIds = [],
+            BirthDate = new DateOnly(1950, 1, 1) },
+        new() { Id = douglas, FirstName = "Douglas", LastName = "Rosenberg",
+            ParentIds = [marc, ellen], ChildIds = [], SpouseIds = [], SiblingIds = [lauren],
+            BirthDate = new DateOnly(1978, 1, 1) },
+        new() { Id = lauren, FirstName = "Lauren", LastName = "Rosenberg",
+            ParentIds = [marc, ellen], ChildIds = [amelia], SpouseIds = [omar], SiblingIds = [douglas],
+            BirthDate = new DateOnly(1982, 1, 1) },
+        new() { Id = omar, FirstName = "Omar", LastName = "Anbari",
+            ParentIds = [], ChildIds = [amelia], SpouseIds = [lauren], SiblingIds = [],
+            BirthDate = new DateOnly(1981, 1, 1) },
+        new() { Id = amelia, FirstName = "Amelia", LastName = "Anbari",
+            ParentIds = [lauren, omar], ChildIds = [], SpouseIds = [], SiblingIds = [] },
+    ];
 
     private static List<PersonDto> BuildFamily(Guid ray, Guid rose, Guid ellen, Guid sarah) =>
     [

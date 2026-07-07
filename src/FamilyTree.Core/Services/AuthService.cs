@@ -124,6 +124,9 @@ public class AuthService(
         return family.Id;
     }
 
+    public async Task<bool> UserExistsAsync(string email) =>
+        await userManager.FindByEmailAsync(email) != null;
+
     public async Task<AuthResult> LinkPersonAsync(Guid userId, Guid? personId)
     {
         var user = await userManager.FindByIdAsync(userId.ToString());

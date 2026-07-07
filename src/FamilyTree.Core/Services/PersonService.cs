@@ -64,6 +64,49 @@ public class PersonService(
         }
     }
 
+    public async Task<ServiceResponse<List<PersonDto>>> GetAllForUserAsync(
+        Guid userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var familyId = await ctx.UserFamilies
+                .Where(uf => uf.UserId == userId)
+                .Select(uf => (Guid?)uf.FamilyId)
+                .FirstOrDefaultAsync(ct);
+
+            if (familyId is null)
+                return ServiceResponse<List<PersonDto>>.Ok([]);
+
+            var people = await ctx.People
+                .AsNoTracking()
+                .Where(p => p.FamilyId == familyId)
+                .OrderBy(p => p.LastName)
+                .ThenBy(p => p.FirstName)
+                .ToListAsync(ct);
+
+            var peopleIds = people.Select(p => p.Id).ToHashSet();
+
+            var relationships = await ctx.Relationships
+                .AsNoTracking()
+                .Where(r => peopleIds.Contains(r.PersonAId) && peopleIds.Contains(r.PersonBId))
+                .ToListAsync(ct);
+
+            var dtos = people
+                .Select(p => PersonMapper.MapPersonToDto(p, relationships))
+                .ToList();
+
+            return ServiceResponse<List<PersonDto>>.Ok(dtos);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading people for user {UserId}", userId);
+            return ServiceResponse<List<PersonDto>>.Fail(
+                "An error occurred loading family members.");
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────
     //  GET BY ID
     // ─────────────────────────────────────────────────────────────

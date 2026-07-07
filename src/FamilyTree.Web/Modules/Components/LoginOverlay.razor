@@ -110,9 +110,16 @@
 @code {
     [Parameter] public EventCallback OnGuest { get; set; }
     [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public string? PrefillEmail { get; set; }
 
     private string _email    = "";
     private string _password = "";
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrWhiteSpace(PrefillEmail))
+            _email = PrefillEmail;
+    }
 
     private void SignInWithGoogle() =>
         Nav.NavigateTo("/auth/google", forceLoad: true);

@@ -154,6 +154,29 @@ public class AuthServiceTreeLinkingTests
         result.Success.Should().BeFalse();
     }
 
+    // ── UserExistsAsync ──────────────────────────────────────────────────────
+    // Backs the story-invite-response "sign in" vs. "create account" decision
+    // (StoryInviteService.SubmitResponseAsync) — found 2026-07-06 when Ellen, who
+    // already had an account, was still redirected to /register after submitting a
+    // story about Morton.
+
+    [Fact]
+    public async Task UserExistsAsync_ExistingEmail_ReturnsTrue()
+    {
+        var (service, _, userManager) = CreateSut();
+        await CreateExistingUserAsync(userManager, "ellen@example.com");
+
+        (await service.UserExistsAsync("ellen@example.com")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UserExistsAsync_UnknownEmail_ReturnsFalse()
+    {
+        var (service, _, _) = CreateSut();
+
+        (await service.UserExistsAsync("nobody@example.com")).Should().BeFalse();
+    }
+
     // ── EnsureUserFamilyAsync ────────────────────────────────────────────────
 
     [Fact]

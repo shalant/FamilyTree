@@ -45,7 +45,7 @@
     <NotAuthorized>
         @if (_showIntro)
         {
-            <LoginOverlay OnGuest="HideIntro" ErrorMessage="@LoginError" />
+            <LoginOverlay OnGuest="HideIntro" ErrorMessage="@LoginError" PrefillEmail="@Email" />
         }
     </NotAuthorized>
 </AuthorizeView>
@@ -73,6 +73,27 @@ else if (!_people.Any())
                    Href="/people/add"
                    Style="background:var(--ft-green-700); color:#fff;">
             Add first person
+        </MudButton>
+    </div>
+}
+else if (_currentUserIsUnlinked && _focusPerson == null)
+{
+    <div style="position:fixed; inset:0; display:flex; flex-direction:column;
+        align-items:center; justify-content:center; text-align:center; padding:0 24px; z-index:10;">
+        <div style="font-size:28px; font-weight:500; font-style:italic;
+            font-family:Georgia,serif; color:var(--ft-green-800); margin-bottom:12px;">
+            Let's get you linked to the tree
+        </div>
+        <div style="font-size:14px; color:var(--ft-gray-400);
+            max-width:360px; line-height:1.7; margin-bottom:28px;">
+            A few quick questions and you'll be able to see where you fit in.
+        </div>
+
+        <MudButton Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.AccountTree"
+                   OnClick="ResumeLinkingAsync"
+                   Style="background:var(--ft-green-700); color:#fff;">
+            Complete your profile →
         </MudButton>
     </div>
 }
@@ -144,6 +165,7 @@ else
     [SupplyParameterFromQuery] public Guid? Focus { get; set; }
     [SupplyParameterFromQuery] public Guid? View  { get; set; }
     [SupplyParameterFromQuery] public string? LoginError { get; set; }
+    [SupplyParameterFromQuery] public string? Email { get; set; }
 
     private List<PersonDto> _people = [];
     private List<CoupleDto> _couples = [];
@@ -155,6 +177,8 @@ else
     private Guid? _lastHandledFocus;  // prevents re-processing the same Focus on re-renders
     private Guid? _lastHandledView;   // prevents re-processing the same View on re-renders
     private Guid? _currentUserId;
+    private bool _currentUserIsUnlinked;
+    private bool _noFocusToastShown;
 
     // ── Drag state ────────────────────────────────────────────────────────────
     private IJSObjectReference? _dragModule;
@@ -180,6 +204,15 @@ else
         var userIdClaim = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (Guid.TryParse(userIdClaim, out var uid)) _currentUserId = uid;
 
+        // An authenticated user who hasn't linked to a Person yet (PersonId still null —
+        // e.g. mid-registration, skipped the linking modal) has no "their tree" to show.
+        // Guests (no _currentUserId) and already-linked users are unaffected.
+        if (_currentUserId.HasValue)
+        {
+            var currentAppUser = await UserManager.FindByIdAsync(_currentUserId.Value.ToString());
+            _currentUserIsUnlinked = !(currentAppUser?.PersonId.HasValue ?? false);
+        }
+
         var result = await PersonService.GetAllAsync();
         if (result.Success)
         {
@@ -195,9 +228,17 @@ else
                 // Explicit URL focus param (shared link, login redirect)
                 _lastHandledFocus = Focus.Value;
                 _focusPerson = _people.FirstOrDefault(p => p.Id == Focus.Value)
-                            ?? _people.FirstOrDefault();
+                            ?? (_currentUserIsUnlinked ? null : _people.FirstOrDefault());
                 TreeContext.SetContext(_focusPerson, _people.Count, _couples.Count);
                 await PersistFocusAsync(_focusPerson?.Id);
+                _ready = true;
+            }
+            else if (_currentUserIsUnlinked)
+            {
+                // No focus param and not yet linked — leave _focusPerson null so the
+                // existing "Choose your starting point" empty state renders instead of
+                // an arbitrary stranger's tree, while CheckAndShowLinkingModalIfNeededAsync
+                // (OnAfterRenderAsync) re-prompts them to finish linking.
                 _ready = true;
             }
             // else: _ready stays false — OnAfterRenderAsync reads DB/localStorage
@@ -215,6 +256,11 @@ else
         }
     }
 
+    // Bound to the "Complete your profile →" button in the unlinked-user empty state —
+    // re-opens the same modal CheckAndShowLinkingModalIfNeededAsync shows automatically,
+    // for when the user skipped it (or dismissed it) the first time around.
+    private async Task ResumeLinkingAsync() => await CheckAndShowLinkingModalIfNeededAsync();
+
     private async Task CheckAndShowLinkingModalIfNeededAsync()
     {
         if (!_currentUserId.HasValue) return;
@@ -230,6 +276,22 @@ else
                 user = await UserManager.FindByIdAsync(_currentUserId.Value.ToString());
                 if (user?.PersonId.HasValue == true)
                 {
+                    _currentUserIsUnlinked = false;
+
+                    // Re-fetch _people — the modal may have just created a brand-new Person
+                    // (the user's own record, e.g. "linked as a new sibling of Douglas"),
+                    // which the _people list loaded before they existed can't contain. Without
+                    // this refresh, the lookup below always misses for a newly-created person,
+                    // silently skipping PersistFocusAsync and leaving FocusPersonId null forever
+                    // — found 2026-07-06 when a fresh page load then fell back to an arbitrary
+                    // "first person alphabetically" instead of the user's own new person.
+                    var refreshed = await PersonService.GetAllAsync();
+                    if (refreshed.Success)
+                    {
+                        _people = refreshed.Data!;
+                        _couples = CoupleHelper.Derive(_people);
+                    }
+
                     var linkedPerson = _people.FirstOrDefault(p => p.Id == user.PersonId.Value);
                     if (linkedPerson != null)
                     {
@@ -325,8 +387,13 @@ else
             StateHasChanged();
         }
 
-        if (_ready && _people.Any() && _focusPerson == null)
+        // Guarded by _noFocusToastShown — without it this fires on every re-render (drag
+        // init, drawer open/close, etc.) since _focusPerson stays null indefinitely until
+        // the user actually picks someone. Also skipped for unlinked users — that empty
+        // state already has its own "let's get you linked" messaging.
+        if (_ready && _people.Any() && _focusPerson == null && !_currentUserIsUnlinked && !_noFocusToastShown)
         {
+            _noFocusToastShown = true;
             Toast.Info("Choose a person to center your tree.");
         }
 
@@ -413,16 +480,26 @@ else
     // Saves focus to DB (if authenticated) and localStorage.
     private async Task PersistFocusAsync(Guid? personId)
     {
-        if (_currentUserId.HasValue && personId.HasValue)
+        if (_currentUserId.HasValue)
         {
-            try { await AuthService.SaveFocusPersonAsync(_currentUserId.Value, personId.Value); }
-            catch { }
+            // Authenticated users are persisted to the DB only — "ft-focus" in
+            // localStorage is a single key shared by every account that has ever used
+            // this browser (a real problem on a shared/dev machine testing multiple
+            // accounts), so an authenticated user must never read OR write it; DB is
+            // their sole source of truth. Reserved for anonymous guest browsing below.
+            if (personId.HasValue)
+            {
+                try { await AuthService.SaveFocusPersonAsync(_currentUserId.Value, personId.Value); }
+                catch { }
+            }
+            return;
         }
+
         try { await JS.InvokeVoidAsync("localStorage.setItem", "ft-focus", personId?.ToString() ?? ""); }
         catch { }
     }
 
-    // Resolves initial focus: DB (authenticated) → localStorage → first person.
+    // Resolves initial focus: DB (authenticated) → localStorage (guest only) → first person.
     private async Task<PersonDto?> ResolveFocusAsync()
     {
         if (_currentUserId.HasValue)
@@ -437,6 +514,11 @@ else
                 }
             }
             catch { }
+
+            // No DB focus yet (e.g. registered but not yet linked) — never fall back to
+            // the shared localStorage key here; it may hold a completely different
+            // account's last-viewed person. Fall straight through to the generic default.
+            return _people.FirstOrDefault();
         }
 
         try

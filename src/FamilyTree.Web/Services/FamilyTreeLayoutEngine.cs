@@ -350,8 +350,41 @@ public class FamilyTreeLayoutEngine
 
             foreach (var person in rootIndividuals)
             {
-                SetNode(person.Id, curX + NodeSpacingX / 2.0);
-                curX += NodeSpacingX;
+                // A "root individual" has no Parent/child group of their own, but may
+                // still have an explicit Sibling link to someone deep inside an existing
+                // nuclear family (e.g. self-service "we're siblings" linking with no
+                // shared parent on the tree). Anchoring next to that sibling — instead of
+                // always appending after the ENTIRE component's subtree — is what already
+                // makes the simpler orphan-sibling cases in FamilyTreeLayoutEngineTests
+                // "just work": in those tests the sibling's own group happens to be the
+                // last thing placed, so appending at curX coincidentally lands adjacent.
+                // Once the sibling is nested several generations deep (not a root itself),
+                // that coincidence breaks down and curX has already moved far to the
+                // right — found 2026-07-06 via a real "test rosenberg" sibling of Douglas
+                // and Lauren (both children of Marc+Ellen) landing past Lauren's spouse.
+                // Pick the RIGHTMOST already-placed sibling, not just the first one in the
+                // list — a person can have multiple already-placed siblings at very
+                // different X positions (e.g. one root-level sibling and one whose subtree
+                // has grown wide), and anchoring off whichever happens to be first could
+                // land back among earlier, narrower siblings instead of past all of them.
+                var siblingNode = (person.SiblingIds ?? [])
+                    .Where(sid => nodeMap.ContainsKey(sid))
+                    .Select(sid => nodeMap[sid])
+                    .OrderByDescending(n => n.X)
+                    .FirstOrDefault();
+
+                if (siblingNode != null)
+                {
+                    var candidateX = siblingNode.X + NodeSpacingX;
+                    while (nodeMap.Values.Any(n => n.Y == siblingNode.Y && Math.Abs(n.X - candidateX) < NodeSpacingX))
+                        candidateX += NodeSpacingX;
+                    SetNode(person.Id, candidateX);
+                }
+                else
+                {
+                    SetNode(person.Id, curX + NodeSpacingX / 2.0);
+                    curX += NodeSpacingX;
+                }
             }
 
             // Safety net: place any person still unpositioned at the right edge.
@@ -726,12 +759,27 @@ public class FamilyTreeLayoutEngine
         var personIds = people.Select(p => p.Id).ToHashSet();
         var claimed   = new HashSet<Guid>();
 
-        // Couple families: children claimed here are not assigned to single parents.
-        foreach (var couple in couples)
-        {
-            if (!personIds.Contains(couple.PersonAId) || !personIds.Contains(couple.PersonBId))
-                continue;
+        // Sort couples by their OWN identity (position in the deterministically-ordered
+        // people list) — NOT by CoupleHelper.Derive's incidental dictionary-insertion
+        // order, which is driven by whichever CHILD's shared-parent check happens to run
+        // first. Found 2026-07-06: marrying "Bill" himself sent his entire nuclear group
+        // to the far left of the tree, because his child Willa's last name ("Kuh") sorted
+        // alphabetically before "Rosenberg"/"Small" — nothing to do with genealogy, purely
+        // an artifact of dictionary iteration order. Sorting couples by the couple's own
+        // position keeps root-group order stable and predictable regardless of which
+        // child happens to trigger the couple's discovery.
+        var personIndex = new Dictionary<Guid, int>();
+        for (int i = 0; i < people.Count; i++) personIndex.TryAdd(people[i].Id, i);
 
+        int CoupleSortKey(CoupleDto c) => Math.Min(
+            personIndex.TryGetValue(c.PersonAId, out var a) ? a : int.MaxValue,
+            personIndex.TryGetValue(c.PersonBId, out var b) ? b : int.MaxValue);
+
+        // Couple families: children claimed here are not assigned to single parents.
+        foreach (var couple in couples
+            .Where(c => personIds.Contains(c.PersonAId) && personIds.Contains(c.PersonBId))
+            .OrderBy(CoupleSortKey))
+        {
             var children = couple.ChildIds.Where(personIds.Contains).ToList();
             foreach (var c in children) claimed.Add(c);
             groups.Add(new NuclearGroup(couple.PersonAId, couple.PersonBId, children));

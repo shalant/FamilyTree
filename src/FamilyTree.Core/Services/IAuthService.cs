@@ -7,6 +7,10 @@ public interface IAuthService
     Task<AuthResult> RegisterAsync(string firstName, string lastName, string email, string password, Guid? inviteId = null);
     Task<AuthResult> LinkPersonAsync(Guid userId, Guid? personId);
 
+    /// <summary>Does an account already exist for this email? Used to decide whether
+    /// a story-invite respondent should be offered "sign in" vs. "create account."</summary>
+    Task<bool> UserExistsAsync(string email);
+
     /// <summary>
     /// Ensures a user has a UserFamily row, defaulting to the single family this
     /// deployment currently has (creating it if missing) if they don't already have

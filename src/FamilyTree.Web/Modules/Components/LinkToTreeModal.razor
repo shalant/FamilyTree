@@ -54,7 +54,7 @@
                     }
                     else if (_stage == Stage.PickSubjectPerson)
                     {
-                        <MudSelect T="Guid?" Label="@($"Which one is {StorySubjectName}?")" Variant="Variant.Outlined"
+                        <MudSelect T="Guid?" Placeholder="Select a person…" Variant="Variant.Outlined"
                                    @bind-Value="_subjectPersonId" Dense="true">
                             @foreach (var p in _treePersons.OrderBy(x => x.FullName))
                             {
@@ -72,7 +72,7 @@
                     }
                     else if (_stage == Stage.PickSubjectConnection)
                     {
-                        <MudSelect T="Guid?" Label="@($"Who is {StorySubjectName} related to?")" Variant="Variant.Outlined"
+                        <MudSelect T="Guid?" Placeholder="Select a person…" Variant="Variant.Outlined"
                                    @bind-Value="_connectionPersonId" Dense="true">
                             @foreach (var p in _treePersons.OrderBy(x => x.FullName))
                             {
@@ -82,8 +82,7 @@
                     }
                     else if (_stage == Stage.SubjectRelationToConnection)
                     {
-                        var connectionName = _treePersons.FirstOrDefault(p => p.Id == _connectionPersonId)?.FullName ?? "them";
-                        <MudSelect T="string" Label="@($"How is {StorySubjectName} related to {connectionName}?")" Variant="Variant.Outlined"
+                        <MudSelect T="string" Placeholder="Select a relationship…" Variant="Variant.Outlined"
                                    @bind-Value="_subjectRelationToken" Dense="true">
                             <MudSelectItem Value="@("ParentOfConnected")">@($"{StorySubjectName} is their parent")</MudSelectItem>
                             <MudSelectItem Value="@("ChildOfConnected")">@($"{StorySubjectName} is their child")</MudSelectItem>
@@ -93,7 +92,7 @@
                     }
                     else if (_stage == Stage.UserRelationToSubject)
                     {
-                        <MudSelect T="string" Label="How are you related?" Variant="Variant.Outlined"
+                        <MudSelect T="string" Placeholder="Select a relationship…" Variant="Variant.Outlined"
                                    @bind-Value="_userRelationToken" Dense="true">
                             <MudSelectItem Value="@("ChildOfConnected")">@($"{StorySubjectName} is my parent")</MudSelectItem>
                             <MudSelectItem Value="@("ParentOfConnected")">I'm their parent</MudSelectItem>
@@ -112,7 +111,7 @@
                     }
                     else if (_stage == Stage.PickUserPerson)
                     {
-                        <MudSelect T="Guid?" Label="Select yourself" Variant="Variant.Outlined"
+                        <MudSelect T="Guid?" Placeholder="Select a person…" Variant="Variant.Outlined"
                                    @bind-Value="_selectedPerson" Dense="true">
                             @foreach (var p in _treePersons.OrderBy(x => x.FullName))
                             {
@@ -130,7 +129,7 @@
                     }
                     else if (_stage == Stage.PickUserConnection)
                     {
-                        <MudSelect T="Guid?" Label="Who do you know?" Variant="Variant.Outlined"
+                        <MudSelect T="Guid?" Placeholder="Select a person…" Variant="Variant.Outlined"
                                    @bind-Value="_connectionPersonId" Dense="true">
                             @foreach (var p in _treePersons.OrderBy(x => x.FullName))
                             {
@@ -140,8 +139,7 @@
                     }
                     else if (_stage == Stage.UserRelationToConnection)
                     {
-                        var connectionName = _treePersons.FirstOrDefault(p => p.Id == _connectionPersonId)?.FullName ?? "them";
-                        <MudSelect T="string" Label="@($"How are you related to {connectionName}?")" Variant="Variant.Outlined"
+                        <MudSelect T="string" Placeholder="Select a relationship…" Variant="Variant.Outlined"
                                    @bind-Value="_userRelationToken" Dense="true">
                             <MudSelectItem Value="@("ChildOfConnected")">They're my parent</MudSelectItem>
                             <MudSelectItem Value="@("ParentOfConnected")">I'm their parent</MudSelectItem>
@@ -259,8 +257,12 @@
 
     private async Task LoadTreePersonsAsync()
     {
+        // Not GetAllAsync() — this modal is shown right after registration, before the
+        // browser is authenticated (login is deferred until after the dialog closes, see
+        // Register.razor.ShowLinkModal), so the ambient-scoped query would see no FamilyId
+        // and return nothing. GetAllForUserAsync resolves the family from UserId directly.
         _treePersons = await TryAsync(
-            () => PersonService.GetAllAsync(),
+            () => PersonService.GetAllForUserAsync(UserId),
             "Loading tree") ?? [];
     }
 
