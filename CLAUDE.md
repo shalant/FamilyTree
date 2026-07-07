@@ -81,6 +81,18 @@ For bidirectional relationship types (Spouse, Sibling), `PersonAId < PersonBId` 
 ### Cross-Root Couple Layout
 When a child of one root group marries a child of another (e.g. siblings-in-law), `FamilyTreeLayoutEngine` detects the cross-root couple, removes it from the recursive placement loop, places each partner as a leaf under their own parent group (at the inner edges), then positions their children at the couple's midpoint in a post-placement pass. Prevents connector tangles.
 
+### Root-Group Placement Order
+Root nuclear groups (couples/individuals with no parent of their own) render left-to-right in a **stable** order derived from each group's own identity: `BuildNuclearGroups` sorts couples by the minimum position of the two partners in the (alphabetically-ordered) people list — never by whichever descendant happens to trigger the couple's discovery. This matters because a person transitions from "root individual" (positioned by simple append order) to "root couple" (positioned by this sort) the instant they gain a spouse; before this was fixed (2026-07-06), that transition's position was decided by whichever of the couple's *children* had the alphabetically-earliest last name (an artifact of `CoupleHelper.Derive`'s dictionary insertion order), not by the couple's own identity — so marrying an existing orphan-sibling root could send their entire nuclear group to the far side of the tree. See `FamilyTreeLayoutEngineTests.MarryingAnOrphanSiblingRoot_DoesNotJumpTheirGroupPastUnrelatedRootsByAlphabeticalAccident`.
+
+Separately, root groups are **deliberately never reordered by sibling relationships** once placed — an earlier version tried clustering siblings together, which caused worse instability (moving already-placed people whenever a new sibling joined, breaking down entirely once one sibling married). See the in-code comment above the "place roots left to right" loop in `ComputeLayout` for the full reasoning.
+
+### Where Layout Bugs Hide: Classification Transitions
+`FamilyTreeLayoutEngine.ComputeLayout` is a pure function — it fully recomputes every position from scratch on every call, off whatever `people`/`couples` data it's given. There's no incremental/partial-update state to go stale, so every layout bug found this session came from the same underlying shape: an edit that changes **which structural bucket a person falls into**, exposing that the deterministic sort/placement rules weren't actually invariant across that specific transition. Known transitions and their fixes:
+- Person gains their first Sibling link with no shared parent on the tree, where the sibling is deep inside an existing nuclear family rather than a root themselves (root-individual sibling-anchor fix, 2026-07-06)
+- Root individual gains a spouse — "individual" → "couple" (root-group-ordering fix, 2026-07-06)
+
+**Rule of thumb for future work**: any new feature that lets a person cross one of these classification lines needs its own `FamilyTreeLayoutEngineTests` regression test built as a before/after pair — same people, only the one edit differing — not just a static one-shot scenario. That's the fastest way to catch the next transition-shaped bug before it reaches production, rather than after a user stumbles into it live.
+
 ### Post-Signup Tree Linking (MVP) — "Willa scenario"
 When a new user signs up after being invited to write a story about someone who isn't on the tree yet (e.g. Willa writing about her father Bill, where neither has a `Person` row), `LinkToTreeModal` walks her through a **subject-first** linking flow instead of asking about herself directly:
 
