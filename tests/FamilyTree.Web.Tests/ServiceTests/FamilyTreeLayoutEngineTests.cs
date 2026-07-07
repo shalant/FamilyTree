@@ -305,6 +305,127 @@ public class FamilyTreeLayoutEngineTests
     }
 
     [Fact]
+    public void PersonWithTwoSpouses_ChildAnchorsUnderTheMarriageThatActuallyHasChildren()
+    {
+        // Reproduces a real bug (2026-07-07): Florence had two recorded spousal
+        // relationships — an active marriage to Bud (with their child Marc) and a
+        // second, childless relationship to Harvey Fleishman with no EndDate recorded
+        // (likely a past marriage missing its end date — messy, but real, data). The
+        // couple-ordering fix from 2026-07-06 sorts couples by identity with no concept
+        // of which one has children, so "Harvey Fleishman" (alphabetically before "Bud
+        // Rosenberg"/"Florence Rosenberg") won Florence's "primary group" slot purely by
+        // name — Marc then had no correct place to anchor, and the whole subtree
+        // sprawled apart across the canvas.
+        var bud = Guid.NewGuid();
+        var florence = Guid.NewGuid();
+        var marc = Guid.NewGuid();
+        var harvey = Guid.NewGuid();
+
+        var people = new List<PersonDto>
+        {
+            new() { Id = bud, FirstName = "Bud", LastName = "Rosenberg",
+                ParentIds = [], ChildIds = [marc], SpouseIds = [florence],
+                BirthDate = new DateOnly(1922, 1, 1) },
+            new() { Id = florence, FirstName = "Florence", LastName = "Rosenberg",
+                ParentIds = [], ChildIds = [marc], SpouseIds = [bud, harvey],
+                BirthDate = new DateOnly(1925, 1, 1) },
+            new() { Id = marc, FirstName = "Marc", LastName = "Rosenberg",
+                ParentIds = [bud, florence], ChildIds = [], SpouseIds = [],
+                BirthDate = new DateOnly(1948, 1, 1) },
+            new() { Id = harvey, FirstName = "Harvey", LastName = "Fleishman",
+                ParentIds = [], ChildIds = [], SpouseIds = [florence] },
+        };
+        var sorted = people.OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToList();
+
+        var layout = _engine.ComputeLayout(sorted, CoupleHelper.Derive(sorted), bud);
+
+        var budNode = layout.Nodes.Single(n => n.Person.Id == bud);
+        var florenceNode = layout.Nodes.Single(n => n.Person.Id == florence);
+        var marcNode = layout.Nodes.Single(n => n.Person.Id == marc);
+
+        var coupleMinX = Math.Min(budNode.X, florenceNode.X);
+        var coupleMaxX = Math.Max(budNode.X, florenceNode.X);
+
+        marcNode.X.Should().BeInRange(coupleMinX - 10, coupleMaxX + 10,
+            "Marc is Bud and Florence's real child and must anchor under their marriage, " +
+            "not get lost because Florence's other, childless relationship won her primary group slot");
+    }
+
+    [Fact]
+    public void CrossRootCouple_StillDetectedWhenOneSideIsNestedUnderAGrandparent()
+    {
+        // Reproduces a real bug (2026-07-07): Marc (Bud+Florence's son) married Ellen
+        // (Ray+Rose's daughter) — the same cross-root marriage as
+        // UnrelatedCrossRootCouple_... above, which the layout engine specifically
+        // detects and reorders root groups for. But once Dora (Bud's mother, a
+        // single-parent group since her spouse Louis is deleted) was restored, Bud
+        // is now recorded as DORA's child — Bud+Florence's group is no longer a root
+        // itself, it's nested one level down. The old detection
+        // (directChildOfRoot) only recognized a bridging couple when BOTH partners
+        // were DIRECT children of a root group's own ChildIds — Marc no longer
+        // qualifies, so the cross-root logic silently stopped firing, and Marc's
+        // position got hijacked by whichever of Dora's or Ray+Rose's subtree was
+        // processed first, sprawling him away from his real parents.
+        var ray = Guid.NewGuid();
+        var rose = Guid.NewGuid();
+        var ellen = Guid.NewGuid();
+        var sarah = Guid.NewGuid();
+        var dora = Guid.NewGuid();
+        var gladys = Guid.NewGuid();
+        var bud = Guid.NewGuid();
+        var florence = Guid.NewGuid();
+        var marc = Guid.NewGuid();
+
+        var people = BuildFamily(ray, rose, ellen, sarah);
+        people.Add(new PersonDto
+        {
+            Id = dora, FirstName = "Dora", LastName = "Herskovitz",
+            ParentIds = [], ChildIds = [bud, gladys], SpouseIds = []
+        });
+        people.Add(new PersonDto
+        {
+            Id = gladys, FirstName = "Gladys", LastName = "Rosenberg",
+            ParentIds = [dora], ChildIds = [], SpouseIds = []
+        });
+        people.Add(new PersonDto
+        {
+            Id = bud, FirstName = "Bud", LastName = "Rosenberg",
+            ParentIds = [dora], ChildIds = [marc], SpouseIds = [florence],
+            BirthDate = new DateOnly(1922, 1, 1)
+        });
+        people.Add(new PersonDto
+        {
+            Id = florence, FirstName = "Florence", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [marc], SpouseIds = [bud],
+            BirthDate = new DateOnly(1925, 1, 1)
+        });
+        people.First(p => p.Id == ellen).SpouseIds = [marc];
+        people.Add(new PersonDto
+        {
+            Id = marc, FirstName = "Marc", LastName = "Rosenberg",
+            ParentIds = [bud, florence], ChildIds = [], SpouseIds = [ellen],
+            BirthDate = new DateOnly(1948, 1, 1)
+        });
+
+        var sorted = people.OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToList();
+
+        var layout = _engine.ComputeLayout(sorted, CoupleHelper.Derive(sorted), ray);
+
+        var budNode = layout.Nodes.Single(n => n.Person.Id == bud);
+        var florenceNode = layout.Nodes.Single(n => n.Person.Id == florence);
+        var marcNode = layout.Nodes.Single(n => n.Person.Id == marc);
+
+        var coupleMinX = Math.Min(budNode.X, florenceNode.X);
+        var coupleMaxX = Math.Max(budNode.X, florenceNode.X);
+
+        marcNode.X.Should().BeInRange(coupleMinX - 10, coupleMaxX + 10,
+            "Marc is Bud and Florence's real child and must anchor under their marriage " +
+            "even though Bud+Florence's group is now nested under Dora instead of being a " +
+            "root itself — the cross-root detection must still recognize Marc+Ellen's " +
+            "marriage and keep Marc from sprawling toward Ray+Rose's branch");
+    }
+
+    [Fact]
     public void AddingThirdMutualSibling_DoesNotMoveAnyPreviouslyPlacedPerson()
     {
         var ray = Guid.NewGuid();

@@ -143,19 +143,52 @@ public class FamilyTreeLayoutEngine
                 .Where(id => id.HasValue).Select(id => id!.Value)
                 .ToHashSet();
 
-            // Map each person to the one group they head as a parent.
-            // Couple groups are preferred over single-parent groups.
+            // Map each person to the one group they head as a parent. A group WITH
+            // children is always preferred over one without — the primary group is what
+            // anchors this person's actual children during recursive placement, so a
+            // childless group (e.g. a second marriage with no kids together) must never
+            // win that slot just by sorting earlier; a couple is then preferred over a
+            // single-parent group as the final tiebreak.
+            //
+            // Found 2026-07-07: a person with two recorded spousal relationships (e.g.
+            // Florence — an active marriage to Bud with their child Marc, plus a second,
+            // childless "Harvey Fleishman" relationship with no EndDate recorded, likely
+            // a past marriage missing its end date) had the CHILDLESS one win as her
+            // primary group, purely because "Fleishman" sorts alphabetically before
+            // "Rosenberg" (the couple-ordering fix from 2026-07-06 sorts by identity, with
+            // no concept of which relationship actually has children on the tree). Marc
+            // then had nowhere correct to anchor from, and the whole subtree sprawled.
             var primaryGroup = new Dictionary<Guid, NuclearGroup>();
-            foreach (var g in compGroups.OrderByDescending(g => g.ParentBId.HasValue ? 1 : 0))
+            foreach (var g in compGroups
+                .OrderByDescending(g => g.ChildIds.Count > 0 ? 1 : 0)
+                .ThenByDescending(g => g.ParentBId.HasValue ? 1 : 0))
             {
                 if (g.ParentAId.HasValue) primaryGroup.TryAdd(g.ParentAId.Value, g);
                 if (g.ParentBId.HasValue) primaryGroup.TryAdd(g.ParentBId.Value, g);
             }
 
-            // Root groups: parents that are not children of any group (tree tops).
+            // Root groups: parents that are not children of any group (tree tops). A
+            // group only competes for its own independent placement slot if it's the
+            // PRIMARY group of EVERY parent it has (not just at least one) — otherwise a
+            // person's second, childless relationship (e.g. a widow's second husband,
+            // with no kids together) would get its own root slot and SetNode that shared
+            // parent there FIRST, locking in their X position via the wrong anchor
+            // before their real family (the one with actual children) is ever
+            // processed. The children then get positioned relative to an anchor that
+            // doesn't match where their parent visually ended up, sending them far from
+            // where they belong. Using OR here (survives if EITHER parent treats it as
+            // primary) is NOT enough: Harvey Fleishman has no competing group of his
+            // own, so this trivially IS his "primary" group even though it is NOT
+            // Florence's — the check must fail if ANY parent's real primary group is
+            // something else, hence AND across every parent that has one at all. Found
+            // 2026-07-07: Harvey (Florence's second, childless husband) claimed
+            // Florence's position before Bud+Florence's group (with their real child
+            // Marc) was processed, sending Marc's position wildly out of alignment.
             var rootGroups = compGroups.Where(g =>
                 (!g.ParentAId.HasValue || !childrenInGroups.Contains(g.ParentAId.Value)) &&
-                (!g.ParentBId.HasValue || !childrenInGroups.Contains(g.ParentBId.Value)))
+                (!g.ParentBId.HasValue || !childrenInGroups.Contains(g.ParentBId.Value)) &&
+                (!g.ParentAId.HasValue || !primaryGroup.TryGetValue(g.ParentAId.Value, out var pgA) || pgA == g) &&
+                (!g.ParentBId.HasValue || !primaryGroup.TryGetValue(g.ParentBId.Value, out var pgB) || pgB == g))
                 .ToList();
 
             // Root individuals: people in no group at all (unlinked singletons).
@@ -165,9 +198,10 @@ public class FamilyTreeLayoutEngine
                 .ToList();
 
             // ── Cross-root couple detection ───────────────────────────────────
-            // When a child of root group A marries a child of root group B,
-            // PlaceGroup would recurse into their NuclearGroup from both sides,
-            // writing conflicting X positions (tangle). Fix:
+            // When a descendant of root group A (at any depth, not just a direct
+            // child) marries a descendant of root group B, PlaceGroup would recurse
+            // into their NuclearGroup from both sides, writing conflicting X
+            // positions (tangle). Fix:
             //   1. Remove the couple from primaryGroup → each partner becomes
             //      a leaf placed under their own parent group.
             //   2. Sort root groups so the two bridged groups are adjacent and
@@ -177,25 +211,73 @@ public class FamilyTreeLayoutEngine
             // After all root groups are placed, PlaceGroup is called once more
             // for each cross-root couple to position their children at the midpoint.
 
-            var directChildOfRoot = new Dictionary<Guid, NuclearGroup>();
+            // Map every person to the root group they ultimately descend from, at ANY
+            // depth — not just as a direct child of the root's own ChildIds. Built by
+            // walking the same primaryGroup-driven chain PlaceGroup itself will later
+            // follow. A single-hop "direct child of root" check (the original approach)
+            // stops working the moment a bridging couple's group becomes nested under a
+            // grandparent instead of being a root itself.
+            //
+            // Found 2026-07-07: Marc (Bud+Florence's son) married Ellen (Ray+Rose's
+            // daughter) — a cross-root marriage the layout engine already knew how to
+            // detect and reorder root groups for, as long as Bud+Florence's group was
+            // itself a root. Once Dora (Bud's mother, restored from a soft delete) made
+            // Bud her recorded child, Bud+Florence's group became nested one level down —
+            // Marc is now a GRANDCHILD of a root (Dora), not a direct child, so the old
+            // check silently stopped firing. Both Dora's subtree and Ray+Rose's subtree
+            // then independently tried to place Marc and Ellen via ordinary recursion,
+            // and whichever ran first hijacked the other's position, sprawling Marc away
+            // from his real parents.
+            var descendantOfRoot = new Dictionary<Guid, NuclearGroup>();
+            void MarkDescendants(NuclearGroup g, NuclearGroup root)
+            {
+                foreach (var cid in g.ChildIds)
+                {
+                    descendantOfRoot.TryAdd(cid, root);
+                    if (primaryGroup.TryGetValue(cid, out var childGroup))
+                        MarkDescendants(childGroup, root);
+                }
+            }
             foreach (var rg in rootGroups)
-                foreach (var cid in rg.ChildIds)
-                    directChildOfRoot.TryAdd(cid, rg);
+            {
+                if (rg.ParentAId.HasValue) descendantOfRoot.TryAdd(rg.ParentAId.Value, rg);
+                if (rg.ParentBId.HasValue) descendantOfRoot.TryAdd(rg.ParentBId.Value, rg);
+                MarkDescendants(rg, rg);
+            }
 
-            var crossRootInfo = new List<(NuclearGroup couple, NuclearGroup rootA, NuclearGroup rootB)>();
+            var crossRootInfo = new List<(NuclearGroup couple, NuclearGroup rootA, NuclearGroup rootB, Guid memberOfA, Guid memberOfB)>();
             foreach (var g in compGroups)
             {
                 if (!g.ParentAId.HasValue || !g.ParentBId.HasValue) continue;
-                if (!directChildOfRoot.TryGetValue(g.ParentAId.Value, out var rgA)) continue;
-                if (!directChildOfRoot.TryGetValue(g.ParentBId.Value, out var rgB)) continue;
-                if (rgA == rgB) continue;
-                crossRootInfo.Add((g, rgA, rgB));
+                if (!descendantOfRoot.TryGetValue(g.ParentAId.Value, out var r1)) continue;
+                if (!descendantOfRoot.TryGetValue(g.ParentBId.Value, out var r2)) continue;
+                if (r1 == r2) continue;
+
+                // Anchor rgA/rgB by their CURRENT position in rootGroups (already sorted
+                // stably) — NOT by the married couple's own canonical PersonA/PersonB GUID
+                // order. Using the couple's own GUID order means whichever spouse happens
+                // to have the lower GUID (utterly arbitrary, and different every time IDs
+                // are regenerated) decides which root group anchors the reorder below —
+                // which can shove an unrelated third root group to the very front of the
+                // tree depending on random GUID comparison. Found 2026-07-06 as a flaky
+                // regression test (MarryingAnOrphanSiblingRoot...) once Bill+Gish's group
+                // was added into the mix alongside the pre-existing Marc/Ellen cross-root
+                // couple: the reorder's outcome depended on whether Marc's or Ellen's GUID
+                // happened to be lower, not on any genealogical or rendering-order fact.
+                var idx1 = rootGroups.IndexOf(r1);
+                var idx2 = rootGroups.IndexOf(r2);
+                var aFirst = idx1 <= idx2;
+                var rgA = aFirst ? r1 : r2;
+                var rgB = aFirst ? r2 : r1;
+                var memberOfA = aFirst ? g.ParentAId.Value : g.ParentBId.Value;
+                var memberOfB = aFirst ? g.ParentBId.Value : g.ParentAId.Value;
+                crossRootInfo.Add((g, rgA, rgB, memberOfA, memberOfB));
             }
 
             if (crossRootInfo.Count > 0)
             {
                 // 1. Remove from primaryGroup so partners are placed as simple leaves.
-                foreach (var (cg, _, _) in crossRootInfo)
+                foreach (var (cg, _, _, _, _) in crossRootInfo)
                 {
                     if (cg.ParentAId.HasValue && primaryGroup.TryGetValue(cg.ParentAId.Value, out var pA) && pA == cg)
                         primaryGroup.Remove(cg.ParentAId.Value);
@@ -210,7 +292,7 @@ public class FamilyTreeLayoutEngine
                 // a newly-added orphan-sibling group (Bill) ending up displaced past its
                 // natural position just because an unrelated pre-existing cross-root
                 // couple (Marc + Ellen) needed Ray/Rose's group pushed rightward.
-                foreach (var (_, rgA, rgB) in crossRootInfo)
+                foreach (var (_, rgA, rgB, _, _) in crossRootInfo)
                 {
                     var idxA = rootGroups.IndexOf(rgA);
                     var idxB = rootGroups.IndexOf(rgB);
@@ -223,12 +305,17 @@ public class FamilyTreeLayoutEngine
                     rootGroups = withoutB;
                 }
 
-                // 3. Sort children: cross-root ParentA → rightmost, ParentB → leftmost.
-                var crossEdge = new Dictionary<Guid, bool>(); // true = isParentA (right edge)
-                foreach (var (cg, _, _) in crossRootInfo)
+                // 3. Sort children: whoever belongs to the left-positioned root group
+                // (rgA) → rightmost (the inner edge, nearest rgB); whoever belongs to
+                // rgB → leftmost (its own inner edge, nearest rgA). Keyed by memberOfA/
+                // memberOfB (which root group each spouse actually belongs to) rather
+                // than the couple's own ParentA/ParentB GUID label, so the edge each
+                // child sorts to always matches which SIDE their root group ended up on.
+                var crossEdge = new Dictionary<Guid, bool>(); // true = belongs to rgA (right edge)
+                foreach (var (_, _, _, memberOfA, memberOfB) in crossRootInfo)
                 {
-                    if (cg.ParentAId.HasValue) crossEdge[cg.ParentAId.Value] = true;
-                    if (cg.ParentBId.HasValue) crossEdge[cg.ParentBId.Value] = false;
+                    crossEdge[memberOfA] = true;
+                    crossEdge[memberOfB] = false;
                 }
                 rootGroups = rootGroups
                     .Select(rg => rg with
@@ -340,7 +427,7 @@ public class FamilyTreeLayoutEngine
             // ── Place children of cross-root couples ──────────────────────────
             // Both partners are already placed as leaves; SetNode's guard skips
             // them and only the children get positioned at the couple's midpoint.
-            foreach (var (cg, _, _) in crossRootInfo)
+            foreach (var (cg, _, _, _, _) in crossRootInfo)
             {
                 if (!cg.ParentAId.HasValue || !cg.ParentBId.HasValue) continue;
                 if (!nodeMap.TryGetValue(cg.ParentAId.Value, out var nA) ||
@@ -387,10 +474,32 @@ public class FamilyTreeLayoutEngine
                 }
             }
 
-            // Safety net: place any person still unpositioned at the right edge.
+            // Safety net: place any person still unpositioned. This is where a person
+            // whose own group was excluded from rootGroups above (because it isn't their
+            // PRIMARY group — e.g. Harvey Fleishman, Florence's second, childless
+            // husband) lands. Anchor next to an already-placed spouse when there is one,
+            // same reasoning as the sibling-anchor case: appending at the far right edge
+            // of the whole component is a jarring, arbitrary position for someone who
+            // actually has a real, known connection on the tree.
             foreach (var person in component)
             {
-                if (!nodeMap.ContainsKey(person.Id))
+                if (nodeMap.ContainsKey(person.Id)) continue;
+
+                var spouseNode = (person.SpouseIds ?? [])
+                    .Concat(person.FormerSpouseIds ?? [])
+                    .Where(sid => nodeMap.ContainsKey(sid))
+                    .Select(sid => nodeMap[sid])
+                    .OrderByDescending(n => n.X)
+                    .FirstOrDefault();
+
+                if (spouseNode != null)
+                {
+                    var candidateX = spouseNode.X + NodeSpacingX;
+                    while (nodeMap.Values.Any(n => n.Y == spouseNode.Y && Math.Abs(n.X - candidateX) < NodeSpacingX))
+                        candidateX += NodeSpacingX;
+                    SetNode(person.Id, candidateX);
+                }
+                else
                 {
                     SetNode(person.Id, curX + NodeSpacingX / 2.0);
                     curX += NodeSpacingX;
