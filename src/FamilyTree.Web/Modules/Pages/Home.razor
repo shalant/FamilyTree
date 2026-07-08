@@ -124,6 +124,7 @@ else
                       People="_people"
                       Couples="_couples"
                       FocusId="_focusPerson?.Id"
+                      AnchorPersonId="_anchorPersonId"
                       OnPersonSelected="HandlePersonSelected" />
 
     <FamilyFactsBanner People="_people" />
@@ -178,6 +179,7 @@ else
     private Guid? _lastHandledView;   // prevents re-processing the same View on re-renders
     private Guid? _currentUserId;
     private bool _currentUserIsUnlinked;
+    private Guid? _anchorPersonId; // the logged-in user's own linked Person — drives lineage-side ordering
     private bool _noFocusToastShown;
 
     // ── Drag state ────────────────────────────────────────────────────────────
@@ -211,6 +213,7 @@ else
         {
             var currentAppUser = await UserManager.FindByIdAsync(_currentUserId.Value.ToString());
             _currentUserIsUnlinked = !(currentAppUser?.PersonId.HasValue ?? false);
+            _anchorPersonId = currentAppUser?.PersonId;
         }
 
         var result = await PersonService.GetAllAsync();
@@ -585,8 +588,9 @@ else
     {
         var parameters = new DialogParameters<ExportDialog>
         {
-            { d => d.People,      _people },
-            { d => d.FocusPerson, _focusPerson }
+            { d => d.People,         _people },
+            { d => d.FocusPerson,    _focusPerson },
+            { d => d.AnchorPersonId, _anchorPersonId }
         };
 
         await DialogService.ShowAsync<ExportDialog>(

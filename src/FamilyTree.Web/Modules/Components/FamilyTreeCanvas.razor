@@ -37,6 +37,18 @@
             <svg class="ft-svg"
                  style="width:@(_layout.CanvasWidth)px; height:@(_layout.CanvasHeight)px;">
 
+                @* Subtle boundary between genuinely disconnected (unrelated) components —
+                   drawn first so connector lines/nodes always render on top of it *@
+                @foreach (var divider in _layout.ComponentDividers)
+                {
+                    <path d="M @F(divider.X) @(divider.TopY) L @F(divider.X) @(divider.BotY)"
+                          fill="none"
+                          stroke="var(--ft-gray-400)"
+                          stroke-width="1"
+                          stroke-dasharray="2 6"
+                          opacity="0.5" />
+                }
+
                 @foreach (var family in _layout.Connectors)
                 {
                     @* Horizontal couple connector *@
@@ -133,6 +145,7 @@
     [Parameter] public List<PersonDto> People { get; set; } = [];
     [Parameter] public List<CoupleDto> Couples { get; set; } = [];
     [Parameter] public Guid? FocusId { get; set; }
+    [Parameter] public Guid? AnchorPersonId { get; set; }
     [Parameter] public EventCallback<PersonDto> OnPersonSelected { get; set; }
 
     private FamilyTreeLayout _layout = FamilyTreeLayout.Empty;
@@ -141,7 +154,7 @@
 
     protected override void OnParametersSet()
     {
-        _layout = LayoutEngine.ComputeLayout(People, Couples, FocusId);
+        _layout = LayoutEngine.ComputeLayout(People, Couples, FocusId, AnchorPersonId);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

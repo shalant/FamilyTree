@@ -426,6 +426,132 @@ public class FamilyTreeLayoutEngineTests
     }
 
     [Fact]
+    public void CrossRootCoupleInnerEdgeSort_AppliesEvenWhenBridgingCoupleIsNestedUnderAGrandparent()
+    {
+        // Same fixture as CrossRootCouple_StillDetectedWhenOneSideIsNestedUnderAGrandparent,
+        // plus a sibling for Marc (Elliot). Found 2026-07-07: the "sort children to inner
+        // edge" step that keeps a cross-root couple's connector from being interrupted by a
+        // sibling only ever rewrote a ROOT's own direct ChildIds — Dora's ChildIds is
+        // [bud, gladys], neither of which is Marc, so the reorder was a silent no-op for
+        // him. Elliot ended up positioned between Marc and Marc's cross-root spouse Ellen,
+        // visually crossing their marriage connector. The fix walks the primaryGroup chain
+        // at ANY depth, reordering whichever specific nested group actually contains Marc.
+        var ray = Guid.NewGuid();
+        var rose = Guid.NewGuid();
+        var ellen = Guid.NewGuid();
+        var sarah = Guid.NewGuid();
+        var dora = Guid.NewGuid();
+        var gladys = Guid.NewGuid();
+        var bud = Guid.NewGuid();
+        var florence = Guid.NewGuid();
+        var marc = Guid.NewGuid();
+        var elliot = Guid.NewGuid();
+
+        var people = BuildFamily(ray, rose, ellen, sarah);
+        people.Add(new PersonDto
+        {
+            Id = dora, FirstName = "Dora", LastName = "Herskovitz",
+            ParentIds = [], ChildIds = [bud, gladys], SpouseIds = []
+        });
+        people.Add(new PersonDto
+        {
+            Id = gladys, FirstName = "Gladys", LastName = "Rosenberg",
+            ParentIds = [dora], ChildIds = [], SpouseIds = []
+        });
+        people.Add(new PersonDto
+        {
+            Id = bud, FirstName = "Bud", LastName = "Rosenberg",
+            ParentIds = [dora], ChildIds = [elliot, marc], SpouseIds = [florence],
+            BirthDate = new DateOnly(1922, 1, 1)
+        });
+        people.Add(new PersonDto
+        {
+            Id = florence, FirstName = "Florence", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [elliot, marc], SpouseIds = [bud],
+            BirthDate = new DateOnly(1925, 1, 1)
+        });
+        people.First(p => p.Id == ellen).SpouseIds = [marc];
+        people.Add(new PersonDto
+        {
+            Id = marc, FirstName = "Marc", LastName = "Rosenberg",
+            ParentIds = [bud, florence], ChildIds = [], SpouseIds = [ellen], SiblingIds = [elliot],
+            BirthDate = new DateOnly(1948, 1, 1)
+        });
+        people.Add(new PersonDto
+        {
+            Id = elliot, FirstName = "Elliot", LastName = "Rosenberg",
+            ParentIds = [bud, florence], ChildIds = [], SpouseIds = [], SiblingIds = [marc],
+            BirthDate = new DateOnly(1950, 1, 1)
+        });
+
+        var sorted = people.OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToList();
+
+        var layout = _engine.ComputeLayout(sorted, CoupleHelper.Derive(sorted), ray);
+
+        var marcNode = layout.Nodes.Single(n => n.Person.Id == marc);
+        var ellenNode = layout.Nodes.Single(n => n.Person.Id == ellen);
+        var elliotNode = layout.Nodes.Single(n => n.Person.Id == elliot);
+
+        var lo = Math.Min(marcNode.X, ellenNode.X);
+        var hi = Math.Max(marcNode.X, ellenNode.X);
+        elliotNode.X.Should().NotBeInRange(lo, hi,
+            "Elliot must never sit strictly between Marc and Marc's cross-root spouse Ellen, " +
+            "interrupting their marriage connector — even though Elliot's parent group " +
+            "(Bud+Florence) is nested two levels under Dora's root rather than being a root itself");
+    }
+
+    [Fact]
+    public void CrossRootCoupleInnerEdgeSort_StillAppliesAtRootDepth()
+    {
+        // Same scenario as above, but Bud+Florence's group IS a root itself (no Dora) —
+        // proves the generalized recursive reorder still handles the shallow, depth-1 case
+        // the original (pre-generalization) code already handled correctly.
+        var ray = Guid.NewGuid();
+        var rose = Guid.NewGuid();
+        var ellen = Guid.NewGuid();
+        var sarah = Guid.NewGuid();
+        var bud = Guid.NewGuid();
+        var florence = Guid.NewGuid();
+        var marc = Guid.NewGuid();
+        var elliot = Guid.NewGuid();
+
+        var people = BuildFamily(ray, rose, ellen, sarah);
+        people.Add(new PersonDto
+        {
+            Id = bud, FirstName = "Bud", LastName = "Small",
+            ParentIds = [], ChildIds = [elliot, marc], SpouseIds = [florence]
+        });
+        people.Add(new PersonDto
+        {
+            Id = florence, FirstName = "Florence", LastName = "Small",
+            ParentIds = [], ChildIds = [elliot, marc], SpouseIds = [bud]
+        });
+        people.First(p => p.Id == ellen).SpouseIds = [marc];
+        people.Add(new PersonDto
+        {
+            Id = marc, FirstName = "Marc", LastName = "Small",
+            ParentIds = [bud, florence], ChildIds = [], SpouseIds = [ellen], SiblingIds = [elliot]
+        });
+        people.Add(new PersonDto
+        {
+            Id = elliot, FirstName = "Elliot", LastName = "Small",
+            ParentIds = [bud, florence], ChildIds = [], SpouseIds = [], SiblingIds = [marc]
+        });
+
+        var layout = _engine.ComputeLayout(people, CoupleHelper.Derive(people), ray);
+
+        var marcNode = layout.Nodes.Single(n => n.Person.Id == marc);
+        var ellenNode = layout.Nodes.Single(n => n.Person.Id == ellen);
+        var elliotNode = layout.Nodes.Single(n => n.Person.Id == elliot);
+
+        var lo = Math.Min(marcNode.X, ellenNode.X);
+        var hi = Math.Max(marcNode.X, ellenNode.X);
+        elliotNode.X.Should().NotBeInRange(lo, hi,
+            "the depth-1 case (Bud+Florence themselves a root) must still keep Elliot off to " +
+            "the outer edge, away from Marc and Ellen's connector");
+    }
+
+    [Fact]
     public void AddingThirdMutualSibling_DoesNotMoveAnyPreviouslyPlacedPerson()
     {
         var ray = Guid.NewGuid();
@@ -686,6 +812,339 @@ public class FamilyTreeLayoutEngineTests
         new() { Id = amelia, FirstName = "Amelia", LastName = "Anbari",
             ParentIds = [lauren, omar], ChildIds = [], SpouseIds = [], SiblingIds = [] },
     ];
+
+    [Fact]
+    public void LineageSide_ClustersOneParentsAncestorsAwayFromTheOther()
+    {
+        // Douglas is the anchor: his father Marc's side (Bud+Florence+Elliot) and his
+        // mother Ellen's side (Ray+Rose+Sarah) must render as two non-interleaved
+        // clusters — Marc and Ellen's own marriage is itself a cross-root couple
+        // bridging the two sides, so this also exercises the interaction between
+        // lineage-side ordering and the existing cross-root adjacency logic.
+        var (ray, rose, ellen, sarah) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var (bud, florence, elliot, marc, douglas) =
+            (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        var people = BuildFamily(ray, rose, ellen, sarah);
+        people.Add(new PersonDto
+        {
+            Id = bud, FirstName = "Bud", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [elliot, marc], SpouseIds = [florence]
+        });
+        people.Add(new PersonDto
+        {
+            Id = florence, FirstName = "Florence", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [elliot, marc], SpouseIds = [bud]
+        });
+        people.Add(new PersonDto
+        {
+            Id = elliot, FirstName = "Elliot", LastName = "Rosenberg",
+            ParentIds = [bud, florence], ChildIds = [], SpouseIds = [], SiblingIds = [marc]
+        });
+        people.Add(new PersonDto
+        {
+            Id = marc, FirstName = "Marc", LastName = "Rosenberg",
+            ParentIds = [bud, florence], ChildIds = [douglas], SpouseIds = [ellen], SiblingIds = [elliot]
+        });
+        people.First(p => p.Id == ellen).SpouseIds = [marc];
+        people.First(p => p.Id == ellen).ChildIds = [douglas];
+        people.Add(new PersonDto
+        {
+            Id = douglas, FirstName = "Douglas", LastName = "Rosenberg",
+            ParentIds = [marc, ellen], ChildIds = [], SpouseIds = []
+        });
+
+        var layout = _engine.ComputeLayout(people, CoupleHelper.Derive(people), douglas, douglas);
+
+        var budSideXs = new[] { bud, florence, elliot }.Select(id => layout.Nodes.Single(n => n.Person.Id == id).X);
+        var ellenSideXs = new[] { ray, rose, sarah }.Select(id => layout.Nodes.Single(n => n.Person.Id == id).X);
+
+        var budMax = budSideXs.Max();
+        var budMin = budSideXs.Min();
+        var ellenMax = ellenSideXs.Max();
+        var ellenMin = ellenSideXs.Min();
+
+        (budMax < ellenMin || ellenMax < budMin).Should().BeTrue(
+            "Marc's side (Bud/Florence/Elliot) and Ellen's side (Ray/Rose/Sarah) must render " +
+            "as two non-interleaved clusters relative to Douglas, the anchor person");
+
+        var layoutAgain = _engine.ComputeLayout(people, CoupleHelper.Derive(people), douglas, douglas);
+        foreach (var node in layout.Nodes)
+        {
+            var again = layoutAgain.Nodes.Single(n => n.Person.Id == node.Person.Id);
+            (again.X, again.Y).Should().Be((node.X, node.Y),
+                "ComputeLayout is a pure function — calling it twice with the same anchor must " +
+                "produce byte-identical positions, never incrementally-drifting state");
+        }
+    }
+
+    [Fact]
+    public void LineageSide_NoAnchor_FallsBackToExistingOrder()
+    {
+        var (ray, rose, ellen, sarah) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var (bud, florence, elliot, marc, douglas) =
+            (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        var people = BuildFamily(ray, rose, ellen, sarah);
+        people.Add(new PersonDto
+        {
+            Id = bud, FirstName = "Bud", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [elliot, marc], SpouseIds = [florence]
+        });
+        people.Add(new PersonDto
+        {
+            Id = florence, FirstName = "Florence", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [elliot, marc], SpouseIds = [bud]
+        });
+        people.Add(new PersonDto
+        {
+            Id = elliot, FirstName = "Elliot", LastName = "Rosenberg",
+            ParentIds = [bud, florence], ChildIds = [], SpouseIds = [], SiblingIds = [marc]
+        });
+        people.Add(new PersonDto
+        {
+            Id = marc, FirstName = "Marc", LastName = "Rosenberg",
+            ParentIds = [bud, florence], ChildIds = [douglas], SpouseIds = [ellen], SiblingIds = [elliot]
+        });
+        people.First(p => p.Id == ellen).SpouseIds = [marc];
+        people.First(p => p.Id == ellen).ChildIds = [douglas];
+        people.Add(new PersonDto
+        {
+            Id = douglas, FirstName = "Douglas", LastName = "Rosenberg",
+            ParentIds = [marc, ellen], ChildIds = [], SpouseIds = []
+        });
+        var couples = CoupleHelper.Derive(people);
+
+        var baseline = _engine.ComputeLayout(people, couples, douglas);
+        var omittedAnchor = _engine.ComputeLayout(people, couples, douglas);
+        var explicitNullAnchor = _engine.ComputeLayout(people, couples, douglas, null);
+        // Bud has zero recorded parents — fewer than the two required for side-ordering.
+        var anchorWithoutTwoParents = _engine.ComputeLayout(people, couples, douglas, bud);
+
+        foreach (var candidate in new[] { omittedAnchor, explicitNullAnchor, anchorWithoutTwoParents })
+        {
+            foreach (var node in baseline.Nodes)
+            {
+                var match = candidate.Nodes.Single(n => n.Person.Id == node.Person.Id);
+                (match.X, match.Y).Should().Be((node.X, node.Y),
+                    "no anchor, an explicit null anchor, or an anchor with fewer than two " +
+                    "recorded parents must all no-op to the exact same layout as no anchor at all");
+            }
+        }
+    }
+
+    [Fact]
+    public void LineageSide_UnreachableRootGroupLandsInNeutralBucket_DoesNotCrash()
+    {
+        // Douglas's own spouse's family connects to the overall tree ONLY through
+        // Douglas himself — the BFS deliberately never hops through the anchor, so
+        // this root group is unreachable from either of Douglas's two parents. Must
+        // not throw, and the group must still render somewhere.
+        var (ray, rose, ellen, sarah) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var (bud, florence, marc, douglas) =
+            (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var (jane, janesDad, janesMom) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        var people = BuildFamily(ray, rose, ellen, sarah);
+        people.Add(new PersonDto
+        {
+            Id = bud, FirstName = "Bud", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [marc], SpouseIds = [florence]
+        });
+        people.Add(new PersonDto
+        {
+            Id = florence, FirstName = "Florence", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [marc], SpouseIds = [bud]
+        });
+        people.Add(new PersonDto
+        {
+            Id = marc, FirstName = "Marc", LastName = "Rosenberg",
+            ParentIds = [bud, florence], ChildIds = [douglas], SpouseIds = [ellen]
+        });
+        people.First(p => p.Id == ellen).SpouseIds = [marc];
+        people.First(p => p.Id == ellen).ChildIds = [douglas];
+        people.Add(new PersonDto
+        {
+            Id = douglas, FirstName = "Douglas", LastName = "Rosenberg",
+            ParentIds = [marc, ellen], ChildIds = [], SpouseIds = [jane]
+        });
+        people.Add(new PersonDto
+        {
+            Id = jane, FirstName = "Jane", LastName = "Doe",
+            ParentIds = [janesDad, janesMom], ChildIds = [], SpouseIds = [douglas]
+        });
+        people.Add(new PersonDto
+        {
+            Id = janesDad, FirstName = "Frank", LastName = "Doe",
+            ParentIds = [], ChildIds = [jane], SpouseIds = [janesMom]
+        });
+        people.Add(new PersonDto
+        {
+            Id = janesMom, FirstName = "Grace", LastName = "Doe",
+            ParentIds = [], ChildIds = [jane], SpouseIds = [janesDad]
+        });
+
+        var act = () => _engine.ComputeLayout(people, CoupleHelper.Derive(people), douglas, douglas);
+        var layout = act.Should().NotThrow().Subject;
+
+        layout.Nodes.Should().Contain(n => n.Person.Id == janesDad);
+        layout.Nodes.Should().Contain(n => n.Person.Id == janesMom);
+    }
+
+    [Fact]
+    public void LineageSide_OrphanSiblingsStayAdjacentToTheirCorrectlyBucketedSiblingRoot()
+    {
+        // Bill and Morton are orphan siblings of Ray with no parents recorded on the
+        // tree — they must land on Ray+Rose's side of the canvas (Ellen's side, from
+        // Douglas's perspective), not get split across the boundary with Marc's side.
+        //
+        // Only Bill is used here, not a Bill+Morton chain: Marc+Ellen's marriage makes
+        // Bud+Florence's and Ray+Rose's root groups forced-adjacent with zero gap (the
+        // existing cross-root adjacency step), and a SECOND orphan sibling anchored off
+        // the first (rather than off Ray directly) can walk across that zero-gap boundary
+        // via the pre-existing sibling-anchor collision-avoidance loop — a real but
+        // separate, pre-existing limitation of that loop, orthogonal to lineage-side
+        // ordering and out of scope for this change (this plan deliberately leaves
+        // rootIndividuals placement untouched). One directly-anchored orphan sibling is
+        // sufficient to prove the side-bucketing requirement this test targets.
+        var (ray, rose, ellen, sarah) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var (bud, florence, elliot, marc, douglas) =
+            (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var bill = Guid.NewGuid();
+
+        var people = BuildFamily(ray, rose, ellen, sarah);
+        people.First(p => p.Id == ray).SiblingIds = [bill];
+        people.Add(new PersonDto
+        {
+            Id = bill, FirstName = "Bill", LastName = "Small",
+            ParentIds = [], ChildIds = [], SpouseIds = [], SiblingIds = [ray]
+        });
+        people.Add(new PersonDto
+        {
+            Id = bud, FirstName = "Bud", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [elliot, marc], SpouseIds = [florence]
+        });
+        people.Add(new PersonDto
+        {
+            Id = florence, FirstName = "Florence", LastName = "Rosenberg",
+            ParentIds = [], ChildIds = [elliot, marc], SpouseIds = [bud]
+        });
+        people.Add(new PersonDto
+        {
+            Id = elliot, FirstName = "Elliot", LastName = "Rosenberg",
+            ParentIds = [bud, florence], ChildIds = [], SpouseIds = [], SiblingIds = [marc]
+        });
+        people.Add(new PersonDto
+        {
+            Id = marc, FirstName = "Marc", LastName = "Rosenberg",
+            ParentIds = [bud, florence], ChildIds = [douglas], SpouseIds = [ellen], SiblingIds = [elliot]
+        });
+        people.First(p => p.Id == ellen).SpouseIds = [marc];
+        people.First(p => p.Id == ellen).ChildIds = [douglas];
+        people.Add(new PersonDto
+        {
+            Id = douglas, FirstName = "Douglas", LastName = "Rosenberg",
+            ParentIds = [marc, ellen], ChildIds = [], SpouseIds = []
+        });
+
+        var layout = _engine.ComputeLayout(people, CoupleHelper.Derive(people), douglas, douglas);
+
+        var budGroupMax = new[] { bud, florence, elliot }.Select(id => layout.Nodes.Single(n => n.Person.Id == id).X).Max();
+        var budGroupMin = new[] { bud, florence, elliot }.Select(id => layout.Nodes.Single(n => n.Person.Id == id).X).Min();
+        var rayGroupMax = new[] { ray, rose, sarah }.Select(id => layout.Nodes.Single(n => n.Person.Id == id).X).Max();
+        var rayGroupMin = new[] { ray, rose, sarah }.Select(id => layout.Nodes.Single(n => n.Person.Id == id).X).Min();
+        var billX = layout.Nodes.Single(n => n.Person.Id == bill).X;
+
+        var rayIsRightOfBud = budGroupMax < rayGroupMin;
+        (rayIsRightOfBud || rayGroupMax < budGroupMin).Should().BeTrue(
+            "Bud+Florence's side and Ray+Rose's side must not interleave");
+
+        if (rayIsRightOfBud)
+        {
+            billX.Should().BeGreaterThan(budGroupMax, "Bill belongs on Ray+Rose's side, not Bud+Florence's");
+        }
+        else
+        {
+            billX.Should().BeLessThan(budGroupMin, "Bill belongs on Ray+Rose's side, not Bud+Florence's");
+        }
+    }
+
+    [Fact]
+    public void OrphanSiblingAnchor_DoesNotWanderIntoAZeroGapAdjacentForeignFamily()
+    {
+        // Real production bug, found 2026-07-07: Bill Small is Ray's brother, married to
+        // Gish (his own root couple — not a plain orphan individual). Morton Small is a
+        // second, truly orphan sibling of Ray and Bill (no parents/spouse/children of his
+        // own). Marc (Bud+Florence's son) marries Ellen (Ray+Rose's daughter), which
+        // forces Ray+Rose's root group zero-gap-adjacent to Bud+Florence's (the existing
+        // cross-root adjacency step). Morton anchors off Ray (his rightmost already-placed
+        // sibling) and, walking rightward looking for an open slot, used to walk straight
+        // through that zero gap into Bud+Florence's own group — landing him visually
+        // inside Florence's family instead of clustered with his real siblings. The dashed
+        // Ray↔Morton SiblingLink then appeared to stretch across the whole canvas.
+        var (gish, bill, ray, rose, ellen, sarah, morton) =
+            (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var (bud, florence, marc) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+
+        var people = new List<PersonDto>
+        {
+            new() { Id = gish, FirstName = "Gish", LastName = "Small", ParentIds = [], ChildIds = [], SpouseIds = [bill] },
+            new() { Id = bill, FirstName = "Bill", LastName = "Small", ParentIds = [], ChildIds = [], SpouseIds = [gish], SiblingIds = [ray, morton] },
+            new() { Id = ray, FirstName = "Ray", LastName = "Small", ParentIds = [], ChildIds = [ellen, sarah], SpouseIds = [rose], SiblingIds = [bill, morton] },
+            new() { Id = rose, FirstName = "Rose", LastName = "Small", ParentIds = [], ChildIds = [ellen, sarah], SpouseIds = [ray] },
+            new() { Id = ellen, FirstName = "Ellen", LastName = "Small", ParentIds = [ray, rose], ChildIds = [], SpouseIds = [marc], SiblingIds = [sarah] },
+            new() { Id = sarah, FirstName = "Sarah", LastName = "Small", ParentIds = [ray, rose], ChildIds = [], SpouseIds = [], SiblingIds = [ellen] },
+            new() { Id = morton, FirstName = "Morton", LastName = "Small", ParentIds = [], ChildIds = [], SpouseIds = [], SiblingIds = [ray, bill] },
+            new() { Id = bud, FirstName = "Bud", LastName = "Rosenberg", ParentIds = [], ChildIds = [marc], SpouseIds = [florence] },
+            new() { Id = florence, FirstName = "Florence", LastName = "Rosenberg", ParentIds = [], ChildIds = [marc], SpouseIds = [bud] },
+            new() { Id = marc, FirstName = "Marc", LastName = "Rosenberg", ParentIds = [bud, florence], ChildIds = [], SpouseIds = [ellen] },
+        };
+
+        var layout = _engine.ComputeLayout(people, CoupleHelper.Derive(people), ray);
+
+        var budFlorenceXs = new[] { bud, florence }.Select(id => layout.Nodes.Single(n => n.Person.Id == id).X);
+        var budMin = budFlorenceXs.Min();
+        var budMax = budFlorenceXs.Max();
+        var mortonX = layout.Nodes.Single(n => n.Person.Id == morton).X;
+
+        mortonX.Should().NotBeInRange(budMin, budMax,
+            "Morton must never land inside Bud+Florence's group span just because Ray+Rose's " +
+            "group got forced zero-gap-adjacent to it by the Marc/Ellen cross-root marriage");
+    }
+
+    [Fact]
+    public void ComponentDivider_PlacedBetweenDisconnectedComponentsWithWidenedGap()
+    {
+        // Two entirely unrelated couples — no relationship path between them at all —
+        // reproduces the "test/test2 unrelated family" scenario from admin testing
+        // (2026-07-07): two disconnected components must render with a wider gap than
+        // the old canvas-edge PaddingX (90px), plus a lightweight visual divider.
+        var (a1, a2) = (Guid.NewGuid(), Guid.NewGuid());
+        var (b1, b2) = (Guid.NewGuid(), Guid.NewGuid());
+
+        var people = new List<PersonDto>
+        {
+            new() { Id = a1, FirstName = "Alice", LastName = "Anderson", ParentIds = [], ChildIds = [], SpouseIds = [a2] },
+            new() { Id = a2, FirstName = "Adam", LastName = "Anderson", ParentIds = [], ChildIds = [], SpouseIds = [a1] },
+            new() { Id = b1, FirstName = "Bob", LastName = "Brown", ParentIds = [], ChildIds = [], SpouseIds = [b2] },
+            new() { Id = b2, FirstName = "Beth", LastName = "Brown", ParentIds = [], ChildIds = [], SpouseIds = [b1] },
+        };
+
+        var layout = _engine.ComputeLayout(people, CoupleHelper.Derive(people), a1);
+
+        layout.ComponentDividers.Should().HaveCount(1,
+            "exactly one boundary is needed between exactly two disconnected components");
+
+        var aMaxX = new[] { a1, a2 }.Select(id => layout.Nodes.Single(n => n.Person.Id == id).X).Max();
+        var bMinX = new[] { b1, b2 }.Select(id => layout.Nodes.Single(n => n.Person.Id == id).X).Min();
+
+        (bMinX - aMaxX).Should().BeGreaterThanOrEqualTo(320,
+            "the inter-component gap must be widened well past the old 90px canvas-edge padding");
+
+        var divider = layout.ComponentDividers.Single();
+        divider.X.Should().BeInRange(aMaxX, bMinX,
+            "the divider must sit within the gap between the two unrelated components, not overlap either one");
+    }
 
     private static List<PersonDto> BuildFamily(Guid ray, Guid rose, Guid ellen, Guid sarah) =>
     [

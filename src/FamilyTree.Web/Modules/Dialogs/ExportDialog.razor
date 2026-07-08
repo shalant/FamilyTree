@@ -111,6 +111,7 @@
 
     [Parameter] public required List<PersonDto> People { get; set; }
     [Parameter] public PersonDto? FocusPerson { get; set; }
+    [Parameter] public Guid? AnchorPersonId { get; set; }
 
     private string       _scope    = "all";
     private string       _format   = "svg";
@@ -236,13 +237,13 @@
 
         if (_format == "svg")
         {
-            var svg = SvgExport.GenerateSvg(people, FocusPerson, svgTitle, _style, _theme);
+            var svg = SvgExport.GenerateSvg(people, FocusPerson, svgTitle, _style, _theme, AnchorPersonId);
             await JS.InvokeVoidAsync("ftDownloadFile",
                 $"familytree-{tag}-{timestamp}.svg", svg, "image/svg+xml;charset=utf-8");
         }
         else if (_format == "png")
         {
-            var svg = SvgExport.GenerateSvg(people, FocusPerson, svgTitle, _style, _theme);
+            var svg = SvgExport.GenerateSvg(people, FocusPerson, svgTitle, _style, _theme, AnchorPersonId);
             await JS.InvokeVoidAsync("ftSvgToPng",
                 svg, $"familytree-{tag}-{timestamp}.png");
         }

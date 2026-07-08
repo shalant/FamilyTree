@@ -43,6 +43,19 @@ public class FamilyTreeLayoutEngine
     //private const int SpouseSpacingX = 160;
     private const int SpouseSpacingX = 200;
 
+    // Gap between two DISCONNECTED components (separate trees entirely, no relationship
+    // path between them) on the same canvas — distinct from PaddingX, which is only the
+    // canvas-edge margin. Found 2026-07-07: two genuinely unrelated families rendered
+    // close enough together (PaddingX's 90px) to read as ambiguously related, especially
+    // once test/admin data introduced extra components on the same canvas.
+    private const int ComponentGapX = 320;
+
+    // Extra slack reserved specifically at a boundary the cross-root-couple step forces
+    // zero-gap-adjacent, so an orphan sibling anchoring off either side afterward (e.g.
+    // Morton, next to Ray) has somewhere to actually land instead of tunnelling into the
+    // neighboring family. See the forcedAdjacencyAfterIndex comment in ComputeLayout.
+    private const int OrphanBufferX = 2 * NodeSpacingX;
+
     /// <summary>
     /// Entry point: computes a complete layout for all people and relationships.
     ///
@@ -60,7 +73,8 @@ public class FamilyTreeLayoutEngine
     public FamilyTreeLayout ComputeLayout(
         List<PersonDto> people,
         List<CoupleDto> couples,
-        Guid? focusPersonId)
+        Guid? focusPersonId,
+        Guid? anchorPersonId = null)
     {
         if (!people.Any())
             return FamilyTreeLayout.Empty;
@@ -125,10 +139,19 @@ public class FamilyTreeLayoutEngine
         var nuclearGroups = BuildNuclearGroups(people, couples);
         var nodeMap = new Dictionary<Guid, LayoutNode>();
         var siblingLinks = new List<SiblingLink>();
+        var componentDividers = new List<ComponentDivider>();
         var xOffset = PaddingX;
+        double? previousComponentEndX = null;
 
         foreach (var component in components)
         {
+            // A lightweight visual boundary between two genuinely disconnected components
+            // (no relationship path between them at all) — placed at the midpoint of the
+            // gap, rendered as a subtle line so unrelated families never read as ambiguously
+            // adjacent even when a canvas happens to show more than one at once.
+            if (previousComponentEndX is { } prevEnd)
+                componentDividers.Add(new ComponentDivider((prevEnd + xOffset) / 2.0, PaddingY, canvasHeight - PaddingY));
+
             var compIds = component.Select(p => p.Id).ToHashSet();
 
             var compGroups = nuclearGroups
@@ -191,6 +214,19 @@ public class FamilyTreeLayoutEngine
                 (!g.ParentBId.HasValue || !primaryGroup.TryGetValue(g.ParentBId.Value, out var pgB) || pgB == g))
                 .ToList();
 
+            // Anchor-based lineage-side ordering: sort root groups by which of the
+            // anchor person's two parents' "sides" they belong to (paternal vs maternal),
+            // BEFORE the cross-root adjacency step below runs. This establishes the base
+            // left-to-right column each root family lives in; the cross-root step is a
+            // harder correctness constraint (must not tangle a couple's own connector)
+            // and needs to be free to make small local adjacency perturbations to that
+            // base order afterward — running this the other way round would let the
+            // side-sort undo the cross-root adjacency guarantee. A stable sort, so within
+            // a side the existing CoupleSortKey-derived order is left untouched. No-ops
+            // entirely when anchorPersonId is null or the anchor has fewer than two
+            // recorded parents.
+            rootGroups = ApplyLineageSideOrder(people, rootGroups, anchorPersonId);
+
             // Root individuals: people in no group at all (unlinked singletons).
             var rootIndividuals = component.Where(p =>
                 !childrenInGroups.Contains(p.Id) &&
@@ -246,6 +282,10 @@ public class FamilyTreeLayoutEngine
             }
 
             var crossRootInfo = new List<(NuclearGroup couple, NuclearGroup rootA, NuclearGroup rootB, Guid memberOfA, Guid memberOfB)>();
+            // Index (into the FINAL rootGroups list) of a boundary forced zero-gap by
+            // step 2 below — consumed by the main placement loop to reserve OrphanBufferX
+            // slack there instead of butting the two groups flush against each other.
+            var forcedAdjacencyAfterIndex = new HashSet<int>();
             foreach (var g in compGroups)
             {
                 if (!g.ParentAId.HasValue || !g.ParentBId.HasValue) continue;
@@ -292,17 +332,30 @@ public class FamilyTreeLayoutEngine
                 // a newly-added orphan-sibling group (Bill) ending up displaced past its
                 // natural position just because an unrelated pre-existing cross-root
                 // couple (Marc + Ellen) needed Ray/Rose's group pushed rightward.
+                //
+                // Record WHICH boundary (by index — stable even though step 3 below
+                // replaces the NuclearGroup instances at these indices with reordered
+                // copies) is a forced zero-gap join, so the placement loop can reserve a
+                // little slack there. Found 2026-07-07 in production: Morton, an orphan
+                // sibling of Ray with no group of his own, anchors off Ray and needs room
+                // to slot in — but Ray+Rose's own measured width only ever accounts for
+                // Ray+Rose themselves, never a future orphan sibling. Normally there's
+                // open canvas to expand into; here there wasn't, because this exact
+                // boundary was forced flush against Bud+Florence's group for the Marc/
+                // Ellen marriage connector, leaving zero slack for Morton to land in.
                 foreach (var (_, rgA, rgB, _, _) in crossRootInfo)
                 {
                     var idxA = rootGroups.IndexOf(rgA);
                     var idxB = rootGroups.IndexOf(rgB);
-                    if (idxA < 0 || idxB < 0 || idxB == idxA + 1) continue; // already adjacent, correct order
+                    if (idxA < 0 || idxB < 0) continue;
+                    if (idxB == idxA + 1) { forcedAdjacencyAfterIndex.Add(idxB); continue; } // already adjacent, correct order
 
                     var moving = rootGroups[idxB];
                     var withoutB = rootGroups.Where((_, i) => i != idxB).ToList();
                     idxA = withoutB.IndexOf(rgA);
                     withoutB.Insert(idxA + 1, moving);
                     rootGroups = withoutB;
+                    forcedAdjacencyAfterIndex.Add(idxA + 1);
                 }
 
                 // 3. Sort children: whoever belongs to the left-positioned root group
@@ -311,19 +364,54 @@ public class FamilyTreeLayoutEngine
                 // memberOfB (which root group each spouse actually belongs to) rather
                 // than the couple's own ParentA/ParentB GUID label, so the edge each
                 // child sorts to always matches which SIDE their root group ended up on.
+                //
+                // This must apply at ANY nesting depth, not just a root's own direct
+                // ChildIds — mirrors the same lesson as descendantOfRoot above. Found
+                // 2026-07-07: Elliot (Marc's sibling) rendered between Marc and Marc's
+                // cross-root spouse Ellen, visually interrupting their marriage connector.
+                // Marc is Bud+Florence's son, and Bud+Florence's own group is nested one
+                // level under grandmother Dora's root — Dora's own ChildIds is [Bud,
+                // Gladys], neither of which is Marc, so a root-only reorder is a silent
+                // no-op for him. Fix: walk the same primaryGroup chain MarkDescendants
+                // follows, and reorder ChildIds on whichever specific group actually
+                // contains a crossEdge member as a direct child, at whatever depth that is.
                 var crossEdge = new Dictionary<Guid, bool>(); // true = belongs to rgA (right edge)
                 foreach (var (_, _, _, memberOfA, memberOfB) in crossRootInfo)
                 {
                     crossEdge[memberOfA] = true;
                     crossEdge[memberOfB] = false;
                 }
-                rootGroups = rootGroups
-                    .Select(rg => rg with
+
+                void ReorderCrossEdgeChildren(NuclearGroup g, int? rootIndex)
+                {
+                    if (g.ChildIds.Any(crossEdge.ContainsKey))
                     {
-                        ChildIds = [.. rg.ChildIds.OrderBy(cid =>
-                            crossEdge.TryGetValue(cid, out var isA) ? (isA ? 2 : 0) : 1)]
-                    })
-                    .ToList();
+                        var reordered = g with
+                        {
+                            ChildIds = [.. g.ChildIds.OrderBy(cid =>
+                                crossEdge.TryGetValue(cid, out var isA) ? (isA ? 2 : 0) : 1)]
+                        };
+
+                        // NuclearGroup is a record (structural equality) — reordering
+                        // ChildIds produces a new instance, so every place that still
+                        // holds a reference to the OLD instance must be repointed to the
+                        // new one before PlaceGroup/MeasureGroup read them.
+                        if (rootIndex.HasValue) rootGroups[rootIndex.Value] = reordered;
+                        if (g.ParentAId.HasValue && primaryGroup.TryGetValue(g.ParentAId.Value, out var pA) && pA == g)
+                            primaryGroup[g.ParentAId.Value] = reordered;
+                        if (g.ParentBId.HasValue && primaryGroup.TryGetValue(g.ParentBId.Value, out var pB) && pB == g)
+                            primaryGroup[g.ParentBId.Value] = reordered;
+
+                        g = reordered;
+                    }
+
+                    foreach (var cid in g.ChildIds)
+                        if (primaryGroup.TryGetValue(cid, out var childGroup))
+                            ReorderCrossEdgeChildren(childGroup, null);
+                }
+
+                for (int i = 0; i < rootGroups.Count; i++)
+                    ReorderCrossEdgeChildren(rootGroups[i], i);
             }
 
             // ── Memoised bottom-up width measurement ─────────────────────────
@@ -417,11 +505,89 @@ public class FamilyTreeLayoutEngine
             // the two ends aren't adjacent.
             double curX = xOffset;
 
-            foreach (var rg in rootGroups)
+            // Recorded so the orphan-individual anchor logic below (sibling/spouse
+            // fallback placement) can tell when it's about to wander into a DIFFERENT
+            // root group's span — see FindOpenXAdjacentTo.
+            var rootGroupExtents = new List<(double Left, double Right)>();
+
+            for (int rgi = 0; rgi < rootGroups.Count; rgi++)
             {
+                var rg = rootGroups[rgi];
+                if (rgi > 0 && forcedAdjacencyAfterIndex.Contains(rgi))
+                    curX += OrphanBufferX;
+
                 var w = MeasureGroup(rg);
+                var left = curX;
                 PlaceGroup(rg, curX + w / 2.0);
                 curX += w;
+                rootGroupExtents.Add((left, curX));
+            }
+
+            // Finds an open X slot adjacent to `anchor` for an orphan individual (a
+            // sibling or spouse with no group of their own). "Safe" territory is the
+            // UNION of every root-group extent that contains ANY of this person's
+            // already-placed relatives — not just the one nearest `anchor` — because an
+            // orphan can have relatives split across two different root groups (e.g.
+            // Morton's siblings Ray and Bill anchor to two separate, adjacent couples).
+            // Walks outward from `anchor` in both directions, refusing to enter any
+            // OTHER root group's span or to wander past the safe union's own outer edge
+            // (which would otherwise walk clean off the canvas looking for empty space).
+            // Falls back to the original unbounded walk only if a person has no
+            // group-affiliated relatives at all to anchor safe territory to.
+            //
+            // Found 2026-07-07 in production: Morton (an orphan sibling of Ray and Bill,
+            // no group of his own) anchored off Ray and walked rightward straight into
+            // Bud+Florence's root group — forced zero-gap-adjacent to Ray+Rose's group by
+            // the cross-root couple step (Marc married Ellen, Ray+Rose's daughter). A
+            // first attempt that treated "any different root group" as foreign wrongly
+            // blocked the leftward retreat too, since Bill's own group (Gish+Bill) is
+            // ALSO a different root group — even though Bill is Morton's actual sibling —
+            // so it fell through to the same unbounded walk and landed in the same wrong
+            // spot. Fixed by unioning safe territory across ALL of a person's relatives,
+            // and (see OrphanBufferX below) reserving actual slack at forced-adjacency
+            // boundaries so there's genuinely somewhere to land.
+            double FindOpenXAdjacentTo(LayoutNode anchor, IReadOnlyList<LayoutNode> relatives)
+            {
+                var safeExtents = rootGroupExtents
+                    .Where(e => relatives.Any(r => r.X >= e.Left && r.X <= e.Right))
+                    .ToList();
+
+                if (safeExtents.Count == 0) return UnboundedExtend(anchor, NodeSpacingX);
+
+                var safeMin = safeExtents.Min(e => e.Left);
+                var safeMax = safeExtents.Max(e => e.Right);
+
+                bool IsOutOfBounds(double x) =>
+                    rootGroupExtents.Any(e => !safeExtents.Contains(e) && x >= e.Left && x <= e.Right) ||
+                    x < safeMin - NodeSpacingX || x > safeMax + NodeSpacingX;
+
+                double? TryDirection(double step)
+                {
+                    var x = anchor.X + step;
+                    while (!IsOutOfBounds(x) && nodeMap.Values.Any(n => n.Y == anchor.Y && Math.Abs(n.X - x) < NodeSpacingX))
+                        x += step;
+                    return IsOutOfBounds(x) ? null : x;
+                }
+
+                if (TryDirection(NodeSpacingX) is { } right) return right;
+                if (TryDirection(-NodeSpacingX) is { } left) return left;
+
+                // Both directions ran out of safe room — scan the whole safe union for
+                // any open slot at all, rather than tunnelling into foreign territory or
+                // wandering off-canvas. Extremely rare in practice.
+                for (var x = safeMin; x <= safeMax; x += NodeSpacingX)
+                    if (!nodeMap.Values.Any(n => n.Y == anchor.Y && Math.Abs(n.X - x) < NodeSpacingX))
+                        return x;
+
+                return (safeMin + safeMax) / 2.0; // last resort: accept overlap over foreign placement
+            }
+
+            double UnboundedExtend(LayoutNode anchor, double step)
+            {
+                var x = anchor.X + step;
+                while (nodeMap.Values.Any(n => n.Y == anchor.Y && Math.Abs(n.X - x) < NodeSpacingX))
+                    x += step;
+                return x;
             }
 
             // ── Place children of cross-root couples ──────────────────────────
@@ -454,18 +620,15 @@ public class FamilyTreeLayoutEngine
                 // different X positions (e.g. one root-level sibling and one whose subtree
                 // has grown wide), and anchoring off whichever happens to be first could
                 // land back among earlier, narrower siblings instead of past all of them.
-                var siblingNode = (person.SiblingIds ?? [])
+                var placedSiblings = (person.SiblingIds ?? [])
                     .Where(sid => nodeMap.ContainsKey(sid))
                     .Select(sid => nodeMap[sid])
-                    .OrderByDescending(n => n.X)
-                    .FirstOrDefault();
+                    .ToList();
+                var siblingNode = placedSiblings.OrderByDescending(n => n.X).FirstOrDefault();
 
                 if (siblingNode != null)
                 {
-                    var candidateX = siblingNode.X + NodeSpacingX;
-                    while (nodeMap.Values.Any(n => n.Y == siblingNode.Y && Math.Abs(n.X - candidateX) < NodeSpacingX))
-                        candidateX += NodeSpacingX;
-                    SetNode(person.Id, candidateX);
+                    SetNode(person.Id, FindOpenXAdjacentTo(siblingNode, placedSiblings));
                 }
                 else
                 {
@@ -485,19 +648,16 @@ public class FamilyTreeLayoutEngine
             {
                 if (nodeMap.ContainsKey(person.Id)) continue;
 
-                var spouseNode = (person.SpouseIds ?? [])
+                var placedSpouses = (person.SpouseIds ?? [])
                     .Concat(person.FormerSpouseIds ?? [])
                     .Where(sid => nodeMap.ContainsKey(sid))
                     .Select(sid => nodeMap[sid])
-                    .OrderByDescending(n => n.X)
-                    .FirstOrDefault();
+                    .ToList();
+                var spouseNode = placedSpouses.OrderByDescending(n => n.X).FirstOrDefault();
 
                 if (spouseNode != null)
                 {
-                    var candidateX = spouseNode.X + NodeSpacingX;
-                    while (nodeMap.Values.Any(n => n.Y == spouseNode.Y && Math.Abs(n.X - candidateX) < NodeSpacingX))
-                        candidateX += NodeSpacingX;
-                    SetNode(person.Id, candidateX);
+                    SetNode(person.Id, FindOpenXAdjacentTo(spouseNode, placedSpouses));
                 }
                 else
                 {
@@ -532,10 +692,16 @@ public class FamilyTreeLayoutEngine
                 }
             }
 
-            xOffset = (int)Math.Ceiling(curX) + PaddingX;
+            previousComponentEndX = curX;
+            xOffset = (int)Math.Ceiling(curX) + ComponentGapX;
         }
 
-        var canvasWidth = xOffset;
+        // Right-edge canvas margin is PaddingX (canvas-edge padding), not ComponentGapX
+        // (inter-component gap) — xOffset above was last advanced by ComponentGapX in
+        // anticipation of a component that never came.
+        var canvasWidth = previousComponentEndX is { } lastEndX
+            ? (int)Math.Ceiling(lastEndX) + PaddingX
+            : xOffset;
 
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 5: Create visual bands (decade markers with time gradient)
@@ -572,6 +738,7 @@ public class FamilyTreeLayoutEngine
             bands,
             connectors,
             siblingLinks,
+            componentDividers,
             canvasWidth,
             canvasHeight,
             focusDepth);
@@ -856,6 +1023,128 @@ public class FamilyTreeLayoutEngine
         }
 
         return components;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // LINEAGE-SIDE ORDERING
+    // ─────────────────────────────────────────────────────────────────────────
+    //
+    // Dedicates a stable side of the canvas to each of an anchor person's two
+    // parents' families (e.g. Doug's father's relatives always render on one
+    // side, his mother's on the other), computed fresh on every ComputeLayout
+    // call rather than incrementally reordering already-placed nodes — the same
+    // shape as the barycenter/median heuristic used for crossing-minimization in
+    // the Sugiyama layered-graph framework. A generic sibling-clustering REORDER
+    // was already tried in this codebase and reverted (see the "place roots left
+    // to right" comment above) because it moved already-placed nodes; this is a
+    // pure sort key instead, so it carries none of that risk. Confirmed to be
+    // anchored to a fixed, stable person (e.g. the logged-in user's own linked
+    // Person) — NOT the transient focusPersonId, which changes as different
+    // people are viewed. Requested 2026-07-07.
+
+    /// <summary>
+    /// BFS hop-distance from each of the anchor's two recorded parents, over an
+    /// undirected graph built from Parent/Child/Spouse/FormerSpouse/Sibling links.
+    /// Returns null if the anchor isn't found or has fewer than two resolvable
+    /// parents — callers must treat that as "side ordering doesn't apply here."
+    /// </summary>
+    private static (Dictionary<Guid, int> DistFromP1, Dictionary<Guid, int> DistFromP2)? ComputeLineageSideDistances(
+        List<PersonDto> people, Guid anchorPersonId)
+    {
+        var personById = people.ToDictionary(p => p.Id);
+        if (!personById.TryGetValue(anchorPersonId, out var anchor))
+            return null;
+
+        var personIndex = new Dictionary<Guid, int>();
+        for (int i = 0; i < people.Count; i++) personIndex.TryAdd(people[i].Id, i);
+
+        // Deterministic pick of "first two" parents by list position — not by Gender,
+        // since PersonMapper/ParentIds carries no father-first/mother-first convention
+        // to rely on, and inventing one here would be an assumption the rest of the
+        // codebase doesn't make.
+        var parents = (anchor.ParentIds ?? [])
+            .Where(personById.ContainsKey)
+            .Distinct()
+            .OrderBy(id => personIndex.TryGetValue(id, out var idx) ? idx : int.MaxValue)
+            .ToList();
+
+        if (parents.Count < 2) return null;
+
+        var p1 = parents[0];
+        var p2 = parents[1];
+
+        // Never hop through the anchor themselves, and exclude the direct p1<->p2
+        // marriage edge in both directions — otherwise one parent's BFS leaks into
+        // the other's side via their own spousal link, defeating the whole point.
+        IEnumerable<Guid> Neighbors(Guid id)
+        {
+            if (!personById.TryGetValue(id, out var person)) yield break;
+
+            // FormerSpouseIds deliberately included (unlike IdentifyConnectedComponents)
+            // — a parent's children from an earlier marriage still belong on that
+            // parent's side of the canvas.
+            var raw = (person.ParentIds ?? [])
+                .Concat(person.ChildIds ?? [])
+                .Concat(person.SpouseIds ?? [])
+                .Concat(person.FormerSpouseIds ?? [])
+                .Concat(person.SiblingIds ?? []);
+
+            foreach (var n in raw)
+            {
+                if (n == anchorPersonId) continue;
+                if (id == p1 && n == p2) continue;
+                if (id == p2 && n == p1) continue;
+                yield return n;
+            }
+        }
+
+        Dictionary<Guid, int> Bfs(Guid start)
+        {
+            var dist = new Dictionary<Guid, int> { [start] = 0 };
+            var queue = new Queue<Guid>();
+            queue.Enqueue(start);
+            while (queue.Count > 0)
+            {
+                var id = queue.Dequeue();
+                foreach (var n in Neighbors(id))
+                    if (!dist.ContainsKey(n)) { dist[n] = dist[id] + 1; queue.Enqueue(n); }
+            }
+            return dist;
+        }
+
+        return (Bfs(p1), Bfs(p2));
+    }
+
+    /// <summary>
+    /// Sorts root groups by which of the anchor's two parents' sides they're
+    /// closer to (stable sort — ties/unreachable groups land in a neutral centre
+    /// bucket, preserving their existing relative order). No-ops entirely when
+    /// anchorPersonId is null or the anchor doesn't have two recorded parents.
+    /// </summary>
+    private static List<NuclearGroup> ApplyLineageSideOrder(
+        List<PersonDto> people, List<NuclearGroup> rootGroups, Guid? anchorPersonId)
+    {
+        if (!anchorPersonId.HasValue) return rootGroups;
+
+        var distances = ComputeLineageSideDistances(people, anchorPersonId.Value);
+        if (distances is not { } d) return rootGroups;
+
+        int SideRank(NuclearGroup rg)
+        {
+            var members = new[] { rg.ParentAId, rg.ParentBId }
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .ToList();
+
+            var d1 = members.Select(m => d.DistFromP1.GetValueOrDefault(m, int.MaxValue)).DefaultIfEmpty(int.MaxValue).Min();
+            var d2 = members.Select(m => d.DistFromP2.GetValueOrDefault(m, int.MaxValue)).DefaultIfEmpty(int.MaxValue).Min();
+
+            if (d1 == int.MaxValue && d2 == int.MaxValue) return 1; // unreachable from either side → neutral centre
+            if (d1 == d2) return 1;                                 // tie (incl. the anchor's own parents, 0/0) → neutral centre
+            return d1 < d2 ? 0 : 2;                                 // side 1 (left) vs side 2 (right)
+        }
+
+        return [.. rootGroups.OrderBy(SideRank)];
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1166,6 +1455,12 @@ public class FamilyTreeLayoutEngine
     public record SiblingLink(double AX, double AY, double BX, double BY);
 
     /// <summary>
+    /// A subtle vertical boundary marking the gap between two genuinely disconnected
+    /// components (no relationship path between them at all) sharing one canvas.
+    /// </summary>
+    public record ComponentDivider(double X, int TopY, int BotY);
+
+    /// <summary>
     /// A nuclear family group used internally during X-axis layout.
     /// Distinct from <see cref="FamilyUnit"/>, which is the SVG connector output.
     /// </summary>
@@ -1190,9 +1485,10 @@ public record FamilyTreeLayout(
     List<FamilyTreeLayoutEngine.GenerationBand> Bands,
     List<FamilyTreeLayoutEngine.FamilyUnit> Connectors,
     List<FamilyTreeLayoutEngine.SiblingLink> SiblingLinks,
+    List<FamilyTreeLayoutEngine.ComponentDivider> ComponentDividers,
     int CanvasWidth,
     int CanvasHeight,
     int FocusDepth)
 {
-    public static FamilyTreeLayout Empty => new([], [], [], [], 900, 600, 0);
+    public static FamilyTreeLayout Empty => new([], [], [], [], [], 900, 600, 0);
 }
