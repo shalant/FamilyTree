@@ -206,14 +206,12 @@ else
         var userIdClaim = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (Guid.TryParse(userIdClaim, out var uid)) _currentUserId = uid;
 
-        // An authenticated user who hasn't linked to a Person yet (PersonId still null —
-        // e.g. mid-registration, skipped the linking modal) has no "their tree" to show.
-        // Guests (no _currentUserId) and already-linked users are unaffected.
+        Guid? claimedPersonId = null;
         if (_currentUserId.HasValue)
         {
             var currentAppUser = await UserManager.FindByIdAsync(_currentUserId.Value.ToString());
-            _currentUserIsUnlinked = !(currentAppUser?.PersonId.HasValue ?? false);
-            _anchorPersonId = currentAppUser?.PersonId;
+            claimedPersonId = currentAppUser?.PersonId;
+            _anchorPersonId = claimedPersonId;
         }
 
         var result = await PersonService.GetAllAsync();
@@ -221,6 +219,14 @@ else
         {
             _people = result.Data!;
             _couples = CoupleHelper.Derive(_people);
+
+            // An authenticated user with no resolvable linked Person has no "their tree"
+            // to show — either they never linked (claimedPersonId is null), or their
+            // AppUser.PersonId still points at a Person that's since been soft-deleted.
+            // See LinkedPersonResolver for why HasValue alone isn't enough. Guests (no
+            // _currentUserId) are unaffected.
+            _currentUserIsUnlinked = _currentUserId.HasValue
+                && !LinkedPersonResolver.IsResolved(claimedPersonId, _people);
 
             if (!_people.Any())
             {
@@ -271,39 +277,44 @@ else
         try
         {
             var user = await UserManager.FindByIdAsync(_currentUserId.Value.ToString());
-            if (user != null && !user.PersonId.HasValue && _people.Any())
+
+            // Not just "never linked" (PersonId null) — see LinkedPersonResolver.
+            var isResolved = LinkedPersonResolver.IsResolved(user?.PersonId, _people);
+            if (user != null && !isResolved && _people.Any())
             {
                 await ShowLinkingModalAsync(user, isRecovery: true);
 
                 // After modal completes, reload user to get updated PersonId and refresh focus
                 user = await UserManager.FindByIdAsync(_currentUserId.Value.ToString());
-                if (user?.PersonId.HasValue == true)
+
+                // Re-fetch _people — the modal may have just created a brand-new Person
+                // (the user's own record, e.g. "linked as a new sibling of Douglas"),
+                // which the _people list loaded before they existed can't contain. Without
+                // this refresh, the lookup below always misses for a newly-created person,
+                // silently skipping PersistFocusAsync and leaving FocusPersonId null forever
+                // — found 2026-07-06 when a fresh page load then fell back to an arbitrary
+                // "first person alphabetically" instead of the user's own new person.
+                var refreshed = await PersonService.GetAllAsync();
+                if (refreshed.Success)
+                {
+                    _people = refreshed.Data!;
+                    _couples = CoupleHelper.Derive(_people);
+                }
+
+                var linkedPerson = user?.PersonId != null
+                    ? _people.FirstOrDefault(p => p.Id == user.PersonId)
+                    : null;
+                if (linkedPerson != null)
                 {
                     _currentUserIsUnlinked = false;
-
-                    // Re-fetch _people — the modal may have just created a brand-new Person
-                    // (the user's own record, e.g. "linked as a new sibling of Douglas"),
-                    // which the _people list loaded before they existed can't contain. Without
-                    // this refresh, the lookup below always misses for a newly-created person,
-                    // silently skipping PersistFocusAsync and leaving FocusPersonId null forever
-                    // — found 2026-07-06 when a fresh page load then fell back to an arbitrary
-                    // "first person alphabetically" instead of the user's own new person.
-                    var refreshed = await PersonService.GetAllAsync();
-                    if (refreshed.Success)
-                    {
-                        _people = refreshed.Data!;
-                        _couples = CoupleHelper.Derive(_people);
-                    }
-
-                    var linkedPerson = _people.FirstOrDefault(p => p.Id == user.PersonId.Value);
-                    if (linkedPerson != null)
-                    {
-                        _focusPerson = linkedPerson;
-                        TreeContext.SetContext(_focusPerson, _people.Count, _couples.Count);
-                        await PersistFocusAsync(_focusPerson.Id);
-                        StateHasChanged();
-                    }
+                    _anchorPersonId = user!.PersonId;
+                    _focusPerson = linkedPerson;
+                    TreeContext.SetContext(_focusPerson, _people.Count, _couples.Count);
+                    await PersistFocusAsync(_focusPerson.Id);
+                    StateHasChanged();
                 }
+                // else: dismissed without resolving to a valid person — stay in the
+                // unlinked state so the recovery prompt remains available next time.
             }
         }
         catch (Exception ex)
