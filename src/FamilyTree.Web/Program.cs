@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using FamilyTree.Core.Data;
 using FamilyTree.Core.Models;
 using FamilyTree.Core.Services;
+using FamilyTree.Shared.DTOs.Admin;
 using FamilyTree.Web.App;
 using FamilyTree.Web.Services;
 using Microsoft.AspNetCore.Identity;
@@ -105,6 +106,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IAdminActivityService, AdminActivityService>();
 builder.Services.AddScoped<IAdminAuditService, AdminAuditService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+builder.Services.AddScoped<IDataIntegrityService, DataIntegrityService>();
 builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ToastService>();
@@ -205,6 +207,67 @@ using (var scope = app.Services.CreateScope())
         await TryNotifyMigrationFailureAsync(scope, migrationLogger,
             "Database migration failed.", ex);
         throw;
+    }
+}
+
+// Best-effort data integrity check: catches a live Relationship left pointing at a
+// soft-deleted Person (drift PersonService.DeleteAsync's cascade should prevent, but a
+// bug elsewhere bypassing it has caused before — see the Elliot Rosenberg incident,
+// docs/TodoList.md). Auto-fixes by soft-deleting the orphaned relationship, then alerts
+// so the underlying cause still gets investigated rather than silently healing forever.
+// Never blocks or fails startup — this is a "nice to catch," not a schema-correctness
+// gate like the migration check above.
+using (var scope = app.Services.CreateScope())
+{
+    var integrityLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        var integrityService = scope.ServiceProvider.GetRequiredService<IDataIntegrityService>();
+        var result = await integrityService.FixOrphanedRelationshipsAsync();
+        if (result.Success && result.Data is { Count: > 0 } fixes)
+            await TryNotifyOrphanedRelationshipsFixedAsync(scope, integrityLogger, fixes);
+    }
+    catch (Exception ex)
+    {
+        integrityLogger.LogError(ex, "Startup data integrity check failed to run.");
+    }
+}
+
+async Task TryNotifyOrphanedRelationshipsFixedAsync(
+    IServiceScope scope, ILogger logger, List<OrphanedRelationshipFixDto> fixes)
+{
+    try
+    {
+        var alertEmail = app.Configuration["Ops:AlertEmail"] ?? app.Configuration["SuperUser:Email"];
+        if (string.IsNullOrWhiteSpace(alertEmail))
+        {
+            logger.LogWarning(
+                "No Ops:AlertEmail or SuperUser:Email configured — skipping orphaned-relationship notification.");
+            return;
+        }
+
+        var rows = string.Join("", fixes.Select(f =>
+            $"<li>{System.Net.WebUtility.HtmlEncode(f.Type)}: " +
+            $"{System.Net.WebUtility.HtmlEncode(f.PersonAName)} ↔ {System.Net.WebUtility.HtmlEncode(f.PersonBName)}</li>"));
+        var html = $"""
+            <p><strong>Startup data integrity check auto-fixed {fixes.Count} orphaned relationship(s).</strong></p>
+            <p>Each one was a live relationship pointing at a Person that's soft-deleted outside the normal
+            delete cascade — a sign some code path is bypassing <code>PersonService.DeleteAsync</code>.
+            The relationships themselves have already been soft-deleted to match; this email is only the
+            "please go find out why" signal.</p>
+            <ul>{rows}</ul>
+            <p>Environment: {app.Environment.EnvironmentName}</p>
+            <p>Time (UTC): {DateTime.UtcNow:u}</p>
+            """;
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var emailSender = scope.ServiceProvider.GetRequiredService<IEmailSender>();
+        await emailSender.SendAsync(
+            alertEmail, "ArborKin: orphaned relationships auto-fixed", html, cts.Token);
+    }
+    catch (Exception notifyEx)
+    {
+        logger.LogError(notifyEx, "Failed to send orphaned-relationship notification email.");
     }
 }
 

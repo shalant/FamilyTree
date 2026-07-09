@@ -1,8 +1,54 @@
 @inherits BaseComponent
 
+@using FamilyTree.Shared.DTOs.Admin
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Components
 @inject IPersonService PersonService
+@inject IDataIntegrityService DataIntegrityService
+
+<MudPaper Class="pa-3 mb-3" Style="background:var(--ft-surface-card);" Elevation="0">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+        <div>
+            <MudText Typo="Typo.subtitle2">Data integrity</MudText>
+            <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                Checks for relationships still pointing at a soft-deleted person and auto-fixes any found.
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.HealthAndSafety"
+                   Disabled="@_checkingIntegrity"
+                   OnClick="RunIntegrityCheckAsync">
+            @if (_checkingIntegrity)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Run integrity check
+        </MudButton>
+    </div>
+    @if (_lastIntegrityFixes != null)
+    {
+        @if (_lastIntegrityFixes.Count == 0)
+        {
+            <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="mt-2" Dense="true">
+                No orphaned relationships found.
+            </MudAlert>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mt-2" Dense="true">
+                Fixed @_lastIntegrityFixes.Count orphaned relationship(s):
+                <ul style="margin:4px 0 0 20px;">
+                    @foreach (var fix in _lastIntegrityFixes)
+                    {
+                        <li>@fix.Type: @fix.PersonAName ↔ @fix.PersonBName</li>
+                    }
+                </ul>
+            </MudAlert>
+        }
+    }
+</MudPaper>
 
 @if (_loadingDeleted)
 {
@@ -70,10 +116,34 @@ else
 @code {
     private bool _loadingDeleted = true;
     private List<DeletedPersonRow> _deleted = [];
+    private bool _checkingIntegrity;
+    private List<OrphanedRelationshipFixDto>? _lastIntegrityFixes;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadDeletedAsync();
+    }
+
+    private async Task RunIntegrityCheckAsync()
+    {
+        _checkingIntegrity = true;
+        try
+        {
+            var fixes = await TryAsync(
+                () => DataIntegrityService.FixOrphanedRelationshipsAsync(),
+                "Running integrity check");
+
+            if (fixes != null)
+            {
+                _lastIntegrityFixes = fixes;
+                if (fixes.Count > 0)
+                    ToastService.Success($"Fixed {fixes.Count} orphaned relationship(s).");
+            }
+        }
+        finally
+        {
+            _checkingIntegrity = false;
+        }
     }
 
     private async Task LoadDeletedAsync()
