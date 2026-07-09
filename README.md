@@ -16,6 +16,12 @@ A full-stack family tree application built with **Blazor Server (.NET 10)**, **E
 
 ---
 
+## Why I Built This
+
+This started as a way to reconnect — a private space where extended and estranged family members could rediscover each other's stories, not just names on a chart. It became a deliberate deep-dive as well: a chance to sharpen my relational database design (schema evolution, migrations, scoping, cascade behavior), practice real exploratory/manual testing discipline rather than leaning on automated coverage alone, and build something end-to-end I could point to as a genuine portfolio piece — not a tutorial clone.
+
+---
+
 ## Screenshots
 
 ### 1. Full Family Tree Canvas
