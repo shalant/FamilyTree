@@ -1,4 +1,5 @@
 @page "/story/respond/{Token}"
+@layout AuthLayout
 @rendermode InteractiveServer
 @inherits BaseComponent
 
@@ -79,23 +80,28 @@
                 <div style="font-size:18px; font-weight:600; color:var(--ft-text-primary); margin-bottom:8px;">
                     Thank you — your memory of @_validation.DisplayName has been saved.
                 </div>
-                <p style="font-size:14px; color:var(--ft-text-muted); margin-bottom:24px; line-height:1.6;">
-                    Want to see the full family tree, add photos, and explore the rest of the story?
-                </p>
-                @* <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                           OnClick='() => Nav.NavigateTo("/register")'>
-                    Create a free account
-                </MudButton> *@
-                @* <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                           Href="/register">
-                    Create a free account
-                </MudButton> *@
-                @if (_story is not null)
+                @if (_story is not null && _story.RecipientHasAccount)
                 {
+                    <p style="font-size:14px; color:var(--ft-text-muted); margin-bottom:24px; line-height:1.6;">
+                        You already have an account — sign in to see the full family tree.
+                    </p>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                           Href="@($"/register?invite={_story.UserInviteId}")">
-                    Create a free account
-                </MudButton>
+                               Href="@($"/?email={Uri.EscapeDataString(_story.RecipientEmail ?? "")}")">
+                        Sign in
+                    </MudButton>
+                }
+                else
+                {
+                    <p style="font-size:14px; color:var(--ft-text-muted); margin-bottom:24px; line-height:1.6;">
+                        Want to see the full family tree, add photos, and explore the rest of the story?
+                    </p>
+                    @if (_story is not null)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                                   Href="@($"/register?invite={_story.UserInviteId}")">
+                            Create a free account
+                        </MudButton>
+                    }
                 }
                 <button class="auth-browse" style="margin-top:14px;"
                         @onclick='() => Nav.NavigateTo("/")'>
@@ -223,12 +229,6 @@
         {
             _submitted = true;
             ToastService.Success($"Your memory of {_validation?.DisplayName} has been saved!");
-
-            // Redirect to registration with invite token if available
-            if (_story.UserInviteId.HasValue)
-                Nav.NavigateTo($"/register?invite={_story.UserInviteId}");
-            else
-                Nav.NavigateTo("/register");
         }
     }
 }

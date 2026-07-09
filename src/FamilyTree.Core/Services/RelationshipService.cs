@@ -23,8 +23,15 @@ public class RelationshipService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
+            var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
+
             var rels = await ctx.Relationships
                 .AsNoTracking()
+                .Where(r => isSuperUser ||
+                    (familyId.HasValue &&
+                     ctx.People.Any(p => p.Id == r.PersonAId && p.FamilyId == familyId) &&
+                     ctx.People.Any(p => p.Id == r.PersonBId && p.FamilyId == familyId)))
                 .OrderBy(r => r.CreatedAt)
                 .Select(r => RelationshipMapper.MapRelationshipToDto(r))
                 .ToListAsync(ct);
@@ -50,6 +57,17 @@ public class RelationshipService(
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
+
+            // Confirm the target person is actually visible to this caller before
+            // returning anything about their relationships — otherwise a caller who
+            // knows a GUID from another family could enumerate that person's relations.
+            var personVisible = await ctx.People.AnyAsync(p => p.Id == personId &&
+                (isSuperUser || (familyId.HasValue && p.FamilyId == familyId)), ct);
+            if (!personVisible)
+                return ServiceResponse<List<RelationshipDto>>.Ok([]);
 
             var rels = await ctx.Relationships
                 .AsNoTracking()
@@ -83,6 +101,10 @@ public class RelationshipService(
                 return ServiceResponse<RelationshipDto>.Fail(dtoValidation.Message);
 
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var scopeError = await ValidateBothPeopleInScopeAsync(ctx, request.PersonAId, request.PersonBId, ct);
+            if (scopeError != null)
+                return ServiceResponse<RelationshipDto>.Fail(scopeError);
 
             // Canonical ordering — lower ID is always PersonA
             var (a, b) = request.PersonAId < request.PersonBId
@@ -152,6 +174,18 @@ public class RelationshipService(
             if (rel is null)
                 return ServiceResponse<RelationshipDto>.Fail($"Relationship {id} not found.");
 
+            // Same generic "not found" message whether the relationship truly doesn't
+            // exist or exists in a different family — never reveal cross-family
+            // existence. Check both the relationship's current people AND the
+            // requested new people, so this can't be used to repoint a relationship
+            // onto someone from another family either.
+            if (await ValidateBothPeopleInScopeAsync(ctx, rel.PersonAId, rel.PersonBId, ct) != null)
+                return ServiceResponse<RelationshipDto>.Fail($"Relationship {id} not found.");
+
+            var scopeError = await ValidateBothPeopleInScopeAsync(ctx, request.PersonAId, request.PersonBId, ct);
+            if (scopeError != null)
+                return ServiceResponse<RelationshipDto>.Fail(scopeError);
+
             // Canonical ordering
             var (a, b) = request.PersonAId < request.PersonBId
                 ? (request.PersonAId, request.PersonBId)
@@ -208,6 +242,9 @@ public class RelationshipService(
                 .FirstOrDefaultAsync(r => r.Id == id, ct);
 
             if (relationship is null)
+                return ServiceResponse.Fail($"Relationship {id} not found.");
+
+            if (await ValidateBothPeopleInScopeAsync(ctx, relationship.PersonAId, relationship.PersonBId, ct) != null)
                 return ServiceResponse.Fail($"Relationship {id} not found.");
 
             ctx.Relationships.Remove(relationship);
@@ -300,5 +337,25 @@ public class RelationshipService(
         }
 
         return null;
+    }
+
+    // Confirms BOTH people belong to the caller's family (or the caller is a
+    // super-user) before allowing a relationship to be created, repointed, updated,
+    // or deleted — without this, any authenticated user who knew two GUIDs from
+    // different families could link them together, or read/modify a relationship
+    // that belongs entirely to someone else's family.
+    private async Task<string?> ValidateBothPeopleInScopeAsync(
+        AppDbContext ctx, Guid personAId, Guid personBId, CancellationToken ct)
+    {
+        if (currentUser.IsSuperUser) return null;
+
+        var familyId = currentUser.FamilyId;
+        if (!familyId.HasValue)
+            return "You do not have access to create or modify relationships.";
+
+        var matchingCount = await ctx.People.CountAsync(p =>
+            (p.Id == personAId || p.Id == personBId) && p.FamilyId == familyId, ct);
+
+        return matchingCount == 2 ? null : "One or both people were not found in your family.";
     }
 }

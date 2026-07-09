@@ -28,4 +28,7 @@ public class CurrentUserService(IHttpContextAccessor httpContextAccessor) : ICur
 
     public string? Email =>
         httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Email);
+
+    public bool IsSuperUser =>
+        httpContextAccessor.HttpContext?.User.IsInRole("SuperUser") ?? false;
 }

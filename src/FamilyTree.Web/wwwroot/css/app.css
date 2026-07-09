@@ -351,9 +351,8 @@ html, body {
     position: fixed;
     inset: 0;
     backdrop-filter: blur(12px);
-    background: rgba(100,100,100,0.35);
+    background: rgba(100,100,100,0.22);
     display: flex;
-    align-items: center;
     justify-content: center;
     z-index: 10001; /* above toolbar (1200) and hero (1250) */
     animation: introFadeIn 0.4s ease-out;
@@ -364,13 +363,20 @@ html, body {
 .intro-glass {
     position: relative;
     isolation: isolate;
-    background: rgba(245,245,245,0.3);
+    background: rgba(255,255,255,0.88);
     backdrop-filter: blur(22px) saturate(160%);
     -webkit-backdrop-filter: blur(22px) saturate(160%);
     border-radius: 20px;
-    padding: 40px 36px;
+    padding: 0px 36px 40px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.12);
     animation: introSlideUp 0.5s ease-out;
+    /* Was centered via .intro-overlay's `align-items: center`, which — combined
+       with `overflow-y: auto` on the overlay — clips the card with no way to
+       scroll to the cut-off part whenever the card is taller than the viewport
+       (a well-known flexbox gotcha, not something a breakpoint alone fixes).
+       `margin: auto` centers when there's room but falls back to normal
+       top-anchored, fully-scrollable flow the instant it doesn't fit. */
+    margin: auto 0;
 }
 
     .intro-glass::before {
@@ -402,6 +408,8 @@ html, body {
 
 /* ── Auth card ────────────────────────────────────────────────────────────── */
 .auth-card {
+    /*margin-top: 30px;*/
+    margin-top: 1rem;
     width: 100%;
     max-width: 440px;
     text-align: left;
@@ -877,10 +885,16 @@ html, body {
     position: relative;
     min-height: 100vh;
     display: flex;
-    align-items: center;
     justify-content: center;
     padding: 32px 16px;
-    overflow: hidden;
+    overflow-x: hidden; /* clips the intentionally-oversized blurred ::before background */
+    overflow-y: auto;   /* was `overflow: hidden` — combined with align-items:center this
+                            clipped the card with NO way to scroll to the cut-off part
+                            whenever it was taller than the viewport (worse than
+                            .intro-overlay's version of the same bug, which at least had
+                            overflow-y:auto). Vertical centering now comes from
+                            .intro-glass's own `margin: auto 0`, which degrades to normal
+                            top-anchored scrollable flow instead of clipping. */
 }
 
 .ft-auth-page::before {
@@ -1778,6 +1792,36 @@ html.ft-no-select * {
     .ft-admin-tabs .mud-tabs-tabbar { width: 100% !important; }
     .ft-admin-tabs .mud-tabs-tabbar-inner { flex-direction: row !important; }
     .ft-admin-tabs .mud-tab { justify-content: center; text-align: center; }
+
+    /* ── Auth pages/overlay (Login, Register, Forgot/Reset password, Story respond) ──
+       Vertical centering via .intro-glass's `margin: auto 0` works well on desktop,
+       where the card reliably fits with room to spare — but on phones the card is a
+       much larger fraction of viewport height, so centering flips unpredictably
+       between "genuinely centered" and "flush against the top" depending on exact
+       content length, which reads as broken rather than responsive. Mobile drops
+       centering entirely in favor of one consistent top-anchored, scrollable layout —
+       also just the standard mobile auth-page pattern — plus a smaller header so the
+       card is short enough to rarely need that scroll in the first place. */
+    .intro-overlay,
+    .ft-auth-page {
+        align-items: flex-start;
+        padding-top: 24px;
+    }
+
+    .intro-glass {
+        margin: 0;
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    .intro-glass img[alt="ArborKin"] {
+        width: 55% !important;
+        max-width: 160px !important;
+    }
+
+    .intro-subtitle {
+        margin-bottom: 12px !important;
+    }
 }
 
 .ft-toast-x {

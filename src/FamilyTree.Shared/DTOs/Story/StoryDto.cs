@@ -18,4 +18,10 @@ public class StoryDto
     public bool IsHidden { get; set; }
     public int SortOrder { get; set; }
     public Guid? UserInviteId { get; set; }
+
+    // Set only by StoryInviteService.SubmitResponseAsync — true when the invited
+    // email already has an account, so the response page offers "sign in" instead
+    // of "create account" (and skips minting a redundant registration invite).
+    public bool RecipientHasAccount { get; set; }
+    public string? RecipientEmail { get; set; }
 }

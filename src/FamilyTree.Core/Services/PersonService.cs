@@ -26,10 +26,15 @@ public class PersonService(
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
 
+            // A super-user (no FamilyId claim, by design) sees everything, including
+            // legacy FamilyId == null records. A regular user with no FamilyId claim —
+            // e.g. a broken/missing UserFamily assignment — must see NOTHING rather than
+            // being accidentally treated the same as a super-user.
             var people = await ctx.People
                 .AsNoTracking()
-                .Where(p => !familyId.HasValue || p.FamilyId == familyId)
+                .Where(p => isSuperUser || (familyId.HasValue && p.FamilyId == familyId))
                 .OrderBy(p => p.LastName)
                 .ThenBy(p => p.FirstName)
                 .ToListAsync(ct);
@@ -59,6 +64,49 @@ public class PersonService(
         }
     }
 
+    public async Task<ServiceResponse<List<PersonDto>>> GetAllForUserAsync(
+        Guid userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var familyId = await ctx.UserFamilies
+                .Where(uf => uf.UserId == userId)
+                .Select(uf => (Guid?)uf.FamilyId)
+                .FirstOrDefaultAsync(ct);
+
+            if (familyId is null)
+                return ServiceResponse<List<PersonDto>>.Ok([]);
+
+            var people = await ctx.People
+                .AsNoTracking()
+                .Where(p => p.FamilyId == familyId)
+                .OrderBy(p => p.LastName)
+                .ThenBy(p => p.FirstName)
+                .ToListAsync(ct);
+
+            var peopleIds = people.Select(p => p.Id).ToHashSet();
+
+            var relationships = await ctx.Relationships
+                .AsNoTracking()
+                .Where(r => peopleIds.Contains(r.PersonAId) && peopleIds.Contains(r.PersonBId))
+                .ToListAsync(ct);
+
+            var dtos = people
+                .Select(p => PersonMapper.MapPersonToDto(p, relationships))
+                .ToList();
+
+            return ServiceResponse<List<PersonDto>>.Ok(dtos);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error loading people for user {UserId}", userId);
+            return ServiceResponse<List<PersonDto>>.Fail(
+                "An error occurred loading family members.");
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────
     //  GET BY ID
     // ─────────────────────────────────────────────────────────────
@@ -70,11 +118,12 @@ public class PersonService(
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
 
-            // TODO: Remove this guard when full family scoping is implemented via UserFamily membership.
             var person = await ctx.People
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == id && (!familyId.HasValue || p.FamilyId == familyId), ct);
+                .FirstOrDefaultAsync(p => p.Id == id &&
+                    (isSuperUser || (familyId.HasValue && p.FamilyId == familyId)), ct);
 
             if (person is null)
                 return ServiceResponse<PersonDto>.Fail($"Person {id} not found.");
@@ -121,6 +170,7 @@ public class PersonService(
 
             var now = DateTime.UtcNow;
             var userId = currentUser.UserId;
+            var familyId = await ResolveFamilyIdForCreateAsync(ctx, ct);
 
             var person = new Person
             {
@@ -135,7 +185,8 @@ public class PersonService(
                 Gender = dto.Gender,
                 BiographyNotes = dto.BiographyNotes?.Trim(),
                 ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim(),
-                FamilyId = currentUser.FamilyId,
+                Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim(),
+                FamilyId = familyId,
                 CreatedAt = now,
                 CreatedBy = userId,
                 UpdatedAt = now,
@@ -162,6 +213,37 @@ public class PersonService(
             return ServiceResponse<PersonDto>.Fail(
                 "An error occurred creating this person.");
         }
+    }
+
+    // A super-user has no FamilyId claim by design (they see every family), so creating
+    // a person directly as a super-user would otherwise leave it ownerless (FamilyId ==
+    // null) — invisible to every regular user, including whichever family it should
+    // actually belong to. Falls back to the single family this deployment currently has
+    // (creating it if truly missing, mirroring AuthService.CreateInviteAsync's same
+    // get-or-create pattern). Also covers the defensive case of a regular user whose
+    // UserFamily assignment is missing — better to land in the existing family than to
+    // create yet another ownerless record.
+    private async Task<Guid> ResolveFamilyIdForCreateAsync(AppDbContext ctx, CancellationToken ct)
+    {
+        if (currentUser.FamilyId.HasValue) return currentUser.FamilyId.Value;
+
+        // Deterministically the oldest family — with more than one Family row now
+        // possible (e.g. a separate test/demo family), an unordered FirstOrDefault
+        // would pick an arbitrary one instead of the original/primary family.
+        var family = await ctx.Families.OrderBy(f => f.CreatedAt).FirstOrDefaultAsync(ct);
+        if (family is null)
+        {
+            family = new Family { Id = Guid.NewGuid(), Name = "My Family", CreatedAt = DateTime.UtcNow };
+            ctx.Families.Add(family);
+            await ctx.SaveChangesAsync(ct);
+        }
+
+        if (!currentUser.IsSuperUser)
+            logger.LogWarning(
+                "User {UserId} has no FamilyId claim when creating a person; defaulting to family {FamilyId}",
+                currentUser.UserId, family.Id);
+
+        return family.Id;
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -207,6 +289,7 @@ public class PersonService(
             person.Gender = dto.Gender;
             person.BiographyNotes = dto.BiographyNotes?.Trim();
             person.ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim();
+            person.Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
             person.UpdatedAt = DateTime.UtcNow;
             person.UpdatedBy = userId;
 
@@ -246,8 +329,26 @@ public class PersonService(
                 return ServiceResponse.Fail($"Person {id} not found.");
 
             var userId = currentUser.UserId;
-            person.DeletedAt = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
+
+            person.DeletedAt = now;
             person.DeletedBy = userId;
+
+            // Cascade soft-delete this person's own relationships so they don't linger
+            // as dangling rows once the person disappears from every query (they're
+            // already excluded from GetAllAsync's relationship list, but leaving them
+            // live in the DB is needless clutter). Tagged with the exact same timestamp
+            // so RestoreAsync can tell these apart from relationships that were already
+            // independently removed before this delete.
+            var relationships = await ctx.Relationships
+                .Where(r => r.PersonAId == id || r.PersonBId == id)
+                .ToListAsync(ct);
+            foreach (var rel in relationships)
+            {
+                rel.DeletedAt = now;
+                rel.DeletedBy = userId;
+            }
+
             await ctx.SaveChangesAsync(ct);
 
             _ = auditLog.LogAsync("Delete", "Person", id, userId: userId);
@@ -282,8 +383,24 @@ public class PersonService(
             if (person.DeletedAt is null)
                 return ServiceResponse.Fail("Person is not deleted.");
 
+            var deletedAt = person.DeletedAt.Value;
+
             person.DeletedAt = null;
             person.DeletedBy = null;
+
+            // Restore only relationships that were cascade-deleted alongside this exact
+            // person deletion (same timestamp) — a relationship the user had already
+            // removed independently, before this person was deleted, stays deleted.
+            var relationships = await ctx.Relationships
+                .IgnoreQueryFilters()
+                .Where(r => (r.PersonAId == id || r.PersonBId == id) && r.DeletedAt == deletedAt)
+                .ToListAsync(ct);
+            foreach (var rel in relationships)
+            {
+                rel.DeletedAt = null;
+                rel.DeletedBy = null;
+            }
+
             await ctx.SaveChangesAsync(ct);
 
             _ = auditLog.LogAsync("Restore", "Person", id, userId: currentUser.UserId);
@@ -308,12 +425,13 @@ public class PersonService(
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
 
             var people = await ctx.People
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .Where(p => p.DeletedAt != null &&
-                            (!familyId.HasValue || p.FamilyId == familyId))
+                            (isSuperUser || (familyId.HasValue && p.FamilyId == familyId)))
                 .OrderByDescending(p => p.DeletedAt)
                 .ToListAsync(ct);
 

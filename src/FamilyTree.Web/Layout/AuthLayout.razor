@@ -1,0 +1,76 @@
+@* Layout for pre-auth / public pages (registration, password reset, anonymous story
+   response). Deliberately has NO CustomAppBar — showing the full app navigation chrome
+   (search, add person, people list, stories) to someone who isn't authenticated yet
+   gives a false "I'm already in the app" signal. Without this, MainLayout's default
+   AppBar renders behind these pages' centered auth cards, since the cards themselves
+   don't cover the full viewport the way LoginOverlay does on Home.razor. *@
+
+@inherits LayoutComponentBase
+@rendermode InteractiveServer
+
+@using MudBlazor
+@using FamilyTree.Web.Services
+@using FamilyTree.Web.Modules.Components
+
+@inject ThemeService Theme
+
+<MudThemeProvider Theme="_mudTheme" @bind-IsDarkMode="_isDark" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+<ToastContainer />
+
+@Body
+
+@code {
+    private bool _isDark;
+
+    private MudTheme _mudTheme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#1e7d50",
+            PrimaryDarken = "#0f472c",
+            PrimaryLighten = "#4db282",
+            Success = "#1e7d50",
+            Background = "#ffffff",
+            Surface = "#f8faf9",
+            DrawerBackground = "#f8faf9",
+            AppbarBackground = "#f8faf9",
+            AppbarText = "#212529",
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#4faa78",
+            PrimaryDarken = "#2e6b48",
+            PrimaryLighten = "#9dd6ba",
+            Success = "#4faa78",
+            Background = "#121417",
+            Surface = "#1a1d21",
+            DrawerBackground = "#1a1d21",
+            AppbarBackground = "#1a1d21",
+            AppbarText = "#dee2e6",
+        },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography { FontFamily = ["Inter", "system-ui", "sans-serif"] }
+        }
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Theme.InitAsync();
+        _isDark = Theme.IsDark;
+        Theme.OnChange += OnThemeChanged;
+        StateHasChanged();
+    }
+
+    private void OnThemeChanged()
+    {
+        _isDark = Theme.IsDark;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Theme.OnChange -= OnThemeChanged;
+}

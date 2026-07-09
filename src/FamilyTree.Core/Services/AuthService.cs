@@ -1,5 +1,6 @@
 using FamilyTree.Core.Data;
 using FamilyTree.Core.Models;
+using FamilyTree.Shared.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -58,19 +59,73 @@ public class AuthService(
         if (!result.Succeeded)
             return new AuthResult(false, result.Errors.First().Description);
 
-        if (matchedInvite != null)
+        // Every registered user needs a UserFamily row, or every family-scoping check
+        // in the app (PersonService.GetAllAsync etc.) treats them as having no FamilyId
+        // claim at all — indistinguishable from a broken account, so they'd see nothing.
+        await using (var ctx = await dbFactory.CreateDbContextAsync())
         {
-            await using var ctx = await dbFactory.CreateDbContextAsync();
-            var invite = await ctx.UserInvites.FindAsync(matchedInvite.Id);
-            if (invite != null)
+            Guid familyId;
+            if (matchedInvite != null)
             {
-                invite.AcceptedAt = DateTime.UtcNow;
-                await ctx.SaveChangesAsync();
+                var invite = await ctx.UserInvites.FindAsync(matchedInvite.Id);
+                if (invite != null)
+                    invite.AcceptedAt = DateTime.UtcNow;
+                familyId = invite?.FamilyId ?? await GetOrCreateDefaultFamilyIdAsync(ctx);
             }
+            else
+            {
+                familyId = await GetOrCreateDefaultFamilyIdAsync(ctx);
+            }
+
+            ctx.UserFamilies.Add(new UserFamily
+            {
+                UserId = user.Id,
+                FamilyId = familyId,
+                Role = "Member",
+                JoinedAt = DateTime.UtcNow,
+            });
+
+            await ctx.SaveChangesAsync();
         }
 
         return new AuthResult(true, UserId: user.Id);
     }
+
+    public async Task EnsureUserFamilyAsync(Guid userId)
+    {
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+
+        var alreadyAssigned = await ctx.UserFamilies.AnyAsync(uf => uf.UserId == userId);
+        if (alreadyAssigned) return;
+
+        var familyId = await GetOrCreateDefaultFamilyIdAsync(ctx);
+        ctx.UserFamilies.Add(new UserFamily
+        {
+            UserId = userId,
+            FamilyId = familyId,
+            Role = "Member",
+            JoinedAt = DateTime.UtcNow,
+        });
+        await ctx.SaveChangesAsync();
+    }
+
+    private static async Task<Guid> GetOrCreateDefaultFamilyIdAsync(AppDbContext ctx)
+    {
+        // Deterministically the oldest family — with more than one Family row now
+        // possible (e.g. a separate test/demo family), an unordered FirstOrDefault
+        // would pick an arbitrary one instead of the original/primary family.
+        var family = await ctx.Families.OrderBy(f => f.CreatedAt).FirstOrDefaultAsync();
+        if (family == null)
+        {
+            family = new Family { Name = "My Family", CreatedAt = DateTime.UtcNow };
+            ctx.Families.Add(family);
+            await ctx.SaveChangesAsync();
+        }
+        return family.Id;
+    }
+
+    public async Task<bool> UserExistsAsync(string email) =>
+        await userManager.FindByEmailAsync(email) != null;
 
     public async Task<AuthResult> LinkPersonAsync(Guid userId, Guid? personId)
     {
@@ -102,13 +157,7 @@ public class AuthService(
                 "An active invite already exists for this email — use the existing link below.",
                 existing.Id);
 
-        var family = await ctx.Families.FirstOrDefaultAsync();
-        if (family == null)
-        {
-            family = new Family { Name = "My Family", CreatedAt = DateTime.UtcNow };
-            ctx.Families.Add(family);
-            await ctx.SaveChangesAsync();
-        }
+        var familyId = await GetOrCreateDefaultFamilyIdAsync(ctx);
 
         var token = Convert.ToBase64String(
                 System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
@@ -118,7 +167,7 @@ public class AuthService(
         {
             Id          = Guid.NewGuid(),
             Email       = email.Trim().ToLower(),
-            FamilyId    = family.Id,
+            FamilyId    = familyId,
             RoleToGrant = "Member",
             Token       = token,
             ExpiresAt   = DateTime.UtcNow.AddDays(ttlDays),
@@ -350,4 +399,167 @@ public class AuthService(
             await ctx.SaveChangesAsync();
         }
     }
+
+    public async Task<AuthResult> LinkUserToTreeAsync(
+        Guid userId,
+        Guid? personId,
+        string? firstName,
+        string? lastName,
+        Guid? connectedPersonId = null,
+        string? relationshipType = null)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return new AuthResult(false, "User not found.");
+
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+
+        if (personId.HasValue)
+        {
+            var existingPerson = await ctx.People.FindAsync(personId.Value);
+            if (existingPerson is null)
+                return new AuthResult(false, "Selected person not found.");
+
+            // IX_AspNetUsers_PersonId is a unique index — one Person can only ever be
+            // claimed by one account. Check before writing so a taken person surfaces a
+            // clear message instead of a raw DbUpdateException bubbling out of
+            // userManager.UpdateAsync (found 2026-07-08: the duplicate-detection modal
+            // can legitimately offer an already-claimed person as a "is this you?" match
+            // when two different accounts share a name).
+            var alreadyLinkedToSomeoneElse = await ctx.Users
+                .AnyAsync(u => u.PersonId == personId.Value && u.Id != userId);
+            if (alreadyLinkedToSomeoneElse)
+                return new AuthResult(false,
+                    $"{existingPerson.FirstName} {existingPerson.LastName} is already linked to another account.");
+
+            user.PersonId = personId.Value;
+            var result = await userManager.UpdateAsync(user);
+            return result.Succeeded
+                ? new AuthResult(true, PersonId: personId.Value)
+                : new AuthResult(false, result.Errors.First().Description);
+        }
+
+        if (!connectedPersonId.HasValue || string.IsNullOrWhiteSpace(relationshipType))
+            return new AuthResult(false, "Invalid link parameters.");
+
+        var connectedPerson = await ctx.People.FindAsync(connectedPersonId.Value);
+        if (connectedPerson is null)
+            return new AuthResult(false, "Connected person not found.");
+
+        if (!IsValidRelationshipToken(relationshipType))
+            return new AuthResult(false, $"Invalid relationship type: {relationshipType}");
+
+        var newPerson = new Person
+        {
+            Id = Guid.NewGuid(),
+            FirstName = firstName?.Trim() ?? "Unknown",
+            LastName = lastName?.Trim() ?? "",
+            FamilyId = connectedPerson.FamilyId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId,
+        };
+
+        ctx.People.Add(newPerson);
+        await ctx.SaveChangesAsync();
+
+        user.PersonId = newPerson.Id;
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+            return new AuthResult(false, updateResult.Errors.First().Description);
+
+        var (personAId, personBId, finalType) =
+            ResolveRelationshipDirection(newPerson.Id, connectedPersonId.Value, relationshipType);
+
+        ctx.Relationships.Add(new Relationship
+        {
+            Id = Guid.NewGuid(),
+            PersonAId = personAId,
+            PersonBId = personBId,
+            Type = finalType,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId,
+        });
+        await ctx.SaveChangesAsync();
+
+        return new AuthResult(true, PersonId: newPerson.Id);
+    }
+
+    public async Task<HashSet<Guid>> GetLinkedPersonIdsAsync(IEnumerable<Guid> personIds)
+    {
+        var ids = personIds.ToList();
+        if (ids.Count == 0) return [];
+
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+        var linked = await ctx.Users
+            .Where(u => u.PersonId != null && ids.Contains(u.PersonId.Value))
+            .Select(u => u.PersonId!.Value)
+            .ToListAsync();
+        return [.. linked];
+    }
+
+    public async Task<AuthResult> CreateUnlinkedPersonAsync(
+        string? firstName,
+        string? lastName,
+        Guid connectedPersonId,
+        string relationshipType,
+        Guid createdByUserId)
+    {
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+
+        var connectedPerson = await ctx.People.FindAsync(connectedPersonId);
+        if (connectedPerson is null)
+            return new AuthResult(false, "Connected person not found.");
+
+        if (!IsValidRelationshipToken(relationshipType))
+            return new AuthResult(false, $"Invalid relationship type: {relationshipType}");
+
+        var newPerson = new Person
+        {
+            Id = Guid.NewGuid(),
+            FirstName = firstName?.Trim() ?? "Unknown",
+            LastName = lastName?.Trim() ?? "",
+            FamilyId = connectedPerson.FamilyId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = createdByUserId,
+        };
+
+        ctx.People.Add(newPerson);
+        await ctx.SaveChangesAsync();
+
+        var (personAId, personBId, finalType) =
+            ResolveRelationshipDirection(newPerson.Id, connectedPersonId, relationshipType);
+
+        ctx.Relationships.Add(new Relationship
+        {
+            Id = Guid.NewGuid(),
+            PersonAId = personAId,
+            PersonBId = personBId,
+            Type = finalType,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = createdByUserId,
+        });
+        await ctx.SaveChangesAsync();
+
+        return new AuthResult(true, PersonId: newPerson.Id);
+    }
+
+    // "subject" is whichever person was just created (Willa or Bill); "connected" is the
+    // existing tree member they're being linked to. Parent direction is explicit in the
+    // token because Relationship rows encode PersonAId = parent, PersonBId = child.
+    private static bool IsValidRelationshipToken(string token) =>
+        token is "ParentOfConnected" or "ChildOfConnected" or "Spouse" or "Sibling";
+
+    private static (Guid PersonAId, Guid PersonBId, RelationshipType Type) ResolveRelationshipDirection(
+        Guid subjectId, Guid connectedPersonId, string relationshipType) => relationshipType switch
+    {
+        "ParentOfConnected" => (subjectId, connectedPersonId, RelationshipType.Parent),
+        "ChildOfConnected"  => (connectedPersonId, subjectId, RelationshipType.Parent),
+        "Spouse" => subjectId < connectedPersonId
+            ? (subjectId, connectedPersonId, RelationshipType.Spouse)
+            : (connectedPersonId, subjectId, RelationshipType.Spouse),
+        "Sibling" => subjectId < connectedPersonId
+            ? (subjectId, connectedPersonId, RelationshipType.Sibling)
+            : (connectedPersonId, subjectId, RelationshipType.Sibling),
+        _ => throw new ArgumentException($"Invalid relationship type: {relationshipType}")
+    };
 }

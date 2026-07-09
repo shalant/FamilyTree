@@ -12,6 +12,14 @@ public interface IStoryService
     Task<ServiceResponse<StoryDto>> UpdateAsync(Guid id, StoryUpsertDto dto, CancellationToken ct = default);
     Task<ServiceResponse> DeleteAsync(Guid id, CancellationToken ct = default);
     Task<ServiceResponse<List<StoryDto>>> GetUnlinkedAsync(CancellationToken ct = default);
+    Task<ServiceResponse<List<StoryDto>>> GetByAuthorEmailAsync(string email, CancellationToken ct = default);
+
+    /// <summary>
+    /// Finds the most recent anonymous invite-response story (never a self-authored one)
+    /// that is still waiting for its subject to be added to the tree — used to drive the
+    /// "subject-first" tree-linking flow. Returns null if there's nothing pending.
+    /// </summary>
+    Task<ServiceResponse<StoryDto?>> GetPendingLinkingSubjectAsync(string email, CancellationToken ct = default);
     Task<ServiceResponse<StoryDto>> LinkToPersonAsync(Guid storyId, Guid personId, CancellationToken ct = default);
     Task<ServiceResponse<StoryDto>> ApproveAsync(Guid storyId, CancellationToken ct = default);
     Task<ServiceResponse<StoryDto>> SetHiddenAsync(Guid storyId, bool hidden, CancellationToken ct = default);

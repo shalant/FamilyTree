@@ -26,25 +26,39 @@ else
             <MudTh></MudTh>
         </HeaderContent>
         <RowTemplate>
-            <MudTd>@context.FullName</MudTd>
-            <MudTd>
+            <MudTd Style="@(context.IsRestored ? "opacity:0.5;" : null)">@context.FullName</MudTd>
+            <MudTd Style="@(context.IsRestored ? "opacity:0.5;" : null)">
                 <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
                     @context.DeletedAt?.ToString("MMM d, yyyy h:mm tt")
                 </MudText>
             </MudTd>
-            <MudTd>
+            <MudTd Style="@(context.IsRestored ? "opacity:0.5;" : null)">
                 <MudText Typo="Typo.caption">
                     @(context.BirthDate?.ToString("yyyy") ?? "—")
                 </MudText>
             </MudTd>
             <MudTd Style="text-align:right;">
-                <MudButton Variant="Variant.Outlined"
-                           Color="Color.Success"
-                           Size="Size.Small"
-                           StartIcon="@Icons.Material.Outlined.RestoreFromTrash"
-                           OnClick="@(() => RestorePersonAsync(context))">
-                    Restore
-                </MudButton>
+                @if (context.IsRestored)
+                {
+                    <MudText Typo="Typo.caption" Style="color:var(--ft-green-600);">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Style="vertical-align:middle;" /> Restored
+                    </MudText>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Outlined.RestoreFromTrash"
+                               Disabled="@context.IsRestoring"
+                               OnClick="@(() => RestorePersonAsync(context))">
+                        @if (context.IsRestoring)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        }
+                        Restore
+                    </MudButton>
+                }
             </MudTd>
         </RowTemplate>
         <PagerContent>
@@ -76,14 +90,35 @@ else
 
     private async Task RestorePersonAsync(DeletedPersonRow row)
     {
-        var success = await TryAsync(
-            () => PersonService.RestoreAsync(row.Id),
-            $"Restoring {row.FullName}");
+        // Guard against a double-fire on the same row (e.g. an accidental second click
+        // before the button's Disabled state re-renders).
+        if (row.IsRestoring || row.IsRestored) return;
 
-        if (success)
+        row.IsRestoring = true;
+        try
         {
-            _deleted.Remove(row);
-            ToastService.Success($"{row.FullName} restored.");
+            var success = await TryAsync(
+                () => PersonService.RestoreAsync(row.Id),
+                $"Restoring {row.FullName}");
+
+            if (success)
+            {
+                // Deliberately NOT removed from _deleted here. Instantly removing a row
+                // shifts every row below it up by one position — found 2026-07-07: a
+                // single restore click was followed by two more, unintended restores on
+                // whatever people had shifted into that same screen position by the time
+                // later clicks landed, confirmed via the audit log (Gladys, then Dora
+                // Herskovitz, then Harvey Fleishman, none of which were the second click
+                // the user remembered making). Marking the row "restored" in place keeps
+                // every other row's position stable for the rest of this viewing session;
+                // it only disappears from the list on the next full reload.
+                row.IsRestored = true;
+                ToastService.Success($"{row.FullName} restored.");
+            }
+        }
+        finally
+        {
+            row.IsRestoring = false;
         }
     }
 
@@ -93,5 +128,7 @@ else
         public string FullName { get; } = dto.FullName;
         public DateTime? DeletedAt { get; } = dto.DeletedAt;
         public DateOnly? BirthDate { get; } = dto.BirthDate;
+        public bool IsRestoring { get; set; }
+        public bool IsRestored { get; set; }
     }
 }

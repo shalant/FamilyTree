@@ -23,9 +23,10 @@ public class GedcomExportService : IGedcomExportService
     {
         await using var ctx = await _dbFactory.CreateDbContextAsync(ct);
         var familyId = _currentUser.FamilyId;
+        var isSuperUser = _currentUser.IsSuperUser;
 
         var people = await ctx.People
-            .Where(p => familyId == null || p.FamilyId == familyId)
+            .Where(p => isSuperUser || (familyId != null && p.FamilyId == familyId))
             .AsNoTracking()
             .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
             .ToListAsync(ct);

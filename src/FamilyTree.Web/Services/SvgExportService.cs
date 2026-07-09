@@ -17,11 +17,12 @@ public class SvgExportService(FamilyTreeLayoutEngine layoutEngine)
         PersonDto? focusPerson,
         string title,
         SvgStyle style = SvgStyle.Classic,
-        SvgColorTheme theme = SvgColorTheme.Forest)
+        SvgColorTheme theme = SvgColorTheme.Forest,
+        Guid? anchorPersonId = null)
     {
         var palette = GetPalette(style, theme);
         var couples = CoupleHelper.Derive(people);
-        var layout  = layoutEngine.ComputeLayout(people, couples, focusPerson?.Id);
+        var layout  = layoutEngine.ComputeLayout(people, couples, focusPerson?.Id, anchorPersonId);
 
         var showHeaderBar  = style != SvgStyle.Minimal;
         var showBands      = style == SvgStyle.Classic;

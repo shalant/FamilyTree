@@ -1,0 +1,644 @@
+@inherits BaseComponent
+@using FamilyTree.Core.Services
+@using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Web.Components
+@using MudBlazor
+
+@inject IPersonService PersonService
+@inject IAuthService AuthService
+@inject IStoryService StoryService
+
+<MudDialog>
+    <DialogContent>
+        <div style="min-width:400px;">
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_complete)
+            {
+                <div style="text-align:center; padding:24px 0;">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                             Style="font-size:48px; color:var(--ft-green-600); margin-bottom:12px;" />
+                    <div style="font-size:18px; font-weight:600; color:var(--ft-text-primary); margin-bottom:8px;">
+                        You're all set!
+                    </div>
+                    <p style="font-size:14px; color:var(--ft-text-muted); line-height:1.6;">
+                        @_completeMessage
+                    </p>
+                </div>
+            }
+            else
+            {
+                <div style="margin-bottom:24px;">
+                    @if (IsRecovery)
+                    {
+                        <div style="font-size:12px; color:var(--ft-text-muted); margin-bottom:12px; padding:8px;
+                            background:rgba(76,175,80,0.04); border-radius:4px;">
+                            Let's finish linking you to the tree.
+                        </div>
+                    }
+
+                    <div style="font-size:14px; font-weight:600; color:var(--ft-text-primary); margin-bottom:16px;">
+                        @CurrentQuestion
+                    </div>
+
+                    @* ── Bill-first path: subject on tree? ──────────────────────────── *@
+                    @if (_stage == Stage.IsSubjectOnTree)
+                    {
+                        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => AnswerIsSubjectOnTree(true)">Yes</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="() => AnswerIsSubjectOnTree(false)">No</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="() => AnswerIsSubjectOnTree(null)">Not sure</MudButton>
+                        </div>
+                    }
+                    else if (_stage == Stage.PickSubjectPerson)
+                    {
+                        <MudSelect T="Guid?" Placeholder="Select a person…" Variant="Variant.Outlined"
+                                   @bind-Value="_subjectPersonId" Dense="true">
+                            @foreach (var p in _treePersons.OrderBy(x => x.FullName))
+                            {
+                                <MudSelectItem Value="@((Guid?)p.Id)">@p.FullName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else if (_stage == Stage.IsSubjectRelated)
+                    {
+                        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => AnswerIsSubjectRelated(true)">Yes</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="() => AnswerIsSubjectRelated(false)">No</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="() => AnswerIsSubjectRelated(null)">Not sure</MudButton>
+                        </div>
+                    }
+                    else if (_stage == Stage.PickSubjectConnection)
+                    {
+                        <MudSelect T="Guid?" Placeholder="Select a person…" Variant="Variant.Outlined"
+                                   @bind-Value="_connectionPersonId" Dense="true">
+                            @foreach (var p in _treePersons.OrderBy(x => x.FullName))
+                            {
+                                <MudSelectItem Value="@((Guid?)p.Id)">@p.FullName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else if (_stage == Stage.SubjectRelationToConnection)
+                    {
+                        <MudSelect T="string" Placeholder="Select a relationship…" Variant="Variant.Outlined"
+                                   @bind-Value="_subjectRelationToken" Dense="true">
+                            <MudSelectItem Value="@("ParentOfConnected")">@($"{StorySubjectName} is their parent")</MudSelectItem>
+                            <MudSelectItem Value="@("ChildOfConnected")">@($"{StorySubjectName} is their child")</MudSelectItem>
+                            <MudSelectItem Value="@("Spouse")">They're spouses</MudSelectItem>
+                            <MudSelectItem Value="@("Sibling")">They're siblings</MudSelectItem>
+                        </MudSelect>
+                    }
+                    else if (_stage == Stage.ConfirmSubjectDuplicate)
+                    {
+                        <MudSelect T="Guid?" Placeholder="Select…" Variant="Variant.Outlined"
+                                   @bind-Value="_duplicateChoice" Dense="true">
+                            @foreach (var p in _duplicateMatches)
+                            {
+                                <MudSelectItem Value="@((Guid?)p.Id)">@p.FullName@(p.BirthDate.HasValue ? $" (b. {p.BirthDate.Value.Year})" : "")</MudSelectItem>
+                            }
+                            <MudSelectItem Value="@((Guid?)Guid.Empty)">No, this is a different person</MudSelectItem>
+                        </MudSelect>
+                    }
+                    else if (_stage == Stage.UserRelationToSubject)
+                    {
+                        <MudSelect T="string" Placeholder="Select a relationship…" Variant="Variant.Outlined"
+                                   @bind-Value="_userRelationToken" Dense="true">
+                            <MudSelectItem Value="@("ChildOfConnected")">@($"{StorySubjectName} is my parent")</MudSelectItem>
+                            <MudSelectItem Value="@("ParentOfConnected")">I'm their parent</MudSelectItem>
+                            <MudSelectItem Value="@("Spouse")">We're spouses</MudSelectItem>
+                            <MudSelectItem Value="@("Sibling")">We're siblings</MudSelectItem>
+                        </MudSelect>
+                    }
+
+                    @* ── Generic path (no story subject) ────────────────────────────── *@
+                    else if (_stage == Stage.IsUserOnTree)
+                    {
+                        <div style="display:flex; gap:12px;">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => AnswerIsUserOnTree(true)">Yes, I'm on this tree</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="() => AnswerIsUserOnTree(false)">No, I'm not</MudButton>
+                        </div>
+                    }
+                    else if (_stage == Stage.PickUserPerson)
+                    {
+                        <MudSelect T="Guid?" Placeholder="Select a person…" Variant="Variant.Outlined"
+                                   @bind-Value="_selectedPerson" Dense="true">
+                            @foreach (var p in _treePersons.OrderBy(x => x.FullName))
+                            {
+                                <MudSelectItem Value="@((Guid?)p.Id)">@p.FullName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else if (_stage == Stage.IsUserRelated)
+                    {
+                        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => AnswerIsUserRelated(true)">Yes, I do</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="() => AnswerIsUserRelated(false)">No, I don't</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="() => AnswerIsUserRelated(null)">I'm not sure</MudButton>
+                        </div>
+                    }
+                    else if (_stage == Stage.PickUserConnection)
+                    {
+                        <MudSelect T="Guid?" Placeholder="Select a person…" Variant="Variant.Outlined"
+                                   @bind-Value="_connectionPersonId" Dense="true">
+                            @foreach (var p in _treePersons.OrderBy(x => x.FullName))
+                            {
+                                <MudSelectItem Value="@((Guid?)p.Id)">@p.FullName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else if (_stage == Stage.UserRelationToConnection)
+                    {
+                        <MudSelect T="string" Placeholder="Select a relationship…" Variant="Variant.Outlined"
+                                   @bind-Value="_userRelationToken" Dense="true">
+                            <MudSelectItem Value="@("ChildOfConnected")">They're my parent</MudSelectItem>
+                            <MudSelectItem Value="@("ParentOfConnected")">I'm their parent</MudSelectItem>
+                            <MudSelectItem Value="@("Spouse")">They're my spouse</MudSelectItem>
+                            <MudSelectItem Value="@("Sibling")">We're siblings</MudSelectItem>
+                        </MudSelect>
+                    }
+                    else if (_stage == Stage.ConfirmUserDuplicate)
+                    {
+                        <MudSelect T="Guid?" Placeholder="Select…" Variant="Variant.Outlined"
+                                   @bind-Value="_duplicateChoice" Dense="true">
+                            @foreach (var p in _duplicateMatches)
+                            {
+                                <MudSelectItem Value="@((Guid?)p.Id)">@p.FullName@(p.BirthDate.HasValue ? $" (b. {p.BirthDate.Value.Year})" : "")</MudSelectItem>
+                            }
+                            <MudSelectItem Value="@((Guid?)Guid.Empty)">No, that's not me</MudSelectItem>
+                        </MudSelect>
+                    }
+                </div>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Default" OnClick="Cancel" Disabled="@_loading">
+            @if (_complete) { <text>Done</text> } else { <text>Skip for now</text> }
+        </MudButton>
+        @if (!_complete)
+        {
+            <MudButton Color="Color.Primary" OnClick="NextStep" Disabled="@(!CanProceed || _loading)">
+                Continue
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public Guid UserId { get; set; }
+    [Parameter] public string? UserFirstName { get; set; }
+    [Parameter] public string? UserLastName { get; set; }
+    [Parameter] public bool IsRecovery { get; set; } = false;
+
+    /// <summary>The person the invite story is about (e.g. "Bill Small") — drives the subject-first flow.</summary>
+    [Parameter] public string? StorySubjectName { get; set; }
+
+    /// <summary>The pending unlinked Story to auto-link once the subject's person is resolved.</summary>
+    [Parameter] public Guid? StoryId { get; set; }
+
+    private enum Stage
+    {
+        IsSubjectOnTree,
+        PickSubjectPerson,
+        IsSubjectRelated,
+        PickSubjectConnection,
+        SubjectRelationToConnection,
+        ConfirmSubjectDuplicate,
+        UserRelationToSubject,
+
+        IsUserOnTree,
+        PickUserPerson,
+        IsUserRelated,
+        PickUserConnection,
+        UserRelationToConnection,
+        ConfirmUserDuplicate,
+    }
+
+    private bool HasSubject => !string.IsNullOrWhiteSpace(StorySubjectName);
+
+    private Stage _stage;
+    private List<PersonDto> _treePersons = [];
+    private bool _loading = true;
+    private bool _complete = false;
+    private string _completeMessage = "";
+
+    private Guid? _selectedPerson;         // Willa picks herself (generic path, already-on-tree case)
+    private Guid? _subjectPersonId;        // Bill's resolved person id (found or newly created)
+    private Guid? _connectionPersonId;     // the existing tree member used as the anchor
+    private string? _subjectRelationToken; // how Bill relates to _connectionPersonId
+    private string? _userRelationToken;    // how Willa relates to _connectionPersonId (generic) or Bill (subject path)
+
+    // Populated right before ConfirmSubjectDuplicate/ConfirmUserDuplicate — candidates whose
+    // First+Last name (case/whitespace-insensitive) matches the name about to be typed in as
+    // a brand-new Person. Guid.Empty in the picker means "no, someone new" (deliberately no
+    // fuzzy matching — an exact-name collision is the actual failure mode this guards against;
+    // see the Elliot duplicate-person incident in TodoList.md).
+    private List<PersonDto> _duplicateMatches = [];
+    private Guid? _duplicateChoice;
+
+    private string CurrentQuestion => _stage switch
+    {
+        Stage.IsSubjectOnTree              => $"Is {StorySubjectName} already on this family tree?",
+        Stage.PickSubjectPerson            => $"Which one is {StorySubjectName}?",
+        Stage.IsSubjectRelated             => $"Is {StorySubjectName} related to anyone on this tree?",
+        Stage.PickSubjectConnection        => $"Who is {StorySubjectName} related to?",
+        Stage.SubjectRelationToConnection  => $"How is {StorySubjectName} related to them?",
+        Stage.ConfirmSubjectDuplicate      => $"We found someone already on the tree named {StorySubjectName} — is this them?",
+        Stage.UserRelationToSubject        => $"How are you related to {StorySubjectName}?",
+
+        Stage.IsUserOnTree                 => "Are you already on this family tree?",
+        Stage.PickUserPerson               => "Who are you?",
+        Stage.IsUserRelated                => "Do you know anyone on this tree?",
+        Stage.PickUserConnection           => "Who do you know?",
+        Stage.UserRelationToConnection     => "How are you related to them?",
+        Stage.ConfirmUserDuplicate         => $"We found someone already on the tree named {UserFirstName} {UserLastName} — is this you?",
+        _ => "Loading..."
+    };
+
+    private bool CanProceed => _stage switch
+    {
+        Stage.IsSubjectOnTree             => false, // advanced directly by the Yes/No/Not-sure buttons
+        Stage.PickSubjectPerson           => _subjectPersonId.HasValue,
+        Stage.IsSubjectRelated            => false,
+        Stage.PickSubjectConnection       => _connectionPersonId.HasValue,
+        Stage.SubjectRelationToConnection => !string.IsNullOrWhiteSpace(_subjectRelationToken),
+        Stage.ConfirmSubjectDuplicate     => _duplicateChoice.HasValue,
+        Stage.UserRelationToSubject       => !string.IsNullOrWhiteSpace(_userRelationToken),
+
+        Stage.IsUserOnTree                => false,
+        Stage.PickUserPerson              => _selectedPerson.HasValue,
+        Stage.IsUserRelated               => false,
+        Stage.PickUserConnection          => _connectionPersonId.HasValue,
+        Stage.UserRelationToConnection    => !string.IsNullOrWhiteSpace(_userRelationToken),
+        Stage.ConfirmUserDuplicate        => _duplicateChoice.HasValue,
+        _ => false
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stage = HasSubject ? Stage.IsSubjectOnTree : Stage.IsUserOnTree;
+        try
+        {
+            await LoadTreePersonsAsync();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadTreePersonsAsync()
+    {
+        // Not GetAllAsync() — this modal is shown right after registration, before the
+        // browser is authenticated (login is deferred until after the dialog closes, see
+        // Register.razor.ShowLinkModal), so the ambient-scoped query would see no FamilyId
+        // and return nothing. GetAllForUserAsync resolves the family from UserId directly.
+        _treePersons = await TryAsync(
+            () => PersonService.GetAllForUserAsync(UserId),
+            "Loading tree") ?? [];
+    }
+
+    // ── Bill-first path ──────────────────────────────────────────────────────
+    private void AnswerIsSubjectOnTree(bool? onTree)
+    {
+        _stage = onTree == true ? Stage.PickSubjectPerson : Stage.IsSubjectRelated;
+    }
+
+    private void AnswerIsSubjectRelated(bool? related)
+    {
+        if (related == true)
+        {
+            _stage = Stage.PickSubjectConnection;
+        }
+        else
+        {
+            CompleteWithMessage($"Thanks! We've saved your story about {StorySubjectName} — " +
+                "it'll link to the tree automatically once they're added.");
+        }
+    }
+
+    // ── Generic path ─────────────────────────────────────────────────────────
+    private void AnswerIsUserOnTree(bool onTree)
+    {
+        _stage = onTree ? Stage.PickUserPerson : Stage.IsUserRelated;
+    }
+
+    private void AnswerIsUserRelated(bool? knows)
+    {
+        if (knows == true)
+        {
+            _stage = Stage.PickUserConnection;
+        }
+        else
+        {
+            CompleteWithMessage("You can link to the tree anytime from your settings.");
+        }
+    }
+
+    private async Task NextStep()
+    {
+        // Guards against a double-click/double-Enter firing this twice before Blazor's
+        // re-render disables the button — without it, the person-creating stages below
+        // could create two Person rows for the same click.
+        if (_loading) return;
+
+        try
+        {
+            switch (_stage)
+            {
+                case Stage.PickSubjectPerson:
+                    _stage = Stage.UserRelationToSubject;
+                    break;
+
+                case Stage.PickSubjectConnection:
+                    _stage = Stage.SubjectRelationToConnection;
+                    break;
+
+                case Stage.SubjectRelationToConnection:
+                    if (await TryStageDuplicateConfirm(SplitName(StorySubjectName), Stage.ConfirmSubjectDuplicate, excludeAlreadyLinked: false))
+                        break;
+                    await CreateSubjectPersonAsync();
+                    break;
+
+                case Stage.ConfirmSubjectDuplicate:
+                    await ResolveSubjectDuplicateAsync();
+                    break;
+
+                case Stage.UserRelationToSubject:
+                    if (await TryStageDuplicateConfirm((UserFirstName, UserLastName), Stage.ConfirmUserDuplicate, excludeAlreadyLinked: true))
+                        break;
+                    await LinkUserToSubjectAsync();
+                    break;
+
+                case Stage.PickUserPerson:
+                    await LinkToExistingPersonAsync();
+                    break;
+
+                case Stage.PickUserConnection:
+                    _stage = Stage.UserRelationToConnection;
+                    break;
+
+                case Stage.UserRelationToConnection:
+                    if (await TryStageDuplicateConfirm((UserFirstName, UserLastName), Stage.ConfirmUserDuplicate, excludeAlreadyLinked: true))
+                        break;
+                    await LinkToNewPersonAsync();
+                    break;
+
+                case Stage.ConfirmUserDuplicate:
+                    await ResolveUserDuplicateAsync();
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error: {ex.Message}");
+        }
+    }
+
+    private void CompleteWithMessage(string message)
+    {
+        _complete = true;
+        _completeMessage = message;
+        StateHasChanged();
+    }
+
+    // Creates Bill as a standalone person linked to the chosen connection, then advances
+    // to asking how Willa herself relates to him.
+    private async Task CreateSubjectPersonAsync()
+    {
+        if (!_connectionPersonId.HasValue || string.IsNullOrWhiteSpace(_subjectRelationToken)) return;
+
+        _loading = true;
+        try
+        {
+            var (subjectFirst, subjectLast) = SplitName(StorySubjectName);
+            var result = await AuthService.CreateUnlinkedPersonAsync(
+                subjectFirst, subjectLast, _connectionPersonId.Value, _subjectRelationToken, UserId);
+
+            if (result.Success && result.PersonId.HasValue)
+            {
+                _subjectPersonId = result.PersonId;
+                _stage = Stage.UserRelationToSubject;
+            }
+            else
+            {
+                ToastService.Error(result.Error ?? $"Failed to add {StorySubjectName} to the tree.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LinkUserToSubjectAsync()
+    {
+        if (!_subjectPersonId.HasValue || string.IsNullOrWhiteSpace(_userRelationToken)) return;
+
+        _loading = true;
+        try
+        {
+            var result = await AuthService.LinkUserToTreeAsync(
+                UserId, null, UserFirstName, UserLastName, _subjectPersonId, _userRelationToken);
+
+            if (result.Success)
+            {
+                await LinkPendingStoryAsync(_subjectPersonId.Value);
+                CompleteWithMessage($"Your profile has been created and linked to {StorySubjectName}!");
+                await Task.Delay(500);
+                SafeDialogClose(DialogResult.Ok(result.PersonId));
+            }
+            else
+            {
+                ToastService.Error(result.Error ?? "Failed to create profile.");
+                _loading = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(ex.Message);
+            _loading = false;
+        }
+    }
+
+    private async Task LinkPendingStoryAsync(Guid personId)
+    {
+        if (!StoryId.HasValue) return;
+        try { await StoryService.LinkToPersonAsync(StoryId.Value, personId); }
+        catch { /* best-effort — the story stays unlinked and can be linked later from admin */ }
+    }
+
+    private static (string First, string Last) SplitName(string? fullName)
+    {
+        var parts = (fullName ?? "").Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch
+        {
+            0 => ("Unknown", ""),
+            1 => (parts[0], ""),
+            _ => (parts[0], parts[1])
+        };
+    }
+
+    // Checks (first, last) against the already-loaded family roster. If any exact,
+    // case/whitespace-insensitive name match exists, stashes the candidates and switches
+    // to the given confirm stage instead of proceeding straight to person-creation — returns
+    // true when the caller should stop (stage was redirected), false to proceed as normal.
+    // excludeAlreadyLinked=true (the "is this you?" case) drops candidates already claimed
+    // by a different AppUser — offering one would always fail LinkUserToTreeAsync's
+    // IX_AspNetUsers_PersonId check (found 2026-07-08: two existing accounts both named
+    // "Elliot Rosenberg" meant every candidate in the picker was already taken). Not applied
+    // to the subject case (StorySubjectName, e.g. "Bill") — the story subject is free to
+    // already have their own separate account; that's not a conflict.
+    private async Task<bool> TryStageDuplicateConfirm((string? First, string? Last) name, Stage confirmStage, bool excludeAlreadyLinked)
+    {
+        var matches = PersonNameDuplicateMatcher.FindMatches(_treePersons, name.First, name.Last);
+
+        if (excludeAlreadyLinked && matches.Count > 0)
+        {
+            var linkedIds = await AuthService.GetLinkedPersonIdsAsync(matches.Select(p => p.Id));
+            matches = matches.Where(p => !linkedIds.Contains(p.Id)).ToList();
+        }
+
+        if (matches.Count == 0) return false;
+
+        _duplicateMatches = matches;
+        _duplicateChoice = null;
+        _stage = confirmStage;
+        return true;
+    }
+
+    private async Task ResolveSubjectDuplicateAsync()
+    {
+        if (_duplicateChoice is { } matchedId && matchedId != Guid.Empty)
+        {
+            // Found them — reuse the existing person instead of creating a duplicate row.
+            _subjectPersonId = matchedId;
+            _stage = Stage.UserRelationToSubject;
+        }
+        else
+        {
+            await CreateSubjectPersonAsync();
+        }
+    }
+
+    private async Task ResolveUserDuplicateAsync()
+    {
+        if (_duplicateChoice is { } matchedId && matchedId != Guid.Empty)
+        {
+            _loading = true;
+            try
+            {
+                var result = await AuthService.LinkUserToTreeAsync(UserId, matchedId, UserFirstName, UserLastName);
+                if (result.Success)
+                {
+                    if (HasSubject && _subjectPersonId.HasValue)
+                        await LinkPendingStoryAsync(_subjectPersonId.Value);
+
+                    CompleteWithMessage(HasSubject
+                        ? $"Your profile has been linked to {StorySubjectName}!"
+                        : "You're linked to the tree! Continue to see your profile.");
+                    await Task.Delay(500);
+                    SafeDialogClose(DialogResult.Ok(result.PersonId));
+                }
+                else
+                {
+                    ToastService.Error(result.Error ?? "Failed to link to tree.");
+                    _loading = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error(ex.Message);
+                _loading = false;
+            }
+        }
+        else if (HasSubject)
+        {
+            await LinkUserToSubjectAsync();
+        }
+        else
+        {
+            await LinkToNewPersonAsync();
+        }
+    }
+
+    private async Task LinkToExistingPersonAsync()
+    {
+        _loading = true;
+        try
+        {
+            var result = await AuthService.LinkUserToTreeAsync(UserId, _selectedPerson, UserFirstName, UserLastName);
+            if (result.Success)
+            {
+                CompleteWithMessage("You're linked to the tree! Continue to see your profile.");
+                await Task.Delay(500);
+                SafeDialogClose(DialogResult.Ok(result.PersonId));
+            }
+            else
+            {
+                ToastService.Error(result.Error ?? "Failed to link to tree.");
+                _loading = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(ex.Message);
+            _loading = false;
+        }
+    }
+
+    private async Task LinkToNewPersonAsync()
+    {
+        _loading = true;
+        try
+        {
+            var result = await AuthService.LinkUserToTreeAsync(
+                UserId, null, UserFirstName, UserLastName, _connectionPersonId, _userRelationToken);
+
+            if (result.Success)
+            {
+                CompleteWithMessage("Your profile has been created and linked to the tree!");
+                await Task.Delay(500);
+                SafeDialogClose(DialogResult.Ok(result.PersonId));
+            }
+            else
+            {
+                ToastService.Error(result.Error ?? "Failed to create profile.");
+                _loading = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(ex.Message);
+            _loading = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        if (_complete)
+            SafeDialogClose(DialogResult.Ok((Guid?)null));
+        else
+            SafeDialogClose(DialogResult.Cancel());
+    }
+
+    private void SafeDialogClose(DialogResult result)
+    {
+        try
+        {
+            MudDialog?.Close(result);
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Dialog close error: {ex.Message}");
+        }
+    }
+}
