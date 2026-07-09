@@ -21,6 +21,49 @@ item the user has run, confirmed, and (where needed) corrected.
 +- After linking, sign out and back in — confirm the tree still shows correctly (this is the stale-cookie thing we just hit)
 +- Invite someone who **already has an account** (e.g. Ellen, invited to write about Morton) to write a story — after submitting, confirm the conversion screen offers **"Sign in"** (pre-filled email), not "Create a free account" → `/register` (found 2026-07-06: it always redirected to register, which would've failed with "account already exists")
 
+## Duplicate-person detection in LinkToTreeModal (added 2026-07-08)
+
+New: right before the modal would silently create a new `Person` row (either the story
+subject, e.g. "Bill," or your own profile), it now checks the typed first+last name
+(exact, case/whitespace-insensitive) against the family's existing roster. On a match it
+asks "We found someone already on the tree named X — is this them?" instead of creating a
+duplicate. Built in response to the Elliot Rosenberg duplicate-person bug found this same
+session (see `TodoList.md`). Only unit-tested (`PersonNameDuplicateMatcherTests`) — never
+clicked through in a live browser, so please actually run all of these:
+
++- Send an invite about a subject whose name **exactly matches** someone already on the
+  tree (e.g. re-invite about "Elliot Rosenberg") — confirm the modal asks the new
+  "is this them?" question at the subject-creation step instead of silently adding a
+  second "Elliot Rosenberg." Pick the existing match — confirm no new `Person` row gets
+  created (check via SQL) and the flow still lets you answer "How are you related to
+  them?" normally.
++- Same setup, but pick "No, this is a different person" instead — confirm a brand-new
+  `Person` row **is** created as before (this must not become impossible to add a
+  same-named relative on purpose, e.g. two "John Smith"s).
++- Subject-first path: after Bill is resolved, when it asks how *you're* related to Bill,
+  type your own name so it exactly matches someone already on the tree — confirm the same
+  duplicate question appears for you, and picking the match links your account directly to
+  that existing person (`user.PersonId` set, no new `Person` row) rather than creating one.
+  Confirmed the prompt fires correctly (seeded a pre-2026-07-04-style unlinked story to
+  reach this otherwise-unreachable path — see `FEATURE_PLAN_INVITE_LINKING_MODAL.md`'s
+  scope-boundary note). The "found a real bug along the way" part: this exact test is what
+  surfaced the `IX_AspNetUsers_PersonId` crash (both candidate Elliots were already claimed
+  by other test accounts) — fixed in `AuthService.LinkUserToTreeAsync` +
+  `GetLinkedPersonIdsAsync` filtering, see `TodoList.md`. The successful-link resolution
+  path itself (picking an *available* match) was verified via the generic-path Marc test
+  below rather than re-run here — same `ResolveUserDuplicateAsync` code either way.
++- Generic path (no story subject, "I know someone on this tree"): same check — register
+  with a name matching an existing tree member and confirm the duplicate question appears
+  there too. Also confirmed the "match found, available to claim" success path here:
+  registering as "Marc Rosenberg" (plain /register, no story invite) and picking the
+  existing, unclaimed Marc linked the account directly to `C1C76DA8` — no new Person row.
++- Negative case: register with a name that matches nobody in the family — confirm the flow
+  proceeds straight through with no extra question, exactly like before this change (no
+  regression to the working case).
++- Confirm the check is family-scoped: a same-named person who exists **only** in a
+  different family (e.g. Smith/Wilson) must not trigger a false "already on the tree"
+  match for a Rosenberg/Small registration.
+
 ## Layout / rendering
 
 +- Add a third mutually-linked sibling to an existing pair — confirm nobody already-positioned moves
@@ -31,8 +74,8 @@ item the user has run, confirmed, and (where needed) corrected.
 
 ## Delete/restore
 
-- Delete a person who has relationships, then restore them — confirm the relationships come back too, not just the person
-- Delete a person, confirm their relationships don't linger as "ghost" rows still showing up elsewhere
++- Delete a person who has relationships, then restore them — confirm the relationships come back too, not just the person
++- Delete a person, confirm their relationships don't linger as "ghost" rows still showing up elsewhere
 +- **FIXED (2026-07-07)** — Admin "Deleted" tab: clicking Restore on one person unexpectedly restored two *more* people (confirmed via audit log: Gladys Rosenberg, then Dora Herskovitz ~12s later, then Harvey Fleishman ~4s after that — none of which was the "Ellen Rosenberg" name remembered from the toast, and Ellen was never actually touched). Root cause: `DeletedTab.razor` removed the restored row from the list immediately, shifting every row below it up by one position — a later click (even seconds apart, while scanning a long list) could land on whoever had since shifted into that same screen position. Fixed: a restored row now stays in place, marked "Restored" with its button disabled, instead of disappearing — row positions stay stable for the rest of the viewing session; the list only shrinks on the next full reload. Please re-verify: restore several people in a row on a long deleted-list page and confirm only the ones you actually clicked get restored.
 
 ## Refresh button
@@ -43,3 +86,10 @@ item the user has run, confirmed, and (where needed) corrected.
 
 +- Visit `/register`, `/forgot-password`, `/reset-password`, and a story-respond link while signed out — confirm none of them show the search bar / nav icons, only the centered auth card
 +- Confirm `/about` and `/faq` still show full navigation when visited from inside the app while logged in
+- **Mobile-responsive auth screens (fixed 2026-07-08, pure CSS, no automated coverage)** —
+  on `/login`, `/register`, `/forgot-password`, `/reset-password`, and a story-respond
+  link: (1) resize a normal desktop browser window short (not narrow) and confirm the
+  card scrolls to reveal the CTA button instead of clipping it off; (2) in mobile device
+  emulation (or a real phone) confirm the card is top-anchored, not floating oddly
+  off-center, and the logo is noticeably smaller than the desktop version. Only checked
+  via Chrome DevTools device emulation so far — worth a real-phone pass before shipping.

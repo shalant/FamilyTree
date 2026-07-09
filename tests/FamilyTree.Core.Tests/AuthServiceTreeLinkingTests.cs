@@ -228,6 +228,58 @@ public class AuthServiceTreeLinkingTests
         reloaded!.PersonId.Should().Be(personId);
     }
 
+    // Regression for 2026-07-08: two different accounts both named "Elliot Rosenberg"
+    // meant the duplicate-detection modal could offer an already-claimed Person as a
+    // "is this you?" match, and LinkUserToTreeAsync used to let SQL Server's
+    // IX_AspNetUsers_PersonId unique index reject it with a raw DbUpdateException
+    // instead of a clean failure. See PersonNameDuplicateMatcher/LinkToTreeModal's
+    // GetLinkedPersonIdsAsync filtering for the other half of the fix.
+    [Fact]
+    public async Task LinkUserToTreeAsync_PersonAlreadyLinkedToAnotherUser_FailsCleanly_DoesNotThrow()
+    {
+        var (service, factory, userManager) = CreateSut();
+        var firstUser = await CreateExistingUserAsync(userManager, "first@example.com");
+        var secondUser = await CreateExistingUserAsync(userManager, "second@example.com");
+        Guid personId;
+        await using (var ctx = factory.CreateDbContext())
+        {
+            var person = new Person { FirstName = "Elliot", LastName = "Rosenberg", CreatedAt = DateTime.UtcNow };
+            ctx.People.Add(person);
+            await ctx.SaveChangesAsync();
+            personId = person.Id;
+        }
+        (await service.LinkUserToTreeAsync(firstUser.Id, personId, null, null)).Success.Should().BeTrue();
+
+        var result = await service.LinkUserToTreeAsync(secondUser.Id, personId, null, null);
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("already linked");
+        var reloadedSecond = await userManager.FindByIdAsync(secondUser.Id.ToString());
+        reloadedSecond!.PersonId.Should().BeNull("the second user must not end up half-linked after a failed claim");
+    }
+
+    // The same person re-linking themselves (e.g. re-running the flow) must still work —
+    // only a *different* user holding the PersonId should be treated as a conflict.
+    [Fact]
+    public async Task LinkUserToTreeAsync_SameUserRelinkingSamePerson_StillSucceeds()
+    {
+        var (service, factory, userManager) = CreateSut();
+        var user = await CreateExistingUserAsync(userManager, "relink@example.com");
+        Guid personId;
+        await using (var ctx = factory.CreateDbContext())
+        {
+            var person = new Person { FirstName = "Elliot", LastName = "Rosenberg", CreatedAt = DateTime.UtcNow };
+            ctx.People.Add(person);
+            await ctx.SaveChangesAsync();
+            personId = person.Id;
+        }
+        (await service.LinkUserToTreeAsync(user.Id, personId, null, null)).Success.Should().BeTrue();
+
+        var result = await service.LinkUserToTreeAsync(user.Id, personId, null, null);
+
+        result.Success.Should().BeTrue();
+    }
+
     [Fact]
     public async Task LinkUserToTreeAsync_ExistingPersonId_NotFound_Fails()
     {

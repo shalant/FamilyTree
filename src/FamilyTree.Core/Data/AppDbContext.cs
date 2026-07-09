@@ -58,6 +58,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(p => p.DeathPlace).HasMaxLength(200);
             e.Property(p => p.BiographyNotes).HasMaxLength(5000);
             e.Property(p => p.ProfilePhotoUrl).HasMaxLength(500);
+            e.Property(p => p.Email).HasMaxLength(256);
 
             e.Property(p => p.Gender)
                 .HasConversion<string>()

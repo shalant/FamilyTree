@@ -20,6 +20,10 @@ public partial class Person
     public string? ProfilePhotoUrl { get; set; }
     public Gender? Gender { get; set; }
 
+    // Contact info only — not the login email, and not wired into any invite/story
+    // email-matching logic. A linked AppUser's login email can differ from this.
+    public string? Email { get; set; }
+
     public Guid? FamilyId { get; set; }
     public virtual Family? Family { get; set; }
 

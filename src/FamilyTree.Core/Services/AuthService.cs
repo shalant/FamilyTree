@@ -420,6 +420,18 @@ public class AuthService(
             if (existingPerson is null)
                 return new AuthResult(false, "Selected person not found.");
 
+            // IX_AspNetUsers_PersonId is a unique index — one Person can only ever be
+            // claimed by one account. Check before writing so a taken person surfaces a
+            // clear message instead of a raw DbUpdateException bubbling out of
+            // userManager.UpdateAsync (found 2026-07-08: the duplicate-detection modal
+            // can legitimately offer an already-claimed person as a "is this you?" match
+            // when two different accounts share a name).
+            var alreadyLinkedToSomeoneElse = await ctx.Users
+                .AnyAsync(u => u.PersonId == personId.Value && u.Id != userId);
+            if (alreadyLinkedToSomeoneElse)
+                return new AuthResult(false,
+                    $"{existingPerson.FirstName} {existingPerson.LastName} is already linked to another account.");
+
             user.PersonId = personId.Value;
             var result = await userManager.UpdateAsync(user);
             return result.Succeeded
@@ -470,6 +482,19 @@ public class AuthService(
         await ctx.SaveChangesAsync();
 
         return new AuthResult(true, PersonId: newPerson.Id);
+    }
+
+    public async Task<HashSet<Guid>> GetLinkedPersonIdsAsync(IEnumerable<Guid> personIds)
+    {
+        var ids = personIds.ToList();
+        if (ids.Count == 0) return [];
+
+        await using var ctx = await dbFactory.CreateDbContextAsync();
+        var linked = await ctx.Users
+            .Where(u => u.PersonId != null && ids.Contains(u.PersonId.Value))
+            .Select(u => u.PersonId!.Value)
+            .ToListAsync();
+        return [.. linked];
     }
 
     public async Task<AuthResult> CreateUnlinkedPersonAsync(

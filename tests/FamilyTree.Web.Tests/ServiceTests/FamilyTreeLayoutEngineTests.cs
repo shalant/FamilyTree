@@ -352,6 +352,61 @@ public class FamilyTreeLayoutEngineTests
     }
 
     [Fact]
+    public void PersonWithTwoSpouses_BothMarriagesHaveChildren_NeitherChildIsLost()
+    {
+        // A true blended family: Florence has TWO marriages, and BOTH produced children
+        // (Marc with Bud, Vivian with Harvey) — unlike the childless-second-marriage case
+        // above. primaryGroup can only let ONE of Florence's two groups anchor her actual
+        // children via PlaceGroup; the other marriage's child (Vivian) is a ChildId of a
+        // real NuclearGroup, so she's excluded from the "root individuals" (orphan) pass
+        // by definition — but if nothing else anchors her either, she falls all the way
+        // through to the final safety-net loop, which only knows how to anchor a person
+        // next to an already-placed SPOUSE, not an already-placed PARENT. A child with no
+        // spouse of her own would then be dumped at the far edge of the whole canvas,
+        // disconnected from Harvey and Florence despite being their recorded daughter.
+        var bud = Guid.NewGuid();
+        var florence = Guid.NewGuid();
+        var marc = Guid.NewGuid();
+        var harvey = Guid.NewGuid();
+        var vivian = Guid.NewGuid();
+
+        var people = new List<PersonDto>
+        {
+            new() { Id = bud, FirstName = "Bud", LastName = "Rosenberg",
+                ParentIds = [], ChildIds = [marc], SpouseIds = [florence],
+                BirthDate = new DateOnly(1922, 1, 1) },
+            new() { Id = florence, FirstName = "Florence", LastName = "Rosenberg",
+                ParentIds = [], ChildIds = [marc, vivian], SpouseIds = [bud, harvey],
+                BirthDate = new DateOnly(1925, 1, 1) },
+            new() { Id = marc, FirstName = "Marc", LastName = "Rosenberg",
+                ParentIds = [bud, florence], ChildIds = [], SpouseIds = [],
+                BirthDate = new DateOnly(1948, 1, 1) },
+            new() { Id = harvey, FirstName = "Harvey", LastName = "Fleishman",
+                ParentIds = [], ChildIds = [vivian], SpouseIds = [florence],
+                BirthDate = new DateOnly(1928, 1, 1) },
+            new() { Id = vivian, FirstName = "Vivian", LastName = "Fleishman",
+                ParentIds = [harvey, florence], ChildIds = [], SpouseIds = [],
+                BirthDate = new DateOnly(1955, 1, 1) },
+        };
+        var sorted = people.OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToList();
+
+        var layout = _engine.ComputeLayout(sorted, CoupleHelper.Derive(sorted), bud);
+
+        var florenceNode = layout.Nodes.Single(n => n.Person.Id == florence);
+        var harveyNode = layout.Nodes.Single(n => n.Person.Id == harvey);
+        var vivianNode = layout.Nodes.Single(n => n.Person.Id == vivian);
+
+        var parentsMinX = Math.Min(florenceNode.X, harveyNode.X);
+        var parentsMaxX = Math.Max(florenceNode.X, harveyNode.X);
+
+        vivianNode.X.Should().BeInRange(parentsMinX - NodeSpacingXForTests, parentsMaxX + NodeSpacingXForTests,
+            "Vivian is Harvey and Florence's real daughter and must land near her actual parents, " +
+            "not be dumped at the far edge of the canvas just because her marriage isn't Florence's primary group");
+    }
+
+    private const int NodeSpacingXForTests = 130; // mirrors the engine's own NodeSpacingX + small tolerance
+
+    [Fact]
     public void CrossRootCouple_StillDetectedWhenOneSideIsNestedUnderAGrandparent()
     {
         // Reproduces a real bug (2026-07-07): Marc (Bud+Florence's son) married Ellen

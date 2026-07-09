@@ -22,6 +22,7 @@ public class PersonDto
         : null;
     public string? BiographyNotes { get; set; }
     public string? ProfilePhotoUrl { get; set; }
+    public string? Email { get; set; }
 
     public Gender? Gender { get; set; }
 

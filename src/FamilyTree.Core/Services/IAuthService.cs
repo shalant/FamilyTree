@@ -53,6 +53,14 @@ public interface IAuthService
         Guid connectedPersonId,
         string relationshipType,
         Guid createdByUserId);
+
+    /// <summary>
+    /// Of the given candidate Person IDs, returns which are already linked to an AppUser
+    /// account — used to filter "is this you?" duplicate-match candidates down to people
+    /// who could actually be claimed (LinkUserToTreeAsync would otherwise reject an
+    /// already-claimed person via IX_AspNetUsers_PersonId).
+    /// </summary>
+    Task<HashSet<Guid>>                 GetLinkedPersonIdsAsync(IEnumerable<Guid> personIds);
 }
 
 public record AuthResult(bool Success, string? Error = null, Guid? UserId = null, Guid? PersonId = null);

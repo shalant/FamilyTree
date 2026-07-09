@@ -90,6 +90,17 @@
                             <MudSelectItem Value="@("Sibling")">They're siblings</MudSelectItem>
                         </MudSelect>
                     }
+                    else if (_stage == Stage.ConfirmSubjectDuplicate)
+                    {
+                        <MudSelect T="Guid?" Placeholder="Select…" Variant="Variant.Outlined"
+                                   @bind-Value="_duplicateChoice" Dense="true">
+                            @foreach (var p in _duplicateMatches)
+                            {
+                                <MudSelectItem Value="@((Guid?)p.Id)">@p.FullName@(p.BirthDate.HasValue ? $" (b. {p.BirthDate.Value.Year})" : "")</MudSelectItem>
+                            }
+                            <MudSelectItem Value="@((Guid?)Guid.Empty)">No, this is a different person</MudSelectItem>
+                        </MudSelect>
+                    }
                     else if (_stage == Stage.UserRelationToSubject)
                     {
                         <MudSelect T="string" Placeholder="Select a relationship…" Variant="Variant.Outlined"
@@ -147,6 +158,17 @@
                             <MudSelectItem Value="@("Sibling")">We're siblings</MudSelectItem>
                         </MudSelect>
                     }
+                    else if (_stage == Stage.ConfirmUserDuplicate)
+                    {
+                        <MudSelect T="Guid?" Placeholder="Select…" Variant="Variant.Outlined"
+                                   @bind-Value="_duplicateChoice" Dense="true">
+                            @foreach (var p in _duplicateMatches)
+                            {
+                                <MudSelectItem Value="@((Guid?)p.Id)">@p.FullName@(p.BirthDate.HasValue ? $" (b. {p.BirthDate.Value.Year})" : "")</MudSelectItem>
+                            }
+                            <MudSelectItem Value="@((Guid?)Guid.Empty)">No, that's not me</MudSelectItem>
+                        </MudSelect>
+                    }
                 </div>
             }
         </div>
@@ -185,6 +207,7 @@
         IsSubjectRelated,
         PickSubjectConnection,
         SubjectRelationToConnection,
+        ConfirmSubjectDuplicate,
         UserRelationToSubject,
 
         IsUserOnTree,
@@ -192,6 +215,7 @@
         IsUserRelated,
         PickUserConnection,
         UserRelationToConnection,
+        ConfirmUserDuplicate,
     }
 
     private bool HasSubject => !string.IsNullOrWhiteSpace(StorySubjectName);
@@ -208,6 +232,14 @@
     private string? _subjectRelationToken; // how Bill relates to _connectionPersonId
     private string? _userRelationToken;    // how Willa relates to _connectionPersonId (generic) or Bill (subject path)
 
+    // Populated right before ConfirmSubjectDuplicate/ConfirmUserDuplicate — candidates whose
+    // First+Last name (case/whitespace-insensitive) matches the name about to be typed in as
+    // a brand-new Person. Guid.Empty in the picker means "no, someone new" (deliberately no
+    // fuzzy matching — an exact-name collision is the actual failure mode this guards against;
+    // see the Elliot duplicate-person incident in TodoList.md).
+    private List<PersonDto> _duplicateMatches = [];
+    private Guid? _duplicateChoice;
+
     private string CurrentQuestion => _stage switch
     {
         Stage.IsSubjectOnTree              => $"Is {StorySubjectName} already on this family tree?",
@@ -215,6 +247,7 @@
         Stage.IsSubjectRelated             => $"Is {StorySubjectName} related to anyone on this tree?",
         Stage.PickSubjectConnection        => $"Who is {StorySubjectName} related to?",
         Stage.SubjectRelationToConnection  => $"How is {StorySubjectName} related to them?",
+        Stage.ConfirmSubjectDuplicate      => $"We found someone already on the tree named {StorySubjectName} — is this them?",
         Stage.UserRelationToSubject        => $"How are you related to {StorySubjectName}?",
 
         Stage.IsUserOnTree                 => "Are you already on this family tree?",
@@ -222,6 +255,7 @@
         Stage.IsUserRelated                => "Do you know anyone on this tree?",
         Stage.PickUserConnection           => "Who do you know?",
         Stage.UserRelationToConnection     => "How are you related to them?",
+        Stage.ConfirmUserDuplicate         => $"We found someone already on the tree named {UserFirstName} {UserLastName} — is this you?",
         _ => "Loading..."
     };
 
@@ -232,6 +266,7 @@
         Stage.IsSubjectRelated            => false,
         Stage.PickSubjectConnection       => _connectionPersonId.HasValue,
         Stage.SubjectRelationToConnection => !string.IsNullOrWhiteSpace(_subjectRelationToken),
+        Stage.ConfirmSubjectDuplicate     => _duplicateChoice.HasValue,
         Stage.UserRelationToSubject       => !string.IsNullOrWhiteSpace(_userRelationToken),
 
         Stage.IsUserOnTree                => false,
@@ -239,6 +274,7 @@
         Stage.IsUserRelated               => false,
         Stage.PickUserConnection          => _connectionPersonId.HasValue,
         Stage.UserRelationToConnection    => !string.IsNullOrWhiteSpace(_userRelationToken),
+        Stage.ConfirmUserDuplicate        => _duplicateChoice.HasValue,
         _ => false
     };
 
@@ -323,10 +359,18 @@
                     break;
 
                 case Stage.SubjectRelationToConnection:
+                    if (await TryStageDuplicateConfirm(SplitName(StorySubjectName), Stage.ConfirmSubjectDuplicate, excludeAlreadyLinked: false))
+                        break;
                     await CreateSubjectPersonAsync();
                     break;
 
+                case Stage.ConfirmSubjectDuplicate:
+                    await ResolveSubjectDuplicateAsync();
+                    break;
+
                 case Stage.UserRelationToSubject:
+                    if (await TryStageDuplicateConfirm((UserFirstName, UserLastName), Stage.ConfirmUserDuplicate, excludeAlreadyLinked: true))
+                        break;
                     await LinkUserToSubjectAsync();
                     break;
 
@@ -339,7 +383,13 @@
                     break;
 
                 case Stage.UserRelationToConnection:
+                    if (await TryStageDuplicateConfirm((UserFirstName, UserLastName), Stage.ConfirmUserDuplicate, excludeAlreadyLinked: true))
+                        break;
                     await LinkToNewPersonAsync();
+                    break;
+
+                case Stage.ConfirmUserDuplicate:
+                    await ResolveUserDuplicateAsync();
                     break;
             }
         }
@@ -435,6 +485,89 @@
             1 => (parts[0], ""),
             _ => (parts[0], parts[1])
         };
+    }
+
+    // Checks (first, last) against the already-loaded family roster. If any exact,
+    // case/whitespace-insensitive name match exists, stashes the candidates and switches
+    // to the given confirm stage instead of proceeding straight to person-creation — returns
+    // true when the caller should stop (stage was redirected), false to proceed as normal.
+    // excludeAlreadyLinked=true (the "is this you?" case) drops candidates already claimed
+    // by a different AppUser — offering one would always fail LinkUserToTreeAsync's
+    // IX_AspNetUsers_PersonId check (found 2026-07-08: two existing accounts both named
+    // "Elliot Rosenberg" meant every candidate in the picker was already taken). Not applied
+    // to the subject case (StorySubjectName, e.g. "Bill") — the story subject is free to
+    // already have their own separate account; that's not a conflict.
+    private async Task<bool> TryStageDuplicateConfirm((string? First, string? Last) name, Stage confirmStage, bool excludeAlreadyLinked)
+    {
+        var matches = PersonNameDuplicateMatcher.FindMatches(_treePersons, name.First, name.Last);
+
+        if (excludeAlreadyLinked && matches.Count > 0)
+        {
+            var linkedIds = await AuthService.GetLinkedPersonIdsAsync(matches.Select(p => p.Id));
+            matches = matches.Where(p => !linkedIds.Contains(p.Id)).ToList();
+        }
+
+        if (matches.Count == 0) return false;
+
+        _duplicateMatches = matches;
+        _duplicateChoice = null;
+        _stage = confirmStage;
+        return true;
+    }
+
+    private async Task ResolveSubjectDuplicateAsync()
+    {
+        if (_duplicateChoice is { } matchedId && matchedId != Guid.Empty)
+        {
+            // Found them — reuse the existing person instead of creating a duplicate row.
+            _subjectPersonId = matchedId;
+            _stage = Stage.UserRelationToSubject;
+        }
+        else
+        {
+            await CreateSubjectPersonAsync();
+        }
+    }
+
+    private async Task ResolveUserDuplicateAsync()
+    {
+        if (_duplicateChoice is { } matchedId && matchedId != Guid.Empty)
+        {
+            _loading = true;
+            try
+            {
+                var result = await AuthService.LinkUserToTreeAsync(UserId, matchedId, UserFirstName, UserLastName);
+                if (result.Success)
+                {
+                    if (HasSubject && _subjectPersonId.HasValue)
+                        await LinkPendingStoryAsync(_subjectPersonId.Value);
+
+                    CompleteWithMessage(HasSubject
+                        ? $"Your profile has been linked to {StorySubjectName}!"
+                        : "You're linked to the tree! Continue to see your profile.");
+                    await Task.Delay(500);
+                    SafeDialogClose(DialogResult.Ok(result.PersonId));
+                }
+                else
+                {
+                    ToastService.Error(result.Error ?? "Failed to link to tree.");
+                    _loading = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error(ex.Message);
+                _loading = false;
+            }
+        }
+        else if (HasSubject)
+        {
+            await LinkUserToSubjectAsync();
+        }
+        else
+        {
+            await LinkToNewPersonAsync();
+        }
     }
 
     private async Task LinkToExistingPersonAsync()

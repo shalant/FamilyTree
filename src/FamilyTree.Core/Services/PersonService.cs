@@ -185,6 +185,7 @@ public class PersonService(
                 Gender = dto.Gender,
                 BiographyNotes = dto.BiographyNotes?.Trim(),
                 ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim(),
+                Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim(),
                 FamilyId = familyId,
                 CreatedAt = now,
                 CreatedBy = userId,
@@ -288,6 +289,7 @@ public class PersonService(
             person.Gender = dto.Gender;
             person.BiographyNotes = dto.BiographyNotes?.Trim();
             person.ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim();
+            person.Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
             person.UpdatedAt = DateTime.UtcNow;
             person.UpdatedBy = userId;
 

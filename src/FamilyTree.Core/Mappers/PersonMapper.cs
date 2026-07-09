@@ -97,6 +97,7 @@ public static class PersonMapper
 
             BiographyNotes = person.BiographyNotes,
             ProfilePhotoUrl = person.ProfilePhotoUrl,
+            Email = person.Email,
 
             Gender = person.Gender,
             RowVersion = person.RowVersion,

@@ -85,6 +85,15 @@
                     <MudSelectItem Value="@((Gender?)Gender.Other)">Other</MudSelectItem>
                 </MudSelect>
             </MudItem>
+            <MudItem xs="6">
+                <div class="ft-field-label">Email</div>
+                <MudTextField @bind-Value="_email"
+                              Placeholder="name@example.com"
+                              InputType="InputType.Email"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Outlined.Email"
+                              Variant="Variant.Outlined" />
+            </MudItem>
         </MudGrid>
     </MudPaper>
 
@@ -521,6 +530,7 @@
     private string _photoUrl = "";
     private string _birthPlace = "";
     private string _deathPlace = "";
+    private string _email = "";
     private DateTime? _birthDate;
     private DateTime? _deathDate;
     private Gender? _gender;
@@ -564,6 +574,7 @@
         _deathDate = Initial.DeathDate?.ToDateTime(TimeOnly.MinValue);
         _birthPlace = Initial.BirthPlace ?? "";
         _deathPlace = Initial.DeathPlace ?? "";
+        _email = Initial.Email ?? "";
         _gender = Initial.Gender;
         _parentIds = [..Initial.ParentIds];
         _spouseIds = [..Initial.SpouseIds];
@@ -835,6 +846,7 @@
                 DeathPlace = string.IsNullOrWhiteSpace(_deathPlace) ? null : _deathPlace.Trim(),
                 BiographyNotes = _notes.Trim(),
                 ProfilePhotoUrl = string.IsNullOrWhiteSpace(_photoUrl) ? null : _photoUrl.Trim(),
+                Email = string.IsNullOrWhiteSpace(_email) ? null : _email.Trim(),
                 Gender = _gender,
                 ParentIds = [.._parentIds],
                 SpouseIds = [.._spouseIds],

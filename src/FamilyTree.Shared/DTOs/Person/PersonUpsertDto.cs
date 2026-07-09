@@ -35,6 +35,10 @@ public class PersonUpsertDto
     [StringLength(500, ErrorMessage = "Profile photo URL cannot exceed 500 characters.")]
     public string? ProfilePhotoUrl { get; set; }
 
+    [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+    [StringLength(256, ErrorMessage = "Email cannot exceed 256 characters.")]
+    public string? Email { get; set; }
+
     public Gender? Gender { get; set; }
 
     public List<Guid> ParentIds { get; set; } = new();

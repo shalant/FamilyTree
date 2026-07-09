@@ -105,4 +105,5 @@ internal sealed class FakeAuthService : IAuthService
     public Task DismissResetRequestAsync(Guid id) => throw new NotImplementedException();
     public Task<AuthResult> LinkUserToTreeAsync(Guid userId, Guid? personId, string? firstName, string? lastName, Guid? connectedPersonId = null, string? relationshipType = null) => throw new NotImplementedException();
     public Task<AuthResult> CreateUnlinkedPersonAsync(string? firstName, string? lastName, Guid connectedPersonId, string relationshipType, Guid createdByUserId) => throw new NotImplementedException();
+    public Task<HashSet<Guid>> GetLinkedPersonIdsAsync(IEnumerable<Guid> personIds) => throw new NotImplementedException();
 }

@@ -172,29 +172,36 @@ public class ClaudeImportService(
 
         var now = DateTime.UtcNow;
 
-        var personIds = await ctx.People
+        var people = await ctx.People
             .IgnoreQueryFilters()
             .Where(p => p.ImportBatchId == batchId && p.DeletedAt == null)
-            .Select(p => p.Id)
             .ToListAsync(ct);
 
-        if (personIds.Count == 0) goto markBatch;
+        if (people.Count > 0)
+        {
+            var personIds = people.Select(p => p.Id).ToHashSet();
 
-        // Soft-delete all persons in this batch
-        await ctx.People
-            .IgnoreQueryFilters()
-            .Where(p => p.ImportBatchId == batchId && p.DeletedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.DeletedAt, now), ct);
+            foreach (var person in people)
+                person.DeletedAt = now;
 
-        // Soft-delete relationships where BOTH sides were in this batch
-        await ctx.Relationships
-            .IgnoreQueryFilters()
-            .Where(r => r.DeletedAt == null
-                     && personIds.Contains(r.PersonAId)
-                     && personIds.Contains(r.PersonBId))
-            .ExecuteUpdateAsync(s => s.SetProperty(r => r.DeletedAt, now), ct);
+            // Soft-delete every relationship touching ANY person in this batch — matching
+            // PersonService.DeleteAsync's cascade (either side, not both). A relationship
+            // linking a batch-created person to a pre-existing one is just as orphaned by
+            // this rollback as one entirely internal to the batch; leaving it live left a
+            // dangling row pointing at a soft-deleted person (found 2026-07-08 — see the
+            // Elliot Rosenberg duplicate-person entry in docs/TodoList.md).
+            var relationships = await ctx.Relationships
+                .IgnoreQueryFilters()
+                .Where(r => r.DeletedAt == null
+                         && (personIds.Contains(r.PersonAId) || personIds.Contains(r.PersonBId)))
+                .ToListAsync(ct);
 
-        markBatch:
+            foreach (var rel in relationships)
+                rel.DeletedAt = now;
+
+            await ctx.SaveChangesAsync(ct);
+        }
+
         var batch = await ctx.ImportBatches.FindAsync([batchId], ct);
         if (batch != null)
         {
