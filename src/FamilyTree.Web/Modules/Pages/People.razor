@@ -4,6 +4,7 @@
 @using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Shared.Enums
+@using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Services
 @using MudBlazor
 
@@ -129,6 +130,12 @@
                                        Color="Color.Primary"
                                        OnClick="@(() => Nav.NavigateTo($"/people/{person.Id}/edit"))" />
                     </MudTooltip>
+                    <MudTooltip Text="Delete" Placement="Placement.Left">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@((e) => PromptDeleteAsync(person, e))" />
+                    </MudTooltip>
                 </MudTd>
             </RowTemplate>
 
@@ -185,4 +192,34 @@
         Gender.Female => Icons.Material.Outlined.Female,
         _ => Icons.Material.Outlined.Transgender
     };
+
+    private async Task PromptDeleteAsync(PersonDto person, MouseEventArgs e)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message, $"This will remove {person.FullName} from your family tree. This action cannot be undone." },
+            { x => x.ConfirmLabel, "Delete" }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(
+            $"Delete {person.FullName}?", parameters);
+
+        var result = await dialog.Result;
+        if (!result.Canceled)
+            await DeletePersonAsync(person);
+    }
+
+    private async Task DeletePersonAsync(PersonDto person)
+    {
+        var result = await PersonService.DeleteAsync(person.Id);
+        if (result.Success)
+        {
+            _people.Remove(person);
+            Toast.Success($"{person.FullName} has been deleted");
+        }
+        else
+        {
+            Toast.Error(result.Message);
+        }
+    }
 }
