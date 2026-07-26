@@ -162,7 +162,7 @@
         if (firstRender)
         {
             _jsModule = await JS.InvokeAsync<IJSObjectReference>(
-                "import", "/js/canvas-interaction.js");
+                "import", "/js/canvas-interaction.js?v=1");
 
             var (fx, fy, genTopY, genBotY) = ComputeDefaultView();
             await _jsModule.InvokeVoidAsync("init", "ft-viewport", "ft-transform", fx, fy, genTopY, genBotY);
