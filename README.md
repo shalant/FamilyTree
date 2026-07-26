@@ -7,8 +7,9 @@
 ### Test Status
 | Metric | Status |
 |--------|--------|
-| **Unit Tests** | 19/19 ✅ |
-| **Component Tests** | 4/4 ✅ (4 skipped) |
+| **Core Tests** | 75/75 ✅ |
+| **Web Tests** | 41/45 ✅ (4 skipped) |
+| **Total** | 116 passing |
 | **Build (Debug + Release)** | ✅ |
 | **CI Pipeline** | ✅ [View Latest Run](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml) |
 
@@ -141,6 +142,21 @@ SQL Server (local SQLEXPRESS) / Azure SQL Database (prod)
 - `FamilyTree.Web` — Blazor Server UI; injects `IPersonService` etc. directly
 
 Key design decisions are documented in `docs/` (ADR 001: JS-free layout engine, relationship canonical ordering, cross-root couple layout, SSR flash prevention).
+
+---
+
+## Quality Strategy
+
+Confidence in code comes from rigorous constraints, not subjective review. This project follows **Uncle Bob Martin's approach**: surround agents (and developers) with a gauntlet of automated checks that catch bugs early.
+
+**Constraints in place:**
+- **Comprehensive test suites** — 75 Core + 41 Web tests; new features come with regression test pairs (before/after)
+- **Strict type safety** — C# 13 nullable reference types; compiler catches entire categories of null-reference bugs
+- **CI enforcement** — `dotnet build` + `dotnet test` must pass on every push (no manual override path)
+- **Database integrity** — unique constraints, referential integrity, soft-delete cascade tracking; data shape enforced by the schema
+- **Build verification** — Release builds verified locally before pushing; Warnings treated as errors
+
+**Result:** The test suite is comprehensive enough that human code review is optional — if code passes the gauntlet, it works.
 
 ---
 
