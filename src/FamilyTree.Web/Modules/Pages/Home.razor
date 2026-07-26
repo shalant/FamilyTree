@@ -415,7 +415,7 @@ else
         // elements appearing after initial load (toolbar/hero) get wired up.
         if (_dragModule == null)
         {
-            _dragModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/ftDrag.js");
+            _dragModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/ftDrag.js?v=1");
             _dotNetRef  = DotNetObjectReference.Create(this);
 
             var tb = await _dragModule.InvokeAsync<double[]?>("loadPos", "toolbar", "ft-toolbar", 0);
