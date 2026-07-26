@@ -25,7 +25,7 @@ public abstract class ComponentTestBase : TestContext
         //Services.AddSingleton<IStoryInviteService, FakeStoryInviteService>();
 
         // JSInterop modules
-        JSInterop.SetupModule("/js/canvas-interaction.js");
+        JSInterop.SetupModule("/js/canvas-interaction.js?v=1");
 
         // Mock all unhandled JSInterop calls
         JSInterop.SetupVoid("focusElement", _ => true);
