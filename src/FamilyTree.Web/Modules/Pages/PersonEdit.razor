@@ -35,6 +35,13 @@ else
                         SubmitLabel="Save changes"
                         OnSubmit="HandleSubmit"
                         OnCancel="@(() => Nav.NavigateTo("/"))" />
+            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+                <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                           StartIcon="@Icons.Material.Filled.Delete"
+                           OnClick="HandleDelete">
+                    Delete person
+                </MudButton>
+            </div>
         </MudContainer>
     </div>
 }
@@ -155,6 +162,33 @@ else
             submittedDto.SiblingIds = [.. submittedDto.SiblingIds, .. suggestions.Select(p => p.Id)];
             await PersonService.UpdateAsync(Id, submittedDto);
             Toast.Success($"Linked as sibling to {suggestions.Count} more.");
+        }
+    }
+
+    private async Task HandleDelete()
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message, $"This will remove {_person!.FullName} from your family tree. This action cannot be undone." },
+            { x => x.ConfirmLabel, "Delete" }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(
+            $"Delete {_person.FullName}?", parameters);
+
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            var deleteResult = await PersonService.DeleteAsync(Id);
+            if (deleteResult.Success)
+            {
+                Toast.Success($"{_person.FullName} has been deleted");
+                Nav.NavigateTo("/people");
+            }
+            else
+            {
+                Toast.Error(deleteResult.Message);
+            }
         }
     }
 }
