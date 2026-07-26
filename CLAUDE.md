@@ -199,6 +199,20 @@ depth, which would remove the fragile birth-year inference machinery entirely.
 - `PersonMapper` enriches `PersonDto` with derived relationship ID lists — not persisted
 - `PersonService.SyncRelationshipsDiffAsync` handles create/update/delete of all relationship types including spouse ↔ former-spouse transitions
 
+## Testing & Quality Strategy
+
+This project follows Uncle Bob Martin's approach to AI-assisted development: **don't read agent-generated code directly; surround agents with rigorous constraints instead.** Confidence in code comes from the gauntlet it's run through, not from subjective review.
+
+**Constraints in place:**
+- **Comprehensive test suites**: `FamilyTreeLayoutEngineTests` (regression suite with before/after pairs for classification transitions), `PersonServiceTests`, `RelationshipServiceTests`, and integration tests hitting a real database (not mocks)
+- **Build verification**: `dotnet build FamilyTree.sln -c Release` must succeed; no warnings treated as acceptable
+- **Test runs**: `dotnet test` must pass 100% before any PR/commit
+- **Type safety**: C# 13 / .NET 10 strict nullable reference types; the compiler catches entire categories of null-reference bugs
+- **Database constraints**: unique constraints on `(PersonAId, PersonBId, Type)` for relationships; referential integrity via EF Core; migrations auto-run with try/catch + critical logging on startup
+- **Integration testing**: stories and invites hit the real database; auth flows tested end-to-end; layout engine tested against known genealogies (cross-root couples, orphaned siblings, multiple marriages)
+
+The CI workflow (`ci.yml`) enforces these automatically on every push/PR. If you see a failing test or a build error, **fix it first** — don't work around it. A regression test suite exists precisely so bad changes fail fast and obviously, not silently.
+
 ## Auth & Security
 
 ### Identity Stack
