@@ -266,17 +266,18 @@ public class StoryInviteService(
                     // If this email already has an account, the response page should
                     // offer "sign in" instead of minting yet another registration
                     // invite that would just fail with "account already exists."
-                    recipientHasAccount = await authService.UserExistsAsync(invite.InvitedEmail);
+                    var userExistsResult = await authService.UserExistsAsync(invite.InvitedEmail);
+                    recipientHasAccount = userExistsResult.Success && userExistsResult.Data;
 
                     if (!recipientHasAccount)
                     {
                         var inviteResult = await authService.CreateInviteAsync(invite.InvitedEmail);
 
-                        // CreateInviteAsync returns Success=false but a valid Id when an active
+                        // CreateInviteAsync returns Success=false but a valid Data when an active
                         // invite already exists for this email — that existing Id is still usable.
-                        if (inviteResult.Id is not null)
+                        if (inviteResult.Data != Guid.Empty)
                         {
-                            userInviteId = inviteResult.Id;
+                            userInviteId = inviteResult.Data;
                         }
                     }
                 }

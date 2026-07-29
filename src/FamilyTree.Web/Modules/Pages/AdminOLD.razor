@@ -1299,12 +1299,14 @@
 
     private async Task LoadPendingInvitesAsync()
     {
-        _pendingInvitesList = await AuthService.GetPendingInvitesAsync();
+        var result = await AuthService.GetPendingInvitesAsync();
+        _pendingInvitesList = result.Success ? result.Data : [];
     }
 
     private async Task LoadPendingResetsAsync()
     {
-        _pendingResets = await AuthService.GetPendingResetRequestsAsync();
+        var result = await AuthService.GetPendingResetRequestsAsync();
+        _pendingResets = result.Success ? result.Data : [];
     }
 
     private async Task CopyResetLink(PasswordResetRequest req)
@@ -1515,14 +1517,14 @@
         var result = await AuthService.CreateInviteAsync(_inviteEmail.Trim());
         _creatingInvite = false;
 
-        if (!result.Success && result.Id is null)
+        if (!result.Success)
         {
-            _inviteError = result.Error;
+            _inviteError = result.Message;
             return;
         }
 
         var baseUri = NavManager.BaseUri.TrimEnd('/');
-        _inviteLink = $"{baseUri}/register?invite={result.Id}";
+        _inviteLink = $"{baseUri}/register?invite={result.Data}";
         _inviteEmail = "";
 
         await LoadPendingInvitesAsync();
@@ -1542,7 +1544,7 @@
         }
         else
         {
-            Toast.Error(result.Error ?? "Failed to cancel invite.");
+            Toast.Error(result.Message ?? "Failed to cancel invite.");
         }
     }
 
@@ -1614,7 +1616,7 @@
         }
         else
         {
-            Toast.Error(result.Error ?? "Failed to link person.");
+            Toast.Error(result.Message ?? "Failed to link person.");
         }
     }
 

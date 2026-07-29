@@ -419,14 +419,14 @@
             var result = await AuthService.CreateUnlinkedPersonAsync(
                 subjectFirst, subjectLast, _connectionPersonId.Value, _subjectRelationToken, UserId);
 
-            if (result.Success && result.PersonId.HasValue)
+            if (result.Success && result.Data != Guid.Empty)
             {
-                _subjectPersonId = result.PersonId;
+                _subjectPersonId = result.Data;
                 _stage = Stage.UserRelationToSubject;
             }
             else
             {
-                ToastService.Error(result.Error ?? $"Failed to add {StorySubjectName} to the tree.");
+                ToastService.Error(result.Message ?? $"Failed to add {StorySubjectName} to the tree.");
             }
         }
         catch (Exception ex)
@@ -454,11 +454,11 @@
                 await LinkPendingStoryAsync(_subjectPersonId.Value);
                 CompleteWithMessage($"Your profile has been created and linked to {StorySubjectName}!");
                 await Task.Delay(500);
-                SafeDialogClose(DialogResult.Ok(result.PersonId));
+                SafeDialogClose(DialogResult.Ok(result.Data));
             }
             else
             {
-                ToastService.Error(result.Error ?? "Failed to create profile.");
+                ToastService.Error(result.Message ?? "Failed to create profile.");
                 _loading = false;
             }
         }
@@ -503,7 +503,8 @@
 
         if (excludeAlreadyLinked && matches.Count > 0)
         {
-            var linkedIds = await AuthService.GetLinkedPersonIdsAsync(matches.Select(p => p.Id));
+            var linkedIdsResult = await AuthService.GetLinkedPersonIdsAsync(matches.Select(p => p.Id));
+            var linkedIds = linkedIdsResult.Success ? linkedIdsResult.Data : [];
             matches = matches.Where(p => !linkedIds.Contains(p.Id)).ToList();
         }
 
@@ -546,11 +547,11 @@
                         ? $"Your profile has been linked to {StorySubjectName}!"
                         : "You're linked to the tree! Continue to see your profile.");
                     await Task.Delay(500);
-                    SafeDialogClose(DialogResult.Ok(result.PersonId));
+                    SafeDialogClose(DialogResult.Ok(result.Data));
                 }
                 else
                 {
-                    ToastService.Error(result.Error ?? "Failed to link to tree.");
+                    ToastService.Error(result.Message ?? "Failed to link to tree.");
                     _loading = false;
                 }
             }
@@ -580,11 +581,11 @@
             {
                 CompleteWithMessage("You're linked to the tree! Continue to see your profile.");
                 await Task.Delay(500);
-                SafeDialogClose(DialogResult.Ok(result.PersonId));
+                SafeDialogClose(DialogResult.Ok(result.Data));
             }
             else
             {
-                ToastService.Error(result.Error ?? "Failed to link to tree.");
+                ToastService.Error(result.Message ?? "Failed to link to tree.");
                 _loading = false;
             }
         }
@@ -607,11 +608,11 @@
             {
                 CompleteWithMessage("Your profile has been created and linked to the tree!");
                 await Task.Delay(500);
-                SafeDialogClose(DialogResult.Ok(result.PersonId));
+                SafeDialogClose(DialogResult.Ok(result.Data));
             }
             else
             {
-                ToastService.Error(result.Error ?? "Failed to create profile.");
+                ToastService.Error(result.Message ?? "Failed to create profile.");
                 _loading = false;
             }
         }

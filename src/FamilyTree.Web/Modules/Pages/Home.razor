@@ -520,10 +520,10 @@ else
         {
             try
             {
-                var dbId = await AuthService.GetFocusPersonIdAsync(_currentUserId.Value);
-                if (dbId.HasValue)
+                var dbIdResult = await AuthService.GetFocusPersonIdAsync(_currentUserId.Value);
+                if (dbIdResult.Success && dbIdResult.Data.HasValue)
                 {
-                    var dbPerson = _people.FirstOrDefault(p => p.Id == dbId.Value);
+                    var dbPerson = _people.FirstOrDefault(p => p.Id == dbIdResult.Data.Value);
                     if (dbPerson != null) return dbPerson;
                 }
             }
