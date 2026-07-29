@@ -24,6 +24,9 @@ public class AppUserClaimsPrincipalFactory(
         if (user.IsSuperUser)
             identity.AddClaim(new Claim(ClaimTypes.Role, "SuperUser"));
 
+        if (user.IsAdmin)
+            identity.AddClaim(new Claim(ClaimTypes.Role, "Admin"));
+
         // Emit FamilyId claim for regular users; super users skip this so they see all data.
         if (!user.IsSuperUser)
         {

@@ -56,6 +56,7 @@ internal sealed class FakeCurrentUserService : ICurrentUserService
     public Guid?   FamilyId    { get; set; }
     public string? Email       { get; set; }
     public bool    IsSuperUser { get; set; }
+    public bool    IsAdmin     { get; set; }
 }
 
 internal sealed class FakeAuditLogService : IAuditLogService

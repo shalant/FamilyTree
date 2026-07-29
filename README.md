@@ -1,10 +1,29 @@
-# FamilyTree
+# ArborKin — Family Tree Application
 
 [![CI](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml/badge.svg)](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dot-net)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-### Test Status
+## About ArborKin
+
+**ArborKin** is a full-stack family tree application designed to help extended families reconnect and preserve their stories. Built with **Blazor Server**, **C# 13**, **EF Core**, and **SQL Server**, it provides an interactive canvas for visualizing genealogy, sharing family memories, and maintaining a permanent record of relationships across generations.
+
+The application prioritizes **privacy first** — families control their own data, invited members can contribute stories and photos, and an audit log ensures complete accountability. The architecture emphasizes **reliability through constraints**: comprehensive tests, strict type safety, and database integrity validation catch bugs before production deployment.
+
+Key technical highlights:
+- **Custom C# layout engine** computing all node positions server-side without DOM measurement
+- **Birth-year timeline Y-axis** for genealogical accuracy and visual continuity
+- **Multi-tenant isolation** — each family's data is completely separated; role-based authorization controls edit privileges
+- **Soft-delete recovery** — accidentally deleted family members can be restored; cascading soft-deletes preserve referential integrity
+- **Invite-first auth** — registration requires a valid family invite token; families control membership
+- **Azure deployment-ready** — App Service + SQL Database + Blob Storage; manual deploy gate prevents accidents
+
+Designed as both a genuine family tool (actively used by 5+ family members) and a portfolio piece demonstrating professional full-stack .NET development.
+
+---
+
+## Test Status
+
 | Metric | Status |
 |--------|--------|
 | **Core Tests** | 75/75 ✅ |
@@ -13,77 +32,100 @@
 | **Build (Debug + Release)** | ✅ |
 | **CI Pipeline** | ✅ [View Latest Run](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml) |
 
-A full-stack family tree application built with **Blazor Server (.NET 10)**, **EF Core**, **SQL Server**, and **MudBlazor** — featuring a custom C# layout engine, smooth pan/zoom canvas, multi-tenant family isolation, invite-only auth, and an admin panel with audit logging.
-
 ---
 
-## Why I Built This
+## Motivation
 
-This started as a way to reconnect — a private space where extended and estranged family members could rediscover each other's stories, not just names on a chart. It became a deliberate deep-dive as well: a chance to sharpen my relational database design (schema evolution, migrations, scoping, cascade behavior), practice real exploratory/manual testing discipline rather than leaning on automated coverage alone, and build something end-to-end I could point to as a genuine portfolio piece — not a tutorial clone.
+This project serves three intertwined goals: **practical**, **educational**, and **professional**.
+
+**Practically**, it's a real tool for a real family. Building software for people you know (rather than hypothetical users) forces you to prioritize genuine usability and reliability. Every feature shipped must work correctly the first time — there's no room for tutorial-code shortcuts.
+
+**Educationally**, it's a deliberate deep-dive into full-stack .NET development. Specifically: relational database design (schema evolution, migration sequencing, scoping strategies, cascade behavior), exploratory testing discipline (understanding when automated tests suffice and when manual testing catches things machines miss), and the architectural decisions that keep code maintainable as complexity grows.
+
+**Professionally**, it's an end-to-end portfolio piece: not a tutorial clone or toy project, but a production-ready application with comprehensive tests, security constraints, role-based access control, and actual deployment infrastructure. It demonstrates the ability to ship a complete system, not just write code that passes a code review.
 
 ---
 
 ## Screenshots
 
-### 1. Full Family Tree Canvas
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin: 2rem 0;">
 
-![FamilyTree Hero](Screenshots/Home.png)
+<div>
 
-Interactive canvas with SVG connectors, focus node highlight, and draggable hero overlay — light mode.
+### Tree Canvas (Light)
+
+<img src="Screenshots/Home.png" alt="FamilyTree Hero" style="width: 100%; max-width: 400px;">
+
+Interactive pan/zoom canvas with SVG connectors and draggable focus overlay.
+
+</div>
+
+<div>
+
+### Tree Canvas (Dark)
+
+<img src="Screenshots/Home_Dark.png" alt="FamilyTree Dark Mode" style="width: 100%; max-width: 400px;">
+
+Dark mode with glass-morphism surfaces and token-driven theme.
+
+</div>
+
+<div>
+
+### Person Detail Drawer
+
+<img src="Screenshots/PersonEditDrawer.png" alt="Person Detail Drawer" style="width: 100%; max-width: 400px;">
+
+Edit / delete actions while tree remains interactive behind the drawer.
+
+</div>
+
+<div>
+
+### Add/Edit Form
+
+<img src="Screenshots/PersonAdd.png" alt="Add Person Form" style="width: 100%; max-width: 400px;">
+
+Shared form for create/update with date validation and photo uploads.
+
+</div>
+
+<div>
+
+### Dashboard
+
+<img src="Screenshots/Dashboard.png" alt="Dashboard" style="width: 100%; max-width: 400px;">
+
+Stats, quick actions, activity feed, export options.
+
+</div>
+
+<div>
+
+### Admin Panel
+
+<img src="Screenshots/Admin.png" alt="Admin Panel" style="width: 100%; max-width: 400px;">
+
+Invite management, user roles, linked-person assignment, audit log.
+
+</div>
+
+</div>
 
 ---
 
-### 2. Dark Mode Tree
+## What's Shipped
 
-![FamilyTree Dark Mode](Screenshots/Home_Dark.png)
-
-Dark mode variant showing the token-driven theme system and glass surfaces.
-
----
-
-### 3. Person Detail Drawer
-
-![Person Detail Drawer](Screenshots/PersonEditDrawer.png)
-
-Side drawer with edit / delete / focus-person actions while the live tree remains visible behind it.
-
----
-
-### 4. Add Person Form
-
-![Add Person Form](Screenshots/PersonAdd.png)
-
-Shared form component used for both add and edit; includes date validation, photo upload, and relationship selectors.
-
----
-
-### 5. Import Family Data
-
-![Import Family Data](Screenshots/Import_Dark.png)
-
-GEDCOM / PDF / CSV / paste-text import wizard in dark mode; previews all relationships before committing.
-
----
-
-### 6. Dashboard
-
-![Dashboard](Screenshots/Dashboard.png)
-
-"Your Family Tree" hub — stats, quick actions, recently added members, export options, and community links.
-
----
-
-### 7. Admin Panel
-
-![Admin Panel](Screenshots/Admin.png)
-
-Admin panel: invite management, user roles, linked-person assignment, and audit tabs.
-
----
-
-## Development Time
-
-Built from initial concept to a fully interactive, themed, multi-tenant application in a compressed timeline. Features delivered include a custom layout engine, auth stack, admin panel, media uploads, CI/CD pipeline, and a test suite — demonstrating end-to-end full-stack delivery speed.
+- **Custom layout engine** — All tree node positions computed in C# before rendering; Y-axis is a real genealogical timeline
+- **Interactive canvas** — Pan, zoom, focus individual persons; draggable toolbar and info overlays persist to browser storage  
+- **Multi-tenant auth** — Invite-only registration, role-based access control (Admin vs. Member), Google OAuth optional
+- **Family data isolation** — Each family's data completely separated; admins control who can edit/delete
+- **Story curation** — Family members can submit memories; admins moderate before public visibility
+- **Media uploads** — Photos stored in Azure Blob Storage; web-optimized thumbnails
+- **Audit trail** — Every create/update/delete logged with timestamp, user, and change summary
+- **Admin dashboard** — Stats, activity feeds, user management, soft-deleted person recovery
+- **CI/CD pipeline** — Automated tests on every push; manual deploy gate to production
+- **Comprehensive tests** — 116 passing tests covering core services, layout engine, auth, and data integrity
 
 ---
 

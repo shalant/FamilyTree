@@ -31,4 +31,7 @@ public class CurrentUserService(IHttpContextAccessor httpContextAccessor) : ICur
 
     public bool IsSuperUser =>
         httpContextAccessor.HttpContext?.User.IsInRole("SuperUser") ?? false;
+
+    public bool IsAdmin =>
+        httpContextAccessor.HttpContext?.User.IsInRole("Admin") ?? false;
 }
