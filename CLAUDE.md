@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Development Workflow
+
+**All feature changes must occur on a branch**, not on `master`. Create a feature branch, make your changes, commit, and then open a PR for code review before merging to `master`. This ensures:
+- Code review happens before production changes
+- CI checks pass on every PR
+- Clear git history with meaningful commit messages
+- Ability to revert if issues arise
+
 ## Build & Run Commands
 
 ```bash
