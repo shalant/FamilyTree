@@ -27,10 +27,11 @@ Designed as both a genuine family tool (actively used by 5+ family members) and 
 | Metric | Status |
 |--------|--------|
 | **Core Tests** | 75/75 ✅ |
-| **Web Tests** | 41/45 ✅ (4 skipped) |
-| **Total** | 116 passing |
+| **Web Tests** | 49/53 ✅ (4 skipped) |
+| **Total** | 124 passing |
 | **Build (Debug + Release)** | ✅ |
 | **CI Pipeline** | ✅ [View Latest Run](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml) |
+| **Branch Protection** | ✅ Master requires PR + passing CI |
 
 ---
 
@@ -118,14 +119,27 @@ Invite management, user roles, linked-person assignment, audit log.
 
 - **Custom layout engine** — All tree node positions computed in C# before rendering; Y-axis is a real genealogical timeline
 - **Interactive canvas** — Pan, zoom, focus individual persons; draggable toolbar and info overlays persist to browser storage  
-- **Multi-tenant auth** — Invite-only registration, role-based access control (Admin vs. Member), Google OAuth optional
-- **Family data isolation** — Each family's data completely separated; admins control who can edit/delete
+- **Role-based access control** — Invite-only registration, Admin vs. Member distinction, Google OAuth optional
+- **Semantic duplicate detection** — Fuzzy name matching (Levenshtein distance, 80% threshold) catches typos and variations when linking new people
+- **Family data isolation** — Each family's data completely separated; admins control who can edit/delete; multi-tenant scoping enforced at service layer
 - **Story curation** — Family members can submit memories; admins moderate before public visibility
 - **Media uploads** — Photos stored in Azure Blob Storage; web-optimized thumbnails
 - **Audit trail** — Every create/update/delete logged with timestamp, user, and change summary
 - **Admin dashboard** — Stats, activity feeds, user management, soft-deleted person recovery
-- **CI/CD pipeline** — Automated tests on every push; manual deploy gate to production
-- **Comprehensive tests** — 116 passing tests covering core services, layout engine, auth, and data integrity
+- **CI/CD pipeline** — Automated tests on every push; branch protection requires PR + CI pass; manual deploy gate to production
+- **Comprehensive tests** — 124 passing tests (75 Core + 49 Web) covering services, layout engine, auth, duplicate detection, and data integrity
+- **Technical blog** — Deep-dive articles on RBAC, fuzzy matching, multi-tenant architecture, layout engine, and testing discipline in `docs/blogs/`
+
+---
+
+## Learn More
+
+**Technical Blog** — Deep-dive articles on architectural decisions and lessons learned:
+- [Role-Based Access Control Implementation](docs/blogs/01-rbac-implementation.md)
+- [Fuzzy Name Matching with Levenshtein Distance](docs/blogs/02-fuzzy-name-matching.md)
+- [Multi-Tenant Architecture for Family Trees](docs/blogs/03-multi-tenant-architecture.md)
+- [Tree Layout Engine: Computing Positions in C#](docs/blogs/04-tree-layout-engine.md)
+- [Testing Discipline: Constraints Over Code Review](docs/blogs/05-testing-discipline.md)
 
 ---
 
