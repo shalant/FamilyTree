@@ -6,6 +6,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace FamilyTree.Core.Tests;
@@ -29,7 +30,8 @@ public class AuthServiceTreeLinkingTests
                 ["Auth:InviteTtlDays"] = "7",
             })
             .Build();
-        var service = new AuthService(userManager, config, factory, new FakeEmailSender());
+        var logger = new NullLogger<AuthService>();
+        var service = new AuthService(userManager, config, factory, new FakeEmailSender(), logger);
         return (service, factory, userManager);
     }
 
@@ -53,9 +55,9 @@ public class AuthServiceTreeLinkingTests
         var result = await service.RegisterAsync("Alice", "Smith", "alice@example.com", ValidPassword);
 
         result.Success.Should().BeTrue();
-        result.UserId.Should().NotBeNull();
+        result.Data.Should().NotBe(Guid.Empty);
         await using var ctx = factory.CreateDbContext();
-        var uf = ctx.UserFamilies.Single(u => u.UserId == result.UserId);
+        var uf = ctx.UserFamilies.Single(u => u.UserId == result.Data);
         uf.Role.Should().Be("Member");
         uf.FamilyId.Should().NotBeEmpty();
     }
@@ -108,7 +110,7 @@ public class AuthServiceTreeLinkingTests
 
         result.Success.Should().BeTrue();
         await using var checkCtx = factory.CreateDbContext();
-        var uf = checkCtx.UserFamilies.Single(u => u.UserId == result.UserId);
+        var uf = checkCtx.UserFamilies.Single(u => u.UserId == result.Data);
         uf.FamilyId.Should().Be(inviteFamilyId, "a registration via invite should join the invite's family, not the default one");
         var invite2 = checkCtx.UserInvites.Single(i => i.Id == inviteId);
         invite2.AcceptedAt.Should().NotBeNull();
@@ -166,7 +168,8 @@ public class AuthServiceTreeLinkingTests
         var (service, _, userManager) = CreateSut();
         await CreateExistingUserAsync(userManager, "ellen@example.com");
 
-        (await service.UserExistsAsync("ellen@example.com")).Should().BeTrue();
+        var exists = await service.UserExistsAsync("ellen@example.com");
+        exists.Data.Should().BeTrue();
     }
 
     [Fact]
@@ -174,7 +177,8 @@ public class AuthServiceTreeLinkingTests
     {
         var (service, _, _) = CreateSut();
 
-        (await service.UserExistsAsync("nobody@example.com")).Should().BeFalse();
+        var exists = await service.UserExistsAsync("nobody@example.com");
+        exists.Data.Should().BeFalse();
     }
 
     // ── EnsureUserFamilyAsync ────────────────────────────────────────────────
@@ -223,7 +227,7 @@ public class AuthServiceTreeLinkingTests
         var result = await service.LinkUserToTreeAsync(user.Id, personId, null, null);
 
         result.Success.Should().BeTrue();
-        result.PersonId.Should().Be(personId);
+        result.Data.Should().Be(personId);
         var reloaded = await userManager.FindByIdAsync(user.Id.ToString());
         reloaded!.PersonId.Should().Be(personId);
     }
@@ -253,7 +257,7 @@ public class AuthServiceTreeLinkingTests
         var result = await service.LinkUserToTreeAsync(secondUser.Id, personId, null, null);
 
         result.Success.Should().BeFalse();
-        result.Error.Should().Contain("already linked");
+        result.Message.Should().Contain("already linked");
         var reloadedSecond = await userManager.FindByIdAsync(secondUser.Id.ToString());
         reloadedSecond!.PersonId.Should().BeNull("the second user must not end up half-linked after a failed claim");
     }
@@ -331,9 +335,9 @@ public class AuthServiceTreeLinkingTests
             user.Id, null, "Willa", "Kuh", connectedPersonId: billId, relationshipType: "ChildOfConnected");
 
         result.Success.Should().BeTrue();
-        result.PersonId.Should().NotBeNull();
+        result.Data.Should().NotBe(Guid.Empty);
         await using var checkCtx = factory.CreateDbContext();
-        var willa = checkCtx.People.Single(p => p.Id == result.PersonId);
+        var willa = checkCtx.People.Single(p => p.Id == result.Data);
         willa.FamilyId.Should().Be(familyId, "a newly created person should inherit the connected person's family");
 
         var rel = checkCtx.Relationships.Single();
@@ -366,7 +370,7 @@ public class AuthServiceTreeLinkingTests
         await using var checkCtx = factory.CreateDbContext();
         var rel = checkCtx.Relationships.Single();
         rel.Type.Should().Be(RelationshipType.Parent);
-        rel.PersonAId.Should().Be(result.PersonId!.Value, "'ParentOfConnected' means the newly-linked subject is the parent, PersonAId");
+        rel.PersonAId.Should().Be(result.Data!.Value, "'ParentOfConnected' means the newly-linked subject is the parent, PersonAId");
         rel.PersonBId.Should().Be(childId);
     }
 
@@ -450,7 +454,7 @@ public class AuthServiceTreeLinkingTests
 
         result.Success.Should().BeTrue();
         await using var checkCtx = factory.CreateDbContext();
-        var bill = checkCtx.People.Single(p => p.Id == result.PersonId);
+        var bill = checkCtx.People.Single(p => p.Id == result.Data);
         bill.FamilyId.Should().Be(familyId);
         bill.CreatedBy.Should().Be(createdBy);
 

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using FamilyTree.Core.Data;
 using FamilyTree.Core.Services;
 using FamilyTree.Core.Models;
+using FamilyTree.Shared;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -78,32 +79,48 @@ internal sealed class FakeEmailSender : IEmailSender
 internal sealed class FakeAuthService : IAuthService
 {
     public bool UserExistsResult { get; set; }
-    public InviteResult CreateInviteResult { get; set; } = new(true, Id: Guid.NewGuid());
+    public Guid CreateInviteResultId { get; set; } = Guid.NewGuid();
     public int CreateInviteCallCount { get; private set; }
 
-    public Task<bool> UserExistsAsync(string email) => Task.FromResult(UserExistsResult);
+    public Task<ServiceResponse<bool>> UserExistsAsync(string email) => Task.FromResult(ServiceResponse<bool>.Ok(UserExistsResult));
 
-    public Task<InviteResult> CreateInviteAsync(string email)
+    public Task<ServiceResponse<Guid>> CreateInviteAsync(string email)
     {
         CreateInviteCallCount++;
-        return Task.FromResult(CreateInviteResult);
+        return Task.FromResult(ServiceResponse<Guid>.Ok(CreateInviteResultId));
     }
 
-    public Task<AuthResult> RegisterAsync(string firstName, string lastName, string email, string password, Guid? inviteId = null) => throw new NotImplementedException();
-    public Task<AuthResult> LinkPersonAsync(Guid userId, Guid? personId) => throw new NotImplementedException();
-    public Task EnsureUserFamilyAsync(Guid userId) => throw new NotImplementedException();
-    public Task<List<UserInvite>> GetPendingInvitesAsync() => throw new NotImplementedException();
-    public Task<AuthResult> CancelInviteAsync(Guid inviteId) => throw new NotImplementedException();
-    public Task<UserInvite?> ValidateInviteAsync(Guid inviteId) => throw new NotImplementedException();
-    public string GetRegistrationMode() => throw new NotImplementedException();
-    public Task SaveFocusPersonAsync(Guid userId, Guid? personId) => throw new NotImplementedException();
-    public Task<Guid?> GetFocusPersonIdAsync(Guid userId) => throw new NotImplementedException();
-    public Task<AuthResult> RequestPasswordResetAsync(string email, string? baseUrl = null) => throw new NotImplementedException();
-    public Task<bool> IsResetRequestValidAsync(Guid requestId) => throw new NotImplementedException();
-    public Task<AuthResult> ResetPasswordAsync(Guid requestId, string newPassword) => throw new NotImplementedException();
-    public Task<List<PasswordResetRequest>> GetPendingResetRequestsAsync() => throw new NotImplementedException();
-    public Task DismissResetRequestAsync(Guid id) => throw new NotImplementedException();
-    public Task<AuthResult> LinkUserToTreeAsync(Guid userId, Guid? personId, string? firstName, string? lastName, Guid? connectedPersonId = null, string? relationshipType = null) => throw new NotImplementedException();
-    public Task<AuthResult> CreateUnlinkedPersonAsync(string? firstName, string? lastName, Guid connectedPersonId, string relationshipType, Guid createdByUserId) => throw new NotImplementedException();
-    public Task<HashSet<Guid>> GetLinkedPersonIdsAsync(IEnumerable<Guid> personIds) => throw new NotImplementedException();
+    public Task<ServiceResponse<Guid>> RegisterAsync(string firstName, string lastName, string email, string password, Guid? inviteId = null)
+        => Task.FromResult(ServiceResponse<Guid>.Fail("Not implemented in test mock"));
+    public Task<ServiceResponse> LinkPersonAsync(Guid userId, Guid? personId)
+        => Task.FromResult(ServiceResponse.Fail("Not implemented in test mock"));
+    public Task<ServiceResponse> EnsureUserFamilyAsync(Guid userId)
+        => Task.FromResult(ServiceResponse.Ok());
+    public Task<ServiceResponse<List<UserInvite>>> GetPendingInvitesAsync()
+        => Task.FromResult(ServiceResponse<List<UserInvite>>.Ok([]));
+    public Task<ServiceResponse> CancelInviteAsync(Guid inviteId)
+        => Task.FromResult(ServiceResponse.Fail("Not implemented in test mock"));
+    public Task<ServiceResponse<UserInvite?>> ValidateInviteAsync(Guid inviteId)
+        => Task.FromResult(ServiceResponse<UserInvite?>.Ok(null));
+    public string GetRegistrationMode() => "Open";
+    public Task<ServiceResponse> SaveFocusPersonAsync(Guid userId, Guid? personId)
+        => Task.FromResult(ServiceResponse.Ok());
+    public Task<ServiceResponse<Guid?>> GetFocusPersonIdAsync(Guid userId)
+        => Task.FromResult(ServiceResponse<Guid?>.Ok(null));
+    public Task<ServiceResponse> RequestPasswordResetAsync(string email, string? baseUrl = null)
+        => Task.FromResult(ServiceResponse.Fail("Not implemented in test mock"));
+    public Task<ServiceResponse<bool>> IsResetRequestValidAsync(Guid requestId)
+        => Task.FromResult(ServiceResponse<bool>.Ok(false));
+    public Task<ServiceResponse> ResetPasswordAsync(Guid requestId, string newPassword)
+        => Task.FromResult(ServiceResponse.Fail("Not implemented in test mock"));
+    public Task<ServiceResponse<List<PasswordResetRequest>>> GetPendingResetRequestsAsync()
+        => Task.FromResult(ServiceResponse<List<PasswordResetRequest>>.Ok([]));
+    public Task<ServiceResponse> DismissResetRequestAsync(Guid id)
+        => Task.FromResult(ServiceResponse.Ok());
+    public Task<ServiceResponse<Guid?>> LinkUserToTreeAsync(Guid userId, Guid? personId, string? firstName, string? lastName, Guid? connectedPersonId = null, string? relationshipType = null)
+        => Task.FromResult(ServiceResponse<Guid?>.Fail("Not implemented in test mock"));
+    public Task<ServiceResponse<Guid>> CreateUnlinkedPersonAsync(string? firstName, string? lastName, Guid connectedPersonId, string relationshipType, Guid createdByUserId)
+        => Task.FromResult(ServiceResponse<Guid>.Fail("Not implemented in test mock"));
+    public Task<ServiceResponse<HashSet<Guid>>> GetLinkedPersonIdsAsync(IEnumerable<Guid> personIds)
+        => Task.FromResult(ServiceResponse<HashSet<Guid>>.Ok([]));
 }

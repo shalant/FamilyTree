@@ -247,7 +247,8 @@
         if (InviteId.HasValue)
         {
             _inviteId = InviteId;
-            _invite = await AuthService.ValidateInviteAsync(InviteId.Value);
+            var inviteResult = await AuthService.ValidateInviteAsync(InviteId.Value);
+            _invite = inviteResult.Success ? inviteResult.Data : null;
             if (_invite != null)
             {
                 _email = _invite.Email;
@@ -318,11 +319,11 @@
 
         if (!result.Success)
         {
-            _error = result.Error;
+            _error = result.Message;
         }
         else
         {
-            _registeredUserId = result.UserId;
+            _registeredUserId = result.Data;
             _registered = true;
             ToastService.Success("Account created — let's link you to your tree!");
         }
