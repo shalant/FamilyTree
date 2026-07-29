@@ -68,6 +68,8 @@ SQL Server (local) / Azure SQL Database (prod)
 
 **CI/CD:** Two separate workflows. `ci.yml` runs build + test automatically on every push/PR to `master`/`main`. `deploy-web.yml` is **manual only** (`workflow_dispatch`) — merging to `master` never deploys by itself; deploying to Azure App Service is a deliberate, separate trigger. The deploy workflow requires `AZURE_WEB_APP_NAME` and `AZURE_WEB_PUBLISH_PROFILE`/`AZURE_CREDENTIALS` secrets in the GitHub repo, and pushes straight to the live App Service (no deployment slot/swap, no health gate). EF migrations run automatically on every Web startup (dev and prod alike) via `ctx.Database.MigrateAsync()` in `Program.cs`, wrapped in try/catch: a failed migration logs `LogCritical`, best-effort emails `Ops:AlertEmail` (falls back to `SuperUser:Email`) with the exception via `IEmailSender`, then rethrows — the app deliberately fails to start rather than serve requests against a schema the code doesn't match.
 
+**Monitoring:** Azure Monitor alerts track app health via metric alerts (availability, HTTP 5xx errors, response time). Three alerts configured: availability < 95% (5 min window), any HTTP 5xx (1 min window), response time > 5 sec (5 min window). All alerts email the ops address (default: doug.rosenberg@gmail.com) via an Action Group. Setup script at `scripts/setup-azure-monitoring.sh`; see `docs/MONITORING.md` for details. Cost: free (included in App Service pricing). Complements in-app migration-failure emails and audit logging.
+
 ## Key Architectural Decisions
 
 ### JS-Free Tree Layout (ADR 001)
