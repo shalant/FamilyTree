@@ -1,15 +1,16 @@
 using FamilyTree.Core.Models;
+using FamilyTree.Shared;
 
 namespace FamilyTree.Core.Services;
 
 public interface IAuthService
 {
-    Task<AuthResult> RegisterAsync(string firstName, string lastName, string email, string password, Guid? inviteId = null);
-    Task<AuthResult> LinkPersonAsync(Guid userId, Guid? personId);
+    Task<ServiceResponse<Guid>> RegisterAsync(string firstName, string lastName, string email, string password, Guid? inviteId = null);
+    Task<ServiceResponse> LinkPersonAsync(Guid userId, Guid? personId);
 
     /// <summary>Does an account already exist for this email? Used to decide whether
     /// a story-invite respondent should be offered "sign in" vs. "create account."</summary>
-    Task<bool> UserExistsAsync(string email);
+    Task<ServiceResponse<bool>> UserExistsAsync(string email);
 
     /// <summary>
     /// Ensures a user has a UserFamily row, defaulting to the single family this
@@ -17,24 +18,24 @@ public interface IAuthService
     /// one. No-op if the user is already assigned. Used for registration paths that
     /// don't go through RegisterAsync (e.g. the Google OAuth new-account branch).
     /// </summary>
-    Task EnsureUserFamilyAsync(Guid userId);
+    Task<ServiceResponse> EnsureUserFamilyAsync(Guid userId);
 
-    Task<InviteResult>                  CreateInviteAsync(string email);
-    Task<List<UserInvite>>              GetPendingInvitesAsync();
-    Task<AuthResult>                    CancelInviteAsync(Guid inviteId);
-    Task<UserInvite?>                   ValidateInviteAsync(Guid inviteId);
-    string                              GetRegistrationMode();
+    Task<ServiceResponse<Guid>>                  CreateInviteAsync(string email);
+    Task<ServiceResponse<List<UserInvite>>>      GetPendingInvitesAsync();
+    Task<ServiceResponse>                        CancelInviteAsync(Guid inviteId);
+    Task<ServiceResponse<UserInvite?>>           ValidateInviteAsync(Guid inviteId);
+    string                                       GetRegistrationMode();
 
-    Task                                SaveFocusPersonAsync(Guid userId, Guid? personId);
-    Task<Guid?>                         GetFocusPersonIdAsync(Guid userId);
+    Task<ServiceResponse>                        SaveFocusPersonAsync(Guid userId, Guid? personId);
+    Task<ServiceResponse<Guid?>>                 GetFocusPersonIdAsync(Guid userId);
 
-    Task<AuthResult>                    RequestPasswordResetAsync(string email, string? baseUrl = null);
-    Task<bool>                          IsResetRequestValidAsync(Guid requestId);
-    Task<AuthResult>                    ResetPasswordAsync(Guid requestId, string newPassword);
-    Task<List<PasswordResetRequest>>    GetPendingResetRequestsAsync();
-    Task                                DismissResetRequestAsync(Guid id);
+    Task<ServiceResponse>                        RequestPasswordResetAsync(string email, string? baseUrl = null);
+    Task<ServiceResponse<bool>>                  IsResetRequestValidAsync(Guid requestId);
+    Task<ServiceResponse>                        ResetPasswordAsync(Guid requestId, string newPassword);
+    Task<ServiceResponse<List<PasswordResetRequest>>>    GetPendingResetRequestsAsync();
+    Task<ServiceResponse>                        DismissResetRequestAsync(Guid id);
 
-    Task<AuthResult>                    LinkUserToTreeAsync(
+    Task<ServiceResponse<Guid?>>                 LinkUserToTreeAsync(
         Guid userId,
         Guid? personId,
         string? firstName,
@@ -47,7 +48,7 @@ public interface IAuthService
     /// member via a relationship — used to add a story subject (e.g. "Bill") to the tree
     /// before the inviting user (e.g. "Willa") links herself to him.
     /// </summary>
-    Task<AuthResult>                    CreateUnlinkedPersonAsync(
+    Task<ServiceResponse<Guid>>                  CreateUnlinkedPersonAsync(
         string? firstName,
         string? lastName,
         Guid connectedPersonId,
@@ -60,8 +61,5 @@ public interface IAuthService
     /// who could actually be claimed (LinkUserToTreeAsync would otherwise reject an
     /// already-claimed person via IX_AspNetUsers_PersonId).
     /// </summary>
-    Task<HashSet<Guid>>                 GetLinkedPersonIdsAsync(IEnumerable<Guid> personIds);
+    Task<ServiceResponse<HashSet<Guid>>>        GetLinkedPersonIdsAsync(IEnumerable<Guid> personIds);
 }
-
-public record AuthResult(bool Success, string? Error = null, Guid? UserId = null, Guid? PersonId = null);
-public record InviteResult(bool Success, string? Error = null, Guid? Id = null);

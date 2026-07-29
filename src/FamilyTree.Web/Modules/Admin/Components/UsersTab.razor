@@ -360,7 +360,7 @@ else
         }
         else
         {
-            ToastService.Error(result.Error ?? "Failed to link person.");
+            ToastService.Error(result.Message ?? "Failed to link person.");
         }
     }
 
@@ -373,14 +373,14 @@ else
         var result = await AuthService.CreateInviteAsync(_inviteEmail.Trim());
         _creatingInvite = false;
 
-        if (!result.Success && result.Id is null)
+        if (!result.Success)
         {
-            _inviteError = result.Error;
+            _inviteError = result.Message;
             return;
         }
 
         var baseUri = NavigationManager.BaseUri.TrimEnd('/');
-        _inviteLink = $"{baseUri}/register?invite={result.Id}";
+        _inviteLink = $"{baseUri}/register?invite={result.Data}";
         _inviteEmail = "";
 
         await LoadPendingInvitesAsync();
@@ -398,7 +398,7 @@ else
         }
         else
         {
-            ToastService.Error(result.Error ?? "Failed to cancel invite.");
+            ToastService.Error(result.Message ?? "Failed to cancel invite.");
         }
     }
 
