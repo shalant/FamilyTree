@@ -146,35 +146,45 @@ Make sure your current IP is allowed in the SQL Server firewall (Portal → SQL 
 
 ---
 
-## Custom domain (arborkin.com) — on hold
+## Custom domain (arborkin.com) — LIVE ✅
 
-> **Status: hold** — waiting on user-testing feedback and a security review before going public.
+> **Status: live** — deployed 2026-07-29. App accessible at `https://arborkin.com`.
 
-The app runs on Azure App Service. Pointing `arborkin.com` at it requires no code changes and no migration — Azure simply answers to both the custom domain and the existing `azurewebsites.net` URL.
+The app runs on Azure App Service, custom domain bound to `arborkin.com`. Both the custom domain and the existing `azurewebsites.net` URL remain accessible; family members should use `arborkin.com`.
 
-**When ready, the steps are:**
+**What was done:**
 
-1. **Azure Portal → App Service → Custom domains → Add custom domain**
-   - Add `arborkin.com` and `www.arborkin.com`
-   - Copy the TXT verification record and A record / CNAME value Azure provides
+1. **Upgraded App Service tier** — Free (F1) → Basic B1 ($13/mo) to enable custom domain support and managed SSL certificates
 
-2. **At your domain registrar**
-   - Add the TXT record (domain ownership verification)
-   - Add an A record pointing `arborkin.com` to Azure's outbound IP, or a CNAME for `www`
-   - DNS propagation: minutes to a few hours
+2. **Added custom domain in Azure**
+   - Azure Portal → App Service → Custom domains → Add custom domain
+   - Selected `arborkin.com`
+   - Azure generated CNAME record
 
-3. **Back in Azure → Custom domains → Add binding**
-   - Select "App Service Managed Certificate" — free on B1, auto-renews
-   - Azure provisions TLS for `arborkin.com` automatically
+3. **Updated DNS at GoDaddy**
+   - Added CNAME record: `arborkin` → `arborkin-erbufqfkhzcka4cb.centralus-01.azurewebsites.net`
+   - DNS propagated within 30 minutes
 
-4. **Verify HTTPS Only is on** — Configuration → TLS/SSL settings → HTTPS Only: On (already the default)
+4. **Configured AllowedHosts in appsettings.json**
+   - Updated `"AllowedHosts"` to semicolon-separated list: `arborkin-erbufqfkhzcka4cb.centralus-01.azurewebsites.net;arborkin.com;www.arborkin.com`
+   - Deployed to Azure via `deploy-web.yml` workflow
 
-**Security items to review before going live on the custom domain:**
-- ✓ `Auth__RegistrationMode = InviteOnly` — confirmed 2026-06-11
-- ✓ `DevAuth__Enabled = false` — confirmed 2026-06-11
-- Review CORS / referrer policy headers
-- Consider adding a `Content-Security-Policy` header via App Service response headers
-- Decide whether `azurewebsites.net` URL should remain accessible or be blocked
+5. **Verified SSL & HTTPS**
+   - Azure auto-provisioned Let's Encrypt certificate via App Service Managed Certificates
+   - HTTPS Only already enabled
+   - Custom domain status shows "Secured" in Azure Portal
+
+**Security verified:**
+- ✓ `Auth__RegistrationMode = InviteOnly` — production setting, confirmed 2026-07-29
+- ✓ `DevAuth__Enabled = false` — production setting, confirmed 2026-07-29
+- ✓ CSP header configured via middleware in `Program.cs`
+- ✓ Response headers (X-Frame-Options, X-Content-Type-Options, etc.) set in middleware
+- ✓ Both custom domain and `azurewebsites.net` URL accessible (backward compatibility for monitoring/alerts)
+
+**What's next:**
+- [ ] Update Azure Monitor alert URLs to ping `arborkin.com` instead of `azurewebsites.net`
+- [ ] Consider redirecting `www.arborkin.com` → `arborkin.com` (currently both work, no preference yet)
+- [ ] Document for future maintainers: custom domain setup checklist in this guide
 
 ---
 
