@@ -10,6 +10,7 @@ public class AppUser : IdentityUser<Guid>
     public Guid? PersonId { get; set; }
     public PersonClaimStatus PersonClaimStatus { get; set; } = PersonClaimStatus.None;
     public bool IsSuperUser { get; set; }
+    public bool IsAdmin { get; set; }
     public string? FeatureFlags { get; set; } // JSON: canEdit, isLocked, dailyCrudCap, isDonor
     public DateTime? CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }

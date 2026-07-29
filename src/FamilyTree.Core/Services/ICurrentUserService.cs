@@ -14,4 +14,10 @@ public interface ICurrentUserService
     /// would let them see every family's data instead of none.
     /// </summary>
     bool    IsSuperUser { get; }
+
+    /// <summary>
+    /// True for an admin-role user (the "Admin" role claim). Admins can edit and delete
+    /// other family members' persons and relationships, but are scoped to their family.
+    /// </summary>
+    bool    IsAdmin { get; }
 }

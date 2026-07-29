@@ -264,6 +264,10 @@ public class PersonService(
             if (person is null)
                 return ServiceResponse<PersonDto>.Fail($"Person {id} not found.");
 
+            // Only super-users and admins can update people.
+            if (!currentUser.IsSuperUser && !currentUser.IsAdmin)
+                return ServiceResponse<PersonDto>.Fail("You do not have permission to update this person.");
+
             var dateError = ValidatePersonDates(dto);
             if (dateError != null) return ServiceResponse<PersonDto>.Fail(dateError);
 
@@ -320,6 +324,10 @@ public class PersonService(
     {
         try
         {
+            // Only super-users and admins can delete people.
+            if (!currentUser.IsSuperUser && !currentUser.IsAdmin)
+                return ServiceResponse.Fail("You do not have permission to delete this person.");
+
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var person = await ctx.People

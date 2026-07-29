@@ -164,6 +164,10 @@ public class RelationshipService(
     {
         try
         {
+            // Only super-users and admins can update relationships.
+            if (!currentUser.IsSuperUser && !currentUser.IsAdmin)
+                return ServiceResponse<RelationshipDto>.Fail("You do not have permission to update this relationship.");
+
             var dtoValidation = ValidationHelper.ValidateDtoNonGeneric(request);
             if (!dtoValidation.Success)
                 return ServiceResponse<RelationshipDto>.Fail(dtoValidation.Message);
@@ -236,6 +240,10 @@ public class RelationshipService(
     {
         try
         {
+            // Only super-users and admins can delete relationships.
+            if (!currentUser.IsSuperUser && !currentUser.IsAdmin)
+                return ServiceResponse.Fail("You do not have permission to delete this relationship.");
+
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var relationship = await ctx.Relationships

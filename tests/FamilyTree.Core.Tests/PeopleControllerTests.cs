@@ -12,10 +12,10 @@ namespace FamilyTree.Core.Tests;
 public class PersonServiceTests
 {
     private static (PersonService service, TestDbContextFactory factory, FakeCurrentUserService fakeUser)
-        CreateSut(Guid? userId = null, Guid? familyId = null)
+        CreateSut(Guid? userId = null, Guid? familyId = null, bool isAdmin = true)
     {
         var factory = new TestDbContextFactory();
-        var fakeUser = new FakeCurrentUserService { UserId = userId, FamilyId = familyId };
+        var fakeUser = new FakeCurrentUserService { UserId = userId, FamilyId = familyId, IsAdmin = isAdmin };
         var service = new PersonService(
             factory,
             NullLogger<PersonService>.Instance,

@@ -97,10 +97,10 @@ public class RelationshipServiceTests
 public class RelationshipServiceFamilyScopingTests
 {
     private static (RelationshipService service, TestDbContextFactory factory, FakeCurrentUserService fakeUser)
-        CreateSut(bool isSuperUser = false, Guid? familyId = null)
+        CreateSut(bool isSuperUser = false, Guid? familyId = null, bool isAdmin = true)
     {
         var factory = new TestDbContextFactory();
-        var fakeUser = new FakeCurrentUserService { IsSuperUser = isSuperUser, FamilyId = familyId };
+        var fakeUser = new FakeCurrentUserService { IsSuperUser = isSuperUser, FamilyId = familyId, IsAdmin = isAdmin };
         var service = new RelationshipService(
             factory,
             NullLogger<RelationshipService>.Instance,
@@ -211,7 +211,7 @@ public class RelationshipServiceFamilyScopingTests
 
         var regularUserService = new RelationshipService(
             factory, NullLogger<RelationshipService>.Instance, new FakeAuditLogService(),
-            new FakeCurrentUserService { FamilyId = Guid.NewGuid() });
+            new FakeCurrentUserService { FamilyId = Guid.NewGuid(), IsAdmin = true });
 
         var result = await regularUserService.DeleteAsync(created.Data!.Id);
 
@@ -266,7 +266,7 @@ public class RelationshipServiceFamilyScopingTests
 
         var regularUserService = new RelationshipService(
             factory, NullLogger<RelationshipService>.Instance, new FakeAuditLogService(),
-            new FakeCurrentUserService { FamilyId = Guid.NewGuid() });
+            new FakeCurrentUserService { FamilyId = Guid.NewGuid(), IsAdmin = true });
 
         var result = await regularUserService.UpdateAsync(created.Data!.Id, new RelationshipUpsertDto
         {
