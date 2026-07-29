@@ -10,6 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Clear git history with meaningful commit messages
 - Ability to revert if issues arise
 
+**Documentation updates (TodoList.md, CLAUDE.md, doc comments) must be included in the PR**, not committed separately to master after merge. This keeps docs in sync with code changes and creates a complete record of what was modified together.
+
 ## Build & Run Commands
 
 ```bash
