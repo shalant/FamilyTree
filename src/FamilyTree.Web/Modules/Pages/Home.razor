@@ -156,6 +156,8 @@ else
                           DragLeft="_heroPos?.Left"
                           DragTop="_heroPos?.Top"
                           OnPositionReset="() => _heroPos = null" />
+
+    <MobileControlPanel />
 }
 
 <PersonDetailDrawer Person="_detailPerson"
@@ -208,6 +210,9 @@ else
     protected override async Task OnInitializedAsync()
     {
         TreeContext.OnCenterTreeRequested += OnCenterTreeFromAppBar;
+        TreeContext.OnZoomInRequested += OnZoomInFromPanel;
+        TreeContext.OnZoomOutRequested += OnZoomOutFromPanel;
+        TreeContext.OnResetViewRequested += OnResetViewFromPanel;
 
         // Get auth state before loading data — AuthorizeView won't render until we know if user is auth'd.
         // This prevents the LoginOverlay flash when signing out (forces waiting for auth resolution).
@@ -478,10 +483,16 @@ else
     }
 
     private void OnCenterTreeFromAppBar() => InvokeAsync(CenterTree);
+    private void OnZoomInFromPanel() => InvokeAsync(async () => { if (_canvas != null) await _canvas.ZoomIn(); });
+    private void OnZoomOutFromPanel() => InvokeAsync(async () => { if (_canvas != null) await _canvas.ZoomOut(); });
+    private void OnResetViewFromPanel() => InvokeAsync(HandleReset);
 
     public async ValueTask DisposeAsync()
     {
         TreeContext.OnCenterTreeRequested -= OnCenterTreeFromAppBar;
+        TreeContext.OnZoomInRequested -= OnZoomInFromPanel;
+        TreeContext.OnZoomOutRequested -= OnZoomOutFromPanel;
+        TreeContext.OnResetViewRequested -= OnResetViewFromPanel;
         try
         {
             if (_dragModule != null) await _dragModule.DisposeAsync();

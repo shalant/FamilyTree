@@ -83,8 +83,9 @@
         </MudAutocomplete>
     </div>
 
-    @* ── User identity (mobile only — replaces search) ────────────────────────── *@
-    <div class="ft-appbar-family-title">
+    @* ── User identity (mobile only — replaces search); tap opens the combined
+       zoom/center/reset + focus-person panel (MobileControlPanel) ─────────── *@
+    <div class="ft-appbar-family-title" @onclick="@(() => { _drawerOpen = false; TreeContext.ToggleMobilePanel(); })">
         <div class="ft-appbar-user-id">
             <MudAvatar Size="Size.Small" Color="Color.Primary">
                 @if (!string.IsNullOrWhiteSpace(_userPhotoUrl))
@@ -97,6 +98,7 @@
                 }
             </MudAvatar>
             <span class="ft-family-title-name">@_userName</span>
+            <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Class="ft-appbar-caret" />
         </div>
     </div>
 
@@ -193,39 +195,10 @@
     <div class="ft-nav-mobile">
         <MudIconButton Icon="@Icons.Material.Outlined.Menu"
                        Style="color:var(--ft-gray-600);"
-                       OnClick="@(() => _drawerOpen = true)" />
+                       OnClick="@(() => { _drawerOpen = true; TreeContext.CloseMobilePanel(); })" />
     </div>
 
 </MudAppBar>
-
-@* ── Context mini-panel (drops below AppBar when chip is tapped, mobile only) ── *@
-@if (_contextExpanded && TreeContext.FocusPerson is { } panel)
-{
-    <div class="ft-context-panel" @onclick:stopPropagation="true">
-        <div class="ft-context-panel-name">@panel.FullName</div>
-        @if (panel.BirthDate.HasValue || panel.DeathDate.HasValue)
-        {
-            <div class="ft-context-panel-dates">
-                @(panel.BirthDate?.Year.ToString() ?? "?")
-                @(panel.DeathDate.HasValue ? $" – {panel.DeathDate.Value.Year}" : (panel.IsDeceased ? "" : " – present"))
-                @if (!string.IsNullOrWhiteSpace(panel.BirthPlace))
-                {
-                    <span> · @panel.BirthPlace</span>
-                }
-            </div>
-        }
-        <div class="ft-context-panel-stats">
-            <span>@TreeContext.PeopleCount people</span>
-            <span class="ft-context-panel-dot">·</span>
-            <span>@TreeContext.CoupleCount couples</span>
-        </div>
-        <button class="ft-context-panel-center" @onclick="RequestCenter" @onclick:stopPropagation="true">
-            <MudIcon Icon="@Icons.Material.Outlined.CenterFocusStrong" Style="font-size:16px; margin-right:6px;" />
-            Center tree
-        </button>
-    </div>
-    <div class="ft-context-panel-backdrop" @onclick="@(() => _contextExpanded = false)"></div>
-}
 
 @* ── Mobile nav panel (custom — no MudDrawer to avoid layout side-effects) ───── *@
 @if (_drawerOpen)
@@ -301,7 +274,6 @@
     private List<PersonDto> _allPeople = [];
     private bool _isDark;
     private bool _drawerOpen;
-    private bool _contextExpanded;
 
     private string _userName     = "";
     private string _userEmail    = "";
@@ -377,22 +349,10 @@
         _searchSelection = null;
     }
 
-    private void ToggleContext()
-    {
-        _contextExpanded = !_contextExpanded;
-        if (_contextExpanded) _drawerOpen = false;
-    }
-
-    private void RequestCenter()
-    {
-        _contextExpanded = false;
-        TreeContext.RequestCenterTree();
-    }
-
     private void NavTo(string url)
     {
         _drawerOpen = false;
-        _contextExpanded = false;
+        TreeContext.CloseMobilePanel();
         Nav.NavigateTo(url);
     }
 

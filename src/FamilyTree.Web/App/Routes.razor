@@ -1,13 +1,18 @@
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Web
 @using MudBlazor
+@using FamilyTree.Web.Modules.Components
 
 <Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)">
             <NotAuthorized>
                 <LayoutView Layout="@typeof(Layout.MainLayout)">
-                    <MudText Typo="Typo.h5" Class="pa-4">Access denied.</MudText>
+                    <div class="ft-inline-error-wrap">
+                        <ErrorStateCard Icon="@Icons.Material.Outlined.Lock"
+                                        Title="Access denied"
+                                        Message="You don't have permission to view this page." />
+                    </div>
                 </LayoutView>
             </NotAuthorized>
         </AuthorizeRouteView>
@@ -16,9 +21,11 @@
     <NotFound>
         <PageTitle>Not found</PageTitle>
         <LayoutView Layout="@typeof(Layout.MainLayout)">
-            <MudText Typo="Typo.h5" Class="pa-4">
-                Sorry, there's nothing at this address.
-            </MudText>
+            <div class="ft-inline-error-wrap">
+                <ErrorStateCard Icon="@Icons.Material.Outlined.ExploreOff"
+                                Title="Page not found"
+                                Message="Sorry, there's nothing at this address." />
+            </div>
         </LayoutView>
     </NotFound>
 </Router>
