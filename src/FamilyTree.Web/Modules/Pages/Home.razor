@@ -50,7 +50,14 @@
     </NotAuthorized>
 </AuthorizeView>
 
-@if (_loading || !_ready)
+@if (!_authStateResolved)
+{
+    @* Auth state still resolving — show spinner to prevent LoginOverlay flashing on logout *@
+    <div style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:10;">
+        <MudProgressCircular Indeterminate="true" Color="Color.Success" />
+    </div>
+}
+else if (_loading || !_ready)
 {
     <div style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:10;">
         <MudProgressCircular Indeterminate="true" Color="Color.Success" />
@@ -174,6 +181,7 @@ else
     private PersonDto? _detailPerson;
     private bool _loading = true;
     private bool _ready   = false;  // true once JS-dependent focus init is done
+    private bool _authStateResolved = false;  // true once auth state is known (prevents LoginOverlay flash on logout)
     private FamilyTreeCanvas? _canvas;
     private Guid? _lastHandledFocus;  // prevents re-processing the same Focus on re-renders
     private Guid? _lastHandledView;   // prevents re-processing the same View on re-renders
@@ -201,8 +209,12 @@ else
     {
         TreeContext.OnCenterTreeRequested += OnCenterTreeFromAppBar;
 
-        // Capture auth user ID for DB focus persistence
+        // Get auth state before loading data — AuthorizeView won't render until we know if user is auth'd.
+        // This prevents the LoginOverlay flash when signing out (forces waiting for auth resolution).
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        _authStateResolved = true;
+
+        // Capture auth user ID for DB focus persistence
         var userIdClaim = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (Guid.TryParse(userIdClaim, out var uid)) _currentUserId = uid;
 

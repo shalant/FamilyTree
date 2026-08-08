@@ -1,0 +1,10 @@
+dings3Aug26
+
+mobile is terrible:
+- no scroll
+- auth card
+
+
+edit page:
+- header must be centered
+- bottom buttons are not aligned
