@@ -1,5 +1,8 @@
 // Figma-style pan/zoom for the family tree canvas.
 // JS owns the transform; Blazor owns the content — no style conflicts.
+// Pointer Events unify mouse/touch/pen into one code path: setPointerCapture
+// keeps delivering events to _viewport even if the pointer leaves its bounds,
+// so no window-level fallback listeners are needed the way plain mousedown required.
 
 // const EDGE_MARGIN = 150; // min pixels of canvas that must remain in viewport
 const EDGE_MARGIN = 40; // min pixels of canvas that must remain in viewport
@@ -12,6 +15,8 @@ let _panY = 0;
 let _dragging = false;
 let _lastX = 0;
 let _lastY = 0;
+let _activePointers = new Map(); // pointerId -> {x, y}
+let _pinchStartDist = null;      // distance between the two active pointers, updated each move
 
 export function init(viewportId, transformId, focusX, focusY, genTopY, genBotY) {
     dispose();
@@ -28,9 +33,11 @@ export function init(viewportId, transformId, focusX, focusY, genTopY, genBotY) 
     _viewport.style.opacity = '1';
 
     _viewport.addEventListener('wheel', _onWheel, { passive: false });
-    _viewport.addEventListener('mousedown', _onMouseDown);
-    window.addEventListener('mousemove', _onMouseMove);
-    window.addEventListener('mouseup', _onMouseUp);
+    _viewport.addEventListener('pointerdown', _onPointerDown);
+    _viewport.addEventListener('pointermove', _onPointerMove);
+    _viewport.addEventListener('pointerup', _onPointerUp);
+    _viewport.addEventListener('pointercancel', _onPointerCancel);
+    _viewport.addEventListener('pointerleave', _onPointerUp);
     _viewport.style.cursor = 'grab';
 }
 
@@ -67,11 +74,16 @@ function _applyDefaultView(focusX, focusY, genTopY, genBotY) {
 export function dispose() {
     if (_viewport) {
         _viewport.removeEventListener('wheel', _onWheel);
-        _viewport.removeEventListener('mousedown', _onMouseDown);
+        _viewport.removeEventListener('pointerdown', _onPointerDown);
+        _viewport.removeEventListener('pointermove', _onPointerMove);
+        _viewport.removeEventListener('pointerup', _onPointerUp);
+        _viewport.removeEventListener('pointercancel', _onPointerCancel);
+        _viewport.removeEventListener('pointerleave', _onPointerUp);
         _viewport.style.cursor = '';
     }
-    window.removeEventListener('mousemove', _onMouseMove);
-    window.removeEventListener('mouseup', _onMouseUp);
+    _activePointers.clear();
+    _pinchStartDist = null;
+    _dragging = false;
     _viewport = null;
     _transform = null;
 }
@@ -114,17 +126,51 @@ function _applyZoomAt(factor, mx, my) {
     _applyTransform();
 }
 
-function _onMouseDown(e) {
-    if (e.button !== 0) return;
-    if (e.target.closest('.person-node')) return;
-    _dragging = true;
-    _lastX = e.clientX;
-    _lastY = e.clientY;
-    _viewport.style.cursor = 'grabbing';
-    e.preventDefault();
+function _distance(p1, p2) {
+    return Math.hypot(p1.x - p2.x, p1.y - p2.y);
 }
 
-function _onMouseMove(e) {
+function _midpoint(p1, p2) {
+    return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+}
+
+function _onPointerDown(e) {
+    if (e.button !== 0) return;
+    if (e.target.closest('.person-node')) return;
+
+    _viewport.setPointerCapture(e.pointerId);
+    _activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (_activePointers.size === 2) {
+        _dragging = false;
+        const [p1, p2] = [..._activePointers.values()];
+        _pinchStartDist = _distance(p1, p2);
+    } else if (_activePointers.size === 1) {
+        _dragging = true;
+        _lastX = e.clientX;
+        _lastY = e.clientY;
+        if (e.pointerType === 'mouse') _viewport.style.cursor = 'grabbing';
+        e.preventDefault();
+    }
+}
+
+function _onPointerMove(e) {
+    if (!_activePointers.has(e.pointerId)) return;
+    _activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (_activePointers.size === 2) {
+        const rect = _viewport.getBoundingClientRect();
+        const [p1, p2] = [..._activePointers.values()];
+        const newDist = _distance(p1, p2);
+        const mid = _midpoint(p1, p2);
+        if (_pinchStartDist) {
+            const factor = newDist / _pinchStartDist;
+            _applyZoomAt(factor, mid.x - rect.left, mid.y - rect.top);
+        }
+        _pinchStartDist = newDist;
+        return;
+    }
+
     if (!_dragging) return;
     _panX += e.clientX - _lastX;
     _panY += e.clientY - _lastY;
@@ -134,9 +180,30 @@ function _onMouseMove(e) {
     _applyTransform();
 }
 
-function _onMouseUp() {
-    _dragging = false;
+function _onPointerUp(e) {
+    _activePointers.delete(e.pointerId);
+    if (_viewport && _viewport.hasPointerCapture && _viewport.hasPointerCapture(e.pointerId)) {
+        _viewport.releasePointerCapture(e.pointerId);
+    }
+
+    if (_activePointers.size === 1) {
+        // Dropping from a pinch back to one finger — resume panning from
+        // that finger's current position instead of jumping.
+        const [remaining] = [..._activePointers.values()];
+        _dragging = true;
+        _lastX = remaining.x;
+        _lastY = remaining.y;
+        _pinchStartDist = null;
+    } else {
+        _dragging = false;
+        _pinchStartDist = null;
+    }
+
     if (_viewport) _viewport.style.cursor = 'grab';
+}
+
+function _onPointerCancel(e) {
+    _onPointerUp(e);
 }
 
 // Prevent panning past EDGE_MARGIN px beyond canvas boundaries.

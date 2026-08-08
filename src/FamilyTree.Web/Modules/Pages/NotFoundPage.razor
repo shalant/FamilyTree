@@ -1,0 +1,19 @@
+@* Target of app.UseStatusCodePagesWithReExecute — handles a genuinely bad URL
+   (direct navigation, refresh, stale bookmark) with the correct HTTP status
+   code preserved. Routes.razor's <NotFound> (using the same ErrorStateCard)
+   covers the separate case of an in-app client-side navigation landing on an
+   unmatched route while the SPA is already running. *@
+@page "/not-found"
+@layout AuthLayout
+@rendermode InteractiveServer
+
+@using FamilyTree.Web.Modules.Components
+@using MudBlazor
+
+<PageTitle>Page not found — ArborKin</PageTitle>
+
+<div class="ft-auth-page">
+    <ErrorStateCard Icon="@Icons.Material.Outlined.ExploreOff"
+                     Title="Page not found"
+                     Message="Sorry, there's nothing at this address." />
+</div>

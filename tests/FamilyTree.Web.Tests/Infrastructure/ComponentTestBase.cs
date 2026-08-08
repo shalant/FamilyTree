@@ -13,6 +13,7 @@ public abstract class ComponentTestBase : TestContext
         // App services
         Services.AddSingleton<ToastService>();
         Services.AddSingleton<FamilyTreeLayoutEngine>();
+        Services.AddSingleton<TreeContextService>();
 
         // MudBlazor services
         Services.AddMudServices();
@@ -24,8 +25,14 @@ public abstract class ComponentTestBase : TestContext
         // Mock StoryInviteService
         //Services.AddSingleton<IStoryInviteService, FakeStoryInviteService>();
 
+        // Loose: JS calls with no explicit setup return a default value instead of
+        // throwing — needed because MudBlazor components (MudTooltip, MudMenu, ...)
+        // drive a large, version-specific surface of internal JS interop calls
+        // (mudPopover.*, mudpopoverHelper.*, ...) that aren't worth mocking individually.
+        JSInterop.Mode = JSRuntimeMode.Loose;
+
         // JSInterop modules
-        JSInterop.SetupModule("/js/canvas-interaction.js?v=1");
+        JSInterop.SetupModule("/js/canvas-interaction.js?v=2");
 
         // Mock all unhandled JSInterop calls
         JSInterop.SetupVoid("focusElement", _ => true);

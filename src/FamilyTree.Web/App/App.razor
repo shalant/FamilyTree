@@ -16,21 +16,34 @@
     <Routes @rendermode="@InteractiveServer" />
     <div id="components-reconnect-modal">
         <div class="ft-reconnect-card">
+            <div class="ft-reconnect-logo">
+                <img src="/images/arborkin-logo__transparent.png" alt="ArborKin" />
+            </div>
+
             <div class="ft-reconnect-body ft-reconnect-body--reconnecting">
                 <div class="ft-reconnect-spinner"></div>
                 <p>Reconnecting…</p>
+                <p class="ft-reconnect-sub">Hang tight, this only takes a moment.</p>
             </div>
             <div class="ft-reconnect-body ft-reconnect-body--failed">
-                <p>Connection lost.</p>
+                <div class="ft-reconnect-icon ft-reconnect-icon--warn">📡</div>
+                <p>Connection lost</p>
+                <p class="ft-reconnect-sub">Check your connection and try again.</p>
                 <button class="ft-reconnect-btn" onclick="window.Blazor.reconnect()">Try again</button>
                 <button class="ft-reconnect-btn ft-reconnect-btn--ghost" onclick="location.reload()">Reload page</button>
             </div>
             <div class="ft-reconnect-body ft-reconnect-body--rejected">
-                <p>Session expired.</p>
+                <div class="ft-reconnect-icon">⏳</div>
+                <p>Session expired</p>
                 <p class="ft-reconnect-sub">Reloading in <span id="ft-reload-countdown">3</span>s…</p>
                 <button class="ft-reconnect-btn" onclick="location.reload()">Reload now</button>
             </div>
         </div>
+    </div>
+    <div id="blazor-error-ui">
+        <span>An unexpected error occurred.</span>
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss" aria-label="Dismiss">✕</a>
     </div>
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>

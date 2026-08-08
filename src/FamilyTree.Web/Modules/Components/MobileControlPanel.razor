@@ -1,0 +1,83 @@
+@* ═══════════════════════════════════════════════════════════════════════════
+   Mobile control panel — replaces the hero overlay + floating toolbar on
+   mobile with one combined panel: focus-person info plus zoom/center/reset.
+   Reachable via the AppBar identity tap (CustomAppBar) or the canvas mini-
+   trigger (CustomToolbar's collapsed pill on mobile); both just flip
+   TreeContext.MobilePanelOpen rather than each owning their own state.
+   ═══════════════════════════════════════════════════════════════════════════ *@
+
+@using FamilyTree.Web.Services
+@inject TreeContextService TreeContext
+@implements IDisposable
+
+@if (TreeContext.MobilePanelOpen)
+{
+    <div class="ft-mobile-panel" @onclick:stopPropagation="true">
+        @if (TreeContext.FocusPerson is { } panel)
+        {
+            <div class="ft-mobile-panel-name">@panel.FullName</div>
+            @if (panel.BirthDate.HasValue || panel.DeathDate.HasValue)
+            {
+                <div class="ft-mobile-panel-dates">
+                    @(panel.BirthDate?.Year.ToString() ?? "?")
+                    @(panel.DeathDate.HasValue ? $" – {panel.DeathDate.Value.Year}" : (panel.IsDeceased ? "" : " – present"))
+                    @if (!string.IsNullOrWhiteSpace(panel.BirthPlace))
+                    {
+                        <span> · @panel.BirthPlace</span>
+                    }
+                </div>
+            }
+            <div class="ft-mobile-panel-stats">
+                <span>@TreeContext.PeopleCount people</span>
+                <span class="ft-mobile-panel-dot">·</span>
+                <span>@TreeContext.CoupleCount couples</span>
+            </div>
+        }
+
+        <div class="ft-mobile-panel-actions">
+            <button class="ft-mobile-panel-btn" @onclick="OnZoomOut" @onclick:stopPropagation="true">
+                <MudIcon Icon="@Icons.Material.Filled.ZoomOut" Style="font-size:18px;" />
+                Zoom out
+            </button>
+            <button class="ft-mobile-panel-btn" @onclick="OnZoomIn" @onclick:stopPropagation="true">
+                <MudIcon Icon="@Icons.Material.Filled.ZoomIn" Style="font-size:18px;" />
+                Zoom in
+            </button>
+            <button class="ft-mobile-panel-btn" @onclick="OnCenter" @onclick:stopPropagation="true">
+                <MudIcon Icon="@Icons.Material.Outlined.CenterFocusStrong" Style="font-size:18px;" />
+                Center
+            </button>
+            <button class="ft-mobile-panel-btn" @onclick="OnReset" @onclick:stopPropagation="true">
+                <MudIcon Icon="@Icons.Material.Outlined.RestartAlt" Style="font-size:18px;" />
+                Reset
+            </button>
+        </div>
+    </div>
+    <div class="ft-mobile-panel-backdrop" @onclick="@(() => TreeContext.CloseMobilePanel())"></div>
+}
+
+@code {
+    protected override void OnInitialized() => TreeContext.OnChange += HandleContextChanged;
+
+    private void HandleContextChanged() => InvokeAsync(StateHasChanged);
+
+    // Zoom in/out keep the panel open (a user may tap either several times in
+    // a row); Center/Reset are one-shot actions, so close afterward like the
+    // panel's previous Center-tree-only incarnation did.
+    private void OnZoomIn() => TreeContext.RequestZoomIn();
+    private void OnZoomOut() => TreeContext.RequestZoomOut();
+
+    private void OnCenter()
+    {
+        TreeContext.CloseMobilePanel();
+        TreeContext.RequestCenterTree();
+    }
+
+    private void OnReset()
+    {
+        TreeContext.CloseMobilePanel();
+        TreeContext.RequestResetView();
+    }
+
+    public void Dispose() => TreeContext.OnChange -= HandleContextChanged;
+}

@@ -1,8 +1,21 @@
+@using FamilyTree.Web.Services
 @inject NavigationManager Nav
+@inject TreeContextService TreeContext
 
-@if (_collapsed)
+@if (_collapsed && ForceCollapsed)
 {
-    @* ── Collapsed: single pill with center + expand ──────────────────────── *@
+    @* ── Mobile: single icon — MobileControlPanel already covers Center (and
+       Zoom/Reset), so a separate Center quick-action here would be redundant. ── *@
+    <div class="ft-toolbar-mini" title="Open controls">
+        <MudIconButton Icon="@Icons.Material.Filled.Tune"
+                       Size="Size.Small"
+                       Style="color:var(--ft-green-700);"
+                       OnClick="OnExpandClick" />
+    </div>
+}
+else if (_collapsed)
+{
+    @* ── Desktop collapsed: pill with center + expand ─────────────────────── *@
     <div class="ft-toolbar-mini" title="Expand toolbar">
         <MudTooltip Text="Center on focus person" Placement="Placement.Top">
             <MudIconButton Icon="@Icons.Material.Filled.CenterFocusStrong"
@@ -12,8 +25,9 @@
         </MudTooltip>
         <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
                        Size="Size.Small"
+                       Class="ft-toolbar-caret"
                        Style="color:var(--ft-gray-400);"
-                       OnClick="@(() => _collapsed = false)" />
+                       OnClick="OnExpandClick" />
     </div>
 }
 else
@@ -108,5 +122,16 @@ else
             _collapsed = ForceCollapsed;
             _lastForceCollapsed = ForceCollapsed;
         }
+    }
+
+    // On mobile (ForceCollapsed), the mini pill has no inline expanded state
+    // to grow into — tapping its arrow opens the shared MobileControlPanel
+    // instead. Desktop keeps its own local expand/collapse toggle unchanged.
+    private void OnExpandClick()
+    {
+        if (ForceCollapsed)
+            TreeContext.ToggleMobilePanel();
+        else
+            _collapsed = false;
     }
 }

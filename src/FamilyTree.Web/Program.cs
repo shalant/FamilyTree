@@ -310,6 +310,13 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// MapRazorComponents only serves paths matching an actual @page route — a genuinely
+// unmatched URL (bad link, stale bookmark, typo) falls straight through to a raw,
+// unstyled 404 with no Blazor circuit ever starting, so Routes.razor's <NotFound>
+// never gets a chance to render. Re-executing 404s through /not-found renders the
+// same ErrorStateCard while preserving the real 404 status code for HTTP correctness.
+app.UseStatusCodePagesWithReExecute("/not-found", "?statusCode={0}");
+
 app.UseHttpsRedirection();
 
 app.Use(async (ctx, next) =>

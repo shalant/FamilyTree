@@ -1,0 +1,14 @@
+@page "/Error"
+@layout AuthLayout
+@rendermode InteractiveServer
+
+@using FamilyTree.Web.Modules.Components
+@using MudBlazor
+
+<PageTitle>Something went wrong — ArborKin</PageTitle>
+
+<div class="ft-auth-page">
+    <ErrorStateCard Icon="@Icons.Material.Outlined.ErrorOutline"
+                     Title="Something went wrong"
+                     Message="An unexpected error occurred on our end. It's been logged — please try again in a moment." />
+</div>
