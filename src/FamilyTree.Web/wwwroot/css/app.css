@@ -60,6 +60,17 @@
     /* Shadows */
     --ft-shadow-sm: 0 1px 3px rgba(0, 0, 0, .08);
     --ft-shadow-md: 0 4px 12px rgba(0, 0, 0, .10);
+    /* Radii — referenced by ~13 pages/components (Dashboard, Admin tabs,
+       About, FAQ, Stories, ...) via var(--ft-radius-card), but never
+       actually defined here. They only existed in wwwroot/css/design-tokens.css,
+       which is never <link>'d from App.razor and also carries a stale,
+       conflicting color palette from an earlier design pass — so linking it
+       to fix this would reintroduce wrong colors. Defining just the two
+       radius tokens here (where every --ft-* var that's actually live
+       already lives) fixes every one of those call sites at once without
+       touching color. */
+    --ft-radius-card: 12px;
+    --ft-radius-sm: 8px;
 }
 
 /* ── Dark mode ────────────────────────────────────────────────────────────── */
@@ -320,25 +331,38 @@ html, body {
     color: var(--ft-green-800);
 }
 
-/* Rounded light-green search bar */
+/* Just an outline — no fill, no shadow. It should blend into the AppBar and
+   read as a plain rounded rectangle with an icon and placeholder, not a
+   separate card floating on top of the bar. */
 .ft-search-wrap .mud-input-root {
-    border-radius: 24px !important;
-    background: var(--ft-green-50) !important;
+    border-radius: var(--ft-radius-card) !important;
+    background: transparent !important;
+    box-shadow: none !important;
 }
-.ft-search-wrap .mud-input-root fieldset {
-    border-radius: 24px !important;
-    border-color: rgba(29, 158, 117, 0.35) !important;
+/* The visible outline lives on fieldset.mud-input-outlined-border, a SIBLING
+   of .mud-input-root under the shared .mud-input wrapper — not a descendant
+   of .mud-input-root. Every rule below previously targeted ".mud-input-root
+   fieldset", which never matched anything, so the border silently stayed at
+   MudBlazor's own default gray (#bdbdbd) regardless of what was written here. */
+.ft-search-wrap .mud-input-outlined-border {
+    border-radius: var(--ft-radius-card) !important;
+    /* Neutral by default (matches common practice — GitHub, Linear, etc. all
+       use a plain gray border at rest); the green accent is reserved for
+       hover/focus below, not baked into the resting state. */
+    border-color: var(--ft-line-border) !important;
 }
-.ft-search-wrap .mud-input-root:hover fieldset {
+.ft-search-wrap .mud-input:hover .mud-input-outlined-border {
     border-color: var(--ft-green-400) !important;
 }
-.ft-search-wrap .mud-input-root.mud-focused fieldset,
-.ft-search-wrap .mud-input-root.mud-input-root-outlined:focus-within fieldset {
+.ft-search-wrap .mud-input:focus-within .mud-input-outlined-border {
     border-color: var(--ft-green-600) !important;
     border-width: 1.5px !important;
 }
-[data-theme="dark"] .ft-search-wrap .mud-input-root {
-    background: rgba(29, 158, 117, 0.1) !important;
+[data-theme="dark"] .ft-search-wrap .mud-input-outlined-border {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+}
+[data-theme="dark"] .ft-search-wrap .mud-input-root:hover fieldset {
+    border-color: var(--ft-green-400) !important;
 }
 
 [data-theme="dark"] .hero-glass {
