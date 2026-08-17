@@ -14,6 +14,7 @@ public abstract class ComponentTestBase : TestContext
         Services.AddSingleton<ToastService>();
         Services.AddSingleton<FamilyTreeLayoutEngine>();
         Services.AddSingleton<TreeContextService>();
+        Services.AddSingleton<ThemeService>();
 
         // MudBlazor services
         Services.AddMudServices();
