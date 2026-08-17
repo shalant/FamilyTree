@@ -34,6 +34,11 @@ public sealed class ThemeService
             // JS not available during SSR pre-render — ignore
         }
         await ApplyAsync();
+        // Subscribers that read IsDark synchronously in their own OnInitialized
+        // (e.g. MobileControlPanel) run before this async load resolves and
+        // capture the pre-init default — without this, they never learn the
+        // real persisted preference until the next manual ToggleAsync.
+        OnChange?.Invoke();
     }
 
     public async Task ToggleAsync()

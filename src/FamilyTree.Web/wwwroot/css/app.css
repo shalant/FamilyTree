@@ -1048,10 +1048,14 @@ html, body {
     display: flex;
     align-items: center;
     padding: 0 20px;
-    background: rgba(212, 240, 228, 0.45);
+    /* Fading the tint out toward the bottom (rather than a flat fill ending
+       in a hard border) lets the canvas's own green gradient show through
+       gradually — a flat edge here reads as a visible seam where two
+       differently-toned translucent panels butt up against each other. */
+    background: linear-gradient(to bottom, rgba(212, 240, 228, 0.45) 0%, rgba(212, 240, 228, 0.45) 60%, rgba(212, 240, 228, 0.1) 100%);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    border-bottom: 0.5px solid rgba(29, 158, 117, 0.18);
+    border-bottom: none;
     animation: ft-banner-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -1108,8 +1112,7 @@ html, body {
 .facts-banner-close:hover { opacity: 1; }
 
 [data-theme="dark"] .facts-banner {
-    background: rgba(18, 40, 28, 0.72);
-    border-bottom-color: rgba(93, 202, 165, 0.15);
+    background: linear-gradient(to bottom, rgba(18, 40, 28, 0.72) 0%, rgba(18, 40, 28, 0.72) 60%, rgba(18, 40, 28, 0.15) 100%);
 }
 [data-theme="dark"] .facts-banner-text {
     color: var(--ft-green-200);
@@ -1204,7 +1207,12 @@ html.ft-no-select * {
     border: 1px solid rgba(255, 255, 255, 0.20);
     border-radius: 12px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+/* Tactile press feedback — the pill is the trigger for the nav/toolbar
+   expansion, so it should feel like something is about to pop open. */
+.ft-toolbar-mini:active { transform: scale(0.90); }
 
 /* Reads as a small caret affordance rather than a full icon button — same
    touch-target size (44px on mobile via #ft-toolbar .mud-icon-button) but a
@@ -1594,6 +1602,13 @@ html.ft-no-select * {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    /* Flex items default to min-width:auto (their own content width), which
+       blocks shrinking below the full name — the parent .ft-appbar-user-id
+       already has min-width:0, but that's wasted unless this item can shrink
+       too, so text-overflow:ellipsis never actually triggers and the name
+       just overflows past the AppBar's centered identity block on mobile. */
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 /* Signals the identity block is tappable (opens MobileControlPanel) — same
@@ -1621,6 +1636,8 @@ html.ft-no-select * {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
     padding: 16px 20px 18px;
     z-index: 1299;
+    transform-origin: top center;
+    animation: ft-nav-drop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 [data-theme="dark"] .ft-mobile-panel {
@@ -1633,6 +1650,7 @@ html.ft-no-select * {
     position: fixed;
     inset: 0;
     z-index: 1298;
+    animation: introFadeIn 0.2s ease-out;
 }
 
 .ft-mobile-panel-name {
@@ -1669,23 +1687,74 @@ html.ft-no-select * {
 }
 
 .ft-mobile-panel-btn {
+    position: relative;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    background: var(--ft-green-600);
+    background: linear-gradient(135deg, var(--ft-green-500) 0%, var(--ft-green-700) 100%);
     color: #fff;
-    border: none;
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
     padding: 10px 12px;
     min-height: 44px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.15s;
+    box-shadow: 0 3px 10px rgba(15, 71, 44, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s;
 }
 
-.ft-mobile-panel-btn:active { background: var(--ft-green-700); }
+/* Glossy top sheen so the gradient reads as glass rather than flat paint. */
+.ft-mobile-panel-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 55%);
+    pointer-events: none;
+}
+
+/* Each action gets a slightly different hue instead of four identical flat-
+   green tiles — still clearly one family, just not visually monotonous. */
+.ft-mobile-panel-actions .ft-mobile-panel-btn:nth-child(1) { background: linear-gradient(135deg, var(--ft-green-400) 0%, var(--ft-green-600) 100%); }
+.ft-mobile-panel-actions .ft-mobile-panel-btn:nth-child(2) { background: linear-gradient(135deg, var(--ft-green-500) 0%, var(--ft-green-700) 100%); }
+.ft-mobile-panel-actions .ft-mobile-panel-btn:nth-child(3) { background: linear-gradient(135deg, var(--ft-green-600) 0%, var(--ft-green-800) 100%); }
+.ft-mobile-panel-actions .ft-mobile-panel-btn:nth-child(4) { background: linear-gradient(135deg, var(--ft-green-500) 0%, var(--ft-green-800) 100%); }
+
+.ft-mobile-panel-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 1px 4px rgba(15, 71, 44, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Secondary treatment for the app-level toggle below the canvas-action grid —
+   frosted glass rather than the actions' solid gradient, so "this is a
+   setting, not a canvas command" reads at a glance. Text uses the theme-aware
+   --ft-text-primary token (not a manually-swapped green shade) specifically
+   because this codebase's green-NNN tokens invert their light/dark meaning
+   between themes — --ft-green-200 is a pale tint in the light palette but a
+   dark accent in the dark palette, so hand-picking it for dark-mode text
+   produced illegible dark-on-dark text. --ft-text-primary already resolves
+   correctly in both themes. */
+.ft-mobile-panel-btn--wide {
+    width: 100%;
+    margin-top: 8px;
+    background: var(--ft-surface-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--ft-text-primary);
+    border: 1px solid var(--ft-line-border);
+    box-shadow: none;
+}
+
+.ft-mobile-panel-btn--wide::before { display: none; }
+
+.ft-mobile-panel-btn--wide:active {
+    transform: scale(0.98);
+    background: var(--ft-green-50);
+}
+
+[data-theme="dark"] .ft-mobile-panel-btn--wide:active { background: rgba(255, 255, 255, 0.06); }
 
 /* ── Mobile nav panel (custom overlay, no MudDrawer) ─────────────────────────
    Drops down from below the AppBar and covers roughly the top half of the
@@ -1709,9 +1778,9 @@ html.ft-no-select * {
     left: 0;
     right: 0;
     max-height: 55vh;
-    background: rgba(255, 255, 255, 0.68);
-    backdrop-filter: blur(26px) saturate(180%);
-    -webkit-backdrop-filter: blur(26px) saturate(180%);
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(29px) saturate(190%);
+    -webkit-backdrop-filter: blur(29px) saturate(190%);
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.5);
     border-radius: 0 0 20px 20px;
     z-index: 20000;
@@ -1719,7 +1788,8 @@ html.ft-no-select * {
     flex-direction: column;
     overflow-y: auto;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
-    animation: ft-nav-drop 0.25s ease-out;
+    transform-origin: top center;
+    animation: ft-nav-drop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .ft-mobile-nav::before {
@@ -1728,20 +1798,35 @@ html.ft-no-select * {
     inset: 0;
     z-index: -1;
     border-radius: inherit;
-    background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.08) 70%);
+    /* Fading fully to 100% (rather than plateauing at a flat 0.08 past the
+       70% mark) removes the visible ring where the gradient's steep early
+       falloff meets its flat tail — that boundary was landing mid-list and
+       reading as a banding seam across whichever row happened to sit there. */
+    background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.04) 100%);
 }
 
 [data-theme="dark"] .ft-mobile-nav {
-    background: rgba(18, 20, 23, 0.62);
+    background: rgba(18, 20, 23, 0.52);
     border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
 [data-theme="dark"] .ft-mobile-nav::before {
-    background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 70%);
+    background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
 }
 
+/* Slight overshoot-then-settle "unfold" rather than a flat slide — same
+   spring bezier as the toast-in animation, reused here for a consistent
+   "delight" feel across the app's pop-in surfaces. */
 @keyframes ft-nav-drop {
-    from { opacity: 0; transform: translateY(-12px); }
+    0%   { opacity: 0; transform: translateY(-16px) scaleY(0.92); }
+    60%  { opacity: 1; transform: translateY(2px) scaleY(1.01); }
+    100% { opacity: 1; transform: translateY(0) scaleY(1); }
+}
+
+/* Drawer/panel items themselves cascade in slightly after the shell settles,
+   rather than all popping in at once with their container. */
+@keyframes ft-item-in {
+    from { opacity: 0; transform: translateY(-6px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -1750,11 +1835,11 @@ html.ft-no-select * {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    padding: 20px 16px 14px;
+    padding: 14px 16px 8px;
 }
 
 .ft-drawer-username {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--ft-text-primary);
     line-height: 1.3;
@@ -1790,25 +1875,35 @@ html.ft-no-select * {
 }
 
 .ft-drawer-nav {
-    padding: 6px 0;
+    padding: 2px 0;
 }
 
 .ft-drawer-item {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 13px 20px;
-    font-size: 15px;
+    gap: 12px;
+    padding: 9px 20px;
+    font-size: 14px;
     color: var(--ft-text-primary);
     cursor: pointer;
     user-select: none;
     transition: background 0.1s;
+    animation: ft-item-in 0.3s ease-out both;
 }
+
+/* Cascade each row in slightly after the last — a plain instant list read
+   as static; each .ft-drawer-nav group restarts its own 1-5 count so the
+   header/theme-toggle rows in the second nav block stagger the same way. */
+.ft-drawer-item:nth-child(1) { animation-delay: 0.06s; }
+.ft-drawer-item:nth-child(2) { animation-delay: 0.10s; }
+.ft-drawer-item:nth-child(3) { animation-delay: 0.14s; }
+.ft-drawer-item:nth-child(4) { animation-delay: 0.18s; }
+.ft-drawer-item:nth-child(5) { animation-delay: 0.22s; }
 
 .ft-drawer-item:hover  { background: var(--ft-green-50); }
 .ft-drawer-item:active { background: var(--ft-green-100); }
 
-.ft-drawer-icon { font-size: 20px !important; color: var(--ft-gray-400); flex-shrink: 0; }
+.ft-drawer-icon { font-size: 18px !important; color: var(--ft-gray-400); flex-shrink: 0; }
 
 .ft-drawer-item--signout { color: var(--ft-gray-500); }
 
@@ -1822,6 +1917,12 @@ html.ft-no-select * {
     display: none;
     align-items: center;
 }
+
+/* Rotating the button itself (rather than just swapping the glyph) reads as
+   a hamburger-morphing-to-X even though it's actually two distinct Material
+   icons underneath — the rotation sells the transition. */
+.ft-hamburger-btn { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.ft-hamburger-btn--open { transform: rotate(90deg); }
 
 /* Tree scroll lock is now injected by TreeLayout.razor via <HeadContent>. */
 
@@ -1918,6 +2019,22 @@ html.ft-no-select * {
         right: auto !important;
     }
     #ft-toolbar .mud-icon-button { min-width: 44px; min-height: 44px; }
+
+    /* The mini pill's desktop styling (near-white glass at 35% opacity, no
+       border weight) reads fine against a MudPaper page background, but on
+       mobile it sits directly on the pale-green canvas — nearly the same
+       luminosity, so the pill all but disappears. Raise contrast here only. */
+    .ft-toolbar-mini {
+        padding: 6px 8px;
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+    }
+
+    [data-theme="dark"] .ft-toolbar-mini {
+        background: rgba(28, 32, 28, 0.9);
+        border-color: rgba(255, 255, 255, 0.12);
+    }
 
     /* Admin nav rail: revert to the original horizontal scrolling tab strip at
        mobile width rather than introducing a second off-canvas drawer pattern

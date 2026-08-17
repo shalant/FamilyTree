@@ -8,6 +8,7 @@
 
 @using FamilyTree.Web.Services
 @inject TreeContextService TreeContext
+@inject ThemeService Theme
 @implements IDisposable
 
 @if (TreeContext.MobilePanelOpen)
@@ -52,14 +53,34 @@
                 Reset
             </button>
         </div>
+
+        <button class="ft-mobile-panel-btn ft-mobile-panel-btn--wide" @onclick="ToggleTheme" @onclick:stopPropagation="true">
+            <MudIcon Icon="@(_isDark ? Icons.Material.Outlined.LightMode : Icons.Material.Outlined.DarkMode)" Style="font-size:18px;" />
+            @(_isDark ? "Light mode" : "Dark mode")
+        </button>
     </div>
     <div class="ft-mobile-panel-backdrop" @onclick="@(() => TreeContext.CloseMobilePanel())"></div>
 }
 
 @code {
-    protected override void OnInitialized() => TreeContext.OnChange += HandleContextChanged;
+    private bool _isDark;
+
+    protected override void OnInitialized()
+    {
+        _isDark = Theme.IsDark;
+        TreeContext.OnChange += HandleContextChanged;
+        Theme.OnChange += HandleThemeChanged;
+    }
 
     private void HandleContextChanged() => InvokeAsync(StateHasChanged);
+
+    private void HandleThemeChanged()
+    {
+        _isDark = Theme.IsDark;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleTheme() => await Theme.ToggleAsync();
 
     // Zoom in/out keep the panel open (a user may tap either several times in
     // a row); Center/Reset are one-shot actions, so close afterward like the
@@ -79,5 +100,9 @@
         TreeContext.RequestResetView();
     }
 
-    public void Dispose() => TreeContext.OnChange -= HandleContextChanged;
+    public void Dispose()
+    {
+        TreeContext.OnChange -= HandleContextChanged;
+        Theme.OnChange -= HandleThemeChanged;
+    }
 }

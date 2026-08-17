@@ -191,11 +191,13 @@
         </MudMenu>
     </div>
 
-    @* ── Hamburger (mobile only) ───────────────────────────────────────────── *@
+    @* ── Hamburger (mobile only) — swaps to a close glyph while the drawer is
+       open, so the trigger itself communicates the expand/collapse state. ── *@
     <div class="ft-nav-mobile">
-        <MudIconButton Icon="@Icons.Material.Outlined.Menu"
+        <MudIconButton Icon="@(_drawerOpen ? Icons.Material.Outlined.Close : Icons.Material.Outlined.Menu)"
+                       Class="@("ft-hamburger-btn" + (_drawerOpen ? " ft-hamburger-btn--open" : ""))"
                        Style="color:var(--ft-gray-600);"
-                       OnClick="@(() => { _drawerOpen = true; TreeContext.CloseMobilePanel(); })" />
+                       OnClick="@(() => { _drawerOpen = !_drawerOpen; TreeContext.CloseMobilePanel(); })" />
     </div>
 
 </MudAppBar>
