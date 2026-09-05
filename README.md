@@ -4,6 +4,8 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dot-net)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
+Built by [Douglas Rosenberg](https://dougrosenbergdev.com) — full-stack .NET software engineer. See the [portfolio write-up and technical blog post](https://dougrosenbergdev.com/blog/building-family-tree-blazor) on ArborKin's tree layout engine, drag-state handling, and photo upload architecture.
+
 ## About ArborKin
 
 **ArborKin** is a full-stack family tree application designed to help extended families reconnect and preserve their stories. Built with **Blazor Server**, **C# 13**, **EF Core**, and **SQL Server**, it provides an interactive canvas for visualizing genealogy, sharing family memories, and maintaining a permanent record of relationships across generations.
