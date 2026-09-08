@@ -2,6 +2,64 @@
 
 ---
 
+## Site Quality Checklist Audit (2026-09-07)
+
+Audited against `docs/SITE_QUALITY_CHECKLIST.md` in the sibling `career-development` repo
+(the 68-item cross-project checklist built from real practices, not an invented rubric).
+Full write-up in the session transcript; summary below. SEO/Analytics categories are
+largely N/A — this is an invite-only private app, not a discoverable public site.
+
+**Fixed this pass (low-risk, mechanical):**
+- [x] Removed dead `AdminFirstAttemptBAD/` folder (6 files, unreferenced anywhere) — an
+      abandoned first draft of the admin panel left in the tree since before this doc's
+      earliest entries.
+- [x] Removed `AdminOLD.razor` (1687 lines, routed at `/adminOLD` but linked from nowhere) —
+      three separate earlier docs (`CODE_AUDIT_2026-07-03.md`, `OVERNIGHT_WORK_SUMMARY.md`,
+      ADR 003) had already flagged this as safe-to-delete legacy; it just never happened.
+      Confirmed unreferenced via grep before deleting, and updated those three docs to mark
+      the item done rather than leaving them stale.
+- [x] Added `Permissions-Policy` response header (`geolocation=(), microphone=(), camera=(),
+      usb=(), payment=()`) — the app uses none of these; previously unset entirely.
+
+**Deferred — need a scoped PR + manual testing, not safe to auto-fix:**
+- [ ] **[SECURITY] CSRF gap on `/auth/do-login` and `/auth/do-logout`** — `ftUtils.js`'s
+      `ftSubmitLogin`/`ftSubmitLogout` build a plain hidden-form POST with no antiforgery
+      token, and the minimal-API endpoints in `Program.cs` never call
+      `IAntiforgery.ValidateRequestAsync`. `app.UseAntiforgery()` is registered but minimal
+      APIs don't auto-protect unless the endpoint opts in — so nothing currently validates
+      these two POSTs. A hostile page could force a visitor's browser to log in as an
+      attacker-controlled account or force a log-out. Needs: a token embedded via `App.razor`
+      (likely a `[CascadingParameter] HttpContext?` + `IAntiforgery.GetAndStoreTokens`, no
+      existing precedent for that pattern in this codebase, so needs real login/logout
+      testing before merge, not just a build check) or an equivalent scoped path.
+- [ ] **[PERFORMANCE] No image resizing/re-encoding on upload** — `MediumService` only checks
+      file size (8MB cap) and MIME type; no `SixLabors.ImageSharp` or similar anywhere in
+      `FamilyTree.Core`. A raw phone-camera photo uploads at full resolution.
+- [ ] **[PERFORMANCE] No response compression** — no `AddResponseCompression`/Brotli wired in
+      `Program.cs`. Needs care around the `/_blazor` SignalR endpoint before enabling.
+- [ ] **[POLISH] Theme flash on load** — `ThemeService.InitAsync()` reads `ft-theme` from
+      `localStorage` via JS interop in `MainLayout.OnAfterRenderAsync`, i.e. after first
+      paint — the exact anti-pattern the checklist calls out (should read a cookie during
+      SSR/prerender instead).
+- [ ] **[SECURITY] CSP still uses `script-src 'unsafe-inline'`** rather than sha256-pinning
+      the handful of inline scripts, and no `Permissions-Policy` existed until this pass
+      (now fixed — see above).
+- [ ] **[QA] Full 4-category Lighthouse audit + Core Web Vitals check** against the live
+      `arborkin.com` production URL — not run this session, needs a live pass.
+- [ ] **[A11Y] Zero `:focus-visible` rules in `app.css`** (23 `:hover` rules exist) — likely
+      relying entirely on MudBlazor defaults; not independently verified by tabbing through
+      the app.
+
+**Already solid, confirmed during audit (no action needed):**
+Login rate limiting + lockout, dev-auth hard-blocked outside Development, branch protection
+on `master`, real CI (build+test on every push, separate from manual-only deploy), 41-file
+test suite across Core/Web including UI/component tests, `docs/Style-Guide.md` +
+CSS-custom-property design tokens (no hardcoded-hex retrofit needed), custom 404 page,
+mobile touch-target sizing (44×44px), secrets hygiene (`.gitignore` correctly excludes
+`appsettings.Production/Staging.json`).
+
+---
+
 ## Bugs noticed in testing on 28-June
 - story invite lacks a correct register link
 - how should stories appear for a typical user? in the detail panel, the plain text is probably not great --> should be a list
