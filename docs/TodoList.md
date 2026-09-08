@@ -50,6 +50,60 @@ largely N/A — this is an invite-only private app, not a discoverable public si
       relying entirely on MudBlazor defaults; not independently verified by tabbing through
       the app.
 
+## Golden-Path Walkthrough (2026-09-07)
+
+Live-tested the exact flow a newly-invited distant family member hits — invite →
+register → account creation → tree-linking modal → landing on the tree — ahead of
+sending real invites to a new branch of the family. Ran against a throwaway local DB,
+DevAuth toggled on only to generate the admin invite, then off to test the real
+anonymous registration path.
+
+**Fixed:**
+- [x] **False "memory saved" toast on plain account invites** — `Register.razor`'s
+      welcome toast ("Welcome! Your memory has been saved...") fired for *any* valid
+      invite, not just the "Willa scenario" (an invite following up on a submitted
+      story). A brand-new user joining with a plain admin-generated invite — the
+      normal case for inviting a new family branch — saw a confident, specific claim
+      about "their memory" that was simply false. Gated the toast on
+      `_storySubjectName != null` so it only fires when there's an actual pending
+      story behind the invite.
+- [x] **Broken "tofu" glyph in the Add Person avatar preview** — `PersonForm.razor`'s
+      `Initials` computed `_firstName.FirstOrDefault()` / `_lastName.FirstOrDefault()`,
+      which returns `'\0'` (not a printable fallback) when a name is still empty —
+      visible as a broken-character box in the live avatar preview while typing,
+      since MudBlazor's default (non-`Immediate`) text field binding only commits a
+      field's value on blur, so the second name field genuinely is empty at first
+      render. Reproduced live adding "Kip Kuh" as the tree's first person. Fixed by
+      skipping empty segments instead of indexing into an empty string. (The same
+      `FirstOrDefault()` pattern exists in 5 other places — `CustomAppBar`,
+      `Dashboard`, `PersonDetailDrawer`, `PersonNode`, `SvgExportService` — but all of
+      those read already-saved `PersonDto` names, which are required non-empty
+      fields, so they can't hit this; left unchanged rather than over-scoping.)
+
+**Confirmed working (no action needed):**
+- Full invite → register → account creation → empty-tree landing flow works cleanly,
+  including the pre-filled email banner and accurate "Account created" toast.
+- The "add yourself via Add First Person, without completing the linking modal"
+  edge case — which Admin's Users tab shows as "— Unlinked —" — is not a dead end:
+  `Home.razor`'s existing recovery path (`ShowLinkingModalAsync` with
+  `isRecovery: true`, gated on `_people.Any()`) correctly re-prompts with a clean
+  "Complete your profile" card on the next visit once there's at least one person to
+  link against. Confirmed live by logging in as the test account a second time.
+- Mobile viewport (finally achieved a real sub-768px `window.innerWidth` this
+  session, unlike a prior session's tooling limitation) — the AppBar correctly
+  switches to hamburger + centered identity, the linking modal fits cleanly, and
+  `document.documentElement.scrollWidth` exceeding `innerWidth` (from the tree
+  canvas's absolutely-positioned content) is real but inert: both `html` and `body`
+  have `overflow-x: hidden` set, so there's no user-visible horizontal scroll.
+
+**Not covered this pass** — worth a follow-up before or shortly after the real invite:
+- The "YES, I already know someone on this tree" anchor-selection path wasn't
+  exercised end-to-end with a real relationship submission (only confirmed the
+  empty-tree dropdown doesn't crash).
+- Google OAuth sign-up path.
+- A real physical mobile device (this session's viewport was emulated via window
+  resize, not a real touch device).
+
 **Already solid, confirmed during audit (no action needed):**
 Login rate limiting + lockout, dev-auth hard-blocked outside Development, branch protection
 on `master`, real CI (build+test on every push, separate from manual-only deploy), 41-file
