@@ -61,7 +61,8 @@ This requires:
 - `ActivityTab.razor` — queries UserActivities directly
 - `AuditLogTab.razor` — queries AuditLogs directly
 - `UsersTab.razor` — queries AppUsers directly
-- `AdminOLD.razor` — legacy, should be deleted
+
+`AdminOLD.razor` was the other listed violation — deleted 2026-09-07 (unreferenced legacy page, superseded by `Admin.razor`).
 
 ## Related
 

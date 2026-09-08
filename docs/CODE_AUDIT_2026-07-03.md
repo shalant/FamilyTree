@@ -81,7 +81,7 @@ private async Task LoadActivityAsync()
 **Issue:** Unused legacy admin page  
 **Status:** Superseded by `Admin.razor`  
 
-**Fix:** Delete (safe to remove)
+**Fix:** Delete (safe to remove) — done 2026-09-07, confirmed unreferenced via grep before removal.
 
 ---
 
@@ -106,7 +106,7 @@ private async Task LoadActivityAsync()
 ### Quick Wins (5-10 min each)
 
 - [ ] Remove unused `@using` statements from refactored components
-- [ ] Check if `AdminOLD.razor` is still referenced anywhere
+- [x] Check if `AdminOLD.razor` is still referenced anywhere — it wasn't; deleted 2026-09-07
 - [ ] Verify `ImportFormPanel.razor` uses correct component imports
 
 ### Verify Patterns

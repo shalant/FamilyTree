@@ -111,7 +111,7 @@ All 3 of these MUST be done before production. ~75 minutes total.
 
 ## 🟡 Medium Priority Tasks
 
-### Task 4: Delete AdminOLD.razor
+### Task 4: Delete AdminOLD.razor — done 2026-09-07
 
 **File:** `src/FamilyTree.Web/Modules/Pages/AdminOLD.razor`
 
@@ -123,7 +123,7 @@ All 3 of these MUST be done before production. ~75 minutes total.
 
 ## ✅ Quick Validation Tasks (5 min each)
 
-- [ ] Verify AdminOLD.razor is not referenced elsewhere (grep)
+- [x] Verify AdminOLD.razor is not referenced elsewhere (grep) — confirmed, then deleted 2026-09-07
 - [ ] Confirm Email__FromAddress updated in Azure Portal to `noreply@arborkin.com`
 - [ ] Check that all refactored components have pagination (MudTablePager)
 
