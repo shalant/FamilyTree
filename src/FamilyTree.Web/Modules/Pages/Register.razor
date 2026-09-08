@@ -271,7 +271,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && _inviteId.HasValue && _invite != null && !_welcomeToastShown)
+        if (firstRender && _inviteId.HasValue && _invite != null && _storySubjectName != null && !_welcomeToastShown)
         {
             _welcomeToastShown = true;
             ToastService.Success("Welcome! Your memory has been saved — now create your free ArborKin account.");

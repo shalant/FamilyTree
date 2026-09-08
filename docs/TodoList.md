@@ -50,6 +50,109 @@ largely N/A — this is an invite-only private app, not a discoverable public si
       relying entirely on MudBlazor defaults; not independently verified by tabbing through
       the app.
 
+## Golden-Path Walkthrough (2026-09-07)
+
+Live-tested the exact flow a newly-invited distant family member hits — invite →
+register → account creation → tree-linking modal → landing on the tree — ahead of
+sending real invites to a new branch of the family. Ran against a throwaway local DB,
+DevAuth toggled on only to generate the admin invite, then off to test the real
+anonymous registration path.
+
+**Fixed:**
+- [x] **False "memory saved" toast on plain account invites** — `Register.razor`'s
+      welcome toast ("Welcome! Your memory has been saved...") fired for *any* valid
+      invite, not just the "Willa scenario" (an invite following up on a submitted
+      story). A brand-new user joining with a plain admin-generated invite — the
+      normal case for inviting a new family branch — saw a confident, specific claim
+      about "their memory" that was simply false. Gated the toast on
+      `_storySubjectName != null` so it only fires when there's an actual pending
+      story behind the invite.
+- [x] **Broken "tofu" glyph in the Add Person avatar preview** — `PersonForm.razor`'s
+      `Initials` computed `_firstName.FirstOrDefault()` / `_lastName.FirstOrDefault()`,
+      which returns `'\0'` (not a printable fallback) when a name is still empty —
+      visible as a broken-character box in the live avatar preview while typing,
+      since MudBlazor's default (non-`Immediate`) text field binding only commits a
+      field's value on blur, so the second name field genuinely is empty at first
+      render. Reproduced live adding "Kip Kuh" as the tree's first person. Fixed by
+      skipping empty segments instead of indexing into an empty string. (The same
+      `FirstOrDefault()` pattern exists in 5 other places — `CustomAppBar`,
+      `Dashboard`, `PersonDetailDrawer`, `PersonNode`, `SvgExportService` — but all of
+      those read already-saved `PersonDto` names, which are required non-empty
+      fields, so they can't hit this; left unchanged rather than over-scoping.)
+
+**Confirmed working (no action needed):**
+- Full invite → register → account creation → empty-tree landing flow works cleanly,
+  including the pre-filled email banner and accurate "Account created" toast.
+- The "add yourself via Add First Person, without completing the linking modal"
+  edge case — which Admin's Users tab shows as "— Unlinked —" — is not a dead end:
+  `Home.razor`'s existing recovery path (`ShowLinkingModalAsync` with
+  `isRecovery: true`, gated on `_people.Any()`) correctly re-prompts with a clean
+  "Complete your profile" card on the next visit once there's at least one person to
+  link against. Confirmed live by logging in as the test account a second time.
+- Mobile viewport (finally achieved a real sub-768px `window.innerWidth` this
+  session, unlike a prior session's tooling limitation) — the AppBar correctly
+  switches to hamburger + centered identity, the linking modal fits cleanly, and
+  `document.documentElement.scrollWidth` exceeding `innerWidth` (from the tree
+  canvas's absolutely-positioned content) is real but inert: both `html` and `body`
+  have `overflow-x: hidden` set, so there's no user-visible horizontal scroll.
+
+**Fixed (second pass, same day)** — prompted by "are there common-but-not-golden
+paths worth testing too?":
+- [x] **Add Person form silently did nothing on empty required fields** —
+      `PersonForm.razor`'s `Submit()` checked `_firstName`/`_lastName` and returned
+      on failure with no error shown (`Required`/`RequiredError` were declared on the
+      `MudTextField`s but nothing ever triggered their validation UI, since that only
+      fires on blur or an explicit `Validate()` call, not because a sibling button
+      was clicked). A user submitting with an untouched name field would see the
+      button appear to do nothing at all — no error, no toast, no navigation. Fixed
+      by wiring `_firstNameError`/`_lastNameError` and binding them to `Error`/
+      `ErrorText`, the same explicit pattern `Register.razor` already used
+      correctly. Confirmed via a genuine reproduction (not a tooling artifact) by
+      reading the code path, then verified live post-fix.
+
+**False leads investigated and ruled out this session** (kept here so a future
+session doesn't re-chase the same ghosts):
+- A password-confirmation mismatch appeared to silently do nothing on submit
+  across three careful attempts (no screenshot involved, checked DOM/console/
+  server logs directly) — traced to `resize_window` to a very small viewport
+  (375×812) desyncing the screenshot pixel scale from the actual CSS viewport
+  (`devicePixelRatio: 2.5` compounding non-proportionally), so click coordinates
+  read off a screenshot were landing entirely outside the real ~582×327px
+  viewport. Re-verified at a normal window size — the mismatch validation works
+  correctly and always did. Lesson: after any `resize_window`, check
+  `window.innerWidth` against the screenshot's own pixel dimensions before
+  trusting further coordinate-based clicks; prefer `find`-returned element refs
+  over raw coordinates when a resize has happened recently.
+- A `document.documentElement.scrollWidth` (1154) exceeding `innerWidth` (577) on
+  a genuinely-achieved mobile viewport looked like a horizontal-scroll bug, but
+  both `html` and `body` have `overflow-x: hidden`, so it's inert — confirmed via
+  computed style, not just eyeballing.
+- Adding a person while using the `DevAuth` bypass appeared to silently fail (the
+  person "created" per server logs but never showing up in the People list).
+  Traced to `DevAuthHandler` never issuing a `"FamilyId"` claim, which
+  `CurrentUserService.FamilyId` requires — a testing-harness-only gap, since real
+  registered users always get a real family via the invite/registration flow.
+  Not fixed (out of scope — it's dev-tooling, not app behavior), just documented
+  here so it isn't re-investigated as a user-facing bug next time.
+
+**Confirmed correct (no fix needed), from the common-path pass:**
+- An invalid/expired/garbage invite token on `/register` in production's
+  `InviteOnly` mode does *not* bypass the invite check — the full signup form
+  renders (no upfront "this link is invalid" banner, a minor polish gap, not a
+  security issue), but submitting is correctly rejected server-side with a clear
+  "This invitation is invalid, expired, or for a different email address."
+  message. No account is created.
+- Password-confirmation mismatch shows "Passwords do not match" correctly.
+
+**Not covered this pass** — worth a follow-up before or shortly after the real invite:
+- The "YES, I already know someone on this tree" anchor-selection path still
+  wasn't exercised end-to-end with a real relationship submission (blocked this
+  session by the DevAuth/FamilyId testing-harness gap above, not by an app bug).
+- Google OAuth sign-up path.
+- A real physical mobile device (this session's viewport was emulated via window
+  resize, not a real touch device).
+- Duplicate-email registration (registering twice with the same address).
+
 **Already solid, confirmed during audit (no action needed):**
 Login rate limiting + lockout, dev-auth hard-blocked outside Development, branch protection
 on `master`, real CI (build+test on every push, separate from manual-only deploy), 41-file

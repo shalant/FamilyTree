@@ -22,6 +22,8 @@
                               Placeholder="e.g. Margaret"
                               Required="true"
                               RequiredError="First name is required."
+                              Error="@(!string.IsNullOrEmpty(_firstNameError))"
+                              ErrorText="@_firstNameError"
                               Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="6">
@@ -30,6 +32,8 @@
                               Placeholder="e.g. Rosenberg"
                               Required="true"
                               RequiredError="Last name is required."
+                              Error="@(!string.IsNullOrEmpty(_lastNameError))"
+                              ErrorText="@_lastNameError"
                               Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="6">
@@ -524,6 +528,8 @@
     private bool _saving;
     private string _firstName = "";
     private string _lastName = "";
+    private string _firstNameError = "";
+    private string _lastNameError = "";
     private string _middleName = "";
     private string _maidenName = "";
     private string _notes = "";
@@ -819,13 +825,27 @@
     private void RemoveChild(Guid id) => _childIds.Remove(id);
 
     // ── initials ───────────────────────────────────────────────────
+    // _firstName/_lastName are live, still-being-typed form fields (unlike the
+    // other Initials computations in this codebase, which read already-saved,
+    // always-non-empty PersonDto names) — FirstOrDefault() on an empty string
+    // returns '\0', which renders as a visible tofu/replacement glyph in the
+    // avatar preview rather than nothing, so empty segments must be skipped.
     private string Initials =>
-        $"{_firstName.FirstOrDefault()}{_lastName.FirstOrDefault()}".ToUpperInvariant().Trim();
+        $"{(_firstName.Length > 0 ? _firstName[0].ToString() : "")}{(_lastName.Length > 0 ? _lastName[0].ToString() : "")}"
+            .ToUpperInvariant();
 
     // ── submit ─────────────────────────────────────────────────────
     private async Task Submit()
     {
-        if (string.IsNullOrWhiteSpace(_firstName) || string.IsNullOrWhiteSpace(_lastName))
+        // Previously this checked _firstName/_lastName and returned silently on
+        // failure — clicking Submit with an untouched required field did nothing
+        // visible at all (no error, no toast), since a MudTextField only shows its
+        // Required/RequiredError state once touched, not merely because a sibling
+        // button was clicked. Setting these explicitly (matching Register.razor's
+        // pattern) makes the same failure visible.
+        _firstNameError = string.IsNullOrWhiteSpace(_firstName) ? "First name is required." : "";
+        _lastNameError = string.IsNullOrWhiteSpace(_lastName) ? "Last name is required." : "";
+        if (_firstNameError.Length > 0 || _lastNameError.Length > 0)
         {
             StateHasChanged();
             return;
