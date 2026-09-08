@@ -144,10 +144,49 @@ session doesn't re-chase the same ghosts):
   message. No account is created.
 - Password-confirmation mismatch shows "Passwords do not match" correctly.
 
+**Second follow-up pass (2026-09-08)** — completed the anchor-relationship
+submission end-to-end (worked around the DevAuth/FamilyId gap by using two real
+registered accounts instead): registered "Kip", had Kip add "Rose Kuh" as the
+tree's first person, generated a second invite, registered "Grandma Kuh" through
+it, picked "YES, I DO know someone" → Rose Kuh → "I'm their parent" → Continue.
+The relationship was created correctly and Grandma landed focused on herself
+with "Your family tree has 2 people" showing — functionally correct.
+
+- [ ] **[LAYOUT BUG, not yet fixed] Two related people with no birth date
+      anywhere in the tree render exactly on top of each other.** Confirmed live:
+      Grandma Kuh's node and label rendered directly on top of Rose Kuh's ("GK"
+      circle with "Rose"/"Grandma" text overlapping illegibly). Root cause pinned
+      down in `FamilyTreeLayoutEngine.ComputeBirthYears` (`Services/
+      FamilyTreeLayoutEngine.cs:956-970`): the existing multi-pass relative-year
+      inference (parent ≈ avg(child years) − 25, sibling ≈ avg(sibling years),
+      etc.) only has something to propagate from once at least one person in the
+      tree has a **real, known** `BirthDate` (Pass 0). When the entire tree has
+      zero known birth dates — the normal state of a brand-new tree on day one,
+      exactly what a first-invited distant family member like a Kuh would hit —
+      `years.Any()` is false after passes 0-2, so the `else` branch
+      (`FamilyTreeLayoutEngine.cs:965-970`) defaults **every** person to
+      `DateTime.Now.Year` with no regard for parent/child/sibling/spouse links
+      that could still establish *relative* spacing even without a real anchor
+      date. The existing code already explicitly guards against a narrower
+      version of this exact failure mode (see the Pass 1 comment about "two
+      people with no birth date and no inferable link... render on top of each
+      other") — this is the same bug class, just triggered when *no one at all*
+      has a seed date rather than only the two unlinked people lacking one.
+      **Not fixed this session** — deliberately, per this repo's own documented
+      rule that a new layout classification-transition bug needs a dedicated
+      `FamilyTreeLayoutEngineTests` before/after regression test, not a
+      live-session patch to the most bug-history-laden part of the codebase.
+      Plausible fix direction: when `years` is empty after passes 0-2, seed one
+      representative person per connected component (rather than seeding
+      literally everyone to the same year) and let the existing relative-offset
+      passes propagate from that single per-component seed — needs the
+      connected-components enumeration (see the section below
+      `ComputeBirthYears` in the same file) threaded through, which is why this
+      needs its own scoped pass rather than a quick inline patch.
+- No console errors observed during the full flow (checked via
+  `read_console_messages`).
+
 **Not covered this pass** — worth a follow-up before or shortly after the real invite:
-- The "YES, I already know someone on this tree" anchor-selection path still
-  wasn't exercised end-to-end with a real relationship submission (blocked this
-  session by the DevAuth/FamilyId testing-harness gap above, not by an app bug).
 - Google OAuth sign-up path.
 - A real physical mobile device (this session's viewport was emulated via window
   resize, not a real touch device).
