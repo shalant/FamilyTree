@@ -100,7 +100,18 @@ public class FamilyTreeLayoutEngine
             : 0;
 
         // ─────────────────────────────────────────────────────────────────────
-        // PHASE 2: Compute birth years (absolute timeline positions)
+        // PHASE 2: Identify connected components (separate family trees)
+        // ─────────────────────────────────────────────────────────────────────
+        //
+        // A connected component is a maximal set of people connected through
+        // parent/child/spouse relationships. Each component is rendered as an
+        // independent tree, laid out side‑by‑side horizontally. Computed before
+        // birth years so a component with no known birth dates of its own can be
+        // seeded independently — see ComputeBirthYears.
+        var components = IdentifyConnectedComponents(people);
+
+        // ─────────────────────────────────────────────────────────────────────
+        // PHASE 3: Compute birth years (absolute timeline positions)
         // ─────────────────────────────────────────────────────────────────────
         //
         // We build a robust birth‑year map that:
@@ -110,21 +121,12 @@ public class FamilyTreeLayoutEngine
         //   • Defaults remaining unknowns to the median year
         //
         // This produces a smooth temporal axis even with sparse data.
-        var birthYears = ComputeBirthYears(people);
+        var birthYears = ComputeBirthYears(people, components);
         // Snap to decade boundaries so band labels land on round numbers (1910, 1920 …)
         var minYear = (birthYears.Values.Min() / 10) * 10;
         var maxYear = ((birthYears.Values.Max() + 9) / 10) * 10;
         var yearRange = maxYear - minYear + 1;
         var canvasHeight = (int)(yearRange * PxPerYear + PaddingY * 2);
-
-        // ─────────────────────────────────────────────────────────────────────
-        // PHASE 3: Identify connected components (separate family trees)
-        // ─────────────────────────────────────────────────────────────────────
-        //
-        // A connected component is a maximal set of people connected through
-        // parent/child/spouse relationships. Each component is rendered as an
-        // independent tree, laid out side‑by‑side horizontally.
-        var components = IdentifyConnectedComponents(people);
 
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 4: Nuclear-family bottom-up / top-down X layout
@@ -859,22 +861,48 @@ public class FamilyTreeLayoutEngine
     ///
     /// Strategy:
     ///   1. Use PersonDto.BirthDate if available
-    ///   2. Infer from children: parent_year ≈ avg(child_years) - 25
-    ///   3. Infer from siblings: sibling_year ≈ avg(known sibling years)
-    ///   4. Infer from spouses: spouse_year ≈ avg(known spouse/former-spouse years)
-    ///   5. Infer from parents: child_year ≈ avg(parent_years) + 25
-    ///   6. Default remaining unknowns to the median year
+    ///   2. If an entire connected component has no known birth date at all,
+    ///      seed one representative person in it so relative-offset inference
+    ///      below has something to propagate from (see the component-seeding
+    ///      step)
+    ///   3. Infer from children: parent_year ≈ avg(child_years) - 25
+    ///   4. Infer from siblings: sibling_year ≈ avg(known sibling years)
+    ///   5. Infer from spouses: spouse_year ≈ avg(known spouse/former-spouse years)
+    ///   6. Infer from parents: child_year ≈ avg(parent_years) + 25
+    ///   7. Default remaining unknowns to the median year
     ///
     /// This multi‑pass approach converges on a consistent temporal model even
     /// when data is incomplete.
     /// </summary>
-    private Dictionary<Guid, int> ComputeBirthYears(List<PersonDto> people)
+    private Dictionary<Guid, int> ComputeBirthYears(List<PersonDto> people, List<List<PersonDto>> components)
     {
         var years = new Dictionary<Guid, int>();
 
         // Pass 0: Assign from known birth dates.
         foreach (var person in people.Where(p => p.BirthDate.HasValue))
             years[person.Id] = person.BirthDate!.Value.Year;
+
+        // Pass 0.5: A connected component with zero known birth dates of its own
+        // has nothing for Pass 1 below to propagate from, so every one of its
+        // members would otherwise fall straight through to the Pass 3 "default to
+        // median" fallback -- landing every related person (parent, child,
+        // sibling, spouse) on the exact same year with no regard for their
+        // relationships. This is the normal state of a brand-new tree on day
+        // one: the first-invited family member's whole component has no birth
+        // dates yet. Seed one representative person per such component so Pass 1
+        // can still infer relative spacing (parent ≈ child - 25, siblings same
+        // year, etc.) within that component, even though no real anchor date
+        // exists anywhere in it. Scoped per component (not "the whole tree has no
+        // dates") so a brand-new, dateless branch grafted onto an already-dated
+        // family doesn't also collapse onto that family's unrelated median year.
+        var currentYear = DateTime.Now.Year;
+        foreach (var component in components)
+        {
+            if (component.Count == 0) continue;
+            if (component.Any(p => years.ContainsKey(p.Id))) continue;
+
+            years[component[0].Id] = currentYear;
+        }
 
         // Pass 1: Infer parents from children, children from parents, and siblings
         // from each other — iterated together until stable. Combining these lets a
@@ -964,9 +992,12 @@ public class FamilyTreeLayoutEngine
         }
         else
         {
-            var currentYear = DateTime.Now.Year;
+            // Unreachable in practice -- Pass 0.5 above seeds one representative per
+            // non-empty component, so every component contributes at least one year
+            // before we get here. Kept as a defensive fallback only.
+            var fallbackYear = DateTime.Now.Year;
             foreach (var person in people)
-                years[person.Id] = currentYear;
+                years[person.Id] = fallbackYear;
         }
 
         return years;

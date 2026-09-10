@@ -1201,6 +1201,68 @@ public class FamilyTreeLayoutEngineTests
             "the divider must sit within the gap between the two unrelated components, not overlap either one");
     }
 
+    [Fact]
+    public void EntirelyDatelessFamily_ParentAndChildDoNotRenderOnTopOfEachOther()
+    {
+        // Reproduces the exact bug found completing the anchor-relationship walkthrough
+        // (2026-09-08): a brand-new tree where NO ONE has a birth date yet -- the normal
+        // state on day one, exactly what a first-invited distant family member creates.
+        // Before the fix, ComputeBirthYears' all-empty fallback defaulted every person to
+        // DateTime.Now.Year with no regard for parent/child links, so a parent centered
+        // over their only child landed at the identical (X, Y) as that child.
+        var grandma = Guid.NewGuid();
+        var rose = Guid.NewGuid();
+
+        var people = new List<PersonDto>
+        {
+            new() { Id = grandma, FirstName = "Grandma", LastName = "Kuh", ParentIds = [], ChildIds = [rose], SpouseIds = [] },
+            new() { Id = rose, FirstName = "Rose", LastName = "Kuh", ParentIds = [grandma], ChildIds = [], SpouseIds = [] },
+        };
+
+        var layout = _engine.ComputeLayout(people, CoupleHelper.Derive(people), rose);
+
+        var grandmaNode = layout.Nodes.Single(n => n.Person.Id == grandma);
+        var roseNode = layout.Nodes.Single(n => n.Person.Id == rose);
+
+        grandmaNode.Y.Should().NotBe(roseNode.Y,
+            "a parent and child must render on different rows even when neither has a known " +
+            "birth date -- inference must still use the parent/child link, not a shared global default");
+    }
+
+    [Fact]
+    public void DatelessComponent_DoesNotCollapseOntoAnUnrelatedComponentsMedianYear()
+    {
+        // A dateless branch is never actually IN the same component as a dated family
+        // unless a relationship connects them -- so the interesting mixed case is two
+        // genuinely disconnected components on the same canvas, one dated and one not
+        // (e.g. an already-populated tree, plus a brand-new unrelated family someone
+        // else just started). Before the fix, ComputeBirthYears only seeded per-person
+        // when the ENTIRE tree had zero known dates; here the dated component means
+        // years.Any() is true, so Bill and Willa would both fall through to Pass 3's
+        // "default to the global median" -- landing on the dated family's unrelated
+        // median year, on top of each other, instead of getting their own inferred
+        // relative spacing.
+        var ray = Guid.NewGuid();
+        var rose = Guid.NewGuid();
+        var ellen = Guid.NewGuid();
+        var sarah = Guid.NewGuid();
+        var bill = Guid.NewGuid();
+        var willa = Guid.NewGuid();
+
+        var people = BuildFamily(ray, rose, ellen, sarah);
+        people.Add(new() { Id = bill, FirstName = "Bill", LastName = "Small", ParentIds = [], ChildIds = [willa], SpouseIds = [] });
+        people.Add(new() { Id = willa, FirstName = "Willa", LastName = "Small", ParentIds = [bill], ChildIds = [], SpouseIds = [] });
+
+        var layout = _engine.ComputeLayout(people, CoupleHelper.Derive(people), ray);
+
+        var billNode = layout.Nodes.Single(n => n.Person.Id == bill);
+        var willaNode = layout.Nodes.Single(n => n.Person.Id == willa);
+
+        billNode.Y.Should().NotBe(willaNode.Y,
+            "Bill and Willa's own parent/child link must drive their relative spacing, not the " +
+            "unrelated dated component's median year");
+    }
+
     private static List<PersonDto> BuildFamily(Guid ray, Guid rose, Guid ellen, Guid sarah) =>
     [
         new() { Id = ray, FirstName = "Ray", LastName = "Small",
