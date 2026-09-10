@@ -43,7 +43,13 @@
 
 <AuthorizeView>
     <NotAuthorized>
-        @if (_showIntro)
+        @* _authStateResolved gate matters here, not just on the spinner block below:
+           AuthorizeView's own NotAuthorized branch can render before this component's
+           OnInitializedAsync has awaited GetAuthenticationStateAsync() (e.g. on the
+           interactive-circuit reconnect after prerendering, which restarts component
+           state fresh) -- without this check, an already-authenticated user briefly
+           sees LoginOverlay underneath the spinner instead of nothing. *@
+        @if (_showIntro && _authStateResolved)
         {
             <LoginOverlay OnGuest="HideIntro" ErrorMessage="@LoginError" PrefillEmail="@Email" />
         }
