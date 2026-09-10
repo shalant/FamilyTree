@@ -152,7 +152,7 @@ it, picked "YES, I DO know someone" → Rose Kuh → "I'm their parent" → Cont
 The relationship was created correctly and Grandma landed focused on herself
 with "Your family tree has 2 people" showing — functionally correct.
 
-- [ ] **[LAYOUT BUG, not yet fixed] Two related people with no birth date
+- [x] **[LAYOUT BUG, fixed 2026-09-09] Two related people with no birth date
       anywhere in the tree render exactly on top of each other.** Confirmed live:
       Grandma Kuh's node and label rendered directly on top of Rose Kuh's ("GK"
       circle with "Rose"/"Grandma" text overlapping illegibly). Root cause pinned
@@ -172,19 +172,46 @@ with "Your family tree has 2 people" showing — functionally correct.
       people with no birth date and no inferable link... render on top of each
       other") — this is the same bug class, just triggered when *no one at all*
       has a seed date rather than only the two unlinked people lacking one.
-      **Not fixed this session** — deliberately, per this repo's own documented
-      rule that a new layout classification-transition bug needs a dedicated
-      `FamilyTreeLayoutEngineTests` before/after regression test, not a
-      live-session patch to the most bug-history-laden part of the codebase.
-      Plausible fix direction: when `years` is empty after passes 0-2, seed one
-      representative person per connected component (rather than seeding
-      literally everyone to the same year) and let the existing relative-offset
-      passes propagate from that single per-component seed — needs the
-      connected-components enumeration (see the section below
-      `ComputeBirthYears` in the same file) threaded through, which is why this
-      needs its own scoped pass rather than a quick inline patch.
+      **Fixed** by computing connected components *before* birth years (was
+      after) and, when a component has no known birth date of its own, seeding
+      one representative person in it so the existing relative-offset inference
+      has something to propagate from — scoped **per component**, not "the
+      whole tree has no dates", so a brand-new dateless branch grafted onto an
+      already-dated family no longer collapses onto that unrelated family's
+      median year either (a second, related collapse this fix also closes, not
+      covered by the original bug report above). `FamilyTreeLayoutEngine.cs` —
+      `ComputeBirthYears` (Pass 0.5) + `ComputeLayout` (Phase 2/3 reordered).
+      Regression tests:
+      `FamilyTreeLayoutEngineTests.EntirelyDatelessFamily_ParentAndChildDoNotRenderOnTopOfEachOther`
+      and `.DatelessComponent_DoesNotCollapseOntoAnUnrelatedComponentsMedianYear`.
 - No console errors observed during the full flow (checked via
   `read_console_messages`).
+
+- [ ] **[LAYOUT BUG, not yet fixed, found live 2026-09-09] A root-individual sibling with
+      an inferred birth year close-but-not-equal to the sibling they anchor next to can
+      still render on top of them.** Reproduced live in the same dev DB used for the fix
+      above: registered a plain account ("Ellen"), linked as Douglas's sibling via the
+      generic "we're siblings" LinkToTreeModal path (no shared parent recorded). Douglas
+      has a real `BirthDate` (1978); Ellen has none, so Pass 1 sibling-inference gives her
+      Douglas's own year (1978) — NOT his sister Lauren's real year (1982), even though
+      Ellen visually landed exactly on top of Lauren, not Douglas. Root cause is X-axis,
+      not birth-year: `FindOpenXAdjacentTo`'s and `UnboundedExtend`'s collision checks
+      (`FamilyTreeLayoutEngine.cs`, `n.Y == anchor.Y` — currently ~line 569 and ~590) treat
+      two nodes as "colliding" only when their Y values are *exactly* equal (same row).
+      Douglas and Lauren differ by 4 birth years × `PxPerYear` (6.5) ≈ 26px — far less than
+      a node's own diameter (60-80px) — so Ellen, anchored next to Douglas at
+      `Douglas.X + NodeSpacingX`, lands on an X slot the exact-Y check sees as free even
+      though it visually overlaps Lauren's much-larger circle sitting a mere 26px above/
+      below on the canvas. This is the same underlying class of bug as the two entries
+      above it (an X/Y collision-avoidance check that's technically correct on its stated
+      condition but doesn't account for a case just outside that condition), but a
+      genuinely different code path and root cause from the birth-year fix above it —
+      deliberately NOT fixed in the same change, per this file's own rule that each
+      classification-transition bug gets its own scoped fix + before/after regression
+      test, not a second fix riding along on an unrelated PR. Plausible fix direction:
+      change the collision predicate from `n.Y == anchor.Y` to a vertical-distance check
+      (`Math.Abs(n.Y - anchor.Y) < <node diameter at that depth>`), so near-miss Y values
+      are still treated as an occupied row.
 
 **Not covered this pass** — worth a follow-up before or shortly after the real invite:
 - Google OAuth sign-up path.
