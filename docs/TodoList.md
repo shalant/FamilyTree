@@ -2,6 +2,48 @@
 
 ---
 
+## Mobile Refinement Round 2 (2026-09-10/11)
+
+Real-phone testing (Android, via the user's own device) of the mobile nav drawer and
+related surfaces, following up on the "mobile overhaul" (2026-08-08) and the site-quality
+audit (2026-09-07) below. Branch: `fix/mobile-refinement-round2`. Full narrative and code
+locations in `CLAUDE.md`'s "Mobile/Tablet Responsive Pattern" section — this entry is the
+checklist form of the same work.
+
+**Fixed:**
+- [x] **Mobile drawer touch targets** — close button (27×26px) and nav rows (38px tall)
+      both under the 44×44 minimum; now exactly compliant.
+- [x] **Mobile drawer two-tone banding** — a decorative `::before` gradient sheen faded
+      unevenly top-to-bottom across the panel; removed (same bug class as one already
+      fixed once before, recurring in a new shape).
+- [x] **Mobile drawer excess dead space** — `max-height: 55vh` left a large empty backdrop
+      area under a short list; now `calc(100dvh - 76px)`, filling nearly the full screen.
+- [x] **Mobile drawer had no closing animation** — instant DOM removal; added a real
+      two-phase close (`ft-nav-close` keyframe + delayed unmount), plus `pointer-events:
+      none` on the closing state as a safety net against a stuck/leftover overlay
+      silently blocking clicks on the rest of the page.
+- [x] **[REGRESSION] AppBar toolbar-reveal caret broken on any `?focus=` URL** —
+      `CanRevealMobileToolbar`'s route check didn't strip the query string before
+      comparing, so a normal shared/persisted-focus link wrongly read as "not home" and
+      hid the caret. Found live comparing two browser sessions rendering differently;
+      fixed and covered by a regression test verified to fail pre-fix, pass post-fix.
+- [x] **People/Stories page header toolbars didn't fit a phone row** — search + filter +
+      add-person controls needed ~789px in one non-wrapping row on People; now wraps.
+      People's 5-column table also had no mobile treatment — contained to scroll
+      horizontally within its own box instead of forcing the whole page to.
+- [x] **PersonForm ignored phone width entirely** — every field pair used a fixed
+      `MudItem xs="6"` with no `sm` override, so fields stayed half-width even on the
+      narrowest phones. This is the shared Add/Edit form — the same flow that caused
+      real frustration in an earlier session. All 10 fields now stack full-width below
+      `sm` (~600px).
+
+**Not investigated this pass** (surfaced but out of scope for a mobile-focused session):
+- [ ] Canvas pinch/pan touch behavior on a real device — CLAUDE.md documents the
+      Pointer-Events implementation as deliberate, not re-verified live here.
+- [ ] Whether the "Complete your profile" button has any issue independent of the
+      stale-session/caret bugs above — worked in every scenario actually reproduced
+      this session, but not yet confirmed against a `?focus=` URL specifically.
+
 ## Site Quality Checklist Audit (2026-09-07)
 
 Audited against `docs/SITE_QUALITY_CHECKLIST.md` in the sibling `career-development` repo
