@@ -16,7 +16,7 @@
         <MudText Typo="Typo.h5" Class="mb-4" Style="font-family:var(--ft-font-display); color:var(--ft-green-800);">Identity</MudText>
 
         <MudGrid Spacing="3">
-            <MudItem xs="6">
+            <MudItem xs="12" sm="6">
                 <div class="ft-field-label">First name <span class="ft-required">*</span></div>
                 <MudTextField @bind-Value="_firstName"
                               Placeholder="e.g. Margaret"
@@ -26,7 +26,7 @@
                               ErrorText="@_firstNameError"
                               Variant="Variant.Outlined" />
             </MudItem>
-            <MudItem xs="6">
+            <MudItem xs="12" sm="6">
                 <div class="ft-field-label">Last name <span class="ft-required">*</span></div>
                 <MudTextField @bind-Value="_lastName"
                               Placeholder="e.g. Rosenberg"
@@ -36,19 +36,19 @@
                               ErrorText="@_lastNameError"
                               Variant="Variant.Outlined" />
             </MudItem>
-            <MudItem xs="6">
+            <MudItem xs="12" sm="6">
                 <div class="ft-field-label">Middle name</div>
                 <MudTextField @bind-Value="_middleName"
                               Placeholder="Middle name"
                               Variant="Variant.Outlined" />
             </MudItem>
-            <MudItem xs="6">
+            <MudItem xs="12" sm="6">
                 <div class="ft-field-label">Maiden name</div>
                 <MudTextField @bind-Value="_maidenName"
                               Placeholder="Birth surname"
                               Variant="Variant.Outlined" />
             </MudItem>
-            <MudItem xs="5">
+            <MudItem xs="12" sm="5">
                 <div class="ft-field-label">Date of birth</div>
                 <MudDatePicker @bind-Date="_birthDate"
                                Placeholder="mm/dd/yyyy"
@@ -56,7 +56,7 @@
                                Editable="true"
                                Variant="Variant.Outlined" />
             </MudItem>
-            <MudItem xs="7">
+            <MudItem xs="12" sm="7">
                 <div class="ft-field-label">Place of birth</div>
                 <MudTextField @bind-Value="_birthPlace"
                               Placeholder="City, State / Country"
@@ -64,7 +64,7 @@
                               AdornmentIcon="@Icons.Material.Outlined.LocationOn"
                               Variant="Variant.Outlined" />
             </MudItem>
-            <MudItem xs="5">
+            <MudItem xs="12" sm="5">
                 <div class="ft-field-label">Date of death</div>
                 <MudDatePicker @bind-Date="_deathDate"
                                Placeholder="mm/dd/yyyy"
@@ -72,7 +72,7 @@
                                Editable="true"
                                Variant="Variant.Outlined" />
             </MudItem>
-            <MudItem xs="7">
+            <MudItem xs="12" sm="7">
                 <div class="ft-field-label">Place of death</div>
                 <MudTextField @bind-Value="_deathPlace"
                               Placeholder="City, State / Country"
@@ -80,7 +80,7 @@
                               AdornmentIcon="@Icons.Material.Outlined.LocationOn"
                               Variant="Variant.Outlined" />
             </MudItem>
-            <MudItem xs="6">
+            <MudItem xs="12" sm="6">
                 <div class="ft-field-label">Gender</div>
                 <MudSelect @bind-Value="_gender" Variant="Variant.Outlined">
                     <MudSelectItem Value="@((Gender?)null)">Not specified</MudSelectItem>
@@ -89,7 +89,7 @@
                     <MudSelectItem Value="@((Gender?)Gender.Other)">Other</MudSelectItem>
                 </MudSelect>
             </MudItem>
-            <MudItem xs="6">
+            <MudItem xs="12" sm="6">
                 <div class="ft-field-label">Email</div>
                 <MudTextField @bind-Value="_email"
                               Placeholder="name@example.com"
