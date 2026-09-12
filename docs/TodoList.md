@@ -2,6 +2,50 @@
 
 ---
 
+## Regression Testing Hardening (2026-09-11)
+
+Motivated by real family (some estranged for years) about to be invited to use the app,
+and a recurring pattern this session set out to fix directly: shipping a feature, then
+noticing a previously-working one had quietly broken. Branch: `testing/regression-hardening`.
+Catalogued all 21 bugs found via manual/live testing across CLAUDE.md and this file — 14
+already had regression tests; the 7 gaps split into two tracks. Full technical detail in
+CLAUDE.md's "Testing & Quality Strategy" section — this entry is the checklist form.
+
+**Track 1 — bUnit regression tests for already-fixed edge cases (no new infra):**
+- [x] `PersonForm`'s tofu-glyph avatar-initials bug (empty name -> `\0` char)
+- [x] `PersonForm`'s silent required-field no-op
+- [x] `Register.razor`'s false "memory saved" toast on a plain (non-story) invite
+- [x] `DeletedTab`'s restore-list-shift misattribution
+- [x] `[Trait("Category","Regression")]` tagging convention + CI filter step
+
+**Track 2 — real Playwright E2E harness (`tests/FamilyTree.E2E.Tests`):**
+- [x] `E2eAppFixture`: real SQL Server (disposable), real external app process, real
+      Playwright browser — not `WebApplicationFactory`/SQLite (see CLAUDE.md for why)
+- [x] Wired up the 3 previously-dead Playwright stubs (permanently skipped, one with a
+      hardcoded token no data backed) into real, passing tests
+- [x] Mobile-viewport regression suite — closes 6 of 7 previously-uncovered mobile-CSS
+      bugs from the mobile refinement round (touch targets, drawer height, close
+      animation, the `?focus=` caret bug), the exact category bUnit structurally cannot
+      see and manual browser-automation testing couldn't reliably reach either
+- [x] `GoldenPathTests` — automates the Golden-Path Walkthrough below end to end
+- [x] CI: new `e2e-test` job with a disposable SQL Server service container +
+      Playwright's own generated install script
+
+**Two small production fixes found via this work** (both real, narrowly scoped, not
+test-only hacks — see CLAUDE.md and the branch's commits for detail):
+- [x] `Program.cs` loaded user secrets in Development *after* `CreateBuilder`'s own
+      environment-variable source, so an env-var override was silently shadowed by a
+      developer's real secrets.json for the same key
+- [x] `BlobServiceClient`'s dev-storage fallback used `?? "..."` (catches only `null`,
+      not an explicitly empty string) — now `IsNullOrWhiteSpace`, matching the pattern
+      already used elsewhere in the same file
+
+**Not investigated this pass:**
+- [ ] The Willa-scenario (subject-first, story-follow-up) linking flow has no E2E
+      coverage yet — only the generic invite/anchor-linking flow does (`GoldenPathTests`)
+- [ ] No visual/screenshot-diff testing — this pass is behavioral/computed-style
+      assertions only, not pixel-level regression
+
 ## Mobile Refinement Round 2 (2026-09-10/11)
 
 Real-phone testing (Android, via the user's own device) of the mobile nav drawer and
