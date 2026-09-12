@@ -31,6 +31,14 @@ jobs:
       - name: Test
         run: dotnet test FamilyTree.sln --no-build -c Release --logger "trx;LogFileName=test_results.trx"
 
+      # Informational only — the full suite above already gates the build. This just
+      # makes regression coverage easy to eyeball separately in CI logs: tests tagged
+      # [Trait("Category","Regression")] protect a specific bug that shipped and was
+      # found live, so a failure here is a real user-facing behavior breaking again.
+      - name: Regression tests (informational)
+        if: always()
+        run: dotnet test FamilyTree.sln --no-build -c Release --filter "Category=Regression" --logger "console;verbosity=detailed"
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
