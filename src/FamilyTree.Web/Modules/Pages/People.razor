@@ -17,7 +17,7 @@
 
 <MudPaper Elevation="0" Class="pa-4" Style="background:var(--ft-surface);">
     <MudStack Row="true" AlignItems="AlignItems.Center"
-              Justify="Justify.SpaceBetween" Class="mb-4">
+              Justify="Justify.SpaceBetween" Class="mb-4 ft-page-toolbar">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudText Typo="Typo.h5"
                      Style="font-style:italic; font-family:Georgia,serif;
@@ -33,7 +33,7 @@
             }
         </MudStack>
 
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="ft-people-actions">
             <MudTextField @bind-Value="_search"
                           Placeholder="Search by name or place…"
                           Adornment="Adornment.Start"

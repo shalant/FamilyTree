@@ -83,9 +83,14 @@
         </MudAutocomplete>
     </div>
 
-    @* ── User identity (mobile only — replaces search); tap opens the combined
-       zoom/center/reset + focus-person panel (MobileControlPanel) ─────────── *@
-    <div class="ft-appbar-family-title" @onclick="@(() => { _drawerOpen = false; TreeContext.ToggleMobilePanel(); })">
+    @* ── User identity (mobile only — replaces search). The tree-canvas toolbar
+       (MobileControlPanel) only exists on "/" once a focus person is showing —
+       everywhere else (unlinked/no-people states, or any other page) there's
+       nothing for a tap to reveal, so only show the caret and wire the tap
+       when that panel actually exists; otherwise this is a plain identity
+       readout, not a false promise of an action. ───────────────────────── *@
+    <div class="@("ft-appbar-family-title" + (CanRevealMobileToolbar ? "" : " ft-appbar-family-title--static"))"
+         @onclick="OnIdentityTapped">
         <div class="ft-appbar-user-id">
             <MudAvatar Size="Size.Small" Color="Color.Primary">
                 @if (!string.IsNullOrWhiteSpace(_userPhotoUrl))
@@ -98,7 +103,10 @@
                 }
             </MudAvatar>
             <span class="ft-family-title-name">@_userName</span>
-            <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Class="ft-appbar-caret" />
+            @if (CanRevealMobileToolbar)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Class="ft-appbar-caret" />
+            }
         </div>
     </div>
 
@@ -197,17 +205,18 @@
         <MudIconButton Icon="@(_drawerOpen ? Icons.Material.Outlined.Close : Icons.Material.Outlined.Menu)"
                        Class="@("ft-hamburger-btn" + (_drawerOpen ? " ft-hamburger-btn--open" : ""))"
                        Style="color:var(--ft-gray-600);"
-                       OnClick="@(() => { _drawerOpen = !_drawerOpen; TreeContext.CloseMobilePanel(); })" />
+                       OnClick="ToggleDrawerAsync" />
     </div>
 
 </MudAppBar>
 
 @* ── Mobile nav panel (custom — no MudDrawer to avoid layout side-effects) ───── *@
-@if (_drawerOpen)
+@if (_drawerOpen || _drawerClosing)
 {
-    <div class="ft-mobile-backdrop" @onclick="@(() => _drawerOpen = false)"></div>
+    <div class="@("ft-mobile-backdrop" + (_drawerClosing ? " ft-mobile-backdrop--closing" : ""))"
+         @onclick="CloseDrawerAsync"></div>
 
-    <div class="ft-mobile-nav">
+    <div class="@("ft-mobile-nav" + (_drawerClosing ? " ft-mobile-nav--closing" : ""))">
         <div class="ft-drawer-header">
             <div>
                 <div class="ft-drawer-username">@_userName</div>
@@ -216,7 +225,7 @@
                     <div class="ft-drawer-role">@_authChipLabel</div>
                 }
             </div>
-            <button class="ft-drawer-close" @onclick="@(() => _drawerOpen = false)" aria-label="Close">✕</button>
+            <button class="ft-drawer-close" @onclick="CloseDrawerAsync" aria-label="Close">✕</button>
         </div>
 
         <div class="ft-drawer-divider"></div>
@@ -276,6 +285,20 @@
     private List<PersonDto> _allPeople = [];
     private bool _isDark;
     private bool _drawerOpen;
+    private bool _drawerClosing;
+
+    // MobileControlPanel (the "toolbar" the identity caret promises to reveal)
+    // only exists on Home's canvas view once a focus person is showing — see
+    // Home.razor, where it's rendered in the same branch as FamilyTreeCanvas.
+    // ToBaseRelativePath keeps the query string attached (e.g. "?focus=<id>"
+    // for a shared/deep-linked tree URL) — checking its raw length against
+    // "/" made every such link on the home route wrongly read as "not home",
+    // hiding the caret. Strip query/fragment before comparing; found live
+    // via two browser sessions on the same account rendering differently
+    // purely because one had a ?focus= URL and the other didn't.
+    private bool CanRevealMobileToolbar =>
+        Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/').Length == 0
+        && TreeContext.FocusPerson != null;
 
     private string _userName     = "";
     private string _userEmail    = "";
@@ -296,11 +319,49 @@
         _isDark = Theme.IsDark;
         Theme.OnChange    += OnThemeChanged;
         TreeContext.OnChange += OnTreeContextChanged;
+        Nav.LocationChanged += OnLocationChanged;
 
         _ = LoadUserInfoAsync(authState.User);
     }
 
     private void OnTreeContextChanged() => InvokeAsync(StateHasChanged);
+
+    // CanRevealMobileToolbar depends on the current route, not just TreeContext
+    // state — navigating away from "/" (or back to it) needs to re-evaluate
+    // whether the identity caret should still look/act interactive.
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => InvokeAsync(StateHasChanged);
+
+    private void OnIdentityTapped()
+    {
+        if (!CanRevealMobileToolbar) return;
+        _ = CloseDrawerAsync();
+        TreeContext.ToggleMobilePanel();
+    }
+
+    private Task ToggleDrawerAsync()
+    {
+        if (_drawerOpen) return CloseDrawerAsync();
+
+        _drawerOpen = true;
+        TreeContext.CloseMobilePanel();
+        return Task.CompletedTask;
+    }
+
+    // Keeps the panel mounted (with a reverse-play of its entrance animation)
+    // for the animation's duration instead of vanishing the instant it's
+    // dismissed — matches the deliberate drop-in on open.
+    private async Task CloseDrawerAsync()
+    {
+        if (!_drawerOpen || _drawerClosing) return;
+
+        _drawerClosing = true;
+        StateHasChanged();
+        await Task.Delay(250);
+        _drawerOpen = false;
+        _drawerClosing = false;
+        StateHasChanged();
+    }
 
     private Task LoadUserInfoAsync(ClaimsPrincipal principal)
     {
@@ -332,6 +393,7 @@
     {
         Theme.OnChange       -= OnThemeChanged;
         TreeContext.OnChange -= OnTreeContextChanged;
+        Nav.LocationChanged  -= OnLocationChanged;
         await ValueTask.CompletedTask;
     }
 

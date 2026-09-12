@@ -1611,6 +1611,12 @@ html.ft-no-select * {
     cursor: pointer;
 }
 
+/* No MobileControlPanel exists for a tap to reveal outside Home's canvas
+   view — plain identity readout there, not a dead click target. */
+.ft-appbar-family-title--static {
+    cursor: default;
+}
+
 .ft-appbar-user-id {
     display: flex;
     align-items: center;
@@ -1781,10 +1787,9 @@ html.ft-no-select * {
 [data-theme="dark"] .ft-mobile-panel-btn--wide:active { background: rgba(255, 255, 255, 0.06); }
 
 /* ── Mobile nav panel (custom overlay, no MudDrawer) ─────────────────────────
-   Drops down from below the AppBar and covers roughly the top half of the
-   screen — the common mobile hamburger pattern — rather than a full-height
-   side drawer, which reads more like a desktop-app off-canvas panel than a
-   mobile one. ─────────────────────────────────────────────────────────────── */
+   Drops down from below the AppBar, sized to fill nearly the whole screen
+   (not a token half-height dropdown, which read as mostly dead backdrop on
+   a real phone) while staying scrollable for a longer list than fits. ──── */
 .ft-mobile-backdrop {
     position: fixed;
     inset: 0;
@@ -1795,14 +1800,30 @@ html.ft-no-select * {
     animation: introFadeIn 0.2s ease-out;
 }
 
+/* pointer-events:none is the real safety net here, not just the animation:
+   CustomAppBar's layout persists across page navigation, so if the delayed
+   unmount in CloseDrawerAsync ever fails to run to completion (an exception,
+   a disposed-component edge case, anything interrupting that await), this
+   class — and the full-viewport fixed backdrop wearing it — could otherwise
+   stay mounted indefinitely at opacity:0: invisible, but still silently
+   eating every click on the page underneath it. */
+.ft-mobile-backdrop--closing { animation: introFadeIn 0.25s ease-in reverse both; pointer-events: none; }
+
 .ft-mobile-nav {
     position: fixed;
     isolation: isolate;
     top: 56px;
     left: 0;
     right: 0;
-    max-height: 55vh;
-    background: rgba(255, 255, 255, 0.58);
+    /* Fill nearly the whole screen below the AppBar rather than a fixed
+       vh fraction — vh alone overshoots on mobile browsers whose address
+       bar collapses/expands, and a flat 55vh read as mostly dead backdrop
+       under a short list anyway. dvh (dynamic viewport height) tracks the
+       real visible area on browsers that support it; the plain-vh line
+       above it is the fallback for those that don't. */
+    max-height: calc(100vh - 76px);
+    max-height: calc(100dvh - 76px);
+    background: rgba(255, 255, 255, 0.72);
     backdrop-filter: blur(29px) saturate(190%);
     -webkit-backdrop-filter: blur(29px) saturate(190%);
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.5);
@@ -1816,26 +1837,26 @@ html.ft-no-select * {
     animation: ft-nav-drop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-.ft-mobile-nav::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    /* Fading fully to 100% (rather than plateauing at a flat 0.08 past the
-       70% mark) removes the visible ring where the gradient's steep early
-       falloff meets its flat tail — that boundary was landing mid-list and
-       reading as a banding seam across whichever row happened to sit there. */
-    background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.04) 100%);
+/* A dedicated close animation, not animation-direction:reverse on the entrance
+   keyframes — ft-nav-drop's opacity holds at 1 for its first 60% (the bounce
+   settle), so playing it backward left opacity barely moving for the first
+   half of the close and made the whole thing read as no animation at all.
+   This ramps opacity and the upward slide together across the full duration
+   instead. CustomAppBar keeps the element mounted with this class applied
+   for the animation's duration before actually removing it from the DOM. */
+.ft-mobile-nav--closing {
+    animation: ft-nav-close 0.25s cubic-bezier(0.4, 0, 1, 1) both;
+    pointer-events: none;
+}
+
+@keyframes ft-nav-close {
+    0%   { opacity: 1; transform: translateY(0) scaleY(1); }
+    100% { opacity: 0; transform: translateY(-18px) scaleY(0.94); }
 }
 
 [data-theme="dark"] .ft-mobile-nav {
-    background: rgba(18, 20, 23, 0.52);
+    background: rgba(18, 20, 23, 0.66);
     border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-[data-theme="dark"] .ft-mobile-nav::before {
-    background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
 }
 
 /* Slight overshoot-then-settle "unfold" rather than a flat slide — same
@@ -1857,9 +1878,9 @@ html.ft-no-select * {
 /* ── Mobile nav drawer ────────────────────────────────────────────────────── */
 .ft-drawer-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    padding: 14px 16px 8px;
+    padding: 8px 8px 8px 16px;
 }
 
 .ft-drawer-username {
@@ -1884,7 +1905,11 @@ html.ft-no-select * {
     font-size: 18px;
     color: var(--ft-gray-500);
     line-height: 1;
-    padding: 4px 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
     border-radius: 6px;
     flex-shrink: 0;
     margin-left: 8px;
@@ -1906,7 +1931,8 @@ html.ft-no-select * {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 9px 20px;
+    min-height: 44px;
+    padding: 0 20px;
     font-size: 14px;
     color: var(--ft-text-primary);
     cursor: pointer;
@@ -2098,6 +2124,19 @@ html.ft-no-select * {
     .intro-subtitle {
         margin-bottom: 12px !important;
     }
+
+    /* Page header toolbars (title + search/filter/action controls) don't
+       fit one row on a phone — wrap instead of letting them clip or force
+       page-wide horizontal scroll. Shared by People and Stories. */
+    .ft-page-toolbar { flex-wrap: wrap; row-gap: 12px; }
+    .ft-people-actions { flex-wrap: wrap; width: 100%; }
+    .ft-people-actions .search-field { flex: 1 1 100%; }
+
+    /* Five columns of real data (Name/Born/Birthplace/Died/Age) don't fit a
+       phone width — let the table itself scroll horizontally instead of
+       forcing the whole page to. */
+    .people-table .mud-table-container { overflow-x: auto; }
+    .people-table table { min-width: 640px; }
 }
 
 .ft-toast-x {
