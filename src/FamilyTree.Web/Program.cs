@@ -21,6 +21,17 @@ var builder = WebApplication.CreateBuilder(args);
 if (builder.Environment.IsDevelopment())
 {
     builder.Configuration.AddUserSecrets<Program>();
+
+    // CreateBuilder already adds environment variables, but at a LOWER precedence
+    // than the user secrets just added above — re-adding here makes env vars win
+    // over a developer's local secrets.json for the same key. Without this, an
+    // env-var override (e.g. ConnectionStrings__DefaultConnection, set by the E2E
+    // test harness to point at a disposable test database) is silently ignored in
+    // favor of whatever the developer has in user secrets, which — for a machine
+    // set up per this repo's own docs — is their real local dev database. No
+    // effect on Azure App Service, which never uses user secrets in the first
+    // place, so this only changes local-dev-with-secrets behavior.
+    builder.Configuration.AddEnvironmentVariables();
 }
 
 // ── Services ──────────────────────────────────────────────────
@@ -117,9 +128,14 @@ builder.Services.AddScoped<IGedcomExportService, GedcomExportService>();
 builder.Services.AddSingleton(_ =>
 {
     var connectionString = builder.Configuration["AzureStorage:ConnectionString"];
-    // Fall back to local emulator so the app starts even without a storage account configured
+    // Fall back to local emulator so the app starts even without a storage account
+    // configured. IsNullOrWhiteSpace, not just null-coalescing on null — an explicitly
+    // empty value (e.g. a config override set to "" rather than omitted entirely) hit
+    // BlobServiceClient's own ArgumentNullException otherwise, matching the same
+    // IsNullOrWhiteSpace pattern already used for Email:SmtpHost and SuperUser:Email
+    // above/below.
     return new Azure.Storage.Blobs.BlobServiceClient(
-        connectionString ?? "UseDevelopmentStorage=true");
+        string.IsNullOrWhiteSpace(connectionString) ? "UseDevelopmentStorage=true" : connectionString);
 });
 
 // ── Auth ──────────────────────────────────────────────────────

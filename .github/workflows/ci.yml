@@ -28,8 +28,13 @@ jobs:
       - name: Build Release
         run: dotnet build FamilyTree.sln --no-restore -c Release
 
+      # Excludes FamilyTree.E2E.Tests deliberately — that project needs the SQL Server
+      # container + Playwright browsers set up below, and fails loudly (not a soft
+      # skip — see E2eTestBase) if it runs without them.
       - name: Test
-        run: dotnet test FamilyTree.sln --no-build -c Release --logger "trx;LogFileName=test_results.trx"
+        run: |
+          dotnet test tests/FamilyTree.Core.Tests/FamilyTree.Core.Tests.csproj --no-build -c Release --logger "trx;LogFileName=core_test_results.trx"
+          dotnet test tests/FamilyTree.Web.Tests/FamilyTree.Web.Tests.csproj --no-build -c Release --logger "trx;LogFileName=web_test_results.trx"
 
       # Informational only — the full suite above already gates the build. This just
       # makes regression coverage easy to eyeball separately in CI logs: tests tagged
@@ -37,11 +42,70 @@ jobs:
       # found live, so a failure here is a real user-facing behavior breaking again.
       - name: Regression tests (informational)
         if: always()
-        run: dotnet test FamilyTree.sln --no-build -c Release --filter "Category=Regression" --logger "console;verbosity=detailed"
+        run: dotnet test tests/FamilyTree.Web.Tests/FamilyTree.Web.Tests.csproj --no-build -c Release --filter "Category=Regression" --logger "console;verbosity=detailed"
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
+          path: '**/*.trx'
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # A real, disposable SQL Server instance — not SQLite/InMemory. Person/Relationship
+    # use SQL Server's RowVersion for optimistic concurrency, which SQLite doesn't
+    # support natively; swapping providers for CI speed would silently stop testing
+    # that behavior. The SA password below is throwaway — this container never holds
+    # real data and is destroyed at the end of the job.
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: E2eCiOnly_NotARealSecret9!
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd="/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'E2eCiOnly_NotARealSecret9!' -Q 'SELECT 1' -C || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore FamilyTree.sln
+
+      # E2eAppFixture launches the real built FamilyTree.Web.dll as an external process
+      # (not WebApplicationFactory/TestServer) — needs the actual build output to exist
+      # at the same configuration the test assembly itself is built with.
+      - name: Build Release
+        run: dotnet build FamilyTree.sln --no-restore -c Release
+
+      # The Microsoft.Playwright package generates this script into its own project's
+      # build output — using it (rather than a separately-installed global CLI tool)
+      # guarantees the installed browser version always matches the package version
+      # actually referenced, with no separate version to keep in sync.
+      - name: Install Playwright browsers
+        run: pwsh tests/FamilyTree.E2E.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: E2E Test
+        env:
+          E2E_ConnectionString: "Server=localhost,1433;Database=FamilyTreeDb_E2E;User Id=sa;Password=E2eCiOnly_NotARealSecret9!;TrustServerCertificate=True"
+        run: dotnet test tests/FamilyTree.E2E.Tests/FamilyTree.E2E.Tests.csproj --no-build -c Release --logger "trx;LogFileName=e2e_test_results.trx"
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
           path: '**/*.trx'
