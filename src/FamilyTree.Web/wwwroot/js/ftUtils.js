@@ -8,29 +8,13 @@ window.ftDownloadFile = (filename, content, mimeType) => {
     URL.revokeObjectURL(url);
 };
 
-window.ftSubmitLogin = (email, password) => {
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/auth/do-login';
-    form.style.display = 'none';
-    const add = (name, value) => {
-        const i = document.createElement('input');
-        i.type = 'hidden'; i.name = name; i.value = value;
-        form.appendChild(i);
-    };
-    add('email', email);
-    add('password', password);
-    document.body.appendChild(form);
-    form.submit();
-};
-
-window.ftSubmitLogout = () => {
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/auth/do-logout';
-    form.style.display = 'none';
-    document.body.appendChild(form);
-    form.submit();
+// Submits an existing <form> already rendered in the DOM (its fields, including
+// <AntiforgeryToken />, are populated server-side by Blazor) rather than building
+// one from scratch here — a JS-built form has no way to carry a valid antiforgery
+// token, since that token is minted server-side and tied to the antiforgery cookie.
+window.ftSubmitFormById = (formId) => {
+    const form = document.getElementById(formId);
+    if (form) form.submit();
 };
 
 window.ftOpenUrl = (url) =>
