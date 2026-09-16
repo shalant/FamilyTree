@@ -207,6 +207,16 @@
         }
 
     </div>
+
+    @* ── Hidden real POST form for the post-registration auto-login (see
+       ShowLinkModal below). A literal <form> with <AntiforgeryToken /> lets the
+       antiforgery cookie/field pair validate server-side, same as LoginOverlay's
+       visible sign-in form — JS just triggers a submit, it doesn't build the form. ── *@
+    <form id="ft-auto-login-form" method="post" action="/auth/do-login" style="display:none">
+        <AntiforgeryToken />
+        <input type="hidden" name="email" value="@_email" />
+        <input type="hidden" name="password" value="@_password" />
+    </form>
 </div>
 
 @code {
@@ -359,7 +369,8 @@
         // Registering only creates the account — it doesn't authenticate this browser.
         // Submit a real POST to /auth/do-login (native form, sets the auth cookie) so the
         // new user actually lands on their own home page instead of whoever was previously
-        // signed in on this device.
-        await JS.InvokeVoidAsync("ftSubmitLogin", _email, _password);
+        // signed in on this device. The form (with its own antiforgery token) already
+        // exists in the DOM — JS just triggers the submit.
+        await JS.InvokeVoidAsync("ftSubmitFormById", "ft-auto-login-form");
     }
 }

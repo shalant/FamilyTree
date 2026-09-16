@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 using FamilyTree.Core.Data;
@@ -37,6 +38,8 @@ if (builder.Environment.IsDevelopment())
 // ── Services ──────────────────────────────────────────────────
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddAntiforgery();
 
 builder.Services.AddMudServices();
 
@@ -375,9 +378,19 @@ if (!devAuthEnabled)
 {
     app.MapPost("/auth/do-login", async (
         HttpContext ctx,
+        IAntiforgery antiforgery,
         Microsoft.AspNetCore.Identity.SignInManager<FamilyTree.Core.Models.AppUser> signInManager,
         Microsoft.AspNetCore.Identity.UserManager<FamilyTree.Core.Models.AppUser> userManager) =>
     {
+        try
+        {
+            await antiforgery.ValidateRequestAsync(ctx);
+        }
+        catch (AntiforgeryValidationException)
+        {
+            return Results.LocalRedirect("/?loginError=csrf");
+        }
+
         var form = await ctx.Request.ReadFormAsync();
         var email    = form["email"].ToString();
         var password = form["password"].ToString();
@@ -401,15 +414,19 @@ if (!devAuthEnabled)
     }).RequireRateLimiting("login");
 
     app.MapPost("/auth/do-logout", async (
+        HttpContext ctx,
+        IAntiforgery antiforgery,
         Microsoft.AspNetCore.Identity.SignInManager<FamilyTree.Core.Models.AppUser> signInManager) =>
     {
-        await signInManager.SignOutAsync();
-        return Results.LocalRedirect("/");
-    });
+        try
+        {
+            await antiforgery.ValidateRequestAsync(ctx);
+        }
+        catch (AntiforgeryValidationException)
+        {
+            return Results.LocalRedirect("/");
+        }
 
-    app.MapGet("/auth/logout", async (
-        Microsoft.AspNetCore.Identity.SignInManager<FamilyTree.Core.Models.AppUser> signInManager) =>
-    {
         await signInManager.SignOutAsync();
         return Results.LocalRedirect("/");
     });

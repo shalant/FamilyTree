@@ -108,16 +108,23 @@ largely N/A — this is an invite-only private app, not a discoverable public si
       usb=(), payment=()`) — the app uses none of these; previously unset entirely.
 
 **Deferred — need a scoped PR + manual testing, not safe to auto-fix:**
-- [ ] **[SECURITY] CSRF gap on `/auth/do-login` and `/auth/do-logout`** — `ftUtils.js`'s
-      `ftSubmitLogin`/`ftSubmitLogout` build a plain hidden-form POST with no antiforgery
-      token, and the minimal-API endpoints in `Program.cs` never call
-      `IAntiforgery.ValidateRequestAsync`. `app.UseAntiforgery()` is registered but minimal
-      APIs don't auto-protect unless the endpoint opts in — so nothing currently validates
-      these two POSTs. A hostile page could force a visitor's browser to log in as an
-      attacker-controlled account or force a log-out. Needs: a token embedded via `App.razor`
-      (likely a `[CascadingParameter] HttpContext?` + `IAntiforgery.GetAndStoreTokens`, no
-      existing precedent for that pattern in this codebase, so needs real login/logout
-      testing before merge, not just a build check) or an equivalent scoped path.
+- [x] **[SECURITY] CSRF gap on `/auth/do-login` and `/auth/do-logout` (fixed 2026-09-15)** —
+      `Program.cs`'s two minimal-API endpoints now call `IAntiforgery.ValidateRequestAsync`
+      before doing anything else, rejecting a tokenless request with `?loginError=csrf`
+      (do-login) or a clean no-op (do-logout) instead of proceeding. Every real caller
+      switched from a JS-built, token-less hidden form onto a real `<form>` carrying
+      `<AntiforgeryToken />`: `LoginOverlay`'s own sign-in form, `Register.razor`'s
+      post-registration auto-login, and `CustomAppBar`'s sign-out (desktop menu + mobile
+      drawer). `ftUtils.js`'s `ftSubmitLogin`/`ftSubmitLogout` (which had no way to carry a
+      valid token, since it's minted server-side per-response) replaced with one generic
+      `ftSubmitFormById` that just submits the already-rendered form. Also removed the
+      unprotected `GET /auth/logout` endpoint entirely — the only remaining logout path is
+      the protected POST. Verified live (real browser: register → auto-login → sign out →
+      sign in) and via raw HTTP (forged requests rejected, valid-token requests pass
+      through to real credential/session logic). Two new E2E regression tests
+      (`CsrfProtectionTests`) — confirmed to actually fail against the pre-fix code (via a
+      temporary revert) before confirming they pass against the fix, per this file's own
+      verification discipline.
 - [ ] **[PERFORMANCE] No image resizing/re-encoding on upload** — `MediumService` only checks
       file size (8MB cap) and MIME type; no `SixLabors.ImageSharp` or similar anywhere in
       `FamilyTree.Core`. A raw phone-camera photo uploads at full resolution.

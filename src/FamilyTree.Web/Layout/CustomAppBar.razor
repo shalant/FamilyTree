@@ -14,6 +14,7 @@
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
 @inject TreeContextService TreeContext
+@inject IJSRuntime JS
 @implements IAsyncDisposable
 
 @* ── AppBar shell ──────────────────────────────────────────────────────────── *@
@@ -209,6 +210,12 @@
     </div>
 
 </MudAppBar>
+
+@* ── Hidden real POST form for sign-out. <AntiforgeryToken /> lets /auth/do-logout
+   validate the request server-side — SignOut() below just triggers a submit. ── *@
+<form id="ft-logout-form" method="post" action="/auth/do-logout" style="display:none">
+    <AntiforgeryToken />
+</form>
 
 @* ── Mobile nav panel (custom — no MudDrawer to avoid layout side-effects) ───── *@
 @if (_drawerOpen || _drawerClosing)
@@ -437,5 +444,5 @@
         $"{p.FirstName?.FirstOrDefault()}{p.LastName?.FirstOrDefault()}"
         .ToUpperInvariant().Trim();
 
-    private void SignOut() => Nav.NavigateTo("/auth/logout", forceLoad: true);
+    private async Task SignOut() => await JS.InvokeVoidAsync("ftSubmitFormById", "ft-logout-form");
 }

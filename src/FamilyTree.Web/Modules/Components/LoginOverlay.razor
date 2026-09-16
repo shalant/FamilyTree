@@ -58,11 +58,16 @@
         {
             <div class="auth-error">Google sign-in is not configured yet. Use email and password.</div>
         }
+        else if (ErrorMessage == "csrf")
+        {
+            <div class="auth-error">Your session expired. Please try signing in again.</div>
+        }
 
         @* ── Email / password form — native POST, no JavaScript ────────────── *@
         @* Hidden inputs carry the Blazor-bound values into the POST body.
            Immediate="true" keeps them in sync on every keystroke. *@
         <form method="post" action="/auth/do-login">
+            <AntiforgeryToken />
             <input type="hidden" name="email"    value="@_email" />
             <input type="hidden" name="password" value="@_password" />
 

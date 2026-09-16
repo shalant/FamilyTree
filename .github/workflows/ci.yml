@@ -107,7 +107,7 @@ jobs:
       - name: E2E Test
         env:
           E2E_ConnectionString: "Server=localhost,1433;Database=FamilyTreeDb_E2E;User Id=sa;Password=${{ secrets.E2E_SA_PASSWORD }};TrustServerCertificate=True"
-        run: dotnet test tests/FamilyTree.E2E.Tests/FamilyTree.E2E.Tests.csproj --no-build -c Release --logger "trx;LogFileName=e2e_test_results.trx"
+        run: dotnet test tests/FamilyTree.E2E.Tests/FamilyTree.E2E.Tests.csproj --no-build -c Release --logger "trx;LogFileName=e2e_test_results.trx" --logger "console;verbosity=detailed"
 
       - name: Upload E2E test results
         if: always()
