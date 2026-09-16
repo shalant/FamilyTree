@@ -125,23 +125,97 @@ largely N/A — this is an invite-only private app, not a discoverable public si
       (`CsrfProtectionTests`) — confirmed to actually fail against the pre-fix code (via a
       temporary revert) before confirming they pass against the fix, per this file's own
       verification discipline.
-- [ ] **[PERFORMANCE] No image resizing/re-encoding on upload** — `MediumService` only checks
-      file size (8MB cap) and MIME type; no `SixLabors.ImageSharp` or similar anywhere in
-      `FamilyTree.Core`. A raw phone-camera photo uploads at full resolution.
-- [ ] **[PERFORMANCE] No response compression** — no `AddResponseCompression`/Brotli wired in
-      `Program.cs`. Needs care around the `/_blazor` SignalR endpoint before enabling.
-- [ ] **[POLISH] Theme flash on load** — `ThemeService.InitAsync()` reads `ft-theme` from
-      `localStorage` via JS interop in `MainLayout.OnAfterRenderAsync`, i.e. after first
-      paint — the exact anti-pattern the checklist calls out (should read a cookie during
-      SSR/prerender instead).
-- [ ] **[SECURITY] CSP still uses `script-src 'unsafe-inline'`** rather than sha256-pinning
-      the handful of inline scripts, and no `Permissions-Policy` existed until this pass
-      (now fixed — see above).
-- [ ] **[QA] Full 4-category Lighthouse audit + Core Web Vitals check** against the live
-      `arborkin.com` production URL — not run this session, needs a live pass.
-- [ ] **[A11Y] Zero `:focus-visible` rules in `app.css`** (23 `:hover` rules exist) — likely
-      relying entirely on MudBlazor defaults; not independently verified by tabbing through
-      the app.
+- [x] **[PERFORMANCE] No image resizing/re-encoding on upload (revisited 2026-09-16)** — this
+      entry was stale: `PersonForm` and `PersonMedia` have compressed images client-side to
+      1400px/JPEG-0.82 via `ftCompressImage` (a canvas resize) since 2026-06-09, well before
+      this line was written; the original audit only checked `FamilyTree.Core` and missed the
+      client-side JS interop path. The real residual gap, confirmed by reading
+      `CompressOrReadAsync` in both callers: when client-side compression fails (canvas can't
+      decode the file — e.g. some HEIC photos in browsers without native HEIC decode), both
+      callers silently fall back to uploading the **original, unresized** file. Closed with a
+      server-side backstop: `MediumService.ResizeIfOversizedAsync` (using `SixLabors.ImageSharp`
+      3.1.11 — pinned below v4, which requires a paid license even for non-commercial use as of
+      this pass) decodes any upload wider/taller than 2000px and re-encodes it in its original
+      format before it reaches blob storage; anything already within bounds (the normal,
+      client-compressed path) passes through untouched, so this only actually does work on the
+      fallback-raw-upload case it exists for. Decode failures (corrupt file, or a format that
+      slipped past the MIME allow-list) fall back to uploading the original bytes unchanged
+      rather than failing the upload. Both real upload paths go through the same
+      `MediumService.CreateAsync` chokepoint, so one change covers both. Regression tests:
+      `MediumServiceTests` (small image passes through unchanged, oversized image resized to
+      ≤2000px preserving aspect ratio, undecodable bytes fall back without throwing).
+- [x] **[PERFORMANCE] No response compression (fixed 2026-09-16)** — `Program.cs` now registers
+      Brotli + Gzip via `AddResponseCompression`, restricted to a static-asset MIME allow-list
+      (CSS/JS/wasm/SVG/fonts) that deliberately excludes `text/html` and JSON: dynamic Razor
+      Component responses carry per-request antiforgery tokens next to attacker-reflected query
+      values (e.g. `Register.razor`'s `?email=` prefill), and compressing that combination is a
+      BREACH-style compression-oracle risk — static assets carry no secrets, so they're safe.
+      `/_blazor` is also explicitly excluded from the compression middleware branch
+      (defense-in-depth; the MIME allow-list already wouldn't touch its negotiate/JSON traffic).
+      Real, measured win, not theoretical: a Lighthouse pass against production before this fix
+      (`performance: 62`) showed `MudBlazor.min.css` alone — 608 KiB uncompressed — was the
+      single largest render-blocking resource (~3.1s of ~4.85s total render-blocking time,
+      against a 1,099 KiB total page weight). A same-branch local Lighthouse run after the fix
+      (not a fair head-to-head — localhost vs. production over the real internet — but
+      directionally solid): `performance: 90`, total page weight 1,099 KiB → 385 KiB. Verified
+      via curl that CSS/JS responses now carry `content-encoding: br` and the home page (`/`)
+      does not; full E2E suite (incl. the CSRF regression tests, which exercise `/auth/do-login`
+      and `/auth/do-logout`) still green with compression enabled.
+- [x] **[POLISH] Theme flash on load (fixed 2026-09-16)** — rather than the cookie/SSR-plumbing
+      approach this line originally suggested (bigger change, more lifecycle risk to verify
+      solo before a live family demo), added `wwwroot/js/theme-init.js`: a small external
+      script placed in `App.razor`'s `<head>` *before* the CSS `<link>` tags. It reads
+      `localStorage['ft-theme']` and sets `data-theme` on `<html>` synchronously, before the
+      browser loads `app.css`/`MudBlazor.min.css` — so the correct theme's CSS variables are
+      already in effect on first paint, instead of only after `ThemeService.InitAsync()`
+      resolves via JS interop in `OnAfterRenderAsync` (well after first paint). `ThemeService`
+      itself is unchanged; it just re-applies the same value a moment later, a harmless no-op.
+      Deliberately external rather than inline, consistent with the CSP hardening below (no new
+      inline script to hash-pin). Known residual gap: MudBlazor's own `IsDarkMode`-bound state
+      (`_isDark` in `MainLayout`/`TreeLayout`/`AuthLayout`) still only updates in
+      `OnAfterRenderAsync`, so any Mud-internal styling driven directly by that C# bool (as
+      opposed to the `data-theme` CSS variables, which are what our own custom styling uses)
+      could still flash — not moved to `OnInitializedAsync` this pass, since that changes
+      component lifecycle timing across three layout files and wasn't confidently verifiable
+      live in the time available before tomorrow's family demo.
+- [x] **[SECURITY] CSP still uses `script-src 'unsafe-inline'` (fixed 2026-09-16)** — audited
+      every inline script/handler in the app first: the only ones were three raw
+      `onclick="..."` attributes in `App.razor`'s `#components-reconnect-modal` (Blazor's own
+      disconnected-state UI, which can't use `@onclick` since it renders before/outside the
+      SignalR circuit `@onclick` depends on). Moved those to `id` attributes with listeners
+      wired in `ftUtils.js` instead of hash-pinning them — removes inline script entirely
+      rather than allowlisting a specific hash, so `script-src 'self'` now needs no exception at
+      all. `style-src 'unsafe-inline'` is unchanged and deliberately out of scope: the app has
+      dozens of dynamic, runtime-computed inline `style="..."` attributes (draggable toolbar/
+      hero positions, tree node coordinates), which CSP hashing structurally can't cover since
+      hashes only match static content. Verified live: no CSP violations in the browser console
+      across the full login/register/reconnect-modal flow; full E2E suite green.
+- [x] **[QA] Full 4-category Lighthouse audit against the live production URL (run 2026-09-16)**
+      — see the response-compression entry above for the actual numbers (performance 62 →
+      accessibility 84, best-practices 100, seo 91 at baseline). Re-run against production
+      itself still pending an actual deploy of this branch; the 90-score local number above is
+      the same code, different network conditions, not a substitute.
+- [x] **[A11Y] Zero `:focus-visible` rules in `app.css` (fixed 2026-09-16)** — added one global
+      `:focus-visible { outline: 2px solid var(--ft-focus-ring); ... }` rule (reusing the same
+      accent already used for the tree canvas's selected-node glow) rather than per-component
+      overrides. Needed `!important`: confirmed live via DevTools that `MudBlazor.min.css`
+      (loaded after `app.css`) ships its own `outline: none` resets on `button`, `button:focus`,
+      `a:focus-visible`, and most `.mud-*` interactive classes, which otherwise win on
+      specificity alone. Verified the rule is the only `!important` outline declaration across
+      every loaded stylesheet, so it wins regardless of selector specificity or load order —
+      confirmed via one genuine real-Tab-key capture (before the `!important` fix, a keyboard-
+      focused MudBlazor input correctly matched `:focus-visible` per the browser's own algorithm
+      but rendered no outline). Could not get a fully deterministic repeat live screenshot
+      through this session's browser-automation tool specifically (Tab-key-driven focus
+      movement proved unreliable to simulate here — a tooling limitation, not a CSS one; see the
+      Mobile Refinement entries elsewhere in this file for a precedented version of the same
+      class of automation gap). **Known residual gap, deliberately not expanded into today**:
+      several custom interactive elements across the app (`.ft-drawer-item`, `.custom-avatar`,
+      `PersonNode`, etc.) are plain `<div @onclick="...">` with no `tabindex`, so they're not in
+      the keyboard tab order at all — a `:focus-visible` outline can't help an element that
+      never receives keyboard focus in the first place. That's a larger, structural
+      keyboard-navigability pass (add `tabindex="0"` + Enter/Space handling across many
+      components), out of scope for what this line asked for.
 
 ## Golden-Path Walkthrough (2026-09-07)
 

@@ -337,6 +337,11 @@
         "resolved": "13.0.3",
         "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
       },
+      "SixLabors.ImageSharp": {
+        "type": "Transitive",
+        "resolved": "3.1.11",
+        "contentHash": "JfPLyigLthuE50yi6tMt7Amrenr/fA31t2CvJyhy/kQmfulIBAqo5T/YFUSRHtuYPXRSaUHygFeh6Qd933EoSw=="
+      },
       "Swashbuckle.AspNetCore": {
         "type": "Transitive",
         "resolved": "7.0.0",
@@ -477,6 +482,7 @@
           "Microsoft.EntityFrameworkCore.Design": "[10.0.8, )",
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.8, )",
           "Microsoft.EntityFrameworkCore.Tools": "[10.0.8, )",
+          "SixLabors.ImageSharp": "[3.1.11, )",
           "Swashbuckle.AspNetCore": "[7.0.0, )"
         }
       },

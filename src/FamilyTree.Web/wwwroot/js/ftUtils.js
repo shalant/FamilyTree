@@ -57,6 +57,14 @@ window.ftCompressImage = (inputId, fileIndex, maxPx, quality) => {
     });
 };
 
+// Reconnect-modal buttons — CSP's script-src has no 'unsafe-inline', so these can't be
+// wired via onclick="..." attributes in App.razor's static markup; attach listeners here
+// instead (this modal is only ever shown/hidden by Blazor's own JS, not @onclick, since
+// it's rendered before/outside the SignalR circuit that @onclick relies on).
+document.getElementById('ft-reconnect-retry')?.addEventListener('click', () => window.Blazor.reconnect());
+document.getElementById('ft-reconnect-reload')?.addEventListener('click', () => location.reload());
+document.getElementById('ft-reconnect-reload-now')?.addEventListener('click', () => location.reload());
+
 // Auto-reload when Blazor's circuit is rejected (stale tab after server restart/deployment).
 (function () {
     const modal = document.getElementById('components-reconnect-modal');

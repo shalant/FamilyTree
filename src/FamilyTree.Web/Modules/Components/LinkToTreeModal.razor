@@ -504,7 +504,7 @@
         if (excludeAlreadyLinked && matches.Count > 0)
         {
             var linkedIdsResult = await AuthService.GetLinkedPersonIdsAsync(matches.Select(p => p.Id));
-            var linkedIds = linkedIdsResult.Success ? linkedIdsResult.Data : [];
+            var linkedIds = linkedIdsResult is { Success: true, Data: not null } ? linkedIdsResult.Data : [];
             matches = matches.Where(p => !linkedIds.Contains(p.Id)).ToList();
         }
 
