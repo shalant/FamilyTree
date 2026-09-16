@@ -12,8 +12,14 @@ namespace FamilyTree.E2E.Tests;
 /// </summary>
 public sealed class TestDataSeeder(string connectionString)
 {
+    // EnableRetryOnFailure: same transient-connection-fault class the app itself now
+    // retries on (see Program.cs) — a containerized SQL Server can reject a login
+    // intermittently right after its health check reports healthy, which showed up in CI
+    // as a seeding-step SqlException unrelated to whatever the test actually exercises.
     private AppDbContext NewContext() => new(
-        new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(connectionString).Options);
+        new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure())
+            .Options);
 
     public async Task<Guid> CreateFamilyAsync(string name = "Test Family")
     {
