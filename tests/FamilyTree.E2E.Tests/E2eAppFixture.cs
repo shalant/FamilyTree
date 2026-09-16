@@ -85,8 +85,12 @@ public sealed class E2eAppFixture : IAsyncLifetime
     {
         try
         {
+            // EnableRetryOnFailure so a momentary container-startup hiccup here doesn't
+            // get misreported as "E2E database unreachable" (skipping the whole run) —
+            // see TestDataSeeder and Program.cs for the same fix against the same
+            // observed-in-CI transient-login-failure class.
             var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseSqlServer(ConnectionString)
+                .UseSqlServer(ConnectionString, sql => sql.EnableRetryOnFailure())
                 .Options;
             await using var db = new AppDbContext(options);
             await db.Database.EnsureDeletedAsync();

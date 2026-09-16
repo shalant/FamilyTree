@@ -63,7 +63,15 @@ var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"]
 
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    // EnableRetryOnFailure: a dropped/rejected connection (e.g. a SQL Server-in-container
+    // still finishing startup right after its health check reports healthy — observed
+    // directly in CI as intermittent "Login failed for user 'sa'" / "Cannot open database"
+    // errors) is a transient fault, not a real failure. Without this, EF throws immediately
+    // instead of retrying, which is exactly the class of error the exception message itself
+    // recommends this fix for.
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sql => sql.EnableRetryOnFailure());
 });
 
 // ── Rate limiting ─────────────────────────────────────────────
