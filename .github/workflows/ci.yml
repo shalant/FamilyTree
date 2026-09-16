@@ -70,8 +70,12 @@ jobs:
           MSSQL_SA_PASSWORD: ${{ secrets.E2E_SA_PASSWORD }}
         ports:
           - 1433:1433
+        # `options` can't read the secrets context directly (GitHub restricts it to
+        # env/github/needs/strategy/matrix) — $MSSQL_SA_PASSWORD is expanded by the
+        # container's own shell when the health check runs, not by the runner, so
+        # the secret still never appears in the workflow file itself.
         options: >-
-          --health-cmd="/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${{ secrets.E2E_SA_PASSWORD }}' -Q 'SELECT 1' -C || exit 1"
+          --health-cmd="/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -C || exit 1"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
