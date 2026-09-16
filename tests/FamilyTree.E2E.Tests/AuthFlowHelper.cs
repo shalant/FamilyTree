@@ -55,9 +55,11 @@ public static class AuthFlowHelper
         await page.GetByRole(AriaRole.Button, new() { Name = "No, I don't" }).ClickAsync();
 
         // "Done" once _complete is true (see LinkToTreeModal.razor) — closes the dialog,
-        // which triggers Register.razor's real ftSubmitLogin POST to /auth/do-login. That
-        // POST is a native form submit (not fetch/XHR), so it causes a real full-page
-        // navigation; wait for it explicitly rather than racing the click.
+        // which triggers Register.razor's real POST to /auth/do-login (a hidden, real
+        // <form> with <AntiforgeryToken />, submitted via JS's ftSubmitFormById — see
+        // CsrfProtectionTests). That POST is a native form submit (not fetch/XHR), so it
+        // causes a real full-page navigation; wait for it explicitly rather than racing
+        // the click.
         await page.GetByRole(AriaRole.Button, new() { Name = "Done" }).ClickAsync();
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
@@ -112,7 +114,7 @@ public static class AuthFlowHelper
 
         // Unlike the "no connection" path above, LinkToNewPersonAsync closes the dialog
         // itself (CompleteWithMessage, then a 500ms pause, then SafeDialogClose, then
-        // Register.razor's real ftSubmitLogin navigation) — there's no "Done" button to
+        // Register.razor's real auto-login navigation) — there's no "Done" button to
         // click, and the whole sequence happens fast enough that asserting on the
         // intermediate completion message races the navigation away from it (observed
         // directly: the assertion timed out, but the resulting page had already fully
