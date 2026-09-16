@@ -175,6 +175,7 @@ public class FamilyTreeLayoutEngineTests
     }
 
     [Fact]
+    [Trait("Category", "Regression")]
     public void MarryingAnOrphanSiblingRoot_DoesNotJumpTheirGroupPastUnrelatedRootsByAlphabeticalAccident()
     {
         // Reproduces a real bug (2026-07-06): marrying "Bill" (an orphan-sibling root
@@ -305,6 +306,7 @@ public class FamilyTreeLayoutEngineTests
     }
 
     [Fact]
+    [Trait("Category", "Regression")]
     public void PersonWithTwoSpouses_ChildAnchorsUnderTheMarriageThatActuallyHasChildren()
     {
         // Reproduces a real bug (2026-07-07): Florence had two recorded spousal
@@ -407,6 +409,7 @@ public class FamilyTreeLayoutEngineTests
     private const int NodeSpacingXForTests = 130; // mirrors the engine's own NodeSpacingX + small tolerance
 
     [Fact]
+    [Trait("Category", "Regression")]
     public void CrossRootCouple_StillDetectedWhenOneSideIsNestedUnderAGrandparent()
     {
         // Reproduces a real bug (2026-07-07): Marc (Bud+Florence's son) married Ellen

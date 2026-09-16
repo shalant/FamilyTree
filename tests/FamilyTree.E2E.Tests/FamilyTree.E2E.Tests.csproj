@@ -1,21 +1,33 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="Microsoft.Playwright" Version="1.61.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="bunit" Version="1.37.7" />
     <PackageReference Include="FluentAssertions" Version="7.0.0" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FamilyTree.Web\FamilyTree.Web.csproj" />
+    <Using Include="Xunit" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Only for AppDbContext access to peek at generated test data (e.g. invite
+         tokens) directly, avoiding fragile email/console-log parsing. Does NOT
+         reference FamilyTree.Web — the app under test runs as a real external
+         process (see E2eAppFixture), not in-process. -->
+    <ProjectReference Include="..\..\src\FamilyTree.Core\FamilyTree.Core.csproj" />
+  </ItemGroup>
+
 </Project>

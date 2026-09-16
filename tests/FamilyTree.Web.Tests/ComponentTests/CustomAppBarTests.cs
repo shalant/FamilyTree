@@ -71,6 +71,7 @@ public class CustomAppBarTests : ComponentTestBase
     // TappingIdentityBlock_TogglesMobilePanel_WhenFocusPersonExists above,
     // just with a query string on the URL, which must not change the outcome.
     [Fact]
+    [Trait("Category", "Regression")]
     public void TappingIdentityBlock_TogglesMobilePanel_WhenUrlHasFocusQueryString()
     {
         var treeContext = Services.GetRequiredService<TreeContextService>();
