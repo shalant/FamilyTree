@@ -29,7 +29,17 @@ public abstract class E2eTestBase
     protected async Task<IPage> NewPageAsync()
     {
         var context = await NewContextAsync();
-        return await context.NewPageAsync();
+        var page = await context.NewPageAsync();
+
+        // Surfaces browser-side JS exceptions and console output in the test's own
+        // captured stdout (VSTest attaches it to a failing test's "Standard Output") —
+        // added after a CI-only, non-reproducible-locally Playwright timeout gave no
+        // clue whether the page hung waiting on a slow server response or had already
+        // failed silently client-side (e.g. a dropped SignalR circuit).
+        page.Console += (_, msg) => Console.WriteLine($"[browser console:{msg.Type}] {msg.Text}");
+        page.PageError += (_, error) => Console.WriteLine($"[browser page error] {error}");
+
+        return page;
     }
 
     protected Task<IBrowserContext> NewContextAsync(BrowserNewContextOptions? options = null) =>
