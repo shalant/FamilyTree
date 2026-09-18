@@ -111,6 +111,58 @@ public class FamilyTreeLayoutEngineTests
     }
 
     [Fact]
+    [Trait("Category", "Regression")]
+    public void OrphanSiblingOfBothSpouses_DoesNotLandInsideTheCouplesOwnGap()
+    {
+        // Found live in production, 2026-09-18: Max is an orphan sibling (no shared
+        // parent on the tree) of BOTH Rose and Fannie. Fannie is, separately, an orphan
+        // sibling of Ray — Rose's husband. Fannie gets placed first (she's discovered
+        // earlier in BFS order, via Ray), anchoring off Ray and landing just past the
+        // Ray+Rose group's own measured bounds (there's a NodeSpacingX of slack allowed
+        // past a root group's edge). When Max is placed next, his rightmost already-
+        // placed sibling is now Fannie — out past Ray — so he anchors off her. The
+        // rightward search from Fannie immediately goes out of bounds; the leftward
+        // search collides with Ray, keeps stepping left, collides with Rose too, and
+        // the gap between them reads as "safe" (Rose sits inside that root group's own
+        // extent) even though it's actually the couple's reserved connector space. Max
+        // ends up rendered squarely between his own sister and her husband, splitting
+        // their couple connector and corrupting the Ellen/Sarah children-bus midpoint.
+        var ray = Guid.NewGuid();
+        var rose = Guid.NewGuid();
+        var ellen = Guid.NewGuid();
+        var sarah = Guid.NewGuid();
+        var fannie = Guid.NewGuid();
+        var max = Guid.NewGuid();
+
+        var people = BuildFamily(ray, rose, ellen, sarah);
+        people.First(p => p.Id == ray).SiblingIds = [fannie];
+        people.First(p => p.Id == rose).SiblingIds = [max];
+        people.Add(new PersonDto
+        {
+            Id = fannie, FirstName = "Fannie", LastName = "Schumevith",
+            ParentIds = [], ChildIds = [], SpouseIds = [], SiblingIds = [ray, max]
+        });
+        people.Add(new PersonDto
+        {
+            Id = max, FirstName = "Max", LastName = "Small",
+            ParentIds = [], ChildIds = [], SpouseIds = [], SiblingIds = [rose, fannie]
+        });
+
+        var layout = _engine.ComputeLayout(people, CoupleHelper.Derive(people), ray);
+
+        var rayNode  = layout.Nodes.Single(n => n.Person.Id == ray);
+        var roseNode = layout.Nodes.Single(n => n.Person.Id == rose);
+        var maxNode  = layout.Nodes.Single(n => n.Person.Id == max);
+
+        var coupleLeft  = Math.Min(rayNode.X, roseNode.X);
+        var coupleRight = Math.Max(rayNode.X, roseNode.X);
+
+        (maxNode.X <= coupleLeft || maxNode.X >= coupleRight).Should().BeTrue(
+            "Max must never render strictly between Ray and Rose — that space belongs to " +
+            $"their own couple connector (Ray={rayNode.X}, Rose={roseNode.X}, Max={maxNode.X})");
+    }
+
+    [Fact]
     public void GrowingAnOrphanSiblingsFamily_PushesTheNextSiblingRightWithoutOverlap()
     {
         // Ray, Bill, Morton are three orphan-sibling roots in a row. Bill has a child

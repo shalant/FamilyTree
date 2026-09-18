@@ -455,13 +455,31 @@ public class FamilyTreeLayoutEngine
                 nodeMap[id] = new LayoutNode(person, (int)Math.Round(x), y, depth, isFocus, size);
             }
 
+            // Reserved [left, right] interval between every couple's own two spouse-nodes,
+            // recorded as each couple is placed (any depth, not just roots) — this space
+            // belongs to their connector/children-midpoint, not to anyone else. Read by
+            // FindOpenXAdjacentTo below: an orphan-sibling search anchored off a person
+            // outside a couple can otherwise walk (via collision-driven stepping) straight
+            // into the visually "safe" territory between that couple's own two nodes,
+            // since nothing previously distinguished "empty because unclaimed" from "empty
+            // because it's the marriage gap." Found live 2026-09-18 in production: Max,
+            // sibling-linked to both Rose (of the Ray+Rose couple) and Fannie (herself
+            // anchored just outside that couple's measured bounds, off her own sibling
+            // Ray), ends up anchored off Fannie — his rightmost already-placed sibling —
+            // and walks leftward through Ray's position and Rose's position, landing
+            // squarely between the two spouses since that gap had no other occupant.
+            var coupleGaps = new List<(double Left, double Right)>();
+
             // ── Top-down placement ────────────────────────────────────────────
             void PlaceGroup(NuclearGroup g, double anchorX)
             {
                 if (g.ParentAId.HasValue && g.ParentBId.HasValue)
                 {
-                    SetNode(g.ParentAId.Value, anchorX - SpouseSpacingX / 2.0);
-                    SetNode(g.ParentBId.Value, anchorX + SpouseSpacingX / 2.0);
+                    var leftX  = anchorX - SpouseSpacingX / 2.0;
+                    var rightX = anchorX + SpouseSpacingX / 2.0;
+                    SetNode(g.ParentAId.Value, leftX);
+                    SetNode(g.ParentBId.Value, rightX);
+                    coupleGaps.Add((leftX, rightX));
                 }
                 else if (g.ParentAId.HasValue)
                 {
@@ -563,10 +581,18 @@ public class FamilyTreeLayoutEngine
                     rootGroupExtents.Any(e => !safeExtents.Contains(e) && x >= e.Left && x <= e.Right) ||
                     x < safeMin - NodeSpacingX || x > safeMax + NodeSpacingX;
 
+                // Strictly between a couple's own two spouse-nodes — reserved for their
+                // connector/children-midpoint, never a legitimate landing spot for someone
+                // else. Treated the same as a node collision below (skip past it, don't
+                // stop there) rather than as out-of-bounds (don't give up the whole
+                // direction just because the gap is in the way).
+                bool InCoupleGap(double x) => coupleGaps.Any(cg => x > cg.Left && x < cg.Right);
+
                 double? TryDirection(double step)
                 {
                     var x = anchor.X + step;
-                    while (!IsOutOfBounds(x) && nodeMap.Values.Any(n => n.Y == anchor.Y && Math.Abs(n.X - x) < NodeSpacingX))
+                    while (!IsOutOfBounds(x) && (InCoupleGap(x) ||
+                           nodeMap.Values.Any(n => n.Y == anchor.Y && Math.Abs(n.X - x) < NodeSpacingX)))
                         x += step;
                     return IsOutOfBounds(x) ? null : x;
                 }
@@ -578,7 +604,7 @@ public class FamilyTreeLayoutEngine
                 // any open slot at all, rather than tunnelling into foreign territory or
                 // wandering off-canvas. Extremely rare in practice.
                 for (var x = safeMin; x <= safeMax; x += NodeSpacingX)
-                    if (!nodeMap.Values.Any(n => n.Y == anchor.Y && Math.Abs(n.X - x) < NodeSpacingX))
+                    if (!InCoupleGap(x) && !nodeMap.Values.Any(n => n.Y == anchor.Y && Math.Abs(n.X - x) < NodeSpacingX))
                         return x;
 
                 return (safeMin + safeMax) / 2.0; // last resort: accept overlap over foreign placement
