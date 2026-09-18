@@ -146,6 +146,7 @@ else
                     <MudTd Style="font-size:13px; font-weight:500;">@context.Title</MudTd>
                     <MudTd>
                         <MudAutocomplete T="PersonDto"
+                                          MaxItems="25"
                                           SearchFunc="SearchPeopleForLinking"
                                           ValueChanged="@(p => HandleLinkSelection(context.Id, context.UnlinkedPersonName, p))"
                                           ToStringFunc="@(p => p?.FullName ?? "")"
@@ -276,14 +277,18 @@ else
             _people = result.Data ?? [];
     }
 
+    // Ordered by relevance and capped generously rather than at 8 — a family with more
+    // than a handful of same-surname members used to silently hide anyone past the 8th
+    // match with no indication more existed.
     private Task<IEnumerable<PersonDto>> SearchPeopleForLinking(string value, CancellationToken _)
     {
-        var matches = _people
-            .Where(p => string.IsNullOrWhiteSpace(value) ||
-                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Take(8);
+        IEnumerable<PersonDto> matches = string.IsNullOrWhiteSpace(value)
+            ? _people.OrderBy(p => p.FullName, StringComparer.OrdinalIgnoreCase)
+            : _people.Where(p => p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
+                     .OrderByDescending(p => p.FullName.StartsWith(value, StringComparison.OrdinalIgnoreCase))
+                     .ThenBy(p => p.FullName, StringComparer.OrdinalIgnoreCase);
 
-        return Task.FromResult<IEnumerable<PersonDto>>([_addNewPersonOption, .. matches]);
+        return Task.FromResult<IEnumerable<PersonDto>>([_addNewPersonOption, .. matches.Take(25)]);
     }
 
     private async Task HandleLinkSelection(Guid storyId, string? unlinkedName, PersonDto? person)

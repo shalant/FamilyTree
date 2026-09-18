@@ -3,6 +3,17 @@
 @using MudBlazor
 @using FamilyTree.Web.Modules.Components
 
+@* Rendered once, outside the Router, so it survives navigation between pages that use
+   different layouts (Home's TreeLayout vs. everything else's MainLayout vs. AuthLayout).
+   Each layout previously had its own <ToastContainer />, so swapping layouts disposed
+   the old one mid-flight — its Dispose() cancels each toast's dismiss timer without
+   removing it from ToastService, so the orphaned toast sat in the shared list forever
+   and got "revived" with a full fresh countdown by the next layout's container whenever
+   it next called HandleChanged(). That's what showed up live as toasts reappearing
+   minutes later, or several piling up at once. One instance for the whole circuit fixes
+   it at the root instead of patching Dispose(). See FamilyTree.Web/Services/ToastService.cs. *@
+<ToastContainer />
+
 <Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)">

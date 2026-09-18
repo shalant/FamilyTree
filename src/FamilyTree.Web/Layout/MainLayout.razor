@@ -12,7 +12,7 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 <MudPopoverProvider />
-<ToastContainer />
+@* ToastContainer lives once at Routes.razor's root, not here — see the comment there. *@
 
 <MudLayout>
     <CustomAppBar @bind-IsDark="_isDark" />

@@ -558,7 +558,7 @@ public class PersonService(
                 {
                     PersonAId = a, PersonBId = b,
                     Type = RelationshipType.Spouse,
-                    EndDate = DateOnly.FromDateTime(DateTime.Today),
+                    EndDate = await ComputeFormerSpouseEndDateAsync(ctx, dto, formerSpouseId, ct),
                     CreatedAt = now,
                     CreatedBy = createdBy,
                 });
@@ -720,7 +720,11 @@ public class PersonService(
             if (dto.SpouseIds.Contains(formerSpouseId)) continue;
             if (existingByPartner.TryGetValue(formerSpouseId, out var rel))
             {
-                if (rel.EndDate == null) { rel.EndDate = DateOnly.FromDateTime(DateTime.Today); rel.UpdatedAt = now; }
+                if (rel.EndDate == null)
+                {
+                    rel.EndDate = await ComputeFormerSpouseEndDateAsync(ctx, dto, formerSpouseId, ct);
+                    rel.UpdatedAt = now;
+                }
             }
             else
             {
@@ -729,11 +733,34 @@ public class PersonService(
                 {
                     PersonAId = ordered[0], PersonBId = ordered[1],
                     Type = RelationshipType.Spouse,
-                    EndDate = DateOnly.FromDateTime(DateTime.Today),
+                    EndDate = await ComputeFormerSpouseEndDateAsync(ctx, dto, formerSpouseId, ct),
                     CreatedAt = now, CreatedBy = createdBy,
                 });
             }
         }
+    }
+
+    // A former-spouse relationship's EndDate previously always defaulted to today,
+    // even when one (or both) partners have a recorded DeathDate that's clearly the
+    // real reason the marriage ended — e.g. a spouse who died in/shortly after
+    // childbirth decades ago, recorded as "ended 2026" the moment someone else got
+    // around to entering the data. Prefers the earlier of the two death dates when
+    // both are known (the marriage ended when the first partner died); falls back to
+    // today only when neither has a recorded death (the divorce case, where there's
+    // no better default available without a dedicated date-entry UI).
+    private static async Task<DateOnly> ComputeFormerSpouseEndDateAsync(
+        AppDbContext ctx, PersonUpsertDto dto, Guid partnerId, CancellationToken ct)
+    {
+        var partnerDeathDate = await ctx.People.AsNoTracking()
+            .Where(p => p.Id == partnerId)
+            .Select(p => p.DeathDate)
+            .FirstOrDefaultAsync(ct);
+
+        var earliest = dto.DeathDate;
+        if (partnerDeathDate.HasValue && (!earliest.HasValue || partnerDeathDate.Value < earliest.Value))
+            earliest = partnerDeathDate;
+
+        return earliest ?? DateOnly.FromDateTime(DateTime.Today);
     }
 
     private static string? ValidatePersonDates(PersonUpsertDto dto)

@@ -35,7 +35,10 @@ else
                         SubmitLabel="Save changes"
                         OnSubmit="HandleSubmit"
                         OnCancel="@(() => Nav.NavigateTo("/"))" />
-            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+            @* Same margin:auto; max-width:680px as PersonForm's own root MudStack, so this
+               row's right edge lines up with Cancel/Save Changes instead of stretching to
+               MudContainer's wider MaxWidth.Medium bound. *@
+            <div style="display:flex; gap:8px; justify-content:flex-end; margin:16px auto 0; max-width:680px;">
                 <MudButton Variant="Variant.Outlined" Color="Color.Error"
                            StartIcon="@Icons.Material.Filled.Delete"
                            OnClick="HandleDelete">

@@ -316,6 +316,7 @@
 
                 <MudAutocomplete @ref="_parentAc"
                                  T="PersonDto"
+                                 MaxItems="RelationshipSearchCap"
                                  SearchFunc="SearchParents"
                                  ValueChanged="AddParent"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -350,6 +351,7 @@
 
                 <MudAutocomplete @ref="_spouseAc"
                                  T="PersonDto"
+                                 MaxItems="RelationshipSearchCap"
                                  SearchFunc="SearchSpouses"
                                  ValueChanged="AddSpouse"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -384,6 +386,7 @@
 
                 <MudAutocomplete @ref="_formerSpouseAc"
                                  T="PersonDto"
+                                 MaxItems="RelationshipSearchCap"
                                  SearchFunc="SearchFormerSpouses"
                                  ValueChanged="AddFormerSpouse"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -418,6 +421,7 @@
 
                 <MudAutocomplete @ref="_siblingAc"
                                  T="PersonDto"
+                                 MaxItems="RelationshipSearchCap"
                                  SearchFunc="SearchSiblings"
                                  ValueChanged="AddSibling"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -452,6 +456,7 @@
 
                 <MudAutocomplete @ref="_childAc"
                                  T="PersonDto"
+                                 MaxItems="RelationshipSearchCap"
                                  SearchFunc="SearchChildren"
                                  ValueChanged="AddChild"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -744,12 +749,29 @@
     }
 
     // ── relationship search ────────────────────────────────────────
+    // Ordered by relevance (name-start matches before mid-name matches, then
+    // alphabetically) and capped generously rather than at 8 — a family with more
+    // than a handful of same-surname members (e.g. searching "Rosenberg") used to
+    // silently hide anyone past the 8th match with no indication more existed.
+    // MaxItems is also set explicitly below on each <MudAutocomplete>, since its own
+    // default would otherwise re-clip whatever this returns.
+    private static IEnumerable<PersonDto> FilterPeople(IEnumerable<PersonDto> people, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return people.OrderBy(p => p.FullName, StringComparer.OrdinalIgnoreCase).Take(RelationshipSearchCap);
+
+        return people
+            .Where(p => p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(p => p.FullName.StartsWith(value, StringComparison.OrdinalIgnoreCase))
+            .ThenBy(p => p.FullName, StringComparer.OrdinalIgnoreCase)
+            .Take(RelationshipSearchCap);
+    }
+
+    private const int RelationshipSearchCap = 25;
+
     private Task<IEnumerable<PersonDto>> SearchParents(string value, CancellationToken _) =>
-        Task.FromResult(AllPeople
-            .Where(p => p.Id != EditingId && !_parentIds.Contains(p.Id))
-            .Where(p => string.IsNullOrWhiteSpace(value) ||
-                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Take(8));
+        Task.FromResult(FilterPeople(
+            AllPeople.Where(p => p.Id != EditingId && !_parentIds.Contains(p.Id)), value));
 
     private async Task AddParent(PersonDto? person)
     {
@@ -761,11 +783,8 @@
     private void RemoveParent(Guid id) => _parentIds.Remove(id);
 
     private Task<IEnumerable<PersonDto>> SearchSpouses(string value, CancellationToken _) =>
-        Task.FromResult(AllPeople
-            .Where(p => p.Id != EditingId && !_spouseIds.Contains(p.Id))
-            .Where(p => string.IsNullOrWhiteSpace(value) ||
-                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Take(8));
+        Task.FromResult(FilterPeople(
+            AllPeople.Where(p => p.Id != EditingId && !_spouseIds.Contains(p.Id)), value));
 
     private async Task AddSpouse(PersonDto? person)
     {
@@ -777,11 +796,8 @@
     private void RemoveSpouse(Guid id) => _spouseIds.Remove(id);
 
     private Task<IEnumerable<PersonDto>> SearchFormerSpouses(string value, CancellationToken _) =>
-        Task.FromResult(AllPeople
-            .Where(p => p.Id != EditingId && !_formerSpouseIds.Contains(p.Id) && !_spouseIds.Contains(p.Id))
-            .Where(p => string.IsNullOrWhiteSpace(value) ||
-                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Take(8));
+        Task.FromResult(FilterPeople(
+            AllPeople.Where(p => p.Id != EditingId && !_formerSpouseIds.Contains(p.Id) && !_spouseIds.Contains(p.Id)), value));
 
     private async Task AddFormerSpouse(PersonDto? person)
     {
@@ -793,11 +809,8 @@
     private void RemoveFormerSpouse(Guid id) => _formerSpouseIds.Remove(id);
 
     private Task<IEnumerable<PersonDto>> SearchSiblings(string value, CancellationToken _) =>
-        Task.FromResult(AllPeople
-            .Where(p => p.Id != EditingId && !_siblingIds.Contains(p.Id))
-            .Where(p => string.IsNullOrWhiteSpace(value) ||
-                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Take(8));
+        Task.FromResult(FilterPeople(
+            AllPeople.Where(p => p.Id != EditingId && !_siblingIds.Contains(p.Id)), value));
 
     private async Task AddSibling(PersonDto? person)
     {
@@ -809,11 +822,8 @@
     private void RemoveSibling(Guid id) => _siblingIds.Remove(id);
 
     private Task<IEnumerable<PersonDto>> SearchChildren(string value, CancellationToken _) =>
-        Task.FromResult(AllPeople
-            .Where(p => p.Id != EditingId && !_childIds.Contains(p.Id))
-            .Where(p => string.IsNullOrWhiteSpace(value) ||
-                        p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
-            .Take(8));
+        Task.FromResult(FilterPeople(
+            AllPeople.Where(p => p.Id != EditingId && !_childIds.Contains(p.Id)), value));
 
     private async Task AddChild(PersonDto? person)
     {
