@@ -190,8 +190,7 @@ html, body {
 /* ── Page ──────────────────────────────────────────────────────── */
 
 .page-header {
-    align-items: center;
-    justify-content: center;
+    text-align: center;
     font-size: 32px;
     font-weight: 500;
     font-style: italic;
