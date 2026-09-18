@@ -2,6 +2,34 @@
 
 ---
 
+## Ideas: agents / MCP / RAG exploration (2026-09-18)
+
+Not bugs — forward-looking feature ideas surfaced while diagnosing the layout bugs
+below, kept here rather than on that bug-fix branch since they're unrelated scope.
+Motivated by wanting real, non-contrived excuses to get hands-on with agents/MCP/RAG
+inside an actual project, plus learning to curtail AI-assisted token consumption.
+
+- [ ] **Agent: revive bulk import as a one-person-at-a-time agent.** The bulk-import
+      feature (`docs/FutureFeatures/bulk-import-deactivated.md`, `ClaudeImportService`)
+      was deactivated specifically because importing many people at once gave no
+      per-item feedback loop — a GEDCOM/CSV import can contain dozens of the exact
+      layout edge cases this session found one at a time. An agent that imports one
+      person at a time, running each addition through `FamilyTreeLayoutEngine` (or a
+      lighter simulation of it) as a check before committing and reporting back
+      per-item, directly addresses the reason it was shelved rather than being a
+      learning exercise bolted onto unrelated code.
+- [ ] **RAG: semantic search over `Story.Body` / `Person.BiographyNotes`.** Both are
+      free-text fields already in the domain model, full of exactly the kind of
+      content keyword search handles badly (e.g. "escaped in Auschwitz," "owned a
+      bakery"). Semantic search ("find mentions of Poland," "who might be related
+      based on this bio") is a real feature, not a demo.
+- [ ] **MCP (and token-reduction lesson): a narrow, purpose-built read tool.** A tool
+      that returns just "this person's relationships as structured JSON" instead of
+      requiring a full GEDCOM export or grep through the layout engine to reconstruct
+      facts by hand — the same technique (small, purpose-built data access instead of
+      reading whole files) is also the general token-reduction lesson from this
+      session's GEDCOM-archaeology work.
+
 ## Regression Testing Hardening (2026-09-11)
 
 Motivated by real family (some estranged for years) about to be invited to use the app,
