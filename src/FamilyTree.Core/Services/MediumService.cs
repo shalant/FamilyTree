@@ -4,6 +4,8 @@ using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Medium;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
 
 namespace FamilyTree.Core.Services;
 
@@ -121,7 +123,12 @@ public class MediumService(
                 return ServiceResponse<MediumDto>.Fail($"Person {dto.PersonId} not found.");
 
             var fileName = $"{dto.Type}-{Guid.NewGuid()}{Path.GetExtension(dto.FileName)}";
-            var url = await blobStorage.UploadAsync(fileStream, fileName, dto.MimeType, ct);
+            var uploadStream = await ResizeIfOversizedAsync(fileStream, dto.MimeType, ct);
+            var url = await blobStorage.UploadAsync(uploadStream, fileName, dto.MimeType, ct);
+            // Only dispose if ResizeIfOversizedAsync actually created a new stream — the
+            // original fileStream is caller-owned.
+            if (!ReferenceEquals(uploadStream, fileStream))
+                await uploadStream.DisposeAsync();
 
             var userId = currentUser.UserId;
             var medium = new Medium
@@ -228,6 +235,61 @@ public class MediumService(
             logger.LogError(ex, "Error deleting medium {Id}", id);
             return ServiceResponse.Fail(
                 "An error occurred deleting this media.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  IMAGE RESIZE (backstop for whatever the client didn't already shrink)
+    // ─────────────────────────────────────────────────────────────
+    // Both real upload paths (PersonForm's profile photo, PersonMedia's gallery) already
+    // downscale to 1400px client-side via ftCompressImage before the bytes ever leave the
+    // browser — so this almost never fires on the common path. It exists for the fallback:
+    // when client-side compression fails (canvas can't decode the file, e.g. some HEIC
+    // photos in browsers without native HEIC decoding), both callers silently fall back to
+    // uploading the original, unresized file. Without a server-side backstop, that fallback
+    // is a real path to a raw, full-resolution phone photo landing in blob storage.
+    private const int MaxImageDimension = 2000;
+
+    private static async Task<Stream> ResizeIfOversizedAsync(
+        Stream fileStream, string? mimeType, CancellationToken ct)
+    {
+        if (mimeType is null || !mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || !fileStream.CanSeek)
+            return fileStream;
+
+        try
+        {
+            fileStream.Position = 0;
+            var format = await Image.DetectFormatAsync(fileStream, ct);
+            fileStream.Position = 0;
+            if (format is null)
+                return fileStream;
+
+            using var image = await Image.LoadAsync(fileStream, ct);
+            if (image.Width <= MaxImageDimension && image.Height <= MaxImageDimension)
+            {
+                fileStream.Position = 0;
+                return fileStream;
+            }
+
+            image.Mutate(x => x.Resize(new ResizeOptions
+            {
+                Mode = ResizeMode.Max,
+                Size = new Size(MaxImageDimension, MaxImageDimension),
+            }));
+
+            var encoder = image.Configuration.ImageFormatsManager.GetEncoder(format);
+            var output = new MemoryStream();
+            await image.SaveAsync(output, encoder, ct);
+            output.Position = 0;
+            return output;
+        }
+        catch
+        {
+            // Not a decodable raster image, or decoding failed for any other reason —
+            // upload the original bytes unchanged rather than fail the whole upload.
+            // ValidateMediumFile has already gated size and MIME type.
+            fileStream.Position = 0;
+            return fileStream;
         }
     }
 

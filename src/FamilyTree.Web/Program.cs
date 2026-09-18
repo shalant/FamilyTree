@@ -1,9 +1,11 @@
-﻿using System.Security.Claims;
+﻿using System.IO.Compression;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using FamilyTree.Core.Data;
 using FamilyTree.Core.Models;
 using FamilyTree.Core.Services;
@@ -42,6 +44,36 @@ builder.Services.AddRazorComponents()
 builder.Services.AddAntiforgery();
 
 builder.Services.AddMudServices();
+
+// Static assets only (CSS/JS/fonts/SVG) — deliberately excludes text/html and JSON.
+// Two reasons: (1) BREACH-style compression-oracle risk — dynamic Razor Component
+// responses embed per-request antiforgery tokens next to attacker-reflected query
+// values (e.g. Register.razor's ?email= prefill), and compression ratio can leak
+// bytes of a secret placed alongside attacker-controlled input; static assets carry
+// no secrets, so they're safe to compress. (2) the SignalR /_blazor endpoint's own
+// negotiate/handshake traffic and the live WebSocket upgrade are untouched either
+// way — response compression only wraps ordinary HTTP response bodies, but the path
+// is excluded below too, defense-in-depth. MudBlazor.min.css alone is 608 KiB
+// uncompressed and was measured as the single largest render-blocking resource on
+// the production site (Lighthouse: ~3.1s of its ~4.85s total render-blocking time).
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes =
+    [
+        "text/css",
+        "application/javascript",
+        "text/javascript",
+        "application/wasm",
+        "image/svg+xml",
+        "font/woff2",
+        "font/woff",
+    ];
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 
 // Typed HTTP clients — point at the API
 //var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"]
@@ -355,7 +387,7 @@ app.Use(async (ctx, next) =>
         "geolocation=(), microphone=(), camera=(), usb=(), payment=()";
     ctx.Response.Headers["Content-Security-Policy"] =
         "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline'; " +
+        "script-src 'self'; " +
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
         "img-src 'self' data: https:; " +
         "connect-src 'self' wss: ws:; " +
@@ -364,6 +396,9 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+app.UseWhen(
+    ctx => !ctx.Request.Path.StartsWithSegments("/_blazor"),
+    branch => branch.UseResponseCompression());
 app.UseStaticFiles();
 app.UseRateLimiter();
 app.UseAuthentication();

@@ -7,6 +7,7 @@
     <base href="/" />
     <link rel="icon" type="image/svg+xml" href="/img/arborkin-favicon.svg" />
     <link rel="icon" type="image/png"     href="/img/arborkin-icon.png" sizes="32x32" />
+    <script src="/js/theme-init.js"></script>
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
@@ -29,14 +30,14 @@
                 <div class="ft-reconnect-icon ft-reconnect-icon--warn">📡</div>
                 <p>Connection lost</p>
                 <p class="ft-reconnect-sub">Check your connection and try again.</p>
-                <button class="ft-reconnect-btn" onclick="window.Blazor.reconnect()">Try again</button>
-                <button class="ft-reconnect-btn ft-reconnect-btn--ghost" onclick="location.reload()">Reload page</button>
+                <button class="ft-reconnect-btn" id="ft-reconnect-retry">Try again</button>
+                <button class="ft-reconnect-btn ft-reconnect-btn--ghost" id="ft-reconnect-reload">Reload page</button>
             </div>
             <div class="ft-reconnect-body ft-reconnect-body--rejected">
                 <div class="ft-reconnect-icon">⏳</div>
                 <p>Session expired</p>
                 <p class="ft-reconnect-sub">Reloading in <span id="ft-reload-countdown">3</span>s…</p>
-                <button class="ft-reconnect-btn" onclick="location.reload()">Reload now</button>
+                <button class="ft-reconnect-btn" id="ft-reconnect-reload-now">Reload now</button>
             </div>
         </div>
     </div>

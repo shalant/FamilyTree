@@ -177,7 +177,7 @@ else
             $"Delete {_person.FullName}?", parameters);
 
         var result = await dialog.Result;
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             var deleteResult = await PersonService.DeleteAsync(Id);
             if (deleteResult.Success)

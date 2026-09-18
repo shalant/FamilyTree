@@ -136,6 +136,24 @@
     box-sizing: border-box;
 }
 
+/* ── Keyboard focus ───────────────────────────────────────────────────────
+   One global rule rather than per-component overrides, so every interactive
+   element (MudBlazor's own, and our custom .ft-* elements) gets a consistent,
+   visible ring for keyboard users, without adding an outline on a plain mouse
+   click (:focus-visible skips that; browsers already omit it for pointer
+   interaction). Reuses --ft-focus-ring — the same accent already used for the
+   tree canvas's selected-node glow — rather than a new token.
+   !important is required: MudBlazor.min.css loads after this file and ships
+   its own `outline: none` resets on `button`, `button:focus`, `a:focus-visible`
+   and most .mud-* interactive classes (verified live — those rules otherwise
+   win on specificity alone, e.g. `button:focus` beats a bare `:focus-visible`),
+   replacing the browser's default indicator with click-only ripple/color
+   feedback that doesn't persist for keyboard users tabbing through. */
+:focus-visible {
+    outline: 2px solid var(--ft-focus-ring) !important;
+    outline-offset: 2px !important;
+}
+
 html, body {
     width: 100vw;
     /*height: 100vh;*/

@@ -74,6 +74,31 @@ internal sealed class FakeEmailSender : IEmailSender
         => Task.CompletedTask;
 }
 
+// Captures the bytes actually handed to UploadAsync so a test can inspect what the
+// service decided to store (e.g. whether MediumService resized an oversized image
+// before upload) without hitting real blob storage.
+internal sealed class FakeBlobStorageService : IBlobStorageService
+{
+    public byte[]? LastUploadedBytes { get; private set; }
+
+    public async Task<string> UploadAsync(Stream fileStream, string fileName, string? mimeType = null, CancellationToken ct = default)
+    {
+        using var ms = new MemoryStream();
+        await fileStream.CopyToAsync(ms, ct);
+        LastUploadedBytes = ms.ToArray();
+        return $"https://fake-blob/{fileName}";
+    }
+
+    public Task<Stream> DownloadAsync(string fileIdentifier, CancellationToken ct = default)
+        => Task.FromResult<Stream>(new MemoryStream(LastUploadedBytes ?? []));
+
+    public Task<bool> DeleteAsync(string fileIdentifier, CancellationToken ct = default)
+        => Task.FromResult(true);
+
+    public Task<bool> ExistsAsync(string fileIdentifier, CancellationToken ct = default)
+        => Task.FromResult(true);
+}
+
 // Only UserExistsAsync/CreateInviteAsync are exercised (by StoryInviteService); every
 // other member throws so a test relying on unstubbed behavior fails loudly instead of
 // silently returning a default value.
