@@ -332,6 +332,66 @@ public class PersonServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_MovingActiveSpouseToFormer_DefaultsEndDateToPartnersDeathDate()
+    {
+        // Found live (2026-09-18): moving someone from "Spouses" to "Former partners"
+        // always set EndDate to today's date, even when the actual, known reason the
+        // marriage ended is that one of them died decades ago. Lillian died the day
+        // after giving birth in 1922; recording her marriage as "ended in 2026" the
+        // moment someone gets around to entering the data is flatly wrong.
+        var (service, factory, _) = CreateSut();
+        var louis = await service.CreateAsync(new PersonUpsertDto { FirstName = "Louis", LastName = "Small" });
+        var lillian = await service.CreateAsync(new PersonUpsertDto
+        {
+            FirstName = "Lillian", LastName = "Mell",
+            DeathDate = new DateOnly(1922, 12, 4),
+        });
+
+        await service.UpdateAsync(louis.Data!.Id, new PersonUpsertDto
+        {
+            FirstName = "Louis", LastName = "Small",
+            SpouseIds = [lillian.Data!.Id],
+        });
+
+        var result = await service.UpdateAsync(louis.Data!.Id, new PersonUpsertDto
+        {
+            FirstName = "Louis", LastName = "Small",
+            FormerSpouseIds = [lillian.Data!.Id],
+        });
+
+        result.Success.Should().BeTrue();
+        await using var ctx = factory.CreateDbContext();
+        var rel = ctx.Relationships.Single(r => r.Type == FamilyTree.Shared.Enums.RelationshipType.Spouse);
+        rel.EndDate.Should().Be(new DateOnly(1922, 12, 4),
+            "the marriage ended when Lillian died, not whenever someone happened to enter the data");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_MovingActiveSpouseToFormer_FallsBackToTodayWhenNeitherPartnerHasDied()
+    {
+        var (service, factory, _) = CreateSut();
+        var alice = await service.CreateAsync(new PersonUpsertDto { FirstName = "Alice", LastName = "One" });
+        var bob = await service.CreateAsync(new PersonUpsertDto { FirstName = "Bob", LastName = "Two" });
+
+        await service.UpdateAsync(alice.Data!.Id, new PersonUpsertDto
+        {
+            FirstName = "Alice", LastName = "One",
+            SpouseIds = [bob.Data!.Id],
+        });
+
+        await service.UpdateAsync(alice.Data!.Id, new PersonUpsertDto
+        {
+            FirstName = "Alice", LastName = "One",
+            FormerSpouseIds = [bob.Data!.Id],
+        });
+
+        await using var ctx = factory.CreateDbContext();
+        var rel = ctx.Relationships.Single(r => r.Type == FamilyTree.Shared.Enums.RelationshipType.Spouse);
+        rel.EndDate.Should().Be(DateOnly.FromDateTime(DateTime.Today),
+            "with no recorded death for either partner (e.g. a divorce), today's date is still the only default available");
+    }
+
+    [Fact]
     public void Delete_ShouldRemovePerson_WhenSuccessful()
     {
         var people = new List<PersonDto>
