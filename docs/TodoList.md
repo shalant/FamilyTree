@@ -30,6 +30,69 @@ inside an actual project, plus learning to curtail AI-assisted token consumption
       reading whole files) is also the general token-reduction lesson from this
       session's GEDCOM-archaeology work.
 
+## Production Bug Batch (found 2026-09-17, most fixed 2026-09-18)
+
+8 bugs found live in production while inviting Aunt Linda to write a story and doing
+general add/edit testing. 6 fixed and merged same day (PR #39,
+`fix/production-bug-batch-sep17` — commits `b775baa` and `d13845e`). The other 2 share
+a diagnosis but no confirmed fix yet — see below.
+
+**Fixed (PR #39):**
+- [x] **Sibling/relationship-picker dropdowns silently hid results past the 8th match**
+      (`PersonForm`, `StoryInviteDialog`, `StoryFormDialog`, admin Stories-linking tab)
+      — no indication more existed, easy to hit with a handful of same-surname
+      relatives. Raised the cap to 25, ordered by relevance (name-start matches first).
+- [x] **Max Small's placement was bad after adding him** — root cause: an orphan
+      sibling (no shared parent on the tree) anchoring off another orphan sibling could
+      land inside an *unrelated* couple's own connector gap, splitting their connector
+      line. `Max` (Rose's & Fannie's orphan sibling) landed squarely between Ray and
+      Rose. Fixed in `FamilyTreeLayoutEngine` by having spouse-gaps get reserved the
+      same way node positions are. Regression test reproduces this exact family shape.
+- [x] **3 toasts appeared ~5 minutes after adding Mo Small** / **double toasts adding 2
+      people in quick succession** / **multiple toasts when editing** — all three were
+      the same root cause: `ToastContainer` was rendered separately in `MainLayout`,
+      `TreeLayout`, and `AuthLayout`. Navigating between pages that use different
+      layouts disposed the old container mid-flight; its `Dispose()` cancelled each
+      toast's dismiss timer without removing it from the shared `ToastService`, so the
+      orphaned toast sat there forever and got "revived" with a fresh countdown by the
+      next layout's container — sometimes minutes later. Fixed by rendering one
+      `ToastContainer` instance in `Routes.razor`, outside the `Router`, so it survives
+      every in-app navigation for the life of the circuit.
+- [x] **Edit-person screen: header not actually centered, Delete button misaligned
+      from the Cancel/Save row above it** — both genuine CSS bugs (dead flex properties
+      with no `display:flex`; Delete button living outside `PersonForm`'s own 680px
+      centered container). Fixed.
+
+**Not fixed — same diagnosis, unconfirmed:**
+- [ ] **[CRASH] Unhandled circuit exception while sending a story invite with no
+      subject selected, and a separate "session expired" reconnect screen with the same
+      red error banner.** Re-investigated 2026-09-20: read through
+      `StoryInviteDialog.Send()` — the `personId is null` case (exactly "no story
+      subject picked") already fails gracefully with an inline error + toast, and
+      predates PR #39, so that guard isn't the cause. Live-reproduced the "invite about
+      someone not on the tree, leave subject blank, hit Send" flow against a local build
+      (fresh throwaway test account, not the real family data) — no crash, clean
+      console. So the exact repro steps as described don't reproduce on current code.
+      **Leading hypothesis**: the pre-fix `ToastContainer.Dispose()` (see the toast bug
+      above) cancelled each toast's *display* timer via its `CancellationTokenSource`,
+      but `BeginLeave()`'s own 280ms fade-out delay (`await Task.Delay(280)` before the
+      final `StateHasChanged()`) was a *separate*, un-cancelled await — if a toast began
+      leaving at the exact moment the user navigated to a different layout, that
+      continuation would resume *after* the component was disposed and call
+      `StateHasChanged()` on a disposed component, which is a textbook Blazor Server
+      "unhandled exception on the circuit, circuit terminated" trigger. That matches the
+      console log exactly (JS interop calls immediately afterward failing with "Cannot
+      send data if the connection is not in the 'Connected' State"), and a terminated
+      (not merely disconnected) circuit is exactly when a reconnect attempt gets
+      *rejected* rather than resumed — which is the `.ft-reconnect-body--rejected` UI,
+      i.e. the "session expired" screen. If this hypothesis is right, PR #39's move to a
+      single circuit-lifetime `ToastContainer` (never disposed mid-session) already
+      fixes this too, structurally, as a side effect — but this was **not confirmed
+      against a real stack trace**: production has `DetailedErrors` off (the default;
+      `Program.cs` never explicitly sets it), so the only signal available was the
+      generic client-side message. Worth watching for a repeat after this branch is
+      deployed rather than trying to force a live repro again.
+
 ## Regression Testing Hardening (2026-09-11)
 
 Motivated by real family (some estranged for years) about to be invited to use the app,
