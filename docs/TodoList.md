@@ -25,30 +25,78 @@ PR #43).
 - [ ] **Test on a real phone** (touch, mobile Safari/Chrome). Prior mobile testing was
       emulated via viewport resize or desktop-width CSS tricks.
 
+**Fixed 2026-10-11 (smoke test): signed out, `/faq` -> "Go to dashboard" froze the page behind a red banner**
+- [x] Found during `docs/Testing/production-smoke-test-checklist.md` section 1. Two bugs
+      stacked. (1) `Routes.razor` wrapped the `NotAuthorized` content in its own
+      `<LayoutView Layout=MainLayout>`, but `AuthorizeRouteView` already renders that content
+      inside `DefaultLayout` (also `MainLayout`). Navigating from one `MainLayout` page into a
+      protected page nested a second `MainLayout`, so two `MudPopoverProvider`s existed and
+      MudBlazor threw "already a subscriber ... 'mud-overlay-to-popover-provider'", which
+      killed the circuit (URL changed, old page stayed, banner appeared). Removed the inner
+      `LayoutView`. Regression test:
+      `RoutesAuthorizationNavigationTests` (verified failing against the old `Routes.razor`).
+      (2) The banner itself rendered as a tall red slab on the left edge: `MudBlazor.min.css`
+      loads after `app.css` and ships its own `#blazor-error-ui` rule (`left:0; bottom:0;
+      width:100%`, error-palette red) at equal specificity, so it beat our amber top-centre
+      toast. Prefixed our selectors with `html body` so they win regardless of load order.
+      No automated test for the CSS (bUnit can't see cascade); checked in a real browser.
+
+**Fixed 2026-10-11 (smoke test): Admin > Users "Generate link" stayed disabled until the email field lost focus**
+- [x] `UsersTab.razor`'s invite email `MudTextField` bound on blur, so `_inviteEmail` stayed
+      empty while typing and the button's `IsNullOrWhiteSpace` check kept it disabled. Added
+      `Immediate="true"` and gated the button on a valid email format (same rule as
+      `StoryInviteDialog`) so it enables as soon as a valid address is typed. Not covered by a
+      bUnit test: `UsersTab` needs fakes for `IAuthService`, `IAdminUserService` and
+      `UserManager<AppUser>`; verified by build and the existing suite only.
+
+**Fixed 2026-10-11 (smoke test): "Link to your tree" button cut off after registering on shorter windows**
+- [x] `Register.razor` kept the whole sign-up form on screen after a successful registration
+      and appended the "You're all set!" block underneath it, so the only next step
+      ("Link to your tree") landed below the fold on shorter windows. The form (heading,
+      invite banner, Google button, fields) now renders only while `!_registered`; the card
+      shows just the logo plus the success block. Regression test:
+      `RegisterSuccessStateTests` (verified failing against the old markup). Not checked in a
+      real browser at the reported window size: the app blocks iframing, so I couldn't emulate
+      a short viewport.
+
+**Fixed 2026-10-11 (smoke test): "Tip: Drag to explore the tree" toast showed twice**
+- [x] `Home.razor`'s `OnAfterRenderAsync` can be re-entered while an earlier call is still
+      awaiting `localStorage.getItem("ft-treehint")`; both calls saw "not seen yet" because
+      the guard flag was only set after the read. The flag (`_treeHintChecked`) is now set
+      before the first await. As a safety net for this recurring class of bug,
+      `ToastService.Show` now skips a toast identical (type, message, title) to one still
+      showing. Regression test: `ToastServiceTests` (verified failing without the dedup). The
+      `Home.razor` race itself has no automated test; `Home` is too heavy to render in bUnit.
+
+**Open (found 2026-10-11, smoke test): signed-out visits to protected pages land on `/?ReturnUrl=...` and the path is dropped after login**
+- [ ] Cookie auth challenges redirect to `/?ReturnUrl=%2Fadmin` (the checklist's "redirect to
+      login" outcome, so not a security issue). Nothing in the app reads `ReturnUrl`, so after
+      signing in the user lands on the tree instead of the page they asked for. Decide whether
+      to honour it (local paths only, to avoid an open redirect) or leave it.
+
 **Bug: page flashes and loads twice on arborkin.com (reported 2026-10-10)**
-- [ ] **Turn off prerendering for the interactive render mode.** `App.razor` uses
-      `@rendermode="@InteractiveServer"` on both `<HeadOutlet>` and `<Routes>`; that
-      built-in mode prerenders by default, so the browser paints a static server render,
-      then the SignalR circuit connects and replaces it with a second, fresh render (the
-      E2E notes in CLAUDE.md already document the second component instance). The
-      existing `_ready` flag, `theme-init.js` (2026-09-16) and `_authStateResolved` gate
-      each hide a symptom inside one render pass; none prevents the two paints.
-      Proposed fix: `new InteractiveServerRenderMode(prerender: false)` on both outlets,
-      plus a small static splash in the HTML shell so users don't see a blank page until
-      the circuit connects. **Diagnosis is from reading the code, not yet reproduced:**
-      confirm first (e.g. `curl https://arborkin.com/` and check whether the body
-      contains rendered content), then confirm gone after. Verify E2E suite still passes
-      and link-preview Open Graph tags (already gated on `_ready`) are unaffected.
-      Deploy is manual.
+- [x] **Turn off prerendering for the interactive render mode (done 2026-10-11).**
+      `App.razor` used `@rendermode="@InteractiveServer"` on both `<HeadOutlet>` and
+      `<Routes>`; that built-in mode prerenders, so the browser painted a static server
+      render, then the SignalR circuit connected and replaced it with a second, fresh
+      render. Confirmed first: `curl` of `/` and `/faq` returned fully rendered page
+      content plus `prerenderId` markers. Fix: `new InteractiveServerRenderMode(prerender:
+      false)` on both outlets, plus a static `#ft-splash` spinner in the HTML shell that
+      `Routes.razor` removes (`ftHideSplash`) on its first render. After: raw HTML holds
+      only the splash; the page renders once the circuit connects, title set, splash gone,
+      no errors in the app log. Full solution tests pass, including the 9 E2E tests.
+      Not done: an automated check that the raw HTML stays prerender-free, and a look at
+      it on a real phone or slow connection. Open Graph tags were already gated on
+      `_ready`, so they never reached crawlers via prerender; unchanged. Deploy is manual.
 - [ ] **Same flash also happens loading the canvas after authenticating (reported
       2026-10-10).** Login is a real form POST to `/auth/do-login` followed by a full-page
       redirect to `/`, so it goes through the same prerender-then-circuit double paint as
-      a cold load; the prerender fix above should cover that part. But the post-login
+      a cold load; the prerender fix above (2026-10-11) should cover that part. But the post-login
       path also has its own sequence on top of it: auth-state spinner -> `_loading`/`_ready`
       spinner (waiting on focus resolution and the `localStorage` read in
       `OnAfterRenderAsync`) -> tree renders -> `canvas-interaction.js` applies the saved
-      position and reveals the canvas. After the prerender fix, re-test this path
-      separately: if a visible jump remains, the cause is that multi-step reveal, not
+      position and reveals the canvas. Re-test this path separately on production after
+      deploying the prerender fix (not verified: no signed-in local session): if a visible jump remains, the cause is that multi-step reveal, not
       prerendering, and needs its own fix. Not investigated yet.
 
 **Google sign-in**

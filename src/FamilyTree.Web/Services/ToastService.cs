@@ -19,6 +19,13 @@ public sealed class ToastService
 
     public void Show(ToastType type, string message, string? title = null, int? duration = null)
     {
+        // Safety net for a recurring bug class (overlapping OnAfterRenderAsync calls, a
+        // double-fired handler): an identical toast that is still showing is not stacked
+        // again. Root causes are still fixed at the source; this just stops a repeat from
+        // ever reaching the screen.
+        if (_toasts.Any(t => t.Type == type && t.Message == message && t.Title == title))
+            return;
+
         var ms = duration ?? (type == ToastType.Error ? 8000 : 5000);
         _toasts.Add(new ToastMessage(Guid.NewGuid(), type, message, title, ms));
         OnChanged?.Invoke();

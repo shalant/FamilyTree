@@ -76,13 +76,16 @@ public class RegisterToastTests : ComponentTestBase
 class FakeAuthService : IAuthService
 {
     public UserInvite? Invite { get; set; }
+    public Guid? RegisteredUserId { get; set; }
 
     public string GetRegistrationMode() => "Open";
     public Task<ServiceResponse<UserInvite?>> ValidateInviteAsync(Guid inviteId)
         => Task.FromResult(ServiceResponse<UserInvite?>.Ok(Invite));
 
     public Task<ServiceResponse<Guid>> RegisterAsync(string firstName, string lastName, string email, string password, Guid? inviteId = null)
-        => throw new NotImplementedException();
+        => RegisteredUserId is { } id
+            ? Task.FromResult(ServiceResponse<Guid>.Ok(id))
+            : throw new NotImplementedException();
     public Task<ServiceResponse> LinkPersonAsync(Guid userId, Guid? personId)
         => throw new NotImplementedException();
     public Task<ServiceResponse<bool>> UserExistsAsync(string email)
