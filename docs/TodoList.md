@@ -13,9 +13,12 @@ PR #43).
 - [ ] **Deploy the Leg 3 scoping/auth fixes** (`security/scoping-adversarial-review`):
       until then any production Admin can take over the super-user account and logged-out
       visitors can open most pages. See "Leg 3 follow-ups" below.
-- [ ] **Fix R0 (parent-cycle crash) first.** A parent cycle through a person with 3+
-      recorded parents kills the web process for every family. See the top of "In
-      Progress / Up Next" and `[LAYOUT FUZZ 2026-10-10] R0` below.
+- [x] **Fix R0 (parent-cycle crash) first.** Fixed 2026-10-11 on `fix/r0-parent-cycle`
+      (code + tests done; **not deployed yet**, since `deploy-web.yml` is manual-only, so
+      production still has the crash until this merges and is deployed). Also run
+      `scripts/check-parent-cycles.sql` against production before or right after
+      deploying, to see whether a loop is already saved there. See
+      `[LAYOUT FUZZ 2026-10-10] R0` below.
 - [ ] **Confirm PR #39's fixes (and everything merged since) are actually deployed.**
       `deploy-web.yml` is manual-only, so merging to `master` does not deploy.
 - [ ] **Confirm every production user has a `UserFamily` row.** The 2026-07-04 entry below
@@ -215,8 +218,9 @@ the couple-gap reservation (2026-09-18) or sibling depth propagation is not caug
 (no invariant covers "nobody between spouses" or node size). So the harness doesn't yet
 replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
 
-- [ ] **[LAYOUT FUZZ 2026-10-10] R0 — CRITICAL: a Parent cycle crashes the whole web
-      process.** `PlaceGroup`/`MeasureGroup`/`MarkDescendants` recurse forever on a cycle
+- [x] **[LAYOUT FUZZ 2026-10-10] R0 — CRITICAL: a Parent cycle crashes the whole web
+      process. FIXED 2026-10-11 (`fix/r0-parent-cycle`; fix not deployed yet, see below).**
+      `PlaceGroup`/`MeasureGroup`/`MarkDescendants` recurse forever on a cycle
       reachable from a root, and a StackOverflow can't be caught. In Blazor Server it kills
       the App Service process for every family, and anyone loading that tree would
       crash it again. Reachable from the UI as far as the code shows (not yet reproduced in
@@ -229,6 +233,48 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       crashed : Stack overflow`. Fix direction: reject cycles in `PersonService`
       (ancestor check on parent add) **and** make the engine cycle-safe (visited set in
       the three recursions), because bad data may already exist. Fix before inviting more people.
+
+      **What was done (2026-10-11):**
+      - *Prevention.* `ParentGraph` (`FamilyTree.Core/Services`) answers "would this link
+        close a loop". Checked on every path that can persist a Parent row:
+        `PersonService.CreateAsync` and `UpdateAsync` (both the parent and the child lists,
+        and only links the save *adds*, so someone already stuck in a loop can still be
+        edited and can remove the bad link), `PersonService.RestoreAsync` (restoring
+        resurrects cascade-deleted Parent links, which can recreate a loop if the tree
+        changed meanwhile), `RelationshipService.CreateAsync`/`UpdateAsync` (judged in both
+        the requested and the stored direction, see the canonical-GUID-order note under
+        "Non-security bugs found by the same review"), and `ClaudeImportService.CommitAsync`
+        (UI deactivated, code still there). `AuthService.LinkUserToTreeAsync` and
+        `CreateUnlinkedPersonAsync` need no check: they only link a person they just
+        created, who has no other links, so one new edge cannot close a loop (pinned by
+        characterization tests that fail if either flow ever starts writing an edge that
+        doesn't involve the new person). A rejected save returns `ServiceResponse.Fail("X
+        is already Y's descendant, so they can't also be Y's parent. That would create a
+        loop in the family tree.")`; the Add/Edit pages already toast any failed save
+        (pinned by `ParentLoopRejectionUiTests`). The parent picker in `PersonForm` still
+        offers descendants and is not filtered (UX follow-up if wanted; the service is the
+        enforcement point).
+      - *Defense.* The engine's four recursions that follow the parent-group chain
+        (`MarkDescendants`, `MeasureGroup`, `PlaceGroup`, and `ReorderCrossEdgeChildren`,
+        which the original entry didn't list) now refuse to re-enter a group already on the
+        **current path**. It is a path guard, not a global visited set, on purpose: a
+        child with 3 recorded parents sits under more than one group and must still be
+        walked both times, so trees without a cycle lay out identically (verified:
+        12,000 random acyclic layouts, byte-identical JSON against the pre-fix engine).
+        On a cycle the closing link is just not followed: every person is still drawn once
+        and the loop is logged as a warning naming the people (once per engine instance).
+      - *Existing data.* `DataIntegrityService.FindParentCyclesAsync` (read-only, super-user
+        or unattended only) and `scripts/check-parent-cycles.sql` (read-only T-SQL, to run
+        against production yourself). Nothing was run against production.
+      - *Tests.* `ParentCycleWritePathTests`, `ParentCycleIntegrityTests`,
+        `FamilyTreeLayoutEngineCycleTests` (every shape run under 3 people-list orders,
+        since the crash depends on list order), `ParentLoopRejectionUiTests`;
+        `Invariant7b_ParentCycleDoesNotCrash` un-skipped; new `Invariant7c` (random
+        families with 1-2 injected cycles, incl. self-parent) plus a generator sanity test.
+        There was no `KnownOpen` flag for R0 (only the skipped test), so nothing to delete.
+      - *Left alone, not part of R0.* The latent Parent-direction inversion in
+        `RelationshipService` is still open (entry below); the new loop check just
+        accounts for it.
 - [ ] **[LAYOUT FUZZ 2026-10-10] R1 — a person linked only by an ended marriage is laid
       out as a separate tree.** `IdentifyConnectedComponents` follows Parent/Child/Spouse/
       Sibling but not `FormerSpouseIds`. A former spouse with no other relatives becomes their own
@@ -818,7 +864,7 @@ mobile touch-target sizing (44×44px), secrets hygiene (`.gitignore` correctly e
 
 ## In Progress / Up Next
 
-- [ ] **[CRITICAL — DO BEFORE INVITING MORE FAMILY] R0: a parent cycle crashes the whole web process (found 2026-10-10 by the layout fuzz harness).** A person with 3+ recorded parents, one of whom is their own descendant, makes `FamilyTreeLayoutEngine` recurse until the stack overflows, which kills the App Service process for every family. Fix on its own branch: reject cycles in `PersonService` (ancestor check on parent add) **and** make the engine's three recursions cycle-safe, because bad data may already exist. Un-skip `FamilyTreeLayoutFuzzTests.Invariant7b_ParentCycleDoesNotCrash` in the same PR. Full details: `[LAYOUT FUZZ 2026-10-10] R0` at the top of this file.
+- [x] **[CRITICAL — DO BEFORE INVITING MORE FAMILY] R0: a parent cycle crashes the whole web process (found 2026-10-10 by the layout fuzz harness). FIXED 2026-10-11 on `fix/r0-parent-cycle`: write paths reject cycles, the engine survives existing ones, `Invariant7b` un-skipped. Not deployed until this merges and `deploy-web.yml` is run by hand; write-up under `[LAYOUT FUZZ 2026-10-10] R0` at the top of this file.** A person with 3+ recorded parents, one of whom is their own descendant, makes `FamilyTreeLayoutEngine` recurse until the stack overflows, which kills the App Service process for every family. Fix on its own branch: reject cycles in `PersonService` (ancestor check on parent add) **and** make the engine's three recursions cycle-safe, because bad data may already exist. Un-skip `FamilyTreeLayoutFuzzTests.Invariant7b_ParentCycleDoesNotCrash` in the same PR. Full details: `[LAYOUT FUZZ 2026-10-10] R0` at the top of this file.
 - [x] **Deploy** — pushed to production; user testing in progress at arborkin-erbufqfkhzcka4cb.centralus-01.azurewebsites.net
 - [x] **[SECURITY — Critical] Family-scope check in `GetByIdAsync`** — `PersonService`, `RelationshipService`, and `MediumService` all lack a `FamilyId` guard on single-entity lookups; any authenticated user who knows a GUID can read across family boundaries
 - [x] **[SECURITY — Critical] `DevAuth` production guard** — add a startup assertion that `DevAuth:Enabled` is false outside of Development environment

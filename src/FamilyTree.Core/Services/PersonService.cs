@@ -208,6 +208,10 @@ public class PersonService(
             var parentError = await ValidateParentRelationshipsAsync(ctx, dto, ct);
             if (parentError != null) return ServiceResponse<PersonDto>.Fail(parentError);
 
+            // The person doesn't exist yet, so Guid.Empty stands in for them.
+            var loopError = await ValidateNoParentLoopAsync(ctx, Guid.Empty, $"{dto.FirstName} {dto.LastName}".Trim(), dto, ct);
+            if (loopError != null) return ServiceResponse<PersonDto>.Fail(loopError);
+
             var spouseError = await ValidateSpouseRelationshipsAsync(ctx, Guid.Empty, dto, ct);
             if (spouseError != null) return ServiceResponse<PersonDto>.Fail(spouseError);
 
@@ -315,6 +319,9 @@ public class PersonService(
 
             var parentError = await ValidateParentRelationshipsAsync(ctx, dto, ct);
             if (parentError != null) return ServiceResponse<PersonDto>.Fail(parentError);
+
+            var loopError = await ValidateNoParentLoopAsync(ctx, id, $"{person.FirstName} {person.LastName}".Trim(), dto, ct);
+            if (loopError != null) return ServiceResponse<PersonDto>.Fail(loopError);
 
             var spouseError = await ValidateSpouseRelationshipsAsync(ctx, id, dto, ct);
             if (spouseError != null) return ServiceResponse<PersonDto>.Fail(spouseError);
@@ -432,9 +439,6 @@ public class PersonService(
 
             var deletedAt = person.DeletedAt.Value;
 
-            person.DeletedAt = null;
-            person.DeletedBy = null;
-
             // Restore only relationships that were cascade-deleted alongside this exact
             // person deletion (same timestamp) — a relationship the user had already
             // removed independently, before this person was deleted, stays deleted.
@@ -442,6 +446,15 @@ public class PersonService(
                 .IgnoreQueryFilters()
                 .Where(r => (r.PersonAId == id || r.PersonBId == id) && r.DeletedAt == deletedAt)
                 .ToListAsync(ct);
+
+            // Restoring brings Parent links back, and the tree may have changed since they
+            // were removed (R0): refuse if that would put someone back among their own
+            // ancestors, rather than reviving a loop.
+            var loopError = await ValidateRestoredParentLinksAsync(ctx, relationships, ct);
+            if (loopError != null) return ServiceResponse.Fail(loopError);
+
+            person.DeletedAt = null;
+            person.DeletedBy = null;
             foreach (var rel in relationships)
             {
                 rel.DeletedAt = null;
@@ -857,6 +870,86 @@ public class PersonService(
         }
 
         return null;
+    }
+
+    // Refuses a save that would make someone their own ancestor (R0, docs/TodoList.md): a Parent
+    // loop sends the layout engine into unbounded recursion. Judges the tree as it will be AFTER
+    // the save (this person's old parent and child links replaced by the DTO's), and only the
+    // links the save ADDS, so a person caught in a loop that predates this check can still be
+    // edited, and can fix it by removing the bad link.
+    private static async Task<string?> ValidateNoParentLoopAsync(
+        AppDbContext ctx, Guid personId, string personName, PersonUpsertDto dto, CancellationToken ct)
+    {
+        var parentIds = dto.ParentIds.Distinct().ToList();
+        var childIds = dto.ChildIds.Distinct().ToList();
+        if (parentIds.Count == 0 && childIds.Count == 0) return null;
+
+        var edges = await ctx.Relationships.AsNoTracking()
+            .Where(r => r.Type == RelationshipType.Parent)
+            .Select(r => new { Parent = r.PersonAId, Child = r.PersonBId })
+            .ToListAsync(ct);
+
+        var existingParents = edges.Where(e => e.Child == personId).Select(e => e.Parent).ToHashSet();
+        var existingChildren = edges.Where(e => e.Parent == personId).Select(e => e.Child).ToHashSet();
+        var addedParents = parentIds.Where(p => !existingParents.Contains(p)).ToList();
+        var addedChildren = childIds.Where(c => !existingChildren.Contains(c)).ToList();
+        if (addedParents.Count == 0 && addedChildren.Count == 0) return null;
+
+        var after = new ParentGraph(edges
+            .Where(e => e.Parent != personId && e.Child != personId)
+            .Select(e => (e.Parent, e.Child))
+            .Concat(parentIds.Select(p => (p, personId)))
+            .Concat(childIds.Select(c => (personId, c))));
+        var descendants = after.Descendants(personId);
+        var ancestors = after.Ancestors(personId);
+
+        Guid? badParent = addedParents.Cast<Guid?>().FirstOrDefault(p => p == personId || descendants.Contains(p!.Value));
+        Guid? badChild = badParent is null
+            ? addedChildren.Cast<Guid?>().FirstOrDefault(c => c == personId || ancestors.Contains(c!.Value))
+            : null;
+        var culprit = badParent ?? badChild;
+        if (culprit is null) return null;
+
+        if (culprit == personId)
+            return "A person can't be their own parent or child. That would create a loop in the family tree.";
+
+        var other = await ctx.People.AsNoTracking()
+            .Where(p => p.Id == culprit)
+            .Select(p => p.FirstName + " " + p.LastName)
+            .FirstOrDefaultAsync(ct) ?? "That person";
+
+        return badParent is not null
+            ? $"{other} is already {personName}'s descendant, so they can't also be {personName}'s parent. " +
+              "That would create a loop in the family tree."
+            : $"{other} is already {personName}'s ancestor, so they can't also be {personName}'s child. " +
+              "That would create a loop in the family tree.";
+    }
+
+    private static async Task<string?> ValidateRestoredParentLinksAsync(
+        AppDbContext ctx, List<Relationship> restoring, CancellationToken ct)
+    {
+        var restoredParentLinks = restoring.Where(r => r.Type == RelationshipType.Parent).ToList();
+        if (restoredParentLinks.Count == 0) return null;
+
+        // Live links plus the ones coming back; the default query filter hides soft-deleted rows.
+        var graph = new ParentGraph(
+            (await ctx.Relationships.AsNoTracking()
+                .Where(r => r.Type == RelationshipType.Parent)
+                .Select(r => new { r.PersonAId, r.PersonBId })
+                .ToListAsync(ct))
+            .Select(r => (r.PersonAId, r.PersonBId))
+            .Concat(restoredParentLinks.Select(r => (r.PersonAId, r.PersonBId))));
+
+        var bad = restoredParentLinks.FirstOrDefault(r =>
+            r.PersonAId == r.PersonBId || graph.Descendants(r.PersonBId).Contains(r.PersonAId));
+        if (bad is null) return null;
+
+        var names = await ctx.People.IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.Id == bad.PersonAId || p.Id == bad.PersonBId)
+            .ToDictionaryAsync(p => p.Id, p => $"{p.FirstName} {p.LastName}", ct);
+        return $"Restoring this person would put {names.GetValueOrDefault(bad.PersonAId, "someone")} and " +
+               $"{names.GetValueOrDefault(bad.PersonBId, "someone")} in a loop of each other's ancestors, " +
+               "because the family tree has changed since they were deleted. Fix the conflicting parent link first.";
     }
 
     private static async Task<string?> ValidateSpouseRelationshipsAsync(
