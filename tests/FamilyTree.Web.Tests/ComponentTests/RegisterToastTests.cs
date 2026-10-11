@@ -91,6 +91,8 @@ class FakeAuthService : IAuthService
         => throw new NotImplementedException();
     public Task<ServiceResponse<Guid>> CreateInviteAsync(string email)
         => throw new NotImplementedException();
+    public Task<ServiceResponse<Guid>> CreateInviteForStoryResponseAsync(string email, Guid? familyId)
+        => throw new NotImplementedException();
     public Task<ServiceResponse<List<UserInvite>>> GetPendingInvitesAsync()
         => throw new NotImplementedException();
     public Task<ServiceResponse> CancelInviteAsync(Guid inviteId)

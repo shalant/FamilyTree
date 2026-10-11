@@ -69,9 +69,15 @@ public class RelationshipService(
             if (!personVisible)
                 return ServiceResponse<List<RelationshipDto>>.Ok([]);
 
+            // The other party must be visible too, or a legacy cross-family row would hand
+            // out a family-B person's ID (finding S3, docs/security.md).
+            var visibleIds = ctx.People
+                .Where(p => isSuperUser || (familyId.HasValue && p.FamilyId == familyId))
+                .Select(p => p.Id);
             var rels = await ctx.Relationships
                 .AsNoTracking()
-                .Where(r => r.PersonAId == personId || r.PersonBId == personId)
+                .Where(r => (r.PersonAId == personId && visibleIds.Contains(r.PersonBId)) ||
+                            (r.PersonBId == personId && visibleIds.Contains(r.PersonAId)))
                 .OrderBy(r => r.CreatedAt)
                 .Select(r => RelationshipMapper.MapRelationshipToDto(r))
                 .ToListAsync(ct);

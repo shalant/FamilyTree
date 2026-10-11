@@ -15,6 +15,44 @@ public class PersonService(
     IAuditLogService auditLog,
     ICurrentUserService currentUser) : IPersonService
 {
+    // People the caller may see or touch: a super-user sees every family (including
+    // legacy FamilyId == null rows); anyone else only their own family, and a caller
+    // with no FamilyId claim (anonymous, or a missing UserFamily row) sees nobody.
+    // Every ID-taking method goes through this so a family-B GUID behaves exactly like
+    // a GUID that doesn't exist (findings S3/S4/S6, docs/security.md, 2026-10-10).
+    private IQueryable<Person> ScopedPeople(AppDbContext ctx, bool includeDeleted = false)
+    {
+        var people = includeDeleted ? ctx.People.IgnoreQueryFilters() : ctx.People;
+        if (currentUser.IsSuperUser) return people;
+        var familyId = currentUser.FamilyId;
+        return people.Where(p => familyId.HasValue && p.FamilyId == familyId);
+    }
+
+    // Relationships of one person whose OTHER party is also visible, so a legacy
+    // cross-family row never surfaces a family-B person's ID in a family-A DTO.
+    private Task<List<Relationship>> VisibleRelationshipsOfAsync(AppDbContext ctx, Guid personId, CancellationToken ct)
+    {
+        var visibleIds = ScopedPeople(ctx).Select(p => p.Id);
+        return ctx.Relationships
+            .AsNoTracking()
+            .Where(r => (r.PersonAId == personId && visibleIds.Contains(r.PersonBId)) ||
+                        (r.PersonBId == personId && visibleIds.Contains(r.PersonAId)))
+            .ToListAsync(ct);
+    }
+
+    // Every relative ID in the DTO must be a person the caller can see. Runs before the
+    // parent/spouse validators, which quote the relative's name, death date and marriage
+    // status back in their error messages.
+    private async Task<string?> ValidateRelativesInScopeAsync(AppDbContext ctx, PersonUpsertDto dto, CancellationToken ct)
+    {
+        var ids = dto.ParentIds.Concat(dto.ChildIds).Concat(dto.SpouseIds)
+            .Concat(dto.FormerSpouseIds).Concat(dto.SiblingIds).Distinct().ToList();
+        if (ids.Count == 0) return null;
+
+        var visible = await ScopedPeople(ctx).CountAsync(p => ids.Contains(p.Id), ct);
+        return visible == ids.Count ? null : "One or more of the selected relatives were not found in your family.";
+    }
+
     // ─────────────────────────────────────────────────────────────
     //  GET ALL
     // ─────────────────────────────────────────────────────────────
@@ -128,10 +166,7 @@ public class PersonService(
             if (person is null)
                 return ServiceResponse<PersonDto>.Fail($"Person {id} not found.");
 
-            var relationships = await ctx.Relationships
-                .AsNoTracking()
-                .Where(r => r.PersonAId == id || r.PersonBId == id)
-                .ToListAsync(ct);
+            var relationships = await VisibleRelationshipsOfAsync(ctx, id, ct);
 
             return ServiceResponse<PersonDto>.Ok(PersonMapper.MapPersonToDto(person, relationships));
         }
@@ -154,6 +189,11 @@ public class PersonService(
             var dtoValidation = ValidationHelper.ValidateDto(dto);
             if (!dtoValidation.Success) return ServiceResponse<PersonDto>.Fail(dtoValidation.Message);
 
+            // Anonymous callers and accounts with no UserFamily row used to fall through to
+            // the oldest family (finding S1). Only a super-user may create without a family.
+            if (!currentUser.IsSuperUser && !currentUser.FamilyId.HasValue)
+                return ServiceResponse<PersonDto>.Fail("You must be signed in to a family to add people.");
+
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             var dateError = ValidatePersonDates(dto);
@@ -161,6 +201,9 @@ public class PersonService(
 
             var nameError = ValidatePersonNames(dto);
             if (nameError != null) return ServiceResponse<PersonDto>.Fail(nameError);
+
+            var scopeError = await ValidateRelativesInScopeAsync(ctx, dto, ct);
+            if (scopeError != null) return ServiceResponse<PersonDto>.Fail(scopeError);
 
             var parentError = await ValidateParentRelationshipsAsync(ctx, dto, ct);
             if (parentError != null) return ServiceResponse<PersonDto>.Fail(parentError);
@@ -200,10 +243,7 @@ public class PersonService(
 
             _ = auditLog.LogAsync("Create", "Person", person.Id, userId: userId);
 
-            var relationships = await ctx.Relationships
-                .AsNoTracking()
-                .Where(r => r.PersonAId == person.Id || r.PersonBId == person.Id)
-                .ToListAsync(ct);
+            var relationships = await VisibleRelationshipsOfAsync(ctx, person.Id, ct);
 
             return ServiceResponse<PersonDto>.Ok(PersonMapper.MapPersonToDto(person, relationships));
         }
@@ -220,9 +260,9 @@ public class PersonService(
     // null) — invisible to every regular user, including whichever family it should
     // actually belong to. Falls back to the single family this deployment currently has
     // (creating it if truly missing, mirroring AuthService.CreateInviteAsync's same
-    // get-or-create pattern). Also covers the defensive case of a regular user whose
-    // UserFamily assignment is missing — better to land in the existing family than to
-    // create yet another ownerless record.
+    // get-or-create pattern). Regular users without a FamilyId no longer reach this:
+    // CreateAsync rejects them (finding S1, 2026-10-10) instead of dropping their person
+    // into the oldest family.
     private async Task<Guid> ResolveFamilyIdForCreateAsync(AppDbContext ctx, CancellationToken ct)
     {
         if (currentUser.FamilyId.HasValue) return currentUser.FamilyId.Value;
@@ -237,11 +277,6 @@ public class PersonService(
             ctx.Families.Add(family);
             await ctx.SaveChangesAsync(ct);
         }
-
-        if (!currentUser.IsSuperUser)
-            logger.LogWarning(
-                "User {UserId} has no FamilyId claim when creating a person; defaulting to family {FamilyId}",
-                currentUser.UserId, family.Id);
 
         return family.Id;
     }
@@ -258,21 +293,25 @@ public class PersonService(
             if (!dtoValidation.Success)
                 return ServiceResponse<PersonDto>.Fail(dtoValidation.Message);
 
-            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
-
-            var person = await ctx.People.FirstOrDefaultAsync(p => p.Id == id, ct);
-            if (person is null)
-                return ServiceResponse<PersonDto>.Fail($"Person {id} not found.");
-
-            // Only super-users and admins can update people.
+            // Only super-users and admins can update people. Checked before the lookup so a
+            // Member gets the same answer for a real GUID and a made-up one.
             if (!currentUser.IsSuperUser && !currentUser.IsAdmin)
                 return ServiceResponse<PersonDto>.Fail("You do not have permission to update this person.");
+
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var person = await ScopedPeople(ctx).FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (person is null)
+                return ServiceResponse<PersonDto>.Fail($"Person {id} not found.");
 
             var dateError = ValidatePersonDates(dto);
             if (dateError != null) return ServiceResponse<PersonDto>.Fail(dateError);
 
             var nameError = ValidatePersonNames(dto);
             if (nameError != null) return ServiceResponse<PersonDto>.Fail(nameError);
+
+            var scopeError = await ValidateRelativesInScopeAsync(ctx, dto, ct);
+            if (scopeError != null) return ServiceResponse<PersonDto>.Fail(scopeError);
 
             var parentError = await ValidateParentRelationshipsAsync(ctx, dto, ct);
             if (parentError != null) return ServiceResponse<PersonDto>.Fail(parentError);
@@ -302,10 +341,7 @@ public class PersonService(
 
             _ = auditLog.LogAsync("Update", "Person", id, userId: userId);
 
-            var relationships = await ctx.Relationships
-                .AsNoTracking()
-                .Where(r => r.PersonAId == id || r.PersonBId == id)
-                .ToListAsync(ct);
+            var relationships = await VisibleRelationshipsOfAsync(ctx, id, ct);
 
             return ServiceResponse<PersonDto>.Ok(PersonMapper.MapPersonToDto(person, relationships));
         }
@@ -330,7 +366,7 @@ public class PersonService(
 
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var person = await ctx.People
+            var person = await ScopedPeople(ctx)
                 .FirstOrDefaultAsync(p => p.Id == id, ct);
 
             if (person is null)
@@ -379,10 +415,13 @@ public class PersonService(
     {
         try
         {
+            // Same rule as DeleteAsync; restore previously had no role or family check.
+            if (!currentUser.IsSuperUser && !currentUser.IsAdmin)
+                return ServiceResponse.Fail("You do not have permission to restore this person.");
+
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var person = await ctx.People
-                .IgnoreQueryFilters()
+            var person = await ScopedPeople(ctx, includeDeleted: true)
                 .FirstOrDefaultAsync(p => p.Id == id, ct);
 
             if (person is null)

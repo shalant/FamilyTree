@@ -186,7 +186,7 @@ depth, which would remove the fragile birth-year inference machinery entirely.
 | `SiblingInferenceDialog` | Offers to link additional siblings when a new sibling is added |
 | `LoginOverlay` | Full-page auth card; handles email/password POST and Google OAuth redirect |
 | `Register.razor` | Invite-aware registration page; reads `?invite=<token>` query param |
-| `Admin.razor` | Admin panel: dashboard stats, deleted persons, user management, audit log, activity, stories management |
+| `Admin.razor` | Admin panel: dashboard stats, deleted persons, stories management, messages; user management, audit log and activity are SuperUser-only |
 | `StatCard` | Dashboard stat tile; accepts `Icon`, `Accent`, `Href`, `Subtitle` parameters |
 | `CustomAppBar` | Top nav; desktop icon row vs. mobile hamburger + centered user identity, both pure CSS breakpoint-driven |
 | `Stories.razor` | `/stories` — family-wide feed of approved, non-hidden stories; "Add story" opens `StoryFormDialog` |
@@ -229,6 +229,7 @@ This project follows Uncle Bob Martin's approach to AI-assisted development: **d
 
 **Constraints in place:**
 - **Layout fuzz harness** (`FamilyTreeLayoutFuzzTests`, added 2026-10-10): CsCheck property tests over random genealogies built through the real `PersonMapper` → `CoupleHelper` path, 200 pinned-seed cases per invariant in CI. Full-domain invariants that hit known-open bugs are skipped with a `docs/TodoList.md` "[LAYOUT FUZZ 2026-10-10] R<n>" pointer; `_ExcludingKnownOpen` twins keep checking the rest. Never loosen an invariant to get green; when you fix an R-numbered bug, un-skip its tests and delete its `KnownOpen` flag in the same PR. `FAMILYTREE_FUZZ_SOAK=1` runs the local soak.
+- **Cross-tenant matrix** (`CrossTenantMatrixTests`, added 2026-10-10): two seeded families; every public method of the family-scoped services is called as a family-A Member and Admin against family-B IDs and must fail or return nothing, with positive controls as family B and as the super-user so a broken seed can't pass vacuously. `PageAuthorizationTests` fails if a page is neither `[Authorize]`d nor allow-listed.
 - **Comprehensive test suites**: `FamilyTreeLayoutEngineTests` (regression suite with before/after pairs for classification transitions), `RelationshipServiceTests`, `AuthServiceTreeLinkingTests`, and integration tests hitting an EF Core InMemory database (a real EF pipeline and real `UserManager<AppUser>`, not mocked services — see `TestInfrastructure.cs`; not literally SQL Server, unlike the E2E suite below)
 - **Build verification**: `dotnet build FamilyTree.sln -c Release` must succeed; no warnings treated as acceptable
 - **Test runs**: `dotnet test` must pass 100% before any PR/commit
@@ -267,7 +268,10 @@ Controlled by `Auth:RegistrationMode` in config:
 - `Closed` — registration disabled entirely
 
 ### Invite Flow
-`IAuthService.CreateInviteAsync(email)` generates a URL-safe base64 token, stores it in `UserInvites`, and returns it. Admin constructs `/register?invite=<token>`. Token TTL is `Auth:InviteTtlDays` (default 7). `CreateInviteAsync` auto-creates a `Family` row if none exists.
+`IAuthService.CreateInviteAsync(email)` (SuperUser-only since 2026-10-10) stores a `UserInvite` and returns its `Id`; Admin › Users builds `/register?invite=<id>` from it (the stored `Token` column is unused). Token TTL is `Auth:InviteTtlDays` (default 7). The super-user has no family claim, so their invites target the oldest family (auto-created if none exists). A story-invite response uses the separate, ungated `CreateInviteForStoryResponseAsync(email, familyId)`, targeting the story subject's family. `RegisterAsync` honours a valid invite's family in every registration mode.
+
+### Family Scoping & Admin Surfaces (2026-10-10)
+Every page requires sign-in via `@attribute [Authorize]` in `_Imports.razor`; public pages opt out with `[AllowAnonymous]` and must be listed in `PageAuthorizationTests.AnonymousRoutes`. Services scope every ID-taking path to the caller's `FamilyId` claim (super-user: all families; no claim: nothing), and a foreign ID gets the same message as a missing one. The Admin role is global, not per-family, so the cross-family admin surfaces (Users tab, password resets, invites, Audit log, Activity) are SuperUser-only in both the services and `Admin.razor`. Family Admins keep person/relationship/story moderation inside their own family. `CrossTenantMatrixTests` locks this in: **add a row for every new public method on a family-scoped service.** Findings, decisions and open items: `docs/security.md`, "Scoping and auth adversarial review".
 
 ### Rate Limiting & Lockout
 - `/auth/do-login` is protected by a fixed-window rate limiter: 5 requests per 15 min per IP (`RequireRateLimiting("login")`)

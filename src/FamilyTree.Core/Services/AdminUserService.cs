@@ -9,10 +9,19 @@ namespace FamilyTree.Core.Services;
 
 public class AdminUserService(
     IDbContextFactory<AppDbContext> dbFactory,
-    ILogger<AdminUserService> logger) : IAdminUserService
+    ILogger<AdminUserService> logger,
+    ICurrentUserService currentUser) : IAdminUserService
 {
+    // Finding S2 (docs/security.md, 2026-10-10): every method here crosses family
+    // boundaries (users, invites, password resets), and a pending reset's Id is a working
+    // reset link, so a family Admin who could list them could take over the super-user.
+    // SuperUser-only, enforced here and not just by hiding the Users tab.
+    internal const string Denied = "Only the site owner can manage user accounts.";
+
     public async Task<ServiceResponse<List<AdminUserDto>>> GetAllUsersAsync(CancellationToken ct = default)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse<List<AdminUserDto>>.Fail(Denied);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
@@ -43,6 +52,8 @@ public class AdminUserService(
 
     public async Task<ServiceResponse<List<AdminInviteDto>>> GetPendingInvitesAsync(CancellationToken ct = default)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse<List<AdminInviteDto>>.Fail(Denied);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
@@ -69,6 +80,8 @@ public class AdminUserService(
 
     public async Task<ServiceResponse<List<AdminPasswordResetDto>>> GetPendingPasswordResetsAsync(CancellationToken ct = default)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse<List<AdminPasswordResetDto>>.Fail(Denied);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
@@ -96,6 +109,8 @@ public class AdminUserService(
 
     public async Task<ServiceResponse<List<PersonDto>>> GetPeopleAsync(CancellationToken ct = default)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse<List<PersonDto>>.Fail(Denied);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
@@ -130,6 +145,8 @@ public class AdminUserService(
 
     public async Task<ServiceResponse> CancelInviteAsync(Guid inviteId, CancellationToken ct = default)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse.Fail(Denied);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
@@ -151,6 +168,8 @@ public class AdminUserService(
 
     public async Task<ServiceResponse> DismissPasswordResetAsync(Guid resetId, CancellationToken ct = default)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse.Fail(Denied);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);

@@ -10,6 +10,9 @@ doc for the testing legs: `docs/Testing/fuzz-and-adversarial-review-plan.md` (me
 PR #43).
 
 **Check before sending invites**
+- [ ] **Deploy the Leg 3 scoping/auth fixes** (`security/scoping-adversarial-review`):
+      until then any production Admin can take over the super-user account and logged-out
+      visitors can open most pages. See "Leg 3 follow-ups" below.
 - [ ] **Fix R0 (parent-cycle crash) first.** A parent cycle through a person with 3+
       recorded parents kills the web process for every family. See the top of "In
       Progress / Up Next" and `[LAYOUT FUZZ 2026-10-10] R0` below.
@@ -70,12 +73,60 @@ PR #43).
       classification transitions: adoption (first confirm the mapper handles `Adopted`
       at all), third spouse, spouse death, deleting a middle generation, merging
       components, half-siblings.
-- [ ] **Leg 3: adversarial review of family-scoping and auth** — `/code-review xhigh` over
-      `PersonService`, `RelationshipService`, `StoryService`, `MediumService`,
-      `GedcomExportService`, `StoryInviteService`, `AuthService`, the claims factory and
-      admin services, then a cross-tenant test matrix (two seeded families, every public
-      service method called as family A against family B's IDs). Run first if only one
-      leg is started: it bears most directly on whether inviting people is safe.
+- [x] **Leg 3: adversarial review of family-scoping and auth** (`security/scoping-adversarial-review`,
+      done 2026-10-10) — `/code-review xhigh` plus a manual pass found S1-S9 (see
+      `docs/security.md`, "Scoping and auth adversarial review"). Fixed S1 (anonymous
+      page access and anonymous creates), S2 (Admin → super-user takeover via copyable
+      reset links; Users/Audit/Activity now SuperUser-only), S3/S4/S6 (cross-family
+      reads, writes and name oracles across Person, Relationship, Medium, Story and
+      StoryInvite services, plus tree linking) and most of S5 (story responses and
+      Open-mode invites now join the right family). Added
+      `CrossTenantMatrixTests` (96 cases incl. positive controls; 57 of the first 90
+      failed before the fixes, the 6 added later each failed first too) and
+      `PageAuthorizationTests`. E2E suite passes (9/9). Token usage recorded in the plan doc.
+
+**Leg 3 follow-ups (2026-10-10, from the scoping/auth review; see `docs/security.md`)**
+- [ ] **Deploy and check before inviting anyone.** The S1/S2 fixes only help once
+      deployed (`deploy-web.yml` is manual). Until then, make sure no one but the owner
+      holds the Admin role in production (S2 is exploitable by any Admin).
+- [ ] **Check how many `Family` rows production has.** S3/S4/S5 only leaked with two or
+      more; not checked in the review (no production access).
+- [ ] **S7: sessions survive revocation.** Add security-stamp validation to the
+      application cookie (`OnValidatePrincipal`) so demoting an Admin or resetting a
+      password ends existing sessions; Blazor circuits also need a revalidating
+      `AuthenticationStateProvider`. Remove or surface the second Admin source,
+      `AppUser.IsAdmin` (the Users tab can't see or clear it).
+- [ ] **S8: blob privacy.** Check the live container's public-access level (not done:
+      no live Azure access). Media URLs are raw blob URIs with no SAS, one shared
+      container, still served after a person is deleted; `security.md` claims SAS tokens.
+- [ ] **S5 remainder:** the super-user's own invites, Google sign-up in Open mode and
+      plain Open-mode signup still land in the oldest family (documented as a
+      single-family assumption). Needs a family picker or per-family invites before a
+      second family uses Open mode.
+- [ ] **Unscoped admin tabs outside the review's scope:** Messages
+      (`UserMessageService.GetAllAsync`, every family's feature requests/contact messages)
+      and the Admin Dashboard stats (`DashboardService`, global counts) are visible to
+      every family Admin. Decide: SuperUser-only, or scope by family.
+- [ ] **S9 lows:** `Auth:RegistrationMode` fails open when missing or mis-cased;
+      story-invite `IsUsed` check-then-set race (double submit makes two stories);
+      CR/LF in names/places injects GEDCOM records; null MIME type skips the upload
+      allow-list (and the size error says 50 MB for an 8 MB limit); `/auth/do-login`
+      ignores `?ReturnUrl=`, so deep links land on the tree after sign-in.
+- [ ] **Package advisories:** `dotnet build` warns NU1902/NU1903 for
+      `SixLabors.ImageSharp` 3.1.11 (high) and `AngleSharp` 1.1.2 (moderate) via
+      `FamilyTree.Web.Tests`; check whether Core's ImageSharp reference is affected too.
+- [ ] **Non-security bugs found by the same review (not fixed, not verified by test):**
+      PersonAdd's post-create `UpdateAsync` (photo back-fill, sibling linking) fails
+      silently for Members yet toasts success; `RelationshipService` canonical GUID
+      ordering inverts Parent/Adopted rows (latent, no UI caller);
+      `RelationshipService.UpdateAsync` always fails on an active spouse (counts itself
+      as the other marriage); `RestoreAsync` revives relationships to a still-deleted
+      partner; the unfiltered `(PersonAId, PersonBId, Type)` unique index blocks re-adding
+      a soft-deleted pair; `PersonService.CreateAsync` isn't transactional;
+      `GetAllAsync` loads every relationship in the database then filters in memory;
+      a story-invite respondent who already has an active `UserInvite` gets a broken
+      `/register?invite=` link (`Fail` never sets `Data`); `AdminUserService`'s pending
+      invites/resets include accepted, cancelled and completed rows.
 
 ---
 

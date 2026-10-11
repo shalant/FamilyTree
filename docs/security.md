@@ -3,6 +3,12 @@
 > Practical security guidance for a public family tree application.
 > The goal is protecting real people's personal data — especially living people and
 > minors — while keeping the app discoverable and useful. Updated: 2026-06-08.
+>
+> **Status note (2026-10-10):** much of the design below (visibility tiers, minor
+> protection, `PersonClaimStatus` approval, email-confirmation gating, MFA, per-family
+> `UserFamily.Role` admins, SAS-token blob URLs, HaveIBeenPwned) is **not implemented**;
+> treat those sections as the target design, not current behaviour. What is actually
+> enforced today is recorded in "Scoping and auth adversarial review (2026-10-10)" below.
 
 ---
 
@@ -186,7 +192,7 @@ Viewer      Unauthenticated public access to public families; read-only, visibil
 
 > Status key: **OPEN** = unmitigated gap, **PARTIAL** = some protection exists, **OK** = well covered.
 
-### A01 · Broken Access Control — OPEN (Critical)
+### A01 · Broken Access Control — OPEN (Critical) → see the 2026-10-10 review below
 - `PersonService.GetByIdAsync()` has **no `FamilyId` check** — any authenticated user who knows a GUID can fetch any person across family boundaries. Same gap exists in `RelationshipService` and `MediumService`.
 - `DevAuthHandler.cs` bypasses all authentication when `DevAuth:Enabled = true`. If this reaches a deployed environment the app is fully open.
 - *Fix:* add family-scope guard to every single-entity lookup; add a startup assertion that `DevAuth:Enabled` is false in non-Development environments.
@@ -231,6 +237,46 @@ Viewer      Unauthenticated public access to public families; read-only, visibil
 - Generic error messages used throughout; `UseExceptionHandler` active in production.
 - Some error messages include entity GUIDs (minor information leakage).
 - If `db.Database.MigrateAsync()` throws on startup the app crashes with no graceful degradation.
+
+---
+
+## Scoping and auth adversarial review (2026-10-10)
+
+Leg 3 of `docs/Testing/fuzz-and-adversarial-review-plan.md`, branch
+`security/scoping-adversarial-review`. A `/code-review` at xhigh effort plus a manual pass
+over `PersonService`, `RelationshipService`, `StoryService`, `MediumService`,
+`GedcomExportService`, `StoryInviteService`, `AuthService`, `AppUserClaimsPrincipalFactory`,
+`CurrentUserService`, `AdminUserService`, `AdminAuditService`, and the pages that call them.
+S3/S4/S5 only leak data once a second `Family` row exists; whether production has more
+than one was not checked (no production access in this review). S1 and S2 were
+exploitable with a single family.
+
+**Enforcement now in place.** Every family-scoped query goes through one predicate per
+service (`ScopedPeople`, `ScopedStories`, `VisiblePersonIds`): a super-user sees all
+families; anyone else sees only their own `FamilyId` claim; a caller with no claim sees
+nothing. A family-B ID behaves exactly like an ID that doesn't exist (same message).
+Locked in by `tests/FamilyTree.Core.Tests/CrossTenantMatrixTests.cs`: two seeded
+families, every public method of the services above called as a family-A Member and
+Admin against family-B IDs, plus positive controls as family B and as the super-user.
+**When adding a public method to one of these services, add a row there.** Pages are
+covered by `tests/FamilyTree.Web.Tests/ComponentTests/PageAuthorizationTests.cs`.
+
+| # | Severity | Finding | Status |
+|---|---|---|---|
+| S1 | Critical | Only `/admin` had `[Authorize]`; `AuthorizeRouteView` only blocks pages that do. Logged out, `/people/add`, `/stories`, `/dashboard` etc. loaded (confirmed in a local run), and `PersonService`/`StoryService`/`MediumService.CreateAsync` accepted anonymous callers, putting their rows in the oldest family. | **Fixed.** `[Authorize]` in `_Imports.razor`; nine public pages opt out with `[AllowAnonymous]`. Creates require a signed-in family member (super-user excepted). |
+| S2 | Critical | Any Admin could take over the super-user: request a reset at `/forgot-password`, then Admin › Users › "Copy reset link" (the reset request `Id` is the only credential). The Admin role is global, and the Users, Audit log and Activity tabs showed every family's accounts, invites and audit rows; Admins could promote others to Admin. | **Fixed.** `AdminUserService`, `AdminAuditService`, `AdminActivityService` and `AuthService`'s invite/reset/link-person methods are SuperUser-only; those tabs are hidden from Admins. Decision 2026-10-10: family Admins keep person/story moderation, scoped to their family. |
+| S3 | High | Cross-family reads: `StoryService.GetAllApprovedAsync` (the `/stories` feed), `GetAllAsync`, `GetUnlinkedAsync`, `GetByPersonAsync`; `MediumService.GetAllAsync`/`GetByPersonIdAsync`; `StoryInviteService.GetAllAsync`; relationship lists exposing another family's person IDs. `GetByPersonAsync` also showed pending and hidden stories in the person drawer. | **Fixed.** All scoped; the drawer shows approved, non-hidden stories only. |
+| S4 | High | Cross-family writes: Person Update/Delete (any Admin), Restore (anyone); relative IDs from another family on Create/Update; Story SetHidden/Approve/Move/LinkToPerson, and edit/delete of any unlinked story by anyone; Medium uploads onto any person; `LinkUserToTreeAsync`/`CreateUnlinkedPersonAsync` planting people in another family; story invites about another family's person. | **Fixed.** All scoped. Story edit/delete: author or Admin (decision 2026-10-10). Restore requires Admin. |
+| S5 | High | New users always joined the oldest family: admin invites, story-invite responses, Open-mode registration with an invite (the invite was ignored). | **Fixed** for story responses (the subject's family, else the sender's) and Open-mode invites (the invite's family). **By design, documented:** the super-user's own invites, Google sign-up in Open mode and plain Open-mode signup still use the oldest family, because the super-user has no family claim and those paths carry no family. Fix before a second family uses Open mode. |
+| S6 | Medium | Name/existence oracles: validators quoted another family's person (name, death date, marital status); different messages for "not found" vs "no permission"/"exists elsewhere". | **Fixed** on every path above. |
+| S7 | Medium | Role and `FamilyId` claims sit in a 14-day sliding cookie with no security-stamp validation, so demoting an Admin or resetting a password doesn't end existing sessions. `AppUser.IsAdmin` is a second, UI-invisible source of the Admin role. | **Open**, TodoList. |
+| S8 | Medium | Media are stored as raw blob URIs with no SAS token, in one shared container; anyone holding a URL can fetch the photo, including after the person is deleted. This contradicts "Blob Storage" under Infrastructure below. The live container's access level was **not** checked (no live Azure access in this review). | **Open**, TodoList. |
+| S9 | Low | `Auth:RegistrationMode` fails open (missing or mis-cased → Open); story-invite `IsUsed` check-then-set race; CR/LF in names/places injects GEDCOM records; a null MIME type skips the upload allow-list; `/auth/do-login` ignores `ReturnUrl`. | **Open**, TodoList. |
+
+**Accepted by design (raise before changing):** any Member can send a story invite to any
+email, and a response offers that email a registration invite into the story's family.
+That's the "Willa scenario" onboarding path (CLAUDE.md), and it bypasses
+`InviteOnly`'s admin gate by intent.
 
 ---
 

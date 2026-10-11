@@ -14,6 +14,51 @@ public class StoryService(
     ICurrentUserService currentUser) : IStoryService
 {
     // ─────────────────────────────────────────────────────────────
+    //  FAMILY SCOPE (findings S3/S4, docs/security.md, 2026-10-10)
+    // ─────────────────────────────────────────────────────────────
+    // A story has no FamilyId column. It belongs to its subject's family when linked;
+    // an unlinked one (PersonId == null) belongs to its author's family, or for an
+    // invite response, to the family of whoever sent the invite.
+    private IQueryable<Story> ScopedStories(AppDbContext ctx)
+    {
+        if (currentUser.IsSuperUser) return ctx.Stories;
+        if (currentUser.FamilyId is not { } familyId) return ctx.Stories.Where(_ => false);
+
+        return ctx.Stories.Where(s =>
+            (s.PersonId != null && ctx.People.Any(p => p.Id == s.PersonId && p.FamilyId == familyId)) ||
+            (s.PersonId == null &&
+                ((s.AuthorId != null && ctx.UserFamilies.Any(uf => uf.UserId == s.AuthorId && uf.FamilyId == familyId)) ||
+                 (s.InviteId != null && ctx.StoryInvites.Any(i => i.Id == s.InviteId &&
+                     ctx.UserFamilies.Any(uf => uf.UserId == i.InvitedByUserId && uf.FamilyId == familyId))))));
+    }
+
+    private IQueryable<Person> ScopedPeople(AppDbContext ctx)
+    {
+        var familyId = currentUser.FamilyId;
+        var isSuperUser = currentUser.IsSuperUser;
+        return ctx.People.Where(p => isSuperUser || (familyId.HasValue && p.FamilyId == familyId));
+    }
+
+    private bool IsAdmin => currentUser.IsSuperUser || currentUser.IsAdmin;
+
+    // The family a story belongs to, by the same rule as ScopedStories; null when it
+    // can't be determined (e.g. an unlinked story written by a super-user).
+    private static async Task<Guid?> StoryFamilyIdAsync(AppDbContext ctx, Story story, CancellationToken ct)
+    {
+        if (story.PersonId is { } personId)
+            return await ctx.People.IgnoreQueryFilters().Where(p => p.Id == personId)
+                .Select(p => p.FamilyId).FirstOrDefaultAsync(ct);
+
+        var userId = story.AuthorId
+            ?? await ctx.StoryInvites.Where(i => i.Id == story.InviteId)
+                .Select(i => (Guid?)i.InvitedByUserId).FirstOrDefaultAsync(ct);
+        if (userId is null) return null;
+
+        return await ctx.UserFamilies.Where(uf => uf.UserId == userId)
+            .OrderBy(uf => uf.JoinedAt).Select(uf => (Guid?)uf.FamilyId).FirstOrDefaultAsync(ct);
+    }
+
+    // ─────────────────────────────────────────────────────────────
     //  GET BY PERSON
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse<List<StoryDto>>> GetByPersonAsync(
@@ -23,10 +68,13 @@ public class StoryService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var stories = await ctx.Stories
+            // Approved and not hidden only: the person drawer showed pending invite
+            // responses and admin-hidden stories to every member, bypassing moderation.
+            // Admins review those in Admin > Stories.
+            var stories = await ScopedStories(ctx)
                 .AsNoTracking()
                 .Include(s => s.Author)
-                .Where(s => s.PersonId == personId)
+                .Where(s => s.PersonId == personId && s.IsApproved && !s.IsHidden)
                 .OrderByDescending(s => s.CreatedAt)
                 .ToListAsync(ct);
 
@@ -56,11 +104,16 @@ public class StoryService(
                 return ServiceResponse<StoryDto>.Fail(
                     "Either an existing person or a person's name is required.");
 
+            // Stories are published immediately (IsApproved = true), so an anonymous or
+            // family-less caller must not reach this (finding S1).
+            if (currentUser.UserId is null || (!currentUser.IsSuperUser && !currentUser.FamilyId.HasValue))
+                return ServiceResponse<StoryDto>.Fail("You must be signed in to a family to add a story.");
+
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
             if (dto.PersonId.HasValue)
             {
-                var personExists = await ctx.People.AnyAsync(p => p.Id == dto.PersonId, ct);
+                var personExists = await ScopedPeople(ctx).AnyAsync(p => p.Id == dto.PersonId, ct);
                 if (!personExists)
                     return ServiceResponse<StoryDto>.Fail($"Person {dto.PersonId} not found.");
             }
@@ -109,14 +162,13 @@ public class StoryService(
 
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var familyId = currentUser.FamilyId;
-            var isSuperUser = currentUser.IsSuperUser;
-
-            var story = await ctx.Stories.FirstOrDefaultAsync(s => s.Id == id &&
-                (isSuperUser || !s.PersonId.HasValue ||
-                 (familyId.HasValue && ctx.People.Any(p => p.Id == s.PersonId && p.FamilyId == familyId))), ct);
+            // Unlinked stories used to be in scope for every caller (!s.PersonId.HasValue).
+            // Now: in the caller's family, and the caller is its author or an Admin.
+            var story = await ScopedStories(ctx).FirstOrDefaultAsync(s => s.Id == id, ct);
             if (story is null)
                 return ServiceResponse<StoryDto>.Fail($"Story {id} not found.");
+            if (!IsAdmin && story.AuthorId != currentUser.UserId)
+                return ServiceResponse<StoryDto>.Fail("You can only edit stories you wrote.");
 
             story.Title = dto.Title;
             story.Body = dto.Body;
@@ -146,14 +198,11 @@ public class StoryService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var familyId = currentUser.FamilyId;
-            var isSuperUser = currentUser.IsSuperUser;
-
-            var story = await ctx.Stories.FirstOrDefaultAsync(s => s.Id == id &&
-                (isSuperUser || !s.PersonId.HasValue ||
-                 (familyId.HasValue && ctx.People.Any(p => p.Id == s.PersonId && p.FamilyId == familyId))), ct);
+            var story = await ScopedStories(ctx).FirstOrDefaultAsync(s => s.Id == id, ct);
             if (story is null)
                 return ServiceResponse.Fail($"Story {id} not found.");
+            if (!IsAdmin && story.AuthorId != currentUser.UserId)
+                return ServiceResponse.Fail("You can only delete stories you wrote.");
 
             ctx.Stories.Remove(story);
             await ctx.SaveChangesAsync(ct);
@@ -179,7 +228,7 @@ public class StoryService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var stories = await ctx.Stories
+            var stories = await ScopedStories(ctx)
                 .AsNoTracking()
                 .Include(s => s.Author)
                 .Where(s => s.IsApproved && !s.IsHidden)
@@ -202,11 +251,13 @@ public class StoryService(
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse<List<StoryDto>>> GetAllAsync(CancellationToken ct = default)
     {
+        if (!IsAdmin) return ServiceResponse<List<StoryDto>>.Fail("Only admins can manage stories.");
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var stories = await ctx.Stories
+            var stories = await ScopedStories(ctx)
                 .AsNoTracking()
                 .Include(s => s.Author)
                 .Include(s => s.Person)
@@ -230,11 +281,13 @@ public class StoryService(
     public async Task<ServiceResponse<StoryDto>> SetHiddenAsync(
         Guid storyId, bool hidden, CancellationToken ct = default)
     {
+        if (!IsAdmin) return ServiceResponse<StoryDto>.Fail("Only admins can manage stories.");
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var story = await ctx.Stories.FirstOrDefaultAsync(s => s.Id == storyId, ct);
+            var story = await ScopedStories(ctx).FirstOrDefaultAsync(s => s.Id == storyId, ct);
             if (story is null)
                 return ServiceResponse<StoryDto>.Fail($"Story {storyId} not found.");
 
@@ -259,11 +312,15 @@ public class StoryService(
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse> MoveAsync(Guid storyId, int direction, CancellationToken ct = default)
     {
+        if (!IsAdmin) return ServiceResponse.Fail("Only admins can manage stories.");
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var ordered = await ctx.Stories
+            // Reorders within the caller's family only; the global list used to swap
+            // SortOrder with whichever family's story happened to sit next to it.
+            var ordered = await ScopedStories(ctx)
                 .OrderBy(s => s.SortOrder)
                 .ThenByDescending(s => s.CreatedAt)
                 .ToListAsync(ct);
@@ -295,11 +352,13 @@ public class StoryService(
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse<List<StoryDto>>> GetUnlinkedAsync(CancellationToken ct = default)
     {
+        if (!IsAdmin) return ServiceResponse<List<StoryDto>>.Fail("Only admins can manage stories.");
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var stories = await ctx.Stories
+            var stories = await ScopedStories(ctx)
                 .AsNoTracking()
                 .Include(s => s.Author)
                 .Where(s => s.PersonId == null)
@@ -384,11 +443,20 @@ public class StoryService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var story = await ctx.Stories.FirstOrDefaultAsync(s => s.Id == storyId, ct);
+            // Two callers: Admin > Stories (an Admin linking any story in their family) and
+            // the post-signup LinkToTreeModal, which runs before the new user is signed in.
+            // Either way the person must sit in the story's own family, so a story can't
+            // be moved into, or attached to, another family (finding S4).
+            var story = IsAdmin
+                ? await ScopedStories(ctx).FirstOrDefaultAsync(s => s.Id == storyId, ct)
+                : await ctx.Stories.FirstOrDefaultAsync(s => s.Id == storyId && s.PersonId == null, ct);
             if (story is null)
                 return ServiceResponse<StoryDto>.Fail($"Story {storyId} not found.");
 
-            var personExists = await ctx.People.AnyAsync(p => p.Id == personId, ct);
+            var storyFamilyId = await StoryFamilyIdAsync(ctx, story, ct);
+            var people = IsAdmin ? ScopedPeople(ctx) : ctx.People;
+            var personExists = await people.AnyAsync(p => p.Id == personId &&
+                (storyFamilyId == null ? currentUser.IsSuperUser : p.FamilyId == storyFamilyId), ct);
             if (!personExists)
                 return ServiceResponse<StoryDto>.Fail($"Person {personId} not found.");
 
@@ -415,11 +483,13 @@ public class StoryService(
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse<StoryDto>> ApproveAsync(Guid storyId, CancellationToken ct = default)
     {
+        if (!IsAdmin) return ServiceResponse<StoryDto>.Fail("Only admins can manage stories.");
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var story = await ctx.Stories.FirstOrDefaultAsync(s => s.Id == storyId, ct);
+            var story = await ScopedStories(ctx).FirstOrDefaultAsync(s => s.Id == storyId, ct);
             if (story is null)
                 return ServiceResponse<StoryDto>.Fail($"Story {storyId} not found.");
 
