@@ -16,6 +16,18 @@ public class MediumService(
     IAuditLogService auditLog,
     ICurrentUserService currentUser) : IMediumService
 {
+    // Media belong to whoever owns the person. Same rule as PersonService.ScopedPeople:
+    // super-user sees all, everyone else only their own family, no FamilyId sees nothing
+    // (findings S3/S4/S6, docs/security.md, 2026-10-10).
+    private IQueryable<Guid> VisiblePersonIds(AppDbContext ctx)
+    {
+        var familyId = currentUser.FamilyId;
+        var isSuperUser = currentUser.IsSuperUser;
+        return ctx.People
+            .Where(p => isSuperUser || (familyId.HasValue && p.FamilyId == familyId))
+            .Select(p => p.Id);
+    }
+
     // ─────────────────────────────────────────────────────────────
     //  GET ALL
     // ─────────────────────────────────────────────────────────────
@@ -25,8 +37,10 @@ public class MediumService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
+            var visible = VisiblePersonIds(ctx);
             var media = await ctx.Media
                 .AsNoTracking()
+                .Where(m => visible.Contains(m.PersonId))
                 .OrderByDescending(m => m.CreatedAt)
                 .ToListAsync(ct);
 
@@ -51,9 +65,10 @@ public class MediumService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
+            var visible = VisiblePersonIds(ctx);
             var media = await ctx.Media
                 .AsNoTracking()
-                .Where(m => m.PersonId == personId)
+                .Where(m => m.PersonId == personId && visible.Contains(m.PersonId))
                 .OrderByDescending(m => m.CreatedAt)
                 .ToListAsync(ct);
 
@@ -118,7 +133,9 @@ public class MediumService(
 
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var personExists = await ctx.People.AnyAsync(p => p.Id == dto.PersonId, ct);
+            // Scoped: another family's person (or any person, for an anonymous caller)
+            // gets the same "not found" as a GUID that doesn't exist.
+            var personExists = await VisiblePersonIds(ctx).AnyAsync(id => id == dto.PersonId, ct);
             if (!personExists)
                 return ServiceResponse<MediumDto>.Fail($"Person {dto.PersonId} not found.");
 

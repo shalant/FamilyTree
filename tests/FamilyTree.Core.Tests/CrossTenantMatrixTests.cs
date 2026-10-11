@@ -38,7 +38,6 @@ public class CrossTenantMatrixTests
     // Rows that failed against the code as of 2026-10-10 (57 of 90). Each fix PR deletes
     // its constant and the Skips that use it. Never skip a new row to get green.
     private const string OpenAnon = "Known open: S1 anonymous create (docs/security.md)";
-    private const string OpenMedium = "Known open: S3/S4/S6 MediumService scoping (docs/security.md)";
     private const string OpenStory = "Known open: S3/S4 StoryService scoping (docs/security.md)";
     private const string OpenStoryInvite = "Known open: S3/S4 StoryInviteService scoping (docs/security.md)";
     private const string OpenAuthLinking = "Known open: S4/S6 AuthService tree linking (docs/security.md)";
@@ -435,7 +434,7 @@ public class CrossTenantMatrixTests
 
     // ── MediumService ───────────────────────────────────────────────────────────
 
-    [Theory(Skip = OpenMedium), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Medium_GetAllAsync_ReturnsNoFamilyBMedia(Caller c)
     {
         var w = await SeedAsync();
@@ -444,7 +443,7 @@ public class CrossTenantMatrixTests
         r.Data!.Select(m => m.Id).Should().NotContain(w.MediumB);
     }
 
-    [Theory(Skip = OpenMedium), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Medium_GetByPersonIdAsync_FamilyBPerson_ReturnsNothing(Caller c)
     {
         var w = await SeedAsync();
@@ -460,7 +459,7 @@ public class CrossTenantMatrixTests
         r.Success.Should().BeFalse();
     }
 
-    [Theory(Skip = OpenMedium), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Medium_CreateAsync_OnFamilyBPerson_FailsAndUploadsNothing(Caller c)
     {
         var w = await SeedAsync();
@@ -473,7 +472,7 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.Media.CountAsync(m => m.PersonId == w.B1))).Should().Be(1);
     }
 
-    [Fact(Skip = OpenMedium)]
+    [Fact]
     public async Task Medium_CreateAsync_SameMessageForForeignAndMissingPerson()
     {
         var w = await SeedAsync();

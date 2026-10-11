@@ -25,14 +25,17 @@ public class MediumServiceTests
         var dbFactory = new TestDbContextFactory();
         await using (var ctx = dbFactory.CreateDbContext())
         {
-            var person = new Person { Id = Guid.NewGuid(), FirstName = "Test", LastName = "Person" };
+            // Caller and person share a family: since 2026-10-10 uploads are scoped to the
+            // caller's family (finding S4), so a family-less caller can't upload at all.
+            var familyId = Guid.NewGuid();
+            var person = new Person { Id = Guid.NewGuid(), FirstName = "Test", LastName = "Person", FamilyId = familyId };
             ctx.People.Add(person);
             await ctx.SaveChangesAsync();
 
             var blob = new FakeBlobStorageService();
             var service = new MediumService(
                 dbFactory, blob, NullLogger<MediumService>.Instance,
-                new FakeAuditLogService(), new FakeCurrentUserService());
+                new FakeAuditLogService(), new FakeCurrentUserService { UserId = Guid.NewGuid(), FamilyId = familyId });
             return (service, blob, person.Id);
         }
     }
