@@ -36,12 +36,15 @@ public class AuthService(
             if (mode == "Closed")
                 return ServiceResponse<Guid>.Fail("Registration is currently closed. Contact the administrator.");
 
-            UserInvite? matchedInvite = null;
-            if (mode == "InviteOnly")
-            {
-                if (!inviteId.HasValue)
-                    return ServiceResponse<Guid>.Fail("An invitation is required. Ask the administrator for an invite link.");
+            if (mode == "InviteOnly" && !inviteId.HasValue)
+                return ServiceResponse<Guid>.Fail("An invitation is required. Ask the administrator for an invite link.");
 
+            // Honour a supplied invite in every mode: in Open mode it used to be ignored,
+            // so the invitee joined the default (oldest) family instead of the invite's
+            // and the invite stayed reusable (finding S5, docs/security.md).
+            UserInvite? matchedInvite = null;
+            if (inviteId.HasValue)
+            {
                 await using var ctx = await dbFactory.CreateDbContextAsync();
                 matchedInvite = await ctx.UserInvites.FirstOrDefaultAsync(i =>
                     i.Id == inviteId.Value
@@ -50,7 +53,8 @@ public class AuthService(
                     && i.CancelledAt == null
                     && i.ExpiresAt > DateTime.UtcNow);
 
-                if (matchedInvite == null)
+                // In Open mode a stale link just falls back to an ordinary signup.
+                if (matchedInvite == null && mode == "InviteOnly")
                     return ServiceResponse<Guid>.Fail("This invitation is invalid, expired, or for a different email address.");
             }
 
@@ -579,9 +583,17 @@ public class AuthService(
 
             await using var ctx = await dbFactory.CreateDbContextAsync();
 
+            // Linking stays inside the user's own family (finding S4/S6, docs/security.md):
+            // a person from another family behaves as "not found", and a new person is
+            // created in the user's family, never the connected person's.
+            var userFamilyId = await UserFamilyIdAsync(ctx, userId);
+            if (userFamilyId is null)
+                return ServiceResponse<Guid?>.Fail("Your account isn't assigned to a family yet.");
+
             if (personId.HasValue)
             {
-                var existingPerson = await ctx.People.FindAsync(personId.Value);
+                var existingPerson = await ctx.People
+                    .FirstOrDefaultAsync(p => p.Id == personId.Value && p.FamilyId == userFamilyId);
                 if (existingPerson is null)
                     return ServiceResponse<Guid?>.Fail("Selected person not found.");
 
@@ -607,7 +619,8 @@ public class AuthService(
             if (!connectedPersonId.HasValue || string.IsNullOrWhiteSpace(relationshipType))
                 return ServiceResponse<Guid?>.Fail("Invalid link parameters.");
 
-            var connectedPerson = await ctx.People.FindAsync(connectedPersonId.Value);
+            var connectedPerson = await ctx.People
+                .FirstOrDefaultAsync(p => p.Id == connectedPersonId.Value && p.FamilyId == userFamilyId);
             if (connectedPerson is null)
                 return ServiceResponse<Guid?>.Fail("Connected person not found.");
 
@@ -619,7 +632,7 @@ public class AuthService(
                 Id = Guid.NewGuid(),
                 FirstName = firstName?.Trim() ?? "Unknown",
                 LastName = lastName?.Trim() ?? "",
-                FamilyId = connectedPerson.FamilyId,
+                FamilyId = userFamilyId,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = userId,
             };
@@ -687,7 +700,11 @@ public class AuthService(
         {
             await using var ctx = await dbFactory.CreateDbContextAsync();
 
-            var connectedPerson = await ctx.People.FindAsync(connectedPersonId);
+            // Same rule as LinkUserToTreeAsync: the anchor must be in the creating user's
+            // family, so the subject can't be planted in another family's tree.
+            var userFamilyId = await UserFamilyIdAsync(ctx, createdByUserId);
+            var connectedPerson = userFamilyId is null ? null : await ctx.People
+                .FirstOrDefaultAsync(p => p.Id == connectedPersonId && p.FamilyId == userFamilyId);
             if (connectedPerson is null)
                 return ServiceResponse<Guid>.Fail("Connected person not found.");
 
@@ -729,6 +746,10 @@ public class AuthService(
             return ServiceResponse<Guid>.Fail("Failed to create unlinked person.");
         }
     }
+
+    private static Task<Guid?> UserFamilyIdAsync(AppDbContext ctx, Guid userId) =>
+        ctx.UserFamilies.Where(uf => uf.UserId == userId)
+            .OrderBy(uf => uf.JoinedAt).Select(uf => (Guid?)uf.FamilyId).FirstOrDefaultAsync();
 
     // "subject" is whichever person was just created (Willa or Bill); "connected" is the
     // existing tree member they're being linked to. Parent direction is explicit in the

@@ -37,7 +37,6 @@ public class CrossTenantMatrixTests
 
     // Rows that failed against the code as of 2026-10-10 (57 of 90). Each fix PR deletes
     // its constant and the Skips that use it. Never skip a new row to get green.
-    private const string OpenAuthLinking = "Known open: S4/S6 AuthService tree linking (docs/security.md)";
 
     // ── Seed ─────────────────────────────────────────────────────────────────────
 
@@ -712,7 +711,7 @@ public class CrossTenantMatrixTests
 
     // ── AuthService (tree linking) ──────────────────────────────────────────────
 
-    [Fact(Skip = OpenAuthLinking)]
+    [Fact]
     public async Task Auth_LinkUserToTreeAsync_ClaimFamilyBPerson_FailsWithoutNamingThem()
     {
         var w = await SeedAsync();
@@ -722,7 +721,7 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.Users.SingleAsync(u => u.Id == w.UserA))).PersonId.Should().Be(w.A1);
     }
 
-    [Fact(Skip = OpenAuthLinking)]
+    [Fact]
     public async Task Auth_LinkUserToTreeAsync_ConnectToFamilyBPerson_CreatesNothingInFamilyB()
     {
         var w = await SeedAsync();
@@ -731,13 +730,26 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.People.AnyAsync(p => p.FirstName == "Intruder"))).Should().BeFalse();
     }
 
-    [Fact(Skip = OpenAuthLinking)]
+    [Fact]
     public async Task Auth_CreateUnlinkedPersonAsync_ConnectToFamilyBPerson_CreatesNothing()
     {
         var w = await SeedAsync();
         var r = await AuthSvc(w, w.As(Caller.MemberA)).CreateUnlinkedPersonAsync("Intruder", "Node", w.B1, "Sibling", w.UserA);
         r.Success.Should().BeFalse();
         (await Read(w, ctx => ctx.People.AnyAsync(p => p.FirstName == "Intruder"))).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Auth_RegisterAsync_OpenModeWithInvite_JoinsTheInvitesFamily()
+    {
+        // Finding S5: in Open mode RegisterAsync ignored a supplied invite, so a family-B
+        // invitee landed in the oldest family (A) and the invite stayed reusable.
+        var w = await SeedAsync();
+        var r = await AuthSvc(w, World.Anonymous, mode: "Open")
+            .RegisterAsync("New", "Bie", "newbie@b.test", "LongEnough123!", w.UserInviteB);
+        r.Success.Should().BeTrue(r.Message);
+        (await Read(w, ctx => ctx.UserFamilies.SingleAsync(uf => uf.UserId == r.Data))).FamilyId.Should().Be(w.FamilyB);
+        (await Read(w, ctx => ctx.UserInvites.SingleAsync(i => i.Id == w.UserInviteB))).AcceptedAt.Should().NotBeNull();
     }
 
     // ── Admin surfaces (S2: SuperUser-only) ─────────────────────────────────────

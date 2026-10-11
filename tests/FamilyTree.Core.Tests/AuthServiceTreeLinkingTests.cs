@@ -45,6 +45,18 @@ public class AuthServiceTreeLinkingTests
         return user;
     }
 
+    // Since 2026-10-10 tree linking stays inside the user's own family (finding S4,
+    // docs/security.md), so linking tests put the user and the seeded people in one
+    // family, as RegisterAsync does for every real account.
+    private static readonly Guid TestFamilyId = Guid.Parse("0000000f-0000-0000-0000-00000000000f");
+
+    private static async Task PutInFamilyAsync(TestDbContextFactory factory, Guid userId, Guid? familyId = null)
+    {
+        await using var ctx = factory.CreateDbContext();
+        ctx.UserFamilies.Add(new UserFamily { UserId = userId, FamilyId = familyId ?? TestFamilyId, Role = "Member", JoinedAt = DateTime.UtcNow });
+        await ctx.SaveChangesAsync();
+    }
+
     // ── RegisterAsync ────────────────────────────────────────────────────────
 
     [Fact]
@@ -215,10 +227,11 @@ public class AuthServiceTreeLinkingTests
     {
         var (service, factory, userManager) = CreateSut();
         var user = await CreateExistingUserAsync(userManager, "link@example.com");
+        await PutInFamilyAsync(factory, user.Id);
         Guid personId;
         await using (var ctx = factory.CreateDbContext())
         {
-            var person = new Person { FirstName = "Rose", LastName = "Small", CreatedAt = DateTime.UtcNow };
+            var person = new Person { FirstName = "Rose", LastName = "Small", FamilyId = TestFamilyId, CreatedAt = DateTime.UtcNow };
             ctx.People.Add(person);
             await ctx.SaveChangesAsync();
             personId = person.Id;
@@ -243,11 +256,13 @@ public class AuthServiceTreeLinkingTests
     {
         var (service, factory, userManager) = CreateSut();
         var firstUser = await CreateExistingUserAsync(userManager, "first@example.com");
+        await PutInFamilyAsync(factory, firstUser.Id);
         var secondUser = await CreateExistingUserAsync(userManager, "second@example.com");
+        await PutInFamilyAsync(factory, secondUser.Id);
         Guid personId;
         await using (var ctx = factory.CreateDbContext())
         {
-            var person = new Person { FirstName = "Elliot", LastName = "Rosenberg", CreatedAt = DateTime.UtcNow };
+            var person = new Person { FirstName = "Elliot", LastName = "Rosenberg", FamilyId = TestFamilyId, CreatedAt = DateTime.UtcNow };
             ctx.People.Add(person);
             await ctx.SaveChangesAsync();
             personId = person.Id;
@@ -269,10 +284,11 @@ public class AuthServiceTreeLinkingTests
     {
         var (service, factory, userManager) = CreateSut();
         var user = await CreateExistingUserAsync(userManager, "relink@example.com");
+        await PutInFamilyAsync(factory, user.Id);
         Guid personId;
         await using (var ctx = factory.CreateDbContext())
         {
-            var person = new Person { FirstName = "Elliot", LastName = "Rosenberg", CreatedAt = DateTime.UtcNow };
+            var person = new Person { FirstName = "Elliot", LastName = "Rosenberg", FamilyId = TestFamilyId, CreatedAt = DateTime.UtcNow };
             ctx.People.Add(person);
             await ctx.SaveChangesAsync();
             personId = person.Id;
@@ -287,8 +303,9 @@ public class AuthServiceTreeLinkingTests
     [Fact]
     public async Task LinkUserToTreeAsync_ExistingPersonId_NotFound_Fails()
     {
-        var (service, _, userManager) = CreateSut();
+        var (service, factory, userManager) = CreateSut();
         var user = await CreateExistingUserAsync(userManager, "link2@example.com");
+        await PutInFamilyAsync(factory, user.Id);
 
         var result = await service.LinkUserToTreeAsync(user.Id, Guid.NewGuid(), null, null);
 
@@ -308,8 +325,9 @@ public class AuthServiceTreeLinkingTests
     [Fact]
     public async Task LinkUserToTreeAsync_NoPersonId_MissingConnectionParams_Fails()
     {
-        var (service, _, userManager) = CreateSut();
+        var (service, factory, userManager) = CreateSut();
         var user = await CreateExistingUserAsync(userManager, "link3@example.com");
+        await PutInFamilyAsync(factory, user.Id);
 
         var result = await service.LinkUserToTreeAsync(user.Id, null, "Willa", "Kuh");
 
@@ -322,6 +340,7 @@ public class AuthServiceTreeLinkingTests
         var (service, factory, userManager) = CreateSut();
         var user = await CreateExistingUserAsync(userManager, "willa@example.com");
         var familyId = Guid.NewGuid();
+        await PutInFamilyAsync(factory, user.Id, familyId);
         Guid billId;
         await using (var ctx = factory.CreateDbContext())
         {
@@ -354,10 +373,11 @@ public class AuthServiceTreeLinkingTests
     {
         var (service, factory, userManager) = CreateSut();
         var user = await CreateExistingUserAsync(userManager, "parent@example.com");
+        await PutInFamilyAsync(factory, user.Id);
         Guid childId;
         await using (var ctx = factory.CreateDbContext())
         {
-            var child = new Person { FirstName = "Child", LastName = "Small", CreatedAt = DateTime.UtcNow };
+            var child = new Person { FirstName = "Child", LastName = "Small", FamilyId = TestFamilyId, CreatedAt = DateTime.UtcNow };
             ctx.People.Add(child);
             await ctx.SaveChangesAsync();
             childId = child.Id;
@@ -381,10 +401,11 @@ public class AuthServiceTreeLinkingTests
     {
         var (service, factory, userManager) = CreateSut();
         var user = await CreateExistingUserAsync(userManager, $"{token}@example.com");
+        await PutInFamilyAsync(factory, user.Id);
         Guid connectedId;
         await using (var ctx = factory.CreateDbContext())
         {
-            var connected = new Person { FirstName = "Connected", LastName = "Person", CreatedAt = DateTime.UtcNow };
+            var connected = new Person { FirstName = "Connected", LastName = "Person", FamilyId = TestFamilyId, CreatedAt = DateTime.UtcNow };
             ctx.People.Add(connected);
             await ctx.SaveChangesAsync();
             connectedId = connected.Id;
@@ -406,10 +427,11 @@ public class AuthServiceTreeLinkingTests
     {
         var (service, factory, userManager) = CreateSut();
         var user = await CreateExistingUserAsync(userManager, "invalidrel@example.com");
+        await PutInFamilyAsync(factory, user.Id);
         Guid connectedId;
         await using (var ctx = factory.CreateDbContext())
         {
-            var connected = new Person { FirstName = "Connected", LastName = "Person", CreatedAt = DateTime.UtcNow };
+            var connected = new Person { FirstName = "Connected", LastName = "Person", FamilyId = TestFamilyId, CreatedAt = DateTime.UtcNow };
             ctx.People.Add(connected);
             await ctx.SaveChangesAsync();
             connectedId = connected.Id;
@@ -424,8 +446,9 @@ public class AuthServiceTreeLinkingTests
     [Fact]
     public async Task LinkUserToTreeAsync_ConnectedPersonNotFound_Fails()
     {
-        var (service, _, userManager) = CreateSut();
+        var (service, factory, userManager) = CreateSut();
         var user = await CreateExistingUserAsync(userManager, "noconn@example.com");
+        await PutInFamilyAsync(factory, user.Id);
 
         var result = await service.LinkUserToTreeAsync(
             user.Id, null, "New", "Person", connectedPersonId: Guid.NewGuid(), relationshipType: "Spouse");
@@ -442,6 +465,7 @@ public class AuthServiceTreeLinkingTests
         var familyId = Guid.NewGuid();
         Guid roseId;
         var createdBy = Guid.NewGuid();
+        await PutInFamilyAsync(factory, createdBy, familyId);
         await using (var ctx = factory.CreateDbContext())
         {
             var rose = new Person { FirstName = "Rose", LastName = "Small", FamilyId = familyId, CreatedAt = DateTime.UtcNow };
@@ -471,13 +495,15 @@ public class AuthServiceTreeLinkingTests
         Guid roseId;
         await using (var ctx = factory.CreateDbContext())
         {
-            var rose = new Person { FirstName = "Rose", LastName = "Small", CreatedAt = DateTime.UtcNow };
+            var rose = new Person { FirstName = "Rose", LastName = "Small", FamilyId = TestFamilyId, CreatedAt = DateTime.UtcNow };
             ctx.People.Add(rose);
             await ctx.SaveChangesAsync();
             roseId = rose.Id;
         }
 
-        var result = await service.CreateUnlinkedPersonAsync("Bill", "Small", roseId, "Parent", Guid.NewGuid());
+        var creator = Guid.NewGuid();
+        await PutInFamilyAsync(factory, creator);
+        var result = await service.CreateUnlinkedPersonAsync("Bill", "Small", roseId, "Parent", creator);
 
         result.Success.Should().BeFalse();
     }
