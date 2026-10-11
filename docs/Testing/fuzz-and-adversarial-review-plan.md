@@ -52,6 +52,11 @@ deterministic. A separate local-only "soak" test runs thousands of cases with a 
 **Done when:** the harness runs in `dotnet test` and its test count appears in the output;
 re-breaking the engine (reverting one of the old fixes) makes it fail.
 
+**Status (2026-10-10):** done on `testing/layout-fuzz-harness`. The first run found root
+causes R0-R10 (`docs/TodoList.md`, "Layout Fuzz Harness: first-run findings"). **R0 is
+critical:** a parent cycle through a person with 3+ parents overflows the stack and kills
+the web process for every family. Fix it before inviting more people, ahead of leg 2.
+
 ## Leg 2: Transition-bug hunt
 
 Enumerate classification transitions beyond the four documented in CLAUDE.md. Candidates:

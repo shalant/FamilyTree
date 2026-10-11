@@ -640,6 +640,7 @@ mobile touch-target sizing (44×44px), secrets hygiene (`.gitignore` correctly e
 
 ## In Progress / Up Next
 
+- [ ] **[CRITICAL — DO BEFORE INVITING MORE FAMILY] R0: a parent cycle crashes the whole web process (found 2026-10-10 by the layout fuzz harness).** A person with 3+ recorded parents, one of whom is their own descendant, makes `FamilyTreeLayoutEngine` recurse until the stack overflows, which kills the App Service process for every family. Fix on its own branch: reject cycles in `PersonService` (ancestor check on parent add) **and** make the engine's three recursions cycle-safe, because bad data may already exist. Un-skip `FamilyTreeLayoutFuzzTests.Invariant7b_ParentCycleDoesNotCrash` in the same PR. Full details: `[LAYOUT FUZZ 2026-10-10] R0` at the top of this file.
 - [x] **Deploy** — pushed to production; user testing in progress at arborkin-erbufqfkhzcka4cb.centralus-01.azurewebsites.net
 - [x] **[SECURITY — Critical] Family-scope check in `GetByIdAsync`** — `PersonService`, `RelationshipService`, and `MediumService` all lack a `FamilyId` guard on single-entity lookups; any authenticated user who knows a GUID can read across family boundaries
 - [x] **[SECURITY — Critical] `DevAuth` production guard** — add a startup assertion that `DevAuth:Enabled` is false outside of Development environment
