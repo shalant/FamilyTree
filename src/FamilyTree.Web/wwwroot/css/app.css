@@ -604,14 +604,21 @@ html, body {
 /* ── Blazor error UI (unhandled circuit exception — small dismissible toast,
    distinct from the reconnect modal's full-screen takeover) ─────────────── */
 
-#blazor-error-ui {
+/* `html body` prefix: MudBlazor.min.css (loaded after this file) ships its own
+   `#blazor-error-ui` rule — full-width red bar pinned to the bottom (left:0; bottom:0;
+   width:100%; background-color: error palette). At equal specificity it won on those
+   properties, so the banner rendered as a tall red slab at the left edge. The extra
+   specificity makes this block win regardless of stylesheet order. */
+html body #blazor-error-ui {
     display: none;
     position: fixed;
     top: 16px;
+    bottom: auto;
     left: 50%;
+    width: auto;
     transform: translateX(-50%);
     z-index: 10500; /* above the reconnect modal's own content, below nothing else needs it */
-    background: rgba(255, 251, 235, 0.92);
+    background-color: rgba(255, 251, 235, 0.92);
     backdrop-filter: blur(16px) saturate(160%);
     -webkit-backdrop-filter: blur(16px) saturate(160%);
     border: 1px solid rgba(245, 158, 11, 0.35);
@@ -622,27 +629,27 @@ html, body {
     font-family: var(--ft-font-body);
     font-size: 13px;
     color: var(--ft-text-primary);
-    display: flex;
     align-items: center;
     gap: 14px;
     max-width: min(420px, calc(100vw - 2rem));
 }
 
-[data-theme="dark"] #blazor-error-ui {
-    background: rgba(40, 33, 14, 0.92);
+html[data-theme="dark"] body #blazor-error-ui {
+    background-color: rgba(40, 33, 14, 0.92);
     color: var(--ft-text-primary);
 }
 
-#blazor-error-ui .reload {
+html body #blazor-error-ui .reload {
     color: var(--ft-green-600);
     font-weight: 600;
     text-decoration: none;
     white-space: nowrap;
 }
 
-#blazor-error-ui .reload:hover { text-decoration: underline; }
+html body #blazor-error-ui .reload:hover { text-decoration: underline; }
 
-#blazor-error-ui .dismiss {
+html body #blazor-error-ui .dismiss {
+    position: static;
     cursor: pointer;
     color: var(--ft-gray-400);
     font-size: 14px;

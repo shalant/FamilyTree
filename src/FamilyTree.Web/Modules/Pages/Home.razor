@@ -205,7 +205,7 @@ else
     private (double Left, double Top)? _toolbarPos;
     private (double Left, double Top)? _heroPos;
     private bool _isNarrowViewport;
-    private bool _showTreeHint = false;
+    private bool _treeHintChecked = false;
     private bool _linkingModalChecked = false;
 
     // Mobile/tablet always anchors bottom-left, ignoring any saved drag position from
@@ -456,14 +456,19 @@ else
 
         await _dragModule.InvokeVoidAsync("init", _dotNetRef);
 
-        if (_ready && _people.Any() && _focusPerson != null && !_showTreeHint)
+        if (_ready && _people.Any() && _focusPerson != null && !_treeHintChecked)
         {
+            // Claim the check BEFORE the first await. OnAfterRenderAsync can be re-entered
+            // while this call is still awaiting localStorage (the drag-init StateHasChanged
+            // above, a focus change, etc.); with the flag set only after the read, two
+            // overlapping calls both saw "not seen yet" and showed the tip twice (found live
+            // 2026-10-11, smoke test).
+            _treeHintChecked = true;
             try
             {
                 var seen = await JS.InvokeAsync<string?>("localStorage.getItem", "ft-treehint");
                 if (seen != "1")
                 {
-                    _showTreeHint = true;
                     Toast.Info("Tip: Drag to explore the tree. Scroll to zoom.");
                     await JS.InvokeVoidAsync("localStorage.setItem", "ft-treehint", "1");
                 }

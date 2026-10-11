@@ -56,6 +56,10 @@
         }
         else
         {
+            @* Once the account exists the form is dead weight: left on screen it pushed the
+               only next step ("Link to your tree") below the fold on shorter windows. *@
+            @if (!_registered)
+            {
             <div style="font-size:20px; font-weight:600; color:var(--ft-text-primary); margin-bottom:4px;">
                 Create your account
             </div>
@@ -156,6 +160,7 @@
                           OnAdornmentClick="() => _showConfirm = !_showConfirm"
                           Error="@(!string.IsNullOrEmpty(_confirmError))"
                           ErrorText="@_confirmError" />
+            }
 
             @if (_registered)
             {

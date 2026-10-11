@@ -17,14 +17,18 @@
 <Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)">
+            @* No <LayoutView> here: AuthorizeRouteView already renders NotAuthorized inside
+               DefaultLayout. Wrapping it in a second MainLayout nested two MudPopoverProviders
+               whenever a user navigated into a protected page from another MainLayout page
+               (e.g. /faq -> /dashboard signed out), throwing "already a subscriber to the
+               content with the given section ID 'mud-overlay-to-popover-provider'" and
+               killing the circuit. *@
             <NotAuthorized>
-                <LayoutView Layout="@typeof(Layout.MainLayout)">
-                    <div class="ft-inline-error-wrap">
-                        <ErrorStateCard Icon="@Icons.Material.Outlined.Lock"
-                                        Title="Access denied"
-                                        Message="You don't have permission to view this page." />
-                    </div>
-                </LayoutView>
+                <div class="ft-inline-error-wrap">
+                    <ErrorStateCard Icon="@Icons.Material.Outlined.Lock"
+                                    Title="Access denied"
+                                    Message="You don't have permission to view this page." />
+                </div>
             </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />

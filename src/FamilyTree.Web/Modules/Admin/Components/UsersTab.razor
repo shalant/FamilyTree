@@ -30,12 +30,13 @@
                           Margin="Margin.None"
                           InputType="InputType.Email"
                           Style="flex:1;"
+                          Immediate="true"
                           Disabled="_creatingInvite" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        StartIcon="@Icons.Material.Outlined.Send"
                        Style="flex-shrink:0;"
                        OnClick="CreateInviteAsync"
-                       Disabled="@(_creatingInvite || string.IsNullOrWhiteSpace(_inviteEmail))">
+                       Disabled="@(_creatingInvite || !IsValidInviteEmail(_inviteEmail))">
                 Generate link
             </MudButton>
         </div>
@@ -361,6 +362,23 @@ else
         else
         {
             ToastService.Error(result.Message ?? "Failed to link person.");
+        }
+    }
+
+    // Same rule as StoryInviteDialog.IsValidEmailFormat. The field binds Immediate so this
+    // re-evaluates on every keystroke — without it the value only committed on blur and the
+    // button stayed disabled until the admin clicked outside the textbox.
+    private static bool IsValidInviteEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email.Trim());
+            return addr.Address == email.Trim() && addr.Host.Contains('.');
+        }
+        catch (FormatException)
+        {
+            return false;
         }
     }
 
