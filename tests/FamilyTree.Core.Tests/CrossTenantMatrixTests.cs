@@ -772,6 +772,20 @@ public class CrossTenantMatrixTests
     }
 
     [Fact]
+    public async Task AdminActivity_DeniesFamilyAdmin()
+    {
+        // The Activity tab reads the same unscoped audit rows as the Audit log tab.
+        var w = await SeedAsync();
+        var svc = new AdminActivityService(w.Db, NullLogger<AdminActivityService>.Instance, w.As(Caller.AdminA));
+        (await svc.GetActivityAuditLogsAsync(w.UserB, DateOnly.FromDateTime(DateTime.UtcNow))).Data.Should().BeNullOrEmpty();
+        (await svc.GetRecentActivityAsync()).Success.Should().BeFalse();
+
+        var su = new AdminActivityService(w.Db, NullLogger<AdminActivityService>.Instance, w.SuperUser);
+        (await su.GetActivityAuditLogsAsync(w.UserB, DateOnly.FromDateTime(DateTime.UtcNow))).Data!
+            .Select(a => a.Id).Should().Contain(w.AuditB);
+    }
+
+    [Fact]
     public async Task AdminAudit_DeniesFamilyAdmin()
     {
         var w = await SeedAsync();

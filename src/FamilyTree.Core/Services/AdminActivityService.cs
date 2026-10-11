@@ -8,10 +8,17 @@ namespace FamilyTree.Core.Services;
 
 public class AdminActivityService(
     IDbContextFactory<AppDbContext> dbFactory,
-    ILogger<AdminActivityService> logger) : IAdminActivityService
+    ILogger<AdminActivityService> logger,
+    ICurrentUserService currentUser) : IAdminActivityService
 {
+    // Activity and audit rows carry no FamilyId and span every family, the same data the
+    // Audit log tab shows. SuperUser-only (finding S2, docs/security.md, 2026-10-10).
+    private const string Denied = "Only the site owner can view activity.";
+
     public async Task<ServiceResponse<List<UserActivity>>> GetRecentActivityAsync(int limit = 200, CancellationToken ct = default)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse<List<UserActivity>>.Fail(Denied);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
@@ -32,6 +39,8 @@ public class AdminActivityService(
 
     public async Task<ServiceResponse<List<AuditLog>>> GetActivityAuditLogsAsync(Guid? userId, DateOnly date, CancellationToken ct = default)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse<List<AuditLog>>.Fail(Denied);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);

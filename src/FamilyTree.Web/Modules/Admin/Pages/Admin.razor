@@ -38,7 +38,8 @@
         </MudTabPanel>
 
         @* SuperUser-only (finding S2, docs/security.md): Users exposes every family's
-           accounts plus copyable password-reset links; the audit log has no family scope.
+           accounts plus copyable password-reset links; audit log and activity have no
+           family scope.
            The services refuse family Admins too; hiding the tabs just avoids an error. *@
         @if (_isSuperUser)
         {
@@ -49,11 +50,11 @@
             <MudTabPanel Text="Audit log" Icon="@Icons.Material.Outlined.History">
                 <AuditLogTab />
             </MudTabPanel>
-        }
 
-        <MudTabPanel Text="Activity" Icon="@Icons.Material.Outlined.BarChart">
-            <ActivityTab />
-        </MudTabPanel>
+            <MudTabPanel Text="Activity" Icon="@Icons.Material.Outlined.BarChart">
+                <ActivityTab />
+            </MudTabPanel>
+        }
 
         <MudTabPanel Text="Stories" Icon="@Icons.Material.Outlined.AutoStories">
             <StoriesTab />
