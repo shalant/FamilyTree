@@ -75,29 +75,28 @@ PR #43).
       to honour it (local paths only, to avoid an open redirect) or leave it.
 
 **Bug: page flashes and loads twice on arborkin.com (reported 2026-10-10)**
-- [ ] **Turn off prerendering for the interactive render mode.** `App.razor` uses
-      `@rendermode="@InteractiveServer"` on both `<HeadOutlet>` and `<Routes>`; that
-      built-in mode prerenders by default, so the browser paints a static server render,
-      then the SignalR circuit connects and replaces it with a second, fresh render (the
-      E2E notes in CLAUDE.md already document the second component instance). The
-      existing `_ready` flag, `theme-init.js` (2026-09-16) and `_authStateResolved` gate
-      each hide a symptom inside one render pass; none prevents the two paints.
-      Proposed fix: `new InteractiveServerRenderMode(prerender: false)` on both outlets,
-      plus a small static splash in the HTML shell so users don't see a blank page until
-      the circuit connects. **Diagnosis is from reading the code, not yet reproduced:**
-      confirm first (e.g. `curl https://arborkin.com/` and check whether the body
-      contains rendered content), then confirm gone after. Verify E2E suite still passes
-      and link-preview Open Graph tags (already gated on `_ready`) are unaffected.
-      Deploy is manual.
+- [x] **Turn off prerendering for the interactive render mode (done 2026-10-11).**
+      `App.razor` used `@rendermode="@InteractiveServer"` on both `<HeadOutlet>` and
+      `<Routes>`; that built-in mode prerenders, so the browser painted a static server
+      render, then the SignalR circuit connected and replaced it with a second, fresh
+      render. Confirmed first: `curl` of `/` and `/faq` returned fully rendered page
+      content plus `prerenderId` markers. Fix: `new InteractiveServerRenderMode(prerender:
+      false)` on both outlets, plus a static `#ft-splash` spinner in the HTML shell that
+      `Routes.razor` removes (`ftHideSplash`) on its first render. After: raw HTML holds
+      only the splash; the page renders once the circuit connects, title set, splash gone,
+      no errors in the app log. Full solution tests pass, including the 9 E2E tests.
+      Not done: an automated check that the raw HTML stays prerender-free, and a look at
+      it on a real phone or slow connection. Open Graph tags were already gated on
+      `_ready`, so they never reached crawlers via prerender; unchanged. Deploy is manual.
 - [ ] **Same flash also happens loading the canvas after authenticating (reported
       2026-10-10).** Login is a real form POST to `/auth/do-login` followed by a full-page
       redirect to `/`, so it goes through the same prerender-then-circuit double paint as
-      a cold load; the prerender fix above should cover that part. But the post-login
+      a cold load; the prerender fix above (2026-10-11) should cover that part. But the post-login
       path also has its own sequence on top of it: auth-state spinner -> `_loading`/`_ready`
       spinner (waiting on focus resolution and the `localStorage` read in
       `OnAfterRenderAsync`) -> tree renders -> `canvas-interaction.js` applies the saved
-      position and reveals the canvas. After the prerender fix, re-test this path
-      separately: if a visible jump remains, the cause is that multi-step reveal, not
+      position and reveals the canvas. Re-test this path separately on production after
+      deploying the prerender fix (not verified: no signed-in local session): if a visible jump remains, the cause is that multi-step reveal, not
       prerendering, and needs its own fix. Not investigated yet.
 
 **Google sign-in**

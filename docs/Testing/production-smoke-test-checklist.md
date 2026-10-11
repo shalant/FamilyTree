@@ -28,21 +28,25 @@ The riskiest area after PR #46: every page now requires sign-in unless it is lis
 invitees.
 
 Should load without signing in:
-- [ ] `/` shows the login overlay and **no tree data**.
-- [ ] `/register?invite=<token>` loads; complete a full registration with a fresh invite.
+- [x] `/` shows the login overlay and **no tree data**.
+- [x] `/register?invite=<token>` loads; complete a full registration with a fresh invite.
+      (2026-10-11: invite generated in Admin > Users for a `+t1` address; account created.
+      Findings: the success state cut off its button on shorter windows, fixed in `862e6ac`.)
 - [ ] `/forgot-password` loads and submits; follow the emailed link to `/reset-password` and
-      complete the reset.
-- [ ] `/story/respond/<token>` loads without login; submit a story.
-- [ ] `/about` and `/faq` load (deliberately public).
-- [ ] A made-up URL shows the custom 404, not a redirect loop or raw error.
+      complete the reset. *(not yet run)*
+- [ ] `/story/respond/<token>` loads without login; submit a story. *(not yet run)*
+- [x] `/about` and `/faq` load (deliberately public).
+- [x] A made-up URL shows the custom 404, not a redirect loop or raw error.
 
 Should **not** be reachable signed out (redirect to login or deny):
-- [ ] `/people`
-- [ ] `/people/add`
-- [ ] `/stories`
-- [ ] `/dashboard`
-- [ ] `/admin`
-- [ ] No person data, story text or media visible on any of the above.
+- [x] `/people` (redirects to `/?ReturnUrl=%2Fpeople`)
+- [x] `/people/add` (redirects to `/?ReturnUrl=...`)
+- [x] `/stories` (redirects to `/?ReturnUrl=...`)
+- [x] `/dashboard` (redirects to `/?ReturnUrl=...`; from `/faq` it first hit the nested-layout
+      crash, fixed in `862e6ac`)
+- [x] `/admin` (redirects to `/?ReturnUrl=%2Fadmin`)
+- [ ] No person data, story text or media visible on any of the above. *(not explicitly
+      confirmed)*
 
 ## 2. Signed in as a regular family member (non-Admin)
 
@@ -89,15 +93,21 @@ Fill in per run. Copy this block for each deploy.
 
 | | |
 |---|---|
-| Date | |
-| Deploy / PR | |
-| Tester | |
-| Browser / device | |
-| Overall | pass / fail |
+| Date | 2026-10-11 |
+| Deploy / PR | Production with PR #46 (Leg 3) live; the fixes below are not deployed yet |
+| Tester | Doug |
+| Browser / device | Desktop Chrome, incognito (signed-out checks) |
+| Overall | In progress: section 1 partly done (forgot-password and story-respond not yet run); sections 2-5 not started |
 
 | # | Section / item | What happened | Expected | URL / steps |
 |---|---|---|---|---|
-| | | | | |
+| 1 | 1 / protected pages | Signed out on `/faq`, "Go to dashboard" froze the page behind a tall red banner (circuit crash: nested `MainLayout`, duplicate `MudPopoverProvider`) | "Access denied" or login redirect, no error | `/faq` > Go to dashboard. Fixed in `862e6ac` |
+| 2 | 1 / error banner | The Blazor error banner rendered as a red slab on the left edge (MudBlazor CSS beat ours) | Small amber toast, top centre | Same repro. Fixed in `862e6ac` |
+| 3 | 1 / register | After "Create account" the form stayed on screen and the "Link to your tree" button fell below the fold on shorter windows | Next step visible | `/register?invite=<token>`, shorter window. Fixed in `862e6ac` |
+| 4 | 4 / invite | Admin > Users "Generate link" stayed disabled until the email field lost focus | Enabled once a valid email is typed | Admin > Users. Fixed in `862e6ac` |
+| 5 | 5 / toasts | "Tip: Drag to explore the tree" toast showed twice | One toast | Sign in as a new user, land on the tree. Fixed in `862e6ac` |
+| 6 | Known issue | Page flashes and loads twice on first load | Single paint | Cold load of any page. Prerender turned off, uncommitted; re-check after deploy |
+| 7 | 1 / protected pages | Redirect to `/?ReturnUrl=...` works, but `ReturnUrl` is never read, so sign-in drops you on the tree | Decide whether to honour it | Open decision in `docs/TodoList.md` |
 
 For each failure: add a `docs/TodoList.md` entry and a regression test (confirm it fails
 against the broken code first), and fix on its own branch.

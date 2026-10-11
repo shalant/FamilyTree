@@ -11,10 +11,11 @@
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
     <link href="css/app.css?v=@AssetVersion("css/app.css")" rel="stylesheet" />
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
-    <HeadOutlet @rendermode="@InteractiveServer" />
+    <HeadOutlet @rendermode="@_interactiveNoPrerender" />
 </head>
 <body>
-    <Routes @rendermode="@InteractiveServer" />
+    <div id="ft-splash" aria-hidden="true"><div class="ft-splash-spinner"></div></div>
+    <Routes @rendermode="@_interactiveNoPrerender" />
     <div id="components-reconnect-modal">
         <div class="ft-reconnect-card">
             <div class="ft-reconnect-logo">
@@ -54,6 +55,13 @@
 </html>
 
 @code {
+    // Prerendering is off: the built-in InteractiveServer mode paints a static server render,
+    // then the SignalR circuit connects and replaces it with a second, fresh render — the
+    // "page flashes and loads twice" bug (docs/TodoList.md, 2026-10-10). Without prerender
+    // the browser paints once, when the circuit is up; #ft-splash covers the gap.
+    private static readonly IComponentRenderMode _interactiveNoPrerender =
+        new InteractiveServerRenderMode(prerender: false);
+
     // No Cache-Control header is set on static files (plain app.UseStaticFiles() in
     // Program.cs), so browsers fall back to heuristic caching off Last-Modified — the
     // longer it's been since a deploy touched a file, the longer a browser will trust

@@ -123,3 +123,9 @@ window.ftSvgToPng = async (svgContent, filename) => {
         img.src = url;
     });
 };
+
+// Removes the static #ft-splash shown by App.razor while the interactive circuit
+// connects (prerendering is off, so nothing else paints until then).
+window.ftHideSplash = () => {
+    document.getElementById('ft-splash')?.remove();
+};

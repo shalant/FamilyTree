@@ -44,3 +44,16 @@
         </LayoutView>
     </NotFound>
 </Router>
+
+@code {
+    [Inject] private IJSRuntime JS { get; set; } = null!;
+
+    // App.razor shows a static #ft-splash until the circuit connects (prerender is off).
+    // First render of this root component means the circuit is up and content is painting.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { await JS.InvokeVoidAsync("ftHideSplash"); }
+        catch (JSDisconnectedException) { }
+    }
+}
