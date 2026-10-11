@@ -31,7 +31,7 @@ public class AuthServiceTreeLinkingTests
             })
             .Build();
         var logger = new NullLogger<AuthService>();
-        var service = new AuthService(userManager, config, factory, new FakeEmailSender(), logger);
+        var service = new AuthService(userManager, config, factory, new FakeEmailSender(), logger, new FakeCurrentUserService());
         return (service, factory, userManager);
     }
 

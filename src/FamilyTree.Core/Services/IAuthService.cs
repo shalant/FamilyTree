@@ -20,7 +20,15 @@ public interface IAuthService
     /// </summary>
     Task<ServiceResponse> EnsureUserFamilyAsync(Guid userId);
 
+    /// <summary>SuperUser-only admin invite (Admin › Users).</summary>
     Task<ServiceResponse<Guid>>                  CreateInviteAsync(string email);
+
+    /// <summary>
+    /// Registration invite offered to someone who just answered a story invite. Not
+    /// caller-gated (the respond page is anonymous); <paramref name="familyId"/> is the
+    /// family the story is about, or null for the default family.
+    /// </summary>
+    Task<ServiceResponse<Guid>>                  CreateInviteForStoryResponseAsync(string email, Guid? familyId);
     Task<ServiceResponse<List<UserInvite>>>      GetPendingInvitesAsync();
     Task<ServiceResponse>                        CancelInviteAsync(Guid inviteId);
     Task<ServiceResponse<UserInvite?>>           ValidateInviteAsync(Guid inviteId);

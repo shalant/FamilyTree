@@ -37,13 +37,19 @@
             <DeletedTab />
         </MudTabPanel>
 
-        <MudTabPanel Text="Users" Icon="@Icons.Material.Outlined.Group">
-            <UsersTab />
-        </MudTabPanel>
+        @* SuperUser-only (finding S2, docs/security.md): Users exposes every family's
+           accounts plus copyable password-reset links; the audit log has no family scope.
+           The services refuse family Admins too; hiding the tabs just avoids an error. *@
+        @if (_isSuperUser)
+        {
+            <MudTabPanel Text="Users" Icon="@Icons.Material.Outlined.Group">
+                <UsersTab />
+            </MudTabPanel>
 
-        <MudTabPanel Text="Audit log" Icon="@Icons.Material.Outlined.History">
-            <AuditLogTab />
-        </MudTabPanel>
+            <MudTabPanel Text="Audit log" Icon="@Icons.Material.Outlined.History">
+                <AuditLogTab />
+            </MudTabPanel>
+        }
 
         <MudTabPanel Text="Activity" Icon="@Icons.Material.Outlined.BarChart">
             <ActivityTab />
@@ -61,5 +67,14 @@
 </div>
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
     private int _activeTab;
+    private bool _isSuperUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+            _isSuperUser = (await AuthState).User.IsInRole("SuperUser");
+    }
 }

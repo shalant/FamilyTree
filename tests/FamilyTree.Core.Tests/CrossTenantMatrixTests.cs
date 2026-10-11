@@ -38,7 +38,6 @@ public class CrossTenantMatrixTests
     // Rows that failed against the code as of 2026-10-10 (57 of 90). Each fix PR deletes
     // its constant and the Skips that use it. Never skip a new row to get green.
     private const string OpenAnon = "Known open: S1 anonymous create (docs/security.md)";
-    private const string OpenAdmin = "Known open: S2 admin surfaces not SuperUser-only (docs/security.md)";
     private const string OpenPerson = "Known open: S3/S4/S6 PersonService scoping (docs/security.md)";
     private const string OpenMedium = "Known open: S3/S4/S6 MediumService scoping (docs/security.md)";
     private const string OpenStory = "Known open: S3/S4 StoryService scoping (docs/security.md)";
@@ -202,17 +201,17 @@ public class CrossTenantMatrixTests
         }).Build();
 
     private static AuthService AuthSvc(World w, ICurrentUserService u, string mode = "InviteOnly") =>
-        new(w.Users, Config(mode), w.Db, new FakeEmailSender(), NullLogger<AuthService>.Instance);
+        new(w.Users, Config(mode), w.Db, new FakeEmailSender(), NullLogger<AuthService>.Instance, u);
 
     private static StoryInviteService StoryInviteSvc(World w, ICurrentUserService u, IEmailSender? email = null) =>
         new(w.Db, NullLogger<StoryInviteService>.Instance, new FakeAuditLogService(), u,
             email ?? new FakeEmailSender(), Config(), AuthSvc(w, u));
 
     private static AdminUserService AdminUserSvc(World w, ICurrentUserService u) =>
-        new(w.Db, NullLogger<AdminUserService>.Instance);
+        new(w.Db, NullLogger<AdminUserService>.Instance, u);
 
     private static AdminAuditService AdminAuditSvc(World w, ICurrentUserService u) =>
-        new(w.Db, NullLogger<AdminAuditService>.Instance);
+        new(w.Db, NullLogger<AdminAuditService>.Instance, u);
 
     private sealed class RecordingEmailSender : IEmailSender
     {
@@ -685,7 +684,7 @@ public class CrossTenantMatrixTests
     // Decision 2026-10-10: the Users tab, invite/reset management and the audit log are
     // SuperUser-only. A family Admin gets nothing, even for their own family.
 
-    [Fact(Skip = OpenAdmin)]
+    [Fact]
     public async Task AdminUsers_AllMethods_DenyFamilyAdmin()
     {
         var w = await SeedAsync();
@@ -700,14 +699,14 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.PasswordResetRequests.AnyAsync(r => r.Id == w.ResetRequestB))).Should().BeTrue();
     }
 
-    [Fact(Skip = OpenAdmin)]
+    [Fact]
     public async Task AdminAudit_DeniesFamilyAdmin()
     {
         var w = await SeedAsync();
         (await AdminAuditSvc(w, w.As(Caller.AdminA)).GetAllAuditLogsAsync()).Data.Should().BeNullOrEmpty();
     }
 
-    [Fact(Skip = OpenAdmin)]
+    [Fact]
     public async Task Auth_AdminInviteAndResetMethods_DenyFamilyAdmin()
     {
         var w = await SeedAsync();

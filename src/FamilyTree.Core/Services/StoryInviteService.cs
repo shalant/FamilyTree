@@ -271,7 +271,7 @@ public class StoryInviteService(
 
                     if (!recipientHasAccount)
                     {
-                        var inviteResult = await authService.CreateInviteAsync(invite.InvitedEmail);
+                        var inviteResult = await authService.CreateInviteForStoryResponseAsync(invite.InvitedEmail, familyId: null);
 
                         // CreateInviteAsync returns Success=false but a valid Data when an active
                         // invite already exists for this email — that existing Id is still usable.

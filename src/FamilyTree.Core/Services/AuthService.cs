@@ -14,8 +14,14 @@ public class AuthService(
     IConfiguration config,
     IDbContextFactory<AppDbContext> dbFactory,
     IEmailSender emailSender,
-    ILogger<AuthService> logger) : IAuthService
+    ILogger<AuthService> logger,
+    ICurrentUserService currentUser) : IAuthService
 {
+    // Invite, password-reset and account-link management is SuperUser-only (finding S2,
+    // docs/security.md, 2026-10-10): a pending reset's Id is a working reset link and the
+    // lists span every family.
+    private const string SuperUserOnly = "Only the site owner can manage user accounts.";
+
     public string GetRegistrationMode() =>
         config["Auth:RegistrationMode"] ?? "Open";
 
@@ -160,6 +166,8 @@ public class AuthService(
 
     public async Task<ServiceResponse> LinkPersonAsync(Guid userId, Guid? personId)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse.Fail(SuperUserOnly);
+
         try
         {
             var user = await userManager.FindByIdAsync(userId.ToString());
@@ -181,6 +189,18 @@ public class AuthService(
 
     public async Task<ServiceResponse<Guid>> CreateInviteAsync(string email)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse<Guid>.Fail(SuperUserOnly);
+        return await CreateInviteCoreAsync(email, familyId: null);
+    }
+
+    // Not caller-gated: StoryInviteService.SubmitResponseAsync runs in the anonymous
+    // /story/respond circuit and offers the responder an account. Only server-side code
+    // reaches it with an email taken from an existing StoryInvite row.
+    public Task<ServiceResponse<Guid>> CreateInviteForStoryResponseAsync(string email, Guid? familyId) =>
+        CreateInviteCoreAsync(email, familyId);
+
+    private async Task<ServiceResponse<Guid>> CreateInviteCoreAsync(string email, Guid? familyId)
+    {
         try
         {
             var ttlDays = config.GetValue("Auth:InviteTtlDays", 7);
@@ -197,7 +217,7 @@ public class AuthService(
                 return ServiceResponse<Guid>.Fail(
                     "An active invite already exists for this email — use the existing link below.");
 
-            var familyId = await GetOrCreateDefaultFamilyIdAsync(ctx);
+            var inviteFamilyId = familyId ?? await GetOrCreateDefaultFamilyIdAsync(ctx);
 
             var token = Convert.ToBase64String(
                     System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
@@ -207,7 +227,7 @@ public class AuthService(
             {
                 Id          = Guid.NewGuid(),
                 Email       = email.Trim().ToLower(),
-                FamilyId    = familyId,
+                FamilyId    = inviteFamilyId,
                 RoleToGrant = "Member",
                 Token       = token,
                 ExpiresAt   = DateTime.UtcNow.AddDays(ttlDays),
@@ -227,6 +247,8 @@ public class AuthService(
 
     public async Task<ServiceResponse<List<UserInvite>>> GetPendingInvitesAsync()
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse<List<UserInvite>>.Fail(SuperUserOnly);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync();
@@ -245,6 +267,8 @@ public class AuthService(
 
     public async Task<ServiceResponse> CancelInviteAsync(Guid inviteId)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse.Fail(SuperUserOnly);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync();
@@ -499,6 +523,8 @@ public class AuthService(
 
     public async Task<ServiceResponse<List<PasswordResetRequest>>> GetPendingResetRequestsAsync()
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse<List<PasswordResetRequest>>.Fail(SuperUserOnly);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync();
@@ -517,6 +543,8 @@ public class AuthService(
 
     public async Task<ServiceResponse> DismissResetRequestAsync(Guid id)
     {
+        if (!currentUser.IsSuperUser) return ServiceResponse.Fail(SuperUserOnly);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync();
