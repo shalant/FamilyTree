@@ -44,7 +44,12 @@ public class StoryInviteService(
 
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
-            var person = await ctx.People.FirstOrDefaultAsync(p => p.Id == dto.PersonId, ct);
+            // Scoped: an invite about another family's person would email that person's
+            // name, photo and years to any address (finding S4, docs/security.md).
+            var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
+            var person = await ctx.People.FirstOrDefaultAsync(p => p.Id == dto.PersonId &&
+                (isSuperUser || (familyId.HasValue && p.FamilyId == familyId)), ct);
             if (person is null)
                 return ServiceResponse.Fail($"Person {dto.PersonId} not found.");
 
@@ -120,11 +125,22 @@ public class StoryInviteService(
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse<List<StoryInviteAdminDto>>> GetAllAsync(CancellationToken ct = default)
     {
+        if (!currentUser.IsSuperUser && !currentUser.IsAdmin)
+            return ServiceResponse<List<StoryInviteAdminDto>>.Fail("Only admins can view story invites.");
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
 
+            // An invite belongs to its subject's family, or (legacy unlinked invites) to
+            // the sender's family (finding S3, docs/security.md).
+            var familyId = currentUser.FamilyId;
+            var isSuperUser = currentUser.IsSuperUser;
             var invites = await ctx.StoryInvites
+                .Where(i => isSuperUser || (familyId.HasValue &&
+                    (i.PersonId != null
+                        ? ctx.People.Any(p => p.Id == i.PersonId && p.FamilyId == familyId)
+                        : ctx.UserFamilies.Any(uf => uf.UserId == i.InvitedByUserId && uf.FamilyId == familyId))))
                 .AsNoTracking()
                 .Include(i => i.Person)
                 .Include(i => i.InvitedByUser)
@@ -271,7 +287,12 @@ public class StoryInviteService(
 
                     if (!recipientHasAccount)
                     {
-                        var inviteResult = await authService.CreateInviteForStoryResponseAsync(invite.InvitedEmail, familyId: null);
+                        // Into the family the story is about (finding S5): the subject's
+                        // family, else the sender's. Was always the oldest family.
+                        var storyFamilyId = invite.Person?.FamilyId
+                            ?? await ctx.UserFamilies.Where(uf => uf.UserId == invite.InvitedByUserId)
+                                .OrderBy(uf => uf.JoinedAt).Select(uf => (Guid?)uf.FamilyId).FirstOrDefaultAsync(ct);
+                        var inviteResult = await authService.CreateInviteForStoryResponseAsync(invite.InvitedEmail, storyFamilyId);
 
                         // CreateInviteAsync returns Success=false but a valid Data when an active
                         // invite already exists for this email — that existing Id is still usable.

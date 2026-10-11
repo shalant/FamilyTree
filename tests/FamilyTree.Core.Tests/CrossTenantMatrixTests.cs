@@ -37,7 +37,6 @@ public class CrossTenantMatrixTests
 
     // Rows that failed against the code as of 2026-10-10 (57 of 90). Each fix PR deletes
     // its constant and the Skips that use it. Never skip a new row to get green.
-    private const string OpenStoryInvite = "Known open: S3/S4 StoryInviteService scoping (docs/security.md)";
     private const string OpenAuthLinking = "Known open: S4/S6 AuthService tree linking (docs/security.md)";
 
     // ── Seed ─────────────────────────────────────────────────────────────────────
@@ -666,7 +665,7 @@ public class CrossTenantMatrixTests
 
     // ── StoryInviteService ──────────────────────────────────────────────────────
 
-    [Theory(Skip = OpenStoryInvite), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task StoryInvite_CreateInviteAsync_AboutFamilyBPerson_FailsAndSendsNothing(Caller c)
     {
         var w = await SeedAsync();
@@ -678,12 +677,26 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.StoryInvites.CountAsync())).Should().Be(1);
     }
 
-    [Theory(Skip = OpenStoryInvite), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task StoryInvite_GetAllAsync_ReturnsNoFamilyBInvites(Caller c)
     {
         var w = await SeedAsync();
         var r = await StoryInviteSvc(w, w.As(c)).GetAllAsync();
         (r.Data ?? []).Select(i => i.Id).Should().NotContain(w.StoryInviteB);
+    }
+
+    [Fact]
+    [Trait("Category", "Regression")]
+    public async Task StoryInvite_SubmitResponse_OffersRegistrationIntoTheStorysFamily()
+    {
+        // Finding S5: the respondent's registration invite always targeted the OLDEST
+        // family, so answering a family-B story invite onboarded the person into family A.
+        var w = await SeedAsync();
+        var r = await StoryInviteSvc(w, World.Anonymous).SubmitResponseAsync(
+            new StoryInviteResponseDto { Token = w.StoryInviteBToken, Body = "A memory", AuthorName = "Cousin" });
+        r.Success.Should().BeTrue();
+        var invite = await Read(w, ctx => ctx.UserInvites.SingleAsync(i => i.Email == "responder@b.test"));
+        invite.FamilyId.Should().Be(w.FamilyB);
     }
 
     // ── GedcomExportService ─────────────────────────────────────────────────────
