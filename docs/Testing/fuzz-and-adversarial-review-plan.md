@@ -52,6 +52,11 @@ deterministic. A separate local-only "soak" test runs thousands of cases with a 
 **Done when:** the harness runs in `dotnet test` and its test count appears in the output;
 re-breaking the engine (reverting one of the old fixes) makes it fail.
 
+**Status (2026-10-10):** done on `testing/layout-fuzz-harness`. The first run found root
+causes R0-R10 (`docs/TodoList.md`, "Layout Fuzz Harness: first-run findings"). **R0 is
+critical:** a parent cycle through a person with 3+ parents overflows the stack and kills
+the web process for every family. Fix it before inviting more people, ahead of leg 2.
+
 ## Leg 2: Transition-bug hunt
 
 Enumerate classification transitions beyond the four documented in CLAUDE.md. Candidates:
@@ -114,6 +119,6 @@ can be budgeted from real numbers.
 
 | Leg | Tokens used | Notes |
 |---|---|---|
-| 1 | _not yet measured_ | |
+| 1 | ~300k: (a) ~150k generator + invariants, (b) ~150k first-run triage | Measured 2026-10-10 from the session's remaining-token counter, so approximate. (a) includes reading the 1,550-line engine and CsCheck API discovery. (b) covers 10 root causes (R0-R10 in `docs/TodoList.md`), 4 local engine experiments to separate causes, 2 harness bugs found and fixed (leaf variant re-picked the anchor; rejection filter starved), and the re-break check. Docs ~10k on top. |
 | 2 | _not yet measured_ | |
 | 3 | _not yet measured_ | |

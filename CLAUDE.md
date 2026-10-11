@@ -228,6 +228,7 @@ depth, which would remove the fragile birth-year inference machinery entirely.
 This project follows Uncle Bob Martin's approach to AI-assisted development: **don't read agent-generated code directly; surround agents with rigorous constraints instead.** Confidence in code comes from the gauntlet it's run through, not from subjective review.
 
 **Constraints in place:**
+- **Layout fuzz harness** (`FamilyTreeLayoutFuzzTests`, added 2026-10-10): CsCheck property tests over random genealogies built through the real `PersonMapper` → `CoupleHelper` path, 200 pinned-seed cases per invariant in CI. Full-domain invariants that hit known-open bugs are skipped with a `docs/TodoList.md` "[LAYOUT FUZZ 2026-10-10] R<n>" pointer; `_ExcludingKnownOpen` twins keep checking the rest. Never loosen an invariant to get green; when you fix an R-numbered bug, un-skip its tests and delete its `KnownOpen` flag in the same PR. `FAMILYTREE_FUZZ_SOAK=1` runs the local soak.
 - **Comprehensive test suites**: `FamilyTreeLayoutEngineTests` (regression suite with before/after pairs for classification transitions), `RelationshipServiceTests`, `AuthServiceTreeLinkingTests`, and integration tests hitting an EF Core InMemory database (a real EF pipeline and real `UserManager<AppUser>`, not mocked services — see `TestInfrastructure.cs`; not literally SQL Server, unlike the E2E suite below)
 - **Build verification**: `dotnet build FamilyTree.sln -c Release` must succeed; no warnings treated as acceptable
 - **Test runs**: `dotnet test` must pass 100% before any PR/commit
