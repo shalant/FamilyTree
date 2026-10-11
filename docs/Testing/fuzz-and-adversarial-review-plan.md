@@ -111,6 +111,15 @@ The next new method then gets checked automatically.
 **Done when:** each confirmed finding has a failing-then-passing test, a fix PR if needed,
 and a line in `docs/security.md` or TodoList.
 
+**Status (2026-10-10):** done on `security/scoping-adversarial-review`. Findings S1-S9 are
+in `docs/security.md` ("Scoping and auth adversarial review"). S1 (anonymous page access
+and anonymous creates, confirmed in a local run) and S2 (any Admin could take over the
+super-user via copyable reset links) were exploitable with a single family. S1-S4 and S6
+are fixed, S5 mostly; S7-S9 are TodoList follow-ups. The matrix is
+`tests/FamilyTree.Core.Tests/CrossTenantMatrixTests.cs` (96 cases). 57 of its first 90
+failed against the original code; failing rows were skipped per fix group and un-skipped
+by the fix commit. Every fix ran its rows red first.
+
 ## Token accounting
 
 Leg 1 is the first measurement: note tokens used for (a) generator and invariants,
@@ -121,4 +130,4 @@ can be budgeted from real numbers.
 |---|---|---|
 | 1 | ~300k: (a) ~150k generator + invariants, (b) ~150k first-run triage | Measured 2026-10-10 from the session's remaining-token counter, so approximate. (a) includes reading the 1,550-line engine and CsCheck API discovery. (b) covers 10 root causes (R0-R10 in `docs/TodoList.md`), 4 local engine experiments to separate causes, 2 harness bugs found and fixed (leaf variant re-picked the anchor; rejection filter starved), and the re-break check. Docs ~10k on top. |
 | 2 | _not yet measured_ | |
-| 3 | _not yet measured_ | |
+| 3 | ~520k: (a) ~330k review (~120k main session + ~210k `/code-review` xhigh subagent), (b) ~180k matrix + 8 fix commits, (c) ~10k docs | Measured 2026-10-10 the same way as leg 1 (remaining-token counter; subagent figure from its own usage report), so approximate. (a) includes a duplicate manual read pass before the run was restarted with fuller instructions (~65k), two local app runs to confirm S1 before and after, and merging 47 agent findings with the manual ones. (b) covers 96 matrix cases, 2 page-auth tests, re-pointing 3 existing test fixtures whose callers had no family (PersonService, MediumService, AuthService linking), and the E2E run (9/9). |
