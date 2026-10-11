@@ -2,6 +2,80 @@
 
 ---
 
+## Pre-invite hardening and testing (2026-10-10)
+
+Context: deciding whether arborkin.com is ready to invite more selected family members.
+Assessment: fine for a small, hand-picked first group; not yet for a broad rollout. Plan
+doc for the testing legs: `docs/Testing/fuzz-and-adversarial-review-plan.md` (merged in
+PR #43).
+
+**Check before sending invites**
+- [ ] **Confirm PR #39's fixes (and everything merged since) are actually deployed.**
+      `deploy-web.yml` is manual-only, so merging to `master` does not deploy.
+- [ ] **Confirm every production user has a `UserFamily` row.** The 2026-07-04 entry below
+      says production "almost certainly" lacked them (a user without one logs in fine but
+      sees a permanently empty tree). The docs don't record whether the backfill was ever
+      done in prod. Check the existing ~5 users, and that a new registration creates the row.
+- [ ] **Test on a real phone** (touch, mobile Safari/Chrome). Prior mobile testing was
+      emulated via viewport resize or desktop-width CSS tricks.
+
+**Bug: page flashes and loads twice on arborkin.com (reported 2026-10-10)**
+- [ ] **Turn off prerendering for the interactive render mode.** `App.razor` uses
+      `@rendermode="@InteractiveServer"` on both `<HeadOutlet>` and `<Routes>`; that
+      built-in mode prerenders by default, so the browser paints a static server render,
+      then the SignalR circuit connects and replaces it with a second, fresh render (the
+      E2E notes in CLAUDE.md already document the second component instance). The
+      existing `_ready` flag, `theme-init.js` (2026-09-16) and `_authStateResolved` gate
+      each hide a symptom inside one render pass; none prevents the two paints.
+      Proposed fix: `new InteractiveServerRenderMode(prerender: false)` on both outlets,
+      plus a small static splash in the HTML shell so users don't see a blank page until
+      the circuit connects. **Diagnosis is from reading the code, not yet reproduced:**
+      confirm first (e.g. `curl https://arborkin.com/` and check whether the body
+      contains rendered content), then confirm gone after. Verify E2E suite still passes
+      and link-preview Open Graph tags (already gated on `_ready`) are unaffected.
+      Deploy is manual.
+- [ ] **Same flash also happens loading the canvas after authenticating (reported
+      2026-10-10).** Login is a real form POST to `/auth/do-login` followed by a full-page
+      redirect to `/`, so it goes through the same prerender-then-circuit double paint as
+      a cold load; the prerender fix above should cover that part. But the post-login
+      path also has its own sequence on top of it: auth-state spinner -> `_loading`/`_ready`
+      spinner (waiting on focus resolution and the `localStorage` read in
+      `OnAfterRenderAsync`) -> tree renders -> `canvas-interaction.js` applies the saved
+      position and reveals the canvas. After the prerender fix, re-test this path
+      separately: if a visible jump remains, the cause is that multi-step reveal, not
+      prerendering, and needs its own fix. Not investigated yet.
+
+**Google sign-in**
+- [ ] **Verify Google sign-in end to end in production, and add automated coverage.**
+      Already built (`/auth/google`, callback with its three cases, `EnsureUserFamilyAsync`)
+      but only registered when `Google:ClientId`/`Google:ClientSecret` are set, and listed
+      under "Not covered this pass" in the 2026-09-11 section. Confirm production
+      credentials and redirect URIs for arborkin.com, then test with a real Google
+      account: new account (and that it gets a `UserFamily` row), existing-email linking,
+      returning user, and behaviour under each `Auth:RegistrationMode`. The E2E suite
+      can't use real Google, so add tests around the callback logic instead.
+      (Scope assumed from conversation; adjust if the intent was different.)
+
+**Testing legs (see the plan doc for full detail; each on its own branch)**
+- [ ] **Leg 1: layout fuzz harness** (`testing/layout-fuzz-harness`) — property-based tests
+      over random genealogies with invariants (no overlaps, every person once, children
+      below parents, determinism, stability under edits, no crashes/NaN). Expect it to
+      surface the still-open 2026-09-09 sibling-overlap bug. Triage failures into
+      separate TodoList entries rather than fixing in the harness branch. Record token
+      usage in the plan doc's accounting table.
+- [ ] **Leg 2: layout transition-bug hunt** — before/after regression tests for untested
+      classification transitions: adoption (first confirm the mapper handles `Adopted`
+      at all), third spouse, spouse death, deleting a middle generation, merging
+      components, half-siblings.
+- [ ] **Leg 3: adversarial review of family-scoping and auth** — `/code-review xhigh` over
+      `PersonService`, `RelationshipService`, `StoryService`, `MediumService`,
+      `GedcomExportService`, `StoryInviteService`, `AuthService`, the claims factory and
+      admin services, then a cross-tenant test matrix (two seeded families, every public
+      service method called as family A against family B's IDs). Run first if only one
+      leg is started: it bears most directly on whether inviting people is safe.
+
+---
+
 ## Ideas: agents / MCP / RAG exploration (2026-09-18)
 
 Not bugs — forward-looking feature ideas surfaced while diagnosing the layout bugs
