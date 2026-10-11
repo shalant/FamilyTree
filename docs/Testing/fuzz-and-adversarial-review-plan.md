@@ -114,6 +114,6 @@ can be budgeted from real numbers.
 
 | Leg | Tokens used | Notes |
 |---|---|---|
-| 1 | _not yet measured_ | |
+| 1 | ~300k: (a) ~150k generator + invariants, (b) ~150k first-run triage | Measured 2026-10-10 from the session's remaining-token counter, so approximate. (a) includes reading the 1,550-line engine and CsCheck API discovery. (b) covers 10 root causes (R0-R10 in `docs/TodoList.md`), 4 local engine experiments to separate causes, 2 harness bugs found and fixed (leaf variant re-picked the anchor; rejection filter starved), and the re-break check. Docs ~10k on top. |
 | 2 | _not yet measured_ | |
 | 3 | _not yet measured_ | |

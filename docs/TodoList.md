@@ -2,6 +2,147 @@
 
 ---
 
+## Layout Fuzz Harness: first-run findings (2026-10-10)
+
+Added `tests/FamilyTree.Web.Tests/ServiceTests/FamilyTreeLayoutFuzzTests.cs` (Leg 1 of
+`docs/Testing/fuzz-and-adversarial-review-plan.md`, branch `testing/layout-fuzz-harness`):
+CsCheck generates random genealogies, runs them through the production path
+(`Person`/`Relationship` rows → `PersonMapper` → LastName/FirstName order →
+`CoupleHelper.Derive` → `ComputeLayout`) and checks the plan's 7 invariants on 200
+pinned-seed cases per invariant (env vars `FAMILYTREE_FUZZ_ITER` / `FAMILYTREE_FUZZ_SEED`
+override; `FAMILYTREE_FUZZ_SOAK=1` runs the local-only soak). Failures shrink to a minimal
+family and print a replay seed.
+
+The first run failed 6 of the 8 active invariants. Triage found the root causes below.
+None are fixed on the harness branch (each gets its own branch and before/after test).
+Every full-domain invariant that fails is `[Fact(Skip = ...)]` pointing here by its R-number. Where a
+useful domain is left, an `_ExcludingKnownOpen` twin runs the **same** invariant over
+families without the known-open shapes (`KnownOpen` enum in the test file), so the harness
+still guards everything else. When fixing one: un-skip its full-domain tests and delete its
+`KnownOpen` flag in the same PR. Triage was confirmed by locally patching the engine with a
+candidate fix and re-running (patches reverted, never committed): the R1 patch alone makes
+full-domain Invariant 6 pass 1,500/1,500, and a vertical-distance collision check removes
+most Invariant 1 failures (R4).
+
+Two deliberate interpretations of the plan's wording, both documented in the test file:
+Invariant 4 asserts "share a Y" only for couples where **neither** partner has a birth date
+(the Y axis is a birth-year timeline, so dated spouses born years apart are meant to differ);
+Invariant 6 allows an unrelated component to shift as a **rigid whole** (a wider neighbour
+or a new min birth year legitimately moves it) but not to deform.
+
+Re-break check (reverting old fixes one at a time against the active tests): reverting
+spouse birth-year inference (2026-07-04) fails the Invariant 6 twin; reverting
+"root group must be primary for EVERY parent" (2026-07-07, AND→OR) fails the Invariant 4
+twin. Reverting "primary group prefers children" (2026-07-07) or dateless-component
+seeding (2026-09-09) is only caught by the skipped full-domain invariants, and reverting
+the couple-gap reservation (2026-09-18) or sibling depth propagation is not caught at all
+(no invariant covers "nobody between spouses" or node size). So the harness doesn't yet
+replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
+
+- [ ] **[LAYOUT FUZZ 2026-10-10] R0 — CRITICAL: a Parent cycle crashes the whole web
+      process.** `PlaceGroup`/`MeasureGroup`/`MarkDescendants` recurse forever on a cycle
+      reachable from a root, and a StackOverflow can't be caught. In Blazor Server it kills
+      the App Service process for every family, and anyone loading that tree would
+      crash it again. Reachable from the UI as far as the code shows (not yet reproduced in
+      a running app): `PersonForm` puts no cap on parent count and doesn't exclude
+      descendants from the parent picker, and `PersonService` doesn't validate.
+      Minimal repro (`Invariant7b_ParentCycleDoesNotCrash`): Root+Root2 are parents of A,
+      A is parent of B, B is also recorded as A's parent (A has 3 parents). With only 2
+      parents the cycle is incidentally unreachable (A's cycle parent forms a couple group
+      with A's root parent, and that group is never a root). Confirmed: `Test host process
+      crashed : Stack overflow`. Fix direction: reject cycles in `PersonService`
+      (ancestor check on parent add) **and** make the engine cycle-safe (visited set in
+      the three recursions), because bad data may already exist. Fix before inviting more people.
+- [ ] **[LAYOUT FUZZ 2026-10-10] R1 — a person linked only by an ended marriage is laid
+      out as a separate tree.** `IdentifyConnectedComponents` follows Parent/Child/Spouse/
+      Sibling but not `FormerSpouseIds`. A former spouse with no other relatives becomes their own
+      component: placed 320px+ to the side, and if dateless, seeded at the current year,
+      which then leaks into the ex's inferred year (spouse inference runs before parent
+      inference). Repro: Ann is parent of Willa; Max *was* married to Willa; all
+      dateless → Willa renders on Ann's row. Also: Doug (1900) was married to Harvey
+      (1908) → Doug 440px away. Fix direction: add `FormerSpouseIds` to the component BFS
+      (`ComputeLineageSideDistances` already includes it, with a comment explaining why).
+      Fails Invariants 3, 4, 6.
+- [ ] **[LAYOUT FUZZ 2026-10-10] R2 — couples split apart in blended families.** A couple
+      only gets a placement slot if it is the primary group of **both** partners. When one
+      partner also has children outside the couple, and the couple has children, or the
+      other partner has children elsewhere or recorded parents, the partners land
+      240-360px apart. Repros: Rose (child Bud, alone) married to Ellen (child Ellen Jr,
+      alone), no shared children → 360px apart. Ann married to Doug (child Willa) but also
+      co-parent of Bill with Dora → Doug 360px from Ann. Common in real families (remarriage
+      with children from both sides). Fails Invariant 4.
+- [ ] **[LAYOUT FUZZ 2026-10-10] R3 — dateless birth-year inference is greedy and
+      order-dependent.** Pass 1 takes the first available evidence (children, then
+      siblings, then spouses, then parents) in list order and never reconciles. Results: a
+      child on the **same row** as a parent (Marc → Bud, Gish; Bud → Bud Jr; Gish →
+      Doug; Bud Jr + Gish co-parent Ray → Ray takes half-sibling Doug's year = Bud Jr's
+      year). A child inferred only 3 years after a parent, overlapping them (Willa inferred
+      from her own child, her father Marc from a different child). Dateless partners on
+      different rows (Ann inferred from 1 dated child, husband Marc from 2). New families
+      start fully dateless, so this hits exactly the people being invited. Fix direction: a
+      constraint pass after inference (child ≥ parent + N, partners equal), or depth-based
+      Y for dateless people (see `bulk-import-deactivated.md`). Fails Invariants 1, 3, 4.
+- [ ] **[LAYOUT FUZZ 2026-10-10] R4 — refinements to the open 2026-09-09 near-miss-Y
+      overlap bug (entry below).** The fuzzer confirms it and adds two details: (1) the
+      suggested fix `Math.Abs(n.Y - anchor.Y) < diameter` is not enough. The collision has
+      to be checked at the **placed person's own** Y, not the anchor's (Sarah 1922, orphan
+      sibling of Doug 1917, overlapped Doug's half-brother Bud 1914 even under the
+      anchor-Y version). (2) The `FindOpenXAdjacentTo` "last resort: accept overlap" return
+      is reachable in generated families. Spouse-anchored partners hit it too: Rose,
+      married to Max 1935, overlapped Max's co-parent Dora 1944. Fails Invariant 1.
+- [ ] **[LAYOUT FUZZ 2026-10-10] R5 — layout depends on the order of the people list.**
+      `CoupleSortKey`, `ComputeDepths` (first person), Pass 0.5 seeding (`component[0]`),
+      inference order (R3) and component order all read list position. Shuffling the list
+      swaps unrelated trees left/right, which is just design. The production-reachable part:
+      `PersonService.GetAllAsync` sorts by LastName, FirstName only, so same-named people
+      come back from SQL in no guaranteed order and the tree can rearrange between page
+      loads. Repro: Doug with two children both named "Gish Kuh" → they swap sides.
+      Historically common (a child named after a sibling who died). Fix direction: add
+      `.ThenBy(p => p.Id)` in `GetAllAsync`, or sort inside the engine. Fails
+      Invariants 5b, 5c.
+- [ ] **[LAYOUT FUZZ 2026-10-10] R6 — DESIGN QUESTION: cross-root couples always sit
+      ~360px apart.** The cross-root step reserves `OrphanBufferX` (240px) between the two
+      bridged root groups on purpose (2026-07-07, so Morton-style orphan siblings have
+      somewhere to land), which puts the partners about 360px apart, past
+      `SpouseSpacingX` (200). Not changing the invariant. Doug to decide: accept the gap
+      (then Invariant 4's bound needs an explicit cross-root exception, recorded as a
+      decision) or only reserve the buffer when an orphan sibling actually needs it.
+- [ ] **[LAYOUT FUZZ 2026-10-10] R7 — a spouse-anchored partner lands past an occupied
+      slot.** The safety net anchors a partner with no group of their own (the 2026-07-07
+      Harvey Fleishman shape, or anyone in 2+ couples) via `FindOpenXAdjacentTo`, which
+      always tries rightward first and steps past whatever holds the adjacent slot. The
+      Florence/Harvey fix only works when that slot is empty. Repros: Bud married to both
+      Bud Lee and Harvey (childless) → Harvey lands past Bud Lee, 360px away, though the
+      left slot is free. Ann (sibling Bill beside her) married Rose, and Ann has a child
+      alone → Rose 240px away. Fix direction: try both sides and take the nearest free slot.
+      Fails Invariant 4.
+- [ ] **[LAYOUT FUZZ 2026-10-10] R8 — an orphan sibling with a partner is anchored to the
+      sibling, not the partner.** A person with no parents but an explicit Sibling link
+      **and** a partner is placed by the root-individual sibling loop, which runs before
+      the spouse safety net, so they end up 240px+ from their partner. Matches the
+      "orphan sibling gains a spouse" classification transition. Fails Invariant 4.
+- [ ] **[LAYOUT FUZZ 2026-10-10] R9 — no vertical clearance check in `PlaceGroup`.** X
+      comes from tree structure, Y from birth year, and nothing checks the combination. A
+      married-in partner at their spouse's slot ±100px can sit right under the spouse's
+      parent. Repro: Willa (1926) married Ann Kuh (1916). Willa's mother Ann Small (1906)
+      renders 65px above Ann Kuh at the same X. Rare (about 1 in 3,000 generated families). Fails
+      Invariant 1.
+- [ ] **[LAYOUT FUZZ 2026-10-10] R10 — cross-root couples' children can stack on the same
+      X.** The post-placement pass drops each cross-root couple's children at the couple's
+      midpoint with no collision check. With two cross-root couples side by side, Ellen Kuh
+      (1970) and Ellen Rosenberg (1969) rendered at the same X, 7px apart. Fails
+      Invariant 1.
+- [ ] **[LAYOUT FUZZ 2026-10-10] Possible extra invariants (not in the plan's 7):**
+      "children sit within their parents' subtree span" (a child of a non-primary couple
+      group goes through the safety net and can land far from both parents with no
+      invariant noticing), and "nobody sits between two spouses" (reverting the
+      2026-09-18 couple-gap fix goes unnoticed). Candidates for Leg 2.
+
+**Harness limitations, so a future reader isn't misled:** shrinking works well on
+the full-domain generator (40-person failures came down to 3-5 people) but barely at all on
+the `_ExcludingKnownOpen` domains (they're built with `Select`, so CsCheck can't shrink
+through the filter). Those failures print the original case instead.
+
 ## Ideas: agents / MCP / RAG exploration (2026-09-18)
 
 Not bugs — forward-looking feature ideas surfaced while diagnosing the layout bugs
@@ -470,6 +611,9 @@ with "Your family tree has 2 people" showing — functionally correct.
       change the collision predicate from `n.Y == anchor.Y` to a vertical-distance check
       (`Math.Abs(n.Y - anchor.Y) < <node diameter at that depth>`), so near-miss Y values
       are still treated as an occupied row.
+      **Update 2026-10-10:** the layout fuzz harness reproduces this as invariant 1. That
+      fix direction is incomplete: check collisions at the placed person's own Y, not the
+      anchor's. See `[LAYOUT FUZZ 2026-10-10] R4` at the top of this file.
 
 **Not covered this pass** — worth a follow-up before or shortly after the real invite:
 - Google OAuth sign-up path.

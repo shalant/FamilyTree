@@ -12,6 +12,12 @@
           "bunit.web": "1.37.7"
         }
       },
+      "CsCheck": {
+        "type": "Direct",
+        "requested": "[4.9.1, )",
+        "resolved": "4.9.1",
+        "contentHash": "rEmuFiG19sF8U4Ef/S79cu9HW4pUGraoCTkmYs0z7SvsGqGAVO3wCjxQPS0KQvPa1g2/w1wBbnAP6cDZKBFEcA=="
+      },
       "FluentAssertions": {
         "type": "Direct",
         "requested": "[7.0.0, )",
