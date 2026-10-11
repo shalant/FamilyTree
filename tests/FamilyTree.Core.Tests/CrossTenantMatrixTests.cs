@@ -37,8 +37,6 @@ public class CrossTenantMatrixTests
 
     // Rows that failed against the code as of 2026-10-10 (57 of 90). Each fix PR deletes
     // its constant and the Skips that use it. Never skip a new row to get green.
-    private const string OpenAnon = "Known open: S1 anonymous create (docs/security.md)";
-    private const string OpenStory = "Known open: S3/S4 StoryService scoping (docs/security.md)";
     private const string OpenStoryInvite = "Known open: S3/S4 StoryInviteService scoping (docs/security.md)";
     private const string OpenAuthLinking = "Known open: S4/S6 AuthService tree linking (docs/security.md)";
 
@@ -509,7 +507,7 @@ public class CrossTenantMatrixTests
 
     private Guid[] AllBStories(World w) => [w.StoryBLinked, w.StoryBUnlinked, w.StoryBPending, w.StoryBHidden];
 
-    [Theory(Skip = OpenStory), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Story_GetByPersonAsync_FamilyBPerson_ReturnsNothing(Caller c)
     {
         var w = await SeedAsync();
@@ -517,7 +515,7 @@ public class CrossTenantMatrixTests
         (r.Data ?? []).Should().BeEmpty();
     }
 
-    [Theory(Skip = OpenStory), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Story_GetAllApprovedAsync_ReturnsNoFamilyBStories(Caller c)
     {
         var w = await SeedAsync();
@@ -526,7 +524,7 @@ public class CrossTenantMatrixTests
         r.Data!.Select(s => s.Id).Should().NotContain(AllBStories(w));
     }
 
-    [Theory(Skip = OpenStory), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Story_GetAllAsync_ReturnsNoFamilyBStories(Caller c)
     {
         var w = await SeedAsync();
@@ -534,7 +532,7 @@ public class CrossTenantMatrixTests
         (r.Data ?? []).Select(s => s.Id).Should().NotContain(AllBStories(w));
     }
 
-    [Theory(Skip = OpenStory), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Story_GetUnlinkedAsync_ReturnsNoFamilyBStories(Caller c)
     {
         var w = await SeedAsync();
@@ -542,7 +540,7 @@ public class CrossTenantMatrixTests
         (r.Data ?? []).Select(s => s.Id).Should().NotContain(w.StoryBUnlinked);
     }
 
-    [Theory(Skip = OpenStory), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Story_CreateAsync_AboutFamilyBPerson_Fails(Caller c)
     {
         var w = await SeedAsync();
@@ -551,7 +549,7 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.Stories.CountAsync(s => s.PersonId == w.B1))).Should().Be(3);
     }
 
-    [Theory(Skip = OpenStory), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Story_UpdateAsync_FamilyBStories_Fail(Caller c)
     {
         var w = await SeedAsync();
@@ -564,7 +562,7 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.Stories.AnyAsync(s => s.Title == "pwned"))).Should().BeFalse();
     }
 
-    [Theory(Skip = OpenStory), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Story_DeleteAsync_FamilyBStories_Fail(Caller c)
     {
         var w = await SeedAsync();
@@ -574,7 +572,7 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.Stories.CountAsync(s => s.Id == w.StoryBLinked || s.Id == w.StoryBUnlinked))).Should().Be(2);
     }
 
-    [Theory(Skip = OpenStory), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Story_SetHiddenAsync_FamilyBStory_Fails(Caller c)
     {
         var w = await SeedAsync();
@@ -583,7 +581,7 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.Stories.SingleAsync(s => s.Id == w.StoryBLinked))).IsHidden.Should().BeFalse();
     }
 
-    [Theory(Skip = OpenStory), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Story_ApproveAsync_FamilyBStory_Fails(Caller c)
     {
         var w = await SeedAsync();
@@ -592,7 +590,7 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.Stories.SingleAsync(s => s.Id == w.StoryBPending))).IsApproved.Should().BeFalse();
     }
 
-    [Theory(Skip = OpenStory), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Story_MoveAsync_DoesNotTouchFamilyBOrdering(Caller c)
     {
         var w = await SeedAsync();
@@ -604,7 +602,7 @@ public class CrossTenantMatrixTests
         after.Should().BeEquivalentTo(before);
     }
 
-    [Theory(Skip = OpenStory), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Story_LinkToPersonAsync_AcrossFamilies_Fails(Caller c)
     {
         var w = await SeedAsync();
@@ -613,6 +611,57 @@ public class CrossTenantMatrixTests
         (await svc.LinkToPersonAsync(w.StoryAUnlinked, w.B1)).Success.Should().BeFalse("A's story must not attach to B's person");
         var stories = await Read(w, ctx => ctx.Stories.Where(s => s.Id == w.StoryBUnlinked || s.Id == w.StoryAUnlinked).ToListAsync());
         stories.Should().OnlyContain(s => s.PersonId == null);
+    }
+
+    // Same-family story rules from the same review (2026-10-10), not cross-tenant but
+    // found alongside: the person drawer bypassed moderation, and any member could edit
+    // or delete anyone's unlinked story.
+
+    [Fact]
+    [Trait("Category", "Regression")]
+    public async Task Story_GetByPersonAsync_OwnFamily_HidesPendingAndHiddenStories()
+    {
+        var w = await SeedAsync();
+        var ids = (await StorySvc(w, w.MemberB).GetByPersonAsync(w.B1)).Data!.Select(s => s.Id).ToList();
+        ids.Should().Contain(w.StoryBLinked);
+        ids.Should().NotContain([w.StoryBPending, w.StoryBHidden]);
+    }
+
+    [Fact]
+    [Trait("Category", "Regression")]
+    public async Task Story_UpdateAndDelete_OnlyAuthorOrAdminInSameFamily()
+    {
+        var w = await SeedAsync();
+        var otherMemberOfB = new FakeCurrentUserService { UserId = Guid.NewGuid(), FamilyId = w.FamilyB };
+        var svc = StorySvc(w, otherMemberOfB);
+        (await svc.UpdateAsync(w.StoryBUnlinked, new StoryUpsertDto { Title = "pwned", Body = "pwned" })).Success.Should().BeFalse();
+        (await svc.DeleteAsync(w.StoryBUnlinked)).Success.Should().BeFalse();
+
+        (await StorySvc(w, w.MemberB).UpdateAsync(w.StoryBUnlinked, new StoryUpsertDto { Title = "mine", Body = "mine" }))
+            .Success.Should().BeTrue("UserB wrote this story");
+    }
+
+    [Fact]
+    public async Task PositiveControl_PostSignupLinking_AnonymousCircuitLinksInviteStoryWithinItsFamily()
+    {
+        // The "Willa scenario": LinkToTreeModal runs before the new user is signed in and
+        // links a legacy unlinked invite-response story to the subject it just created.
+        var w = await SeedAsync();
+        var storyId = Guid.NewGuid();
+        await using (var ctx = w.Db.CreateDbContext())
+        {
+            ctx.Stories.Add(new Story
+            {
+                Id = storyId, PersonId = null, AuthorId = null, InviteId = w.StoryInviteB,
+                UnlinkedPersonName = "Bill", Title = "A memory", Body = "...", CreatedAt = DateTime.UtcNow,
+            });
+            await ctx.SaveChangesAsync();
+        }
+
+        var anon = StorySvc(w, World.Anonymous);
+        (await anon.LinkToPersonAsync(storyId, w.A1)).Success.Should().BeFalse("the invite came from family B");
+        (await anon.LinkToPersonAsync(storyId, w.B2)).Success.Should().BeTrue();
+        (await anon.LinkToPersonAsync(w.StoryBLinked, w.B2)).Success.Should().BeFalse("already-linked stories can't be relinked anonymously");
     }
 
     // ── StoryInviteService ──────────────────────────────────────────────────────
@@ -722,7 +771,7 @@ public class CrossTenantMatrixTests
 
     // ── Anonymous caller (S1) ───────────────────────────────────────────────────
 
-    [Fact(Skip = OpenAnon)]
+    [Fact]
     public async Task Anonymous_CannotCreatePeopleStoriesOrMedia()
     {
         var w = await SeedAsync();
@@ -735,7 +784,7 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.Stories.AnyAsync(s => s.Title == "spam"))).Should().BeFalse();
     }
 
-    [Fact(Skip = OpenAnon)]
+    [Fact]
     public async Task Anonymous_ReadsReturnNothing()
     {
         var w = await SeedAsync();
