@@ -38,7 +38,6 @@ public class CrossTenantMatrixTests
     // Rows that failed against the code as of 2026-10-10 (57 of 90). Each fix PR deletes
     // its constant and the Skips that use it. Never skip a new row to get green.
     private const string OpenAnon = "Known open: S1 anonymous create (docs/security.md)";
-    private const string OpenPerson = "Known open: S3/S4/S6 PersonService scoping (docs/security.md)";
     private const string OpenMedium = "Known open: S3/S4/S6 MediumService scoping (docs/security.md)";
     private const string OpenStory = "Known open: S3/S4 StoryService scoping (docs/security.md)";
     private const string OpenStoryInvite = "Known open: S3/S4 StoryInviteService scoping (docs/security.md)";
@@ -253,7 +252,7 @@ public class CrossTenantMatrixTests
         r.Data.Should().BeNull();
     }
 
-    [Theory(Skip = OpenPerson), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Person_GetByIdAsync_OwnPerson_DoesNotExposeFamilyBRelationIds(Caller c)
     {
         var w = await SeedAsync();
@@ -271,7 +270,7 @@ public class CrossTenantMatrixTests
         r.Data!.Select(p => p.Id).Should().NotContain(w.BDeleted);
     }
 
-    [Theory(Skip = OpenPerson), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Person_UpdateAsync_FamilyBPerson_FailsAndLeavesItUnchanged(Caller c)
     {
         var w = await SeedAsync();
@@ -281,7 +280,7 @@ public class CrossTenantMatrixTests
         b1.FirstName.Should().Be("Beatrix");
     }
 
-    [Theory(Skip = OpenPerson), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Person_DeleteAsync_FamilyBPerson_FailsAndLeavesItLive(Caller c)
     {
         var w = await SeedAsync();
@@ -290,7 +289,7 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.People.AnyAsync(p => p.Id == w.B1))).Should().BeTrue();
     }
 
-    [Theory(Skip = OpenPerson), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Person_RestoreAsync_FamilyBPerson_FailsAndLeavesItDeleted(Caller c)
     {
         var w = await SeedAsync();
@@ -300,7 +299,7 @@ public class CrossTenantMatrixTests
         p.DeletedAt.Should().NotBeNull();
     }
 
-    [Theory(Skip = OpenPerson), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Person_CreateAsync_WithFamilyBRelative_FailsAndLinksNothing(Caller c)
     {
         var w = await SeedAsync();
@@ -313,7 +312,7 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.People.AnyAsync(p => p.FirstName == "New"))).Should().BeFalse();
     }
 
-    [Theory(Skip = OpenPerson), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Person_CreateAsync_WithFamilyBRelative_DoesNotEchoTheirDetails(Caller c)
     {
         var w = await SeedAsync();
@@ -327,7 +326,7 @@ public class CrossTenantMatrixTests
         r.Message.Should().NotContainAny(BNames);
     }
 
-    [Theory(Skip = OpenPerson), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Person_CreateAsync_WithFamilyBSpouse_DoesNotRevealMaritalStatus(Caller c)
     {
         var w = await SeedAsync();
@@ -338,7 +337,7 @@ public class CrossTenantMatrixTests
         r.Message.Should().NotContainAny(BNames);
     }
 
-    [Theory(Skip = OpenPerson), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Person_UpdateAsync_OwnPersonPointedAtFamilyBRelative_Fails(Caller c)
     {
         var w = await SeedAsync();
@@ -349,7 +348,7 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.Relationships.AnyAsync(x => x.PersonAId == w.A1 && x.PersonBId == w.B2))).Should().BeFalse();
     }
 
-    [Fact(Skip = OpenPerson)]
+    [Fact]
     public async Task Person_UpdateAsync_MemberGetsSameMessageForForeignAndMissingIds()
     {
         var w = await SeedAsync();
@@ -389,7 +388,7 @@ public class CrossTenantMatrixTests
         (r.Data ?? []).Should().BeEmpty();
     }
 
-    [Theory(Skip = OpenPerson), InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Relationship_GetForPersonAsync_OwnPerson_DoesNotExposeFamilyBLinks(Caller c)
     {
         var w = await SeedAsync();

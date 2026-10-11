@@ -12,10 +12,18 @@ namespace FamilyTree.Core.Tests;
 public class PersonServiceTests
 {
     private static (PersonService service, TestDbContextFactory factory, FakeCurrentUserService fakeUser)
-        CreateSut(Guid? userId = null, Guid? familyId = null, bool isAdmin = true)
+        CreateSut(Guid? userId = null, Guid? familyId = null, bool isAdmin = true, bool noFamily = false)
     {
         var factory = new TestDbContextFactory();
-        var fakeUser = new FakeCurrentUserService { UserId = userId, FamilyId = familyId, IsAdmin = isAdmin };
+        // The caller belongs to a family unless a test opts out: since 2026-10-10 a
+        // non-super-user with no FamilyId can't create people (finding S1), so a
+        // family-less default would make every create in this file fail for that reason.
+        var fakeUser = new FakeCurrentUserService
+        {
+            UserId = userId,
+            FamilyId = noFamily ? null : familyId ?? Guid.NewGuid(),
+            IsAdmin = isAdmin,
+        };
         var service = new PersonService(
             factory,
             NullLogger<PersonService>.Instance,
@@ -316,7 +324,7 @@ public class PersonServiceTests
         // ownerless (FamilyId == null) and invisible to every regular family member.
         // Two creates in a row should also land in the SAME fallback family, not each
         // spin up a brand new one.
-        var (service, factory, fakeUser) = CreateSut();
+        var (service, factory, fakeUser) = CreateSut(noFamily: true);
         fakeUser.IsSuperUser = true;
 
         await service.CreateAsync(new PersonUpsertDto { FirstName = "Bill", LastName = "Small" });
