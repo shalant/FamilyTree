@@ -84,6 +84,21 @@ confirm the test fails, restore.
 
 **Done when:** each new test runs in the suite and each new bug has its own TodoList entry.
 
+**Status (2026-10-11):** done on `testing/layout-transition-regressions`. The pairs are in
+their own file, `tests/FamilyTree.Web.Tests/ServiceTests/FamilyTreeLayoutTransitionTests.cs`,
+not `FamilyTreeLayoutEngineTests.cs` (already 1,341 lines). They build families from
+`Person` + `Relationship` rows through `PersonMapper`, not hand-written DTOs. 12
+transitions, each run under ascending and descending GUIDs (24 cases): 7 pass, 5 are
+skipped with pointers. New findings R11-R13 and the adoption gap are in `docs/TodoList.md`,
+"Layout transition hunt: findings". Every skip was run unskipped first, and each failure was
+traced to its cause with a position dump. Two predicted labels turned out wrong and were
+corrected: the dateless case doesn't hit R3, and the orphan-sibling-marries case is R13,
+not R8. Three failures on the first run were mistakes in the tests (a parent younger than
+their child; two rigid-block checks on parents who correctly re-centre over fewer
+children), fixed in the tests, not the engine. No `[Trait("Category","Regression")]`:
+none of these reproduces a bug found live. No engine fixes here, per the plan (one
+branch per fix).
+
 ## Leg 3: Scoping and auth adversarial review
 
 **Step 1, read-only:** `/code-review xhigh` (user-triggered) scoped to:
@@ -131,5 +146,5 @@ can be budgeted from real numbers.
 | Leg | Tokens used | Notes |
 |---|---|---|
 | 1 | ~300k: (a) ~150k generator + invariants, (b) ~150k first-run triage | Measured 2026-10-10 from the session's remaining-token counter, so approximate. (a) includes reading the 1,550-line engine and CsCheck API discovery. (b) covers 10 root causes (R0-R10 in `docs/TodoList.md`), 4 local engine experiments to separate causes, 2 harness bugs found and fixed (leaf variant re-picked the anchor; rejection filter starved), and the re-break check. Docs ~10k on top. |
-| 2 | _not yet measured_ | |
+| 2 | ~135k: (a) ~45k reading the engine, mapper, existing tests and fuzz helpers, (b) ~55k writing 12 pairs + triage (one position-dump pass across 4 shapes), (c) ~35k fixing 3 test mistakes, the full suite run and docs | Measured 2026-10-11 the same way (remaining-token counter), run on Opus. Much cheaper than leg 1: Leg 1's R0-R10 write-ups already explained most of the failures, so triage was mostly matching to an existing entry. |
 | 3 | ~520k: (a) ~330k review (~120k main session + ~210k `/code-review` xhigh subagent), (b) ~180k matrix + 8 fix commits, (c) ~10k docs | Measured 2026-10-10 the same way as leg 1 (remaining-token counter; subagent figure from its own usage report), so approximate. (a) includes a duplicate manual read pass before the run was restarted with fuller instructions (~65k), two local app runs to confirm S1 before and after, and merging 47 agent findings with the manual ones. (b) covers 96 matrix cases, 2 page-auth tests, re-pointing 3 existing test fixtures whose callers had no family (PersonService, MediumService, AuthService linking), and the E2E run (9/9). |

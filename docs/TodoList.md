@@ -120,10 +120,12 @@ PR #43).
       edits, no crashes/NaN). First run found root causes R0-R10, triaged into the
       "Layout Fuzz Harness: first-run findings" section below. Token usage recorded in the
       plan doc.
-- [ ] **Leg 2: layout transition-bug hunt** — before/after regression tests for untested
-      classification transitions: adoption (first confirm the mapper handles `Adopted`
-      at all), third spouse, spouse death, deleting a middle generation, merging
-      components, half-siblings.
+- [x] **Leg 2: layout transition-bug hunt** (`testing/layout-transition-regressions`,
+      done 2026-10-11) — `FamilyTreeLayoutTransitionTests`: 12 before/after pairs, each
+      run with ascending and descending GUIDs. 7 pass and now guard their transition; 5
+      are skipped, pointing at R1, R4/R7, and the three new entries R11-R13 in the
+      "Layout transition hunt" section below. Adoption turned out to be a dormant product
+      gap, not a layout bug (entry in the same section). Token usage recorded in the plan doc.
 - [x] **Leg 3: adversarial review of family-scoping and auth** (`security/scoping-adversarial-review`,
       done 2026-10-10) — `/code-review xhigh` plus a manual pass found S1-S9 (see
       `docs/security.md`, "Scoping and auth adversarial review"). Fixed S1 (anonymous
@@ -358,12 +360,84 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       "children sit within their parents' subtree span" (a child of a non-primary couple
       group goes through the safety net and can land far from both parents with no
       invariant noticing), and "nobody sits between two spouses" (reverting the
-      2026-09-18 couple-gap fix goes unnoticed). Candidates for Leg 2.
+      2026-09-18 couple-gap fix goes unnoticed). Candidates for Leg 2. *2026-10-11:* both
+      now asserted, on the small hand-built families in `FamilyTreeLayoutTransitionTests`
+      only ("nobody between spouses" in `AssertSound`, "child under parents" in
+      `AssertChildUnderParents`). Still not in the fuzz harness: a wide family legitimately
+      spreads children past their parents, so the second one needs a real subtree-span
+      bound first.
 
 **Harness limitations, so a future reader isn't misled:** shrinking works well on
 the full-domain generator (40-person failures came down to 3-5 people) but barely at all on
 the `_ExcludingKnownOpen` domains (they're built with `Select`, so CsCheck can't shrink
 through the filter). Those failures print the original case instead.
+
+## Layout transition hunt: findings (2026-10-11)
+
+Leg 2 of `docs/Testing/fuzz-and-adversarial-review-plan.md`. Tests:
+`tests/FamilyTree.Web.Tests/ServiceTests/FamilyTreeLayoutTransitionTests.cs`. Each test
+lays out one family before and after a single user edit, built from `Person` +
+`Relationship` rows through `PersonMapper` and `CoupleHelper`. Every test runs with
+ascending and descending GUIDs, because GUID order decides which partner of a couple sits
+on the left.
+
+**Covered and passing (now guarding the transition):** a marriage with children ends
+(nobody moves); a single parent gains a co-parent; deleting a middle generation; merging
+two trees with a Parent link; a Sibling link between two married parents; a dateless
+family gains its first birth date (expected R3 here, but this shape doesn't trigger it);
+focus moved to another tree or to a deleted id (nobody moves).
+
+**Duplicates of open entries (tests skipped with a pointer):** a childless second
+marriage ending leaves the ex as a separate tree (R1). A third marriage: the before state
+is already wrong, since the second partner lands on the occupied right side (R7) and the
+third lands on top of the second (R4).
+
+- [ ] **[LAYOUT TRANSITIONS 2026-10-11] R11 — a second couple gaining its first child
+      can take over the primary group and move the first family.** `primaryGroup`
+      prefers a group with children, then a couple, then list order (`CoupleSortKey`,
+      the partners' position in the LastName/FirstName list). While Louis's second
+      marriage (Libby) is childless, his first (Lillian, child Ray) wins. Once Libby has
+      a child (Sid), both groups have children and "Libby" sorts before "Lillian", so
+      Louis+Libby takes the slot. Lillian then goes through the spouse safety net, and
+      Ray, whose group is no longer placed, is appended at the right edge. Ray's family
+      jumps 320px when a half-brother is added. This is the real Louis/Lillian/Libby family
+      from commit 073ae02, and its before state already overlaps (Libby lands on
+      Lillian, R4 and R7), so production probably shows that now. Same root cause as R2
+      (a couple that isn't primary for both partners is never placed as a group), but
+      fixing R2 alone won't stop the flip: the primary choice also needs a tie-break
+      that doesn't change when a group gains children (for example, the earliest marriage
+      or the oldest child). Test:
+      `ChildlessSecondMarriageGainsAChild_FirstMarriagesChildStaysUnderItsParents`.
+- [ ] **[LAYOUT TRANSITIONS 2026-10-11] R12 — a root parent can't turn toward a co-parent
+      in another tree.** Pat (married to Alex, child Kim) has a child, Kit, with Blair,
+      who is unmarried to Pat and is the daughter of a separate root couple. The
+      cross-root step correctly puts Kit at the Pat/Blair midpoint, but Pat and Blair sit
+      460-660px apart. The inner-edge sort only reorders a group's children, and Pat is a
+      root group's parent, so which side of Pat+Alex he sits on is decided by
+      `CoupleHelper`'s GUID order. With ascending ids, Alex sits between Pat and Blair.
+      Related to R2 and R6. Test:
+      `HalfSiblingWithAnUnmarriedCoParent_BothChildrenStayUnderTheirOwnParents`.
+- [ ] **[LAYOUT TRANSITIONS 2026-10-11] R13 — DESIGN QUESTION: an orphan sibling who
+      marries jumps to their own alphabetical root slot.** Unmarried, Bill (Sibling-linked
+      to Ray, no parents) is a root individual anchored beside Ray. Married to Gish, the
+      couple becomes a root group and takes its `CoupleSortKey` slot: "Bill" sorts before
+      "Ray", so Bill+Gish move to the far left and Ray's whole family shifts 320px right.
+      This follows from two deliberate choices in CLAUDE.md (root groups ordered by their
+      own identity, 2026-07-06; never reordered by sibling links), so it's a design call,
+      not a plain bug. Options: accept it, or let a root group whose only link into the
+      component is a Sibling link take the slot after its sibling's root group (a sort
+      key, not a reorder of placed nodes). The test also records a before-state overlap
+      with ascending ids (Bill lands on Rose, R4). Test:
+      `OrphanSiblingMarries_SpouseLandsBesideHimAndRaysFamilyDoesNotMove`.
+- [ ] **Adoption is a dormant product gap, not a layout bug.** `RelationshipType.Adopted`
+      exists, `RelationshipService` validates it and `GedcomExportService` exports it, but
+      `PersonMapper` ignores it (an `Adopted` row produces no `ParentIds`/`ChildIds`), and
+      `ParentGraph`'s loop check only reads `Parent` rows. Nothing writes an `Adopted` row
+      today: `PersonService`, the AuthService linking flows and the import only create
+      Parent/Spouse/Sibling, and no page injects `IRelationshipService`. So no layout
+      test, since there's no reachable state. If adoption is ever added to the UI, the
+      mapper, the loop check and the layout all need it in the same change. Until then,
+      adoptive parents entered as plain `Parent` render correctly.
 
 ---
 
