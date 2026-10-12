@@ -237,6 +237,120 @@ public class FamilyTreeLayoutTransitionTests
             "Max must stay beside Willa, not move to a separate tree");
     }
 
+    // R2 (2026-10-11): Pat (Gran's son) is married to Alex with a child, Kim. Pat then
+    // gains two children with no other parent recorded, Kit and Kat, and Kit marries Zed.
+    // That single-parent group was never placed: Kit and Kat landed past Pat's brother Sam
+    // at the edge of the tree, and Zed was drawn on top of Kat.
+    [Theory, InlineData(false), InlineData(true)]
+    public void ChildrenWithNoOtherRecordedParent_SitUnderThatParentBesideTheirMarriage(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var gran = t.Add("Gran", "Kuh", 1920);
+        var sam = t.Add("Sam", "Kuh", 1948);
+        var pat = t.Add("Pat", "Kuh", 1950);
+        var alex = t.Add("Alex", "Lee", 1950);
+        var kim = t.Add("Kim", "Kuh", 1975);
+        t.Parent(gran, sam).Parent(gran, pat).Marry(pat, alex).Parent(pat, kim).Parent(alex, kim);
+
+        var after = t.Clone();
+        var kat = after.Add("Kat", "Kuh", 1970);
+        var kit = after.Add("Kit", "Kuh", 1972);
+        var zed = after.Add("Zed", "Zee", 1971);
+        after.Parent(pat, kat).Parent(pat, kit).Marry(kit, zed);
+        var layout = after.Layout(pat);
+
+        AssertSound(after, layout);
+        AssertChildUnderParents(after, layout, kim);
+        // Kat and Kit sit outward of Kim, and Kit's marriage makes their slot wide, so
+        // they aren't held to AssertChildUnderParents' one-SpouseSpacingX bound.
+        var nodes = ById(layout);
+        var samSide = Math.Sign(nodes[sam].X - nodes[pat].X);
+        foreach (var child in new[] { kat, kit })
+            Math.Sign(nodes[sam].X - nodes[child].X).Should().Be(samSide,
+                $"{after.Name(child)} belongs under Pat, not past Pat's brother Sam");
+    }
+
+    // R2 (2026-10-11): Ann (Gran's daughter) has a son, Marc, with no other parent recorded,
+    // so her primary group is a single-parent group. She then marries Lauren, who has no
+    // other relatives. Only a couple could carry an attached marriage, so Lauren went to the
+    // spouse safety net, which could walk off the left edge of the canvas.
+    [Theory, InlineData(false), InlineData(true)]
+    public void SingleParentMarriesSomeoneWithNoOtherRelatives_PartnerSitsBesideThem(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var gran = t.Add("Gran", "Kuh", 1920);
+        var sam = t.Add("Sam", "Kuh", 1946);
+        var ann = t.Add("Ann", "Kuh", 1950);
+        var max = t.Add("Max", "Kuh", 1944);
+        var marc = t.Add("Marc", "Kuh", 1975);
+        var lauren = t.Add("Lauren", "Lee", 1949);
+        t.Parent(gran, sam).Parent(gran, ann).Parent(gran, max).Parent(ann, marc);
+
+        var before = t.Layout(ann);
+        var after = t.Clone().Marry(ann, lauren).Layout(ann);
+
+        AssertSound(t, before);
+        AssertSound(t, after);
+        AssertChildUnderParents(t, after, marc);
+        ById(after).Values.Should().OnlyContain(n => n.X >= ById(before).Values.Min(b => b.X),
+            "nobody may be pushed past the left edge of the tree");
+    }
+
+    // R2 (a) from docs/TodoList.md (fuzz seed 880): Ellen Kuh, who has no parents on the
+    // tree, was married to Max Small (Max Sr's son) and they have a child, Gish. The
+    // marriage ends and she marries Ellen Small (Florence's daughter). Ellen Kuh belonged
+    // to no family in the cross-root check, so the new marriage wasn't seen as joining two
+    // families: Florence's side placed Ellen Kuh beside Ellen Small, on the far side from
+    // Max, 520px from him.
+    [Theory, InlineData(false), InlineData(true)]
+    public void RemarriageIntoAnotherFamily_ParentlessPartnerSitsBetweenBothPartners(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var florence = t.Add("Florence", "Small", 1916);
+        var maxSr = t.Add("Max", "Small", 1924);
+        var ellenSmall = t.Add("Ellen", "Small", 1951);
+        var ellenKuh = t.Add("Ellen", "Kuh", 1958);
+        var maxJr = t.Add("Max", "Small", 1959);
+        var gish = t.Add("Gish", "Kuh", 1988);
+        t.Parent(florence, ellenSmall).Parent(maxSr, maxJr)
+         .Marry(ellenKuh, maxJr).Parent(ellenKuh, gish).Parent(maxJr, gish);
+
+        var before = t.Layout(ellenKuh);
+        var after = t.Clone().EndMarriage(ellenKuh, maxJr, new DateOnly(1990, 1, 1))
+                             .Marry(ellenKuh, ellenSmall).Layout(ellenKuh);
+
+        AssertSound(t, before);
+        AssertSound(t, after);
+        AssertChildUnderParents(t, after, gish);
+    }
+
+    // R2 (2026-10-11): Rose (Ellen and Doug's daughter) married Bill from Dora's family to
+    // the left, a cross-root couple. Ellen also has a son, Ben, with no other parent
+    // recorded, and Ben is married to Gish. Ben's family hangs on Ellen's side of her
+    // couple; on the side facing Dora's family it sat between Rose and Bill, 440px apart.
+    // The couple is turned so it hangs on the far side.
+    [Theory, InlineData(false), InlineData(true)]
+    public void AttachedFamilyHangsAwayFromACrossRootMarriage(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var dora = t.Add("Dora", "Rosenberg", 1923);
+        var ellen = t.Add("Ellen", "Rosenberg", 1926);
+        var doug = t.Add("Doug", "Rosenberg", 1932);
+        var bill = t.Add("Bill", "Rosenberg", 1967);
+        var rose = t.Add("Rose", "Rosenberg", 1976);
+        var max = t.Add("Max", "Rosenberg", 2002);
+        t.Parent(dora, bill).Marry(ellen, doug).Parent(ellen, rose).Parent(doug, rose)
+         .Marry(rose, bill).Parent(rose, max).Parent(bill, max);
+
+        var after = t.Clone();
+        var ben = after.Add("Ben", "Rosenberg", 1950);
+        var gish = after.Add("Gish", "Lee", 1950);
+        after.Parent(ellen, ben).Marry(ben, gish);
+
+        AssertSound(t, t.Layout(bill));
+        AssertSound(after, after.Layout(bill));
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // PARENTS AND CHILDREN
     // ─────────────────────────────────────────────────────────────────────────
