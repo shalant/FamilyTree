@@ -294,7 +294,11 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       240-360px apart. Repros: Rose (child Bud, alone) married to Ellen (child Ellen Jr,
       alone), no shared children → 360px apart. Ann married to Doug (child Willa) but also
       co-parent of Bill with Dora → Doug 360px from Ann. Common in real families (remarriage
-      with children from both sides). Fails Invariant 4.
+      with children from both sides). Fails Invariant 4. *2026-10-12 (R11 fix):* the
+      subset where the second partner has no parents on the tree and no other group now
+      lays out correctly (placed beside the shared person, children under them). Still
+      open when that partner has recorded parents, children by someone else, or the
+      person's primary group is a single-parent group (both Rose/Ellen repros above).
 - [ ] **[LAYOUT FUZZ 2026-10-10] R3 — dateless birth-year inference is greedy and
       order-dependent.** Pass 1 takes the first available evidence (children, then
       siblings, then spouses, then parents) in list order and never reconciles. Results: a
@@ -339,7 +343,10 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       Bud Lee and Harvey (childless) → Harvey lands past Bud Lee, 360px away, though the
       left slot is free. Ann (sibling Bill beside her) married Rose, and Ann has a child
       alone → Rose 240px away. Fix direction: try both sides and take the nearest free slot.
-      Fails Invariant 4.
+      Fails Invariant 4. *2026-10-12 (R11 fix):* a person's second partner (no parents,
+      no other group) no longer goes through the safety net; they're placed on the shared
+      person's free side. The safety net still places a third partner, and the partners
+      in the Ann/Rose repro, and still tries rightward first.
 - [ ] **[LAYOUT FUZZ 2026-10-10] R8 — an orphan sibling with a partner is anchored to the
       sibling, not the partner.** A person with no parents but an explicit Sibling link
       **and** a partner is placed by the root-individual sibling loop, which runs before
@@ -392,7 +399,7 @@ marriage ending leaves the ex as a separate tree (R1). A third marriage: the bef
 is already wrong, since the second partner lands on the occupied right side (R7) and the
 third lands on top of the second (R4).
 
-- [ ] **[LAYOUT TRANSITIONS 2026-10-11] R11 — a second couple gaining its first child
+- [x] **[LAYOUT TRANSITIONS 2026-10-11] R11 — a second couple gaining its first child
       can take over the primary group and move the first family.** `primaryGroup`
       prefers a group with children, then a couple, then list order (`CoupleSortKey`,
       the partners' position in the LastName/FirstName list). While Louis's second
@@ -408,6 +415,25 @@ third lands on top of the second (R4).
       that doesn't change when a group gains children (for example, the earliest marriage
       or the oldest child). Test:
       `ChildlessSecondMarriageGainsAChild_FirstMarriagesChildStaysUnderItsParents`.
+      **Fixed 2026-10-12** on `fix/r11-second-couple-first-child` (not deployed yet).
+      Two changes in `FamilyTreeLayoutEngine`: (1) among a person's couples that have
+      children, the one with the oldest child is primary, so a later half-sibling can't
+      flip it; (2) a second couple whose other partner has no parents on the tree and no
+      better group (Libby, or Florence's Harvey) is placed as part of the primary group:
+      the partner sits `SpouseSpacingX` out on the shared person's free side, and its
+      children sit under that pair (pushed outward only if they'd hit the first family's
+      children). The slot is reserved in `MeasureGroup` even while the second marriage is
+      childless, so its first child moves nobody. That also fixes the before-state
+      overlap (Libby on Lillian), since she no longer goes through the safety net. Test
+      un-skipped and passing for both GUID orders, plus a new
+      `SecondMarriageWithChildrenGainsAnother_FirstFamilyMovesOnlyAsABlock`; both
+      verified failing against the pre-fix engine. Fuzz check over 2,329 generated
+      families where someone is in 2+ couples (5,000 seeds): Invariant 1 failures
+      850 → 666, Invariant 4 failures 2,100 → 1,826. 137 cases fail that passed before,
+      all in still-open shapes: 130 are R2 (a partner with parents or children by
+      someone else), 5 also carry R1/R6/R8, and 2 are a third marriage whose partner
+      still goes through the safety net (R4/R7, `ThirdMarriage_...`). No KnownOpen flag
+      changed: R2 and R7 are only partly fixed (see their notes).
 - [ ] **[LAYOUT TRANSITIONS 2026-10-11] R12 — a root parent can't turn toward a co-parent
       in another tree.** Pat (married to Alex, child Kim) has a child, Kit, with Blair,
       who is unmarried to Pat and is the daughter of a separate root couple. The
