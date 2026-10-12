@@ -336,24 +336,50 @@ public class FamilyTreeLayoutEngine
             // what the "never reordered by sibling relationships" rule (see the
             // place-roots loop) is about. Runs before the cross-root step, which may still
             // make its own adjacency moves afterward.
+            //
+            // siblingFollowers records, by parent pair, each such group's target, so the
+            // placement loop keeps a follower in the same run as its target (no orphan
+            // slack between them).
+            var siblingFollowers = new Dictionary<(Guid?, Guid?), (Guid?, Guid?)>();
+            static (Guid?, Guid?) PairKey(NuclearGroup g) =>
+                Nullable.Compare(g.ParentAId, g.ParentBId) <= 0 ? (g.ParentAId, g.ParentBId) : (g.ParentBId, g.ParentAId);
             {
                 var siblingTarget = new Dictionary<NuclearGroup, NuclearGroup>();
+                var listIndex = new Dictionary<Guid, int>();
+                for (var i = 0; i < people.Count; i++) listIndex.TryAdd(people[i].Id, i);
+                // Who leads when two root groups' parents are each other's siblings (Ray's
+                // family and Bill's): the older sibling. A recorded birth date outranks an
+                // inferred one (Bill with no date is inferred from Ray, so they'd tie), then
+                // the earlier year, then list order. All three are the person's own data, so
+                // the choice doesn't change when either of them marries; list order of the
+                // GROUPS did (a single parent sorts after couples, a couple by name), which
+                // flipped who followed whom the moment Bill married.
+                (int, int, int) Seniority(Guid id) => (
+                    personById[id].BirthDate is null ? 1 : 0,
+                    birthYears.GetValueOrDefault(id, int.MaxValue),
+                    listIndex.GetValueOrDefault(id, int.MaxValue));
                 foreach (var rg in rootGroups)
                 {
-                    var target = new[] { rg.ParentAId, rg.ParentBId }
+                    var link = new[] { rg.ParentAId, rg.ParentBId }
                         .Where(id => id.HasValue)
-                        .SelectMany(id => personById[id!.Value].SiblingIds ?? [])
-                        .Select(sid => descendantOfRoot.GetValueOrDefault(sid))
-                        .Where(r => r is not null && r != rg)
-                        .OrderBy(r => rootGroups.IndexOf(r!))
+                        .SelectMany(id => (personById[id!.Value].SiblingIds ?? [])
+                            .Select(sid => (Member: id!.Value, Sibling: sid, Root: descendantOfRoot.GetValueOrDefault(sid))))
+                        .Where(x => x.Root is not null && x.Root != rg)
+                        .OrderBy(x => rootGroups.IndexOf(x.Root!))
                         .FirstOrDefault();
+                    var target = link.Root;
                     if (target is null) continue;
-                    // Two groups pointing at each other (or a longer loop) would have no
-                    // order to follow; the first one keeps its own slot.
+                    // The sibling heads the target group too, so that group points back
+                    // here: only the younger sibling's group follows.
+                    if ((target.ParentAId == link.Sibling || target.ParentBId == link.Sibling) &&
+                        Seniority(link.Member).CompareTo(Seniority(link.Sibling)) < 0) continue;
+                    // A longer loop would have no order to follow; the group that would
+                    // close it keeps its own slot.
                     var t = target;
                     while (t is not null && t != rg) t = siblingTarget.GetValueOrDefault(t);
                     if (t == rg) continue;
                     siblingTarget[rg] = target;
+                    siblingFollowers[PairKey(rg)] = PairKey(target);
                 }
 
                 if (siblingTarget.Count > 0)
@@ -544,6 +570,47 @@ public class FamilyTreeLayoutEngine
                 parent is { } p && primaryGroup.TryGetValue(p, out var pg) && pg == g &&
                 attachedFor.TryGetValue(p, out var att) ? att : null;
 
+            // ── Turn a couple so its cross-root partner faces the other family (R12) ──
+            // PlaceGroupBody always draws ParentA on the left, and which partner is A comes
+            // from CoupleHelper's GUID order. When one of them is also in a cross-root
+            // couple (Pat, married to Alex, has a child with Blair from another root
+            // family), half the time the other spouse (Alex) ended up between Pat and
+            // Blair, 460-660px apart. Step 3 above already sorts a cross-root member's
+            // slot to the inner edge of their parents' children; this does the same for
+            // the side they sit on inside their own couple: rgA's member goes right, rgB's
+            // left. Skipped when that person has an attached second marriage (it hangs on
+            // their free side, which would then face the other family) and when two
+            // cross-root couples want opposite sides of the same person (first one wins).
+            //
+            // Not done for a sibling-linked follower group (R13): turning it would flip a
+            // married couple the moment a Sibling link is added to one of them
+            // (SiblingLinkBetweenTwoMarriedParents_BothFamiliesKeepTheirShape).
+            if (crossRootInfo.Count > 0)
+            {
+                var wantRight = new Dictionary<Guid, bool>();
+                foreach (var (_, _, _, memberOfA, memberOfB) in crossRootInfo)
+                {
+                    wantRight.TryAdd(memberOfA, true);
+                    wantRight.TryAdd(memberOfB, false);
+                }
+                foreach (var (person, right) in wantRight)
+                {
+                    if (attachedFor.ContainsKey(person)) continue;
+                    if (!primaryGroup.TryGetValue(person, out var g) || !g.ParentBId.HasValue) continue;
+                    var isRight = g.ParentBId == person;
+                    if (isRight == right) continue;
+                    var partner = isRight ? g.ParentAId!.Value : g.ParentBId.Value;
+                    if (wantRight.TryGetValue(partner, out var partnerRight) && partnerRight == right) continue;
+                    if (attachedFor.ContainsKey(partner)) continue;
+
+                    var turned = g with { ParentAId = g.ParentBId, ParentBId = g.ParentAId };
+                    var rootIndex = rootGroups.IndexOf(g);
+                    if (rootIndex >= 0) rootGroups[rootIndex] = turned;
+                    foreach (var key in primaryGroup.Where(kv => kv.Value == g).Select(kv => kv.Key).ToList())
+                        primaryGroup[key] = turned;
+                }
+            }
+
             // ── Memoised bottom-up width measurement ─────────────────────────
             var widthCache = new Dictionary<NuclearGroup, double>();
             // Per group with an attached second marriage: the extra width each attachment
@@ -729,16 +796,35 @@ public class FamilyTreeLayoutEngine
             // the two ends aren't adjacent.
             double curX = xOffset;
 
+
             // Recorded so the orphan-individual anchor logic below (sibling/spouse
             // fallback placement) can tell when it's about to wander into a DIFFERENT
             // root group's span — see FindOpenXAdjacentTo.
             var rootGroupExtents = new List<(double Left, double Right)>();
 
+            var prevInRun = false;
             for (int rgi = 0; rgi < rootGroups.Count; rgi++)
             {
                 var rg = rootGroups[rgi];
-                if (rgi > 0 && forcedAdjacencyAfterIndex.Contains(rgi))
+                // The orphan slack goes AFTER a forced-adjacent run of families, not
+                // between the two families the cross-root couple joins (R6, 2026-10-12).
+                // Between them it kept every cross-root couple 240px further apart than
+                // their slots allowed (~360px or more, past SpouseSpacingX). Making it
+                // conditional on an orphan sibling existing was tried and rejected: an
+                // orphan sibling marrying (no longer a root individual) then removed the
+                // slack and shifted the right-hand family 240px. After the run, the
+                // orphan still has room beside the family they anchor off, and nothing
+                // moves when they marry.
+                // A sibling-linked follower (R13) of the family just placed, or of the same
+                // family as the follower just placed, stays in that run.
+                var inRun = forcedAdjacencyAfterIndex.Contains(rgi) ||
+                    (rgi > 0 && prevInRun && siblingFollowers.TryGetValue(PairKey(rg), out var follows) &&
+                     (follows == PairKey(rootGroups[rgi - 1]) ||
+                      (siblingFollowers.TryGetValue(PairKey(rootGroups[rgi - 1]), out var prevFollows) &&
+                       prevFollows == follows)));
+                if (prevInRun && !inRun)
                     curX += OrphanBufferX;
+                prevInRun = inRun;
 
                 var w = MeasureGroup(rg);
                 var left = curX;
@@ -822,6 +908,83 @@ public class FamilyTreeLayoutEngine
                 return x;
             }
 
+            // ── Pull cross-root partners together (R6/R12) ─────────────────────
+            // Each partner of a cross-root couple was placed in their own family's slot,
+            // so even with the two families adjacent and the partners on the inner edges
+            // they can sit 320px+ apart (a lone child is centred under parents who are
+            // 320px wide). A partner who heads no placed group of their own (a leaf, with
+            // nobody hanging below them yet; the couple's own children are placed after
+            // this) can slide toward the other, as long as they don't land on anyone,
+            // between anyone else's partners, or with anyone between the two of them.
+            // A partner never leaves the span between their own parents (a child must
+            // still read as theirs; CrossRootCouple_StillDetectedWhenOneSideIsNested...
+            // pins Marc there), so a gap wider than both spans allow is only narrowed.
+            // Tried in order: both move, only the right one, only the left one. If none
+            // fits, nobody moves.
+            bool IsLeaf(Guid id) => !primaryGroup.ContainsKey(id) && !attachedFor.ContainsKey(id);
+            bool Fits(LayoutNode l, LayoutNode r, double lx, double rx)
+            {
+                var top = Math.Min(l.Y, r.Y) - l.Size / 2.0;
+                var bottom = Math.Max(l.Y, r.Y) + l.Size / 2.0;
+                foreach (var n in nodeMap.Values)
+                {
+                    if (n.Person.Id == l.Person.Id || n.Person.Id == r.Person.Id) continue;
+                    if (n.X > lx && n.X < rx && n.Y >= top && n.Y <= bottom) return false;
+                    foreach (var (m, mx) in new[] { (l, lx), (r, rx) })
+                        if (Math.Sqrt(Math.Pow(n.X - mx, 2) + Math.Pow(n.Y - m.Y, 2)) < (n.Size + m.Size) / 2.0 + 10)
+                            return false;
+                }
+                foreach (var c in couples)
+                {
+                    if (c.PersonAId == l.Person.Id || c.PersonBId == l.Person.Id ||
+                        c.PersonAId == r.Person.Id || c.PersonBId == r.Person.Id) continue;
+                    if (!nodeMap.TryGetValue(c.PersonAId, out var ca) || !nodeMap.TryGetValue(c.PersonBId, out var cb)) continue;
+                    var (cl, cr) = ca.X < cb.X ? (ca, cb) : (cb, ca);
+                    var cTop = Math.Min(ca.Y, cb.Y) - ca.Size / 2.0;
+                    var cBottom = Math.Max(ca.Y, cb.Y) + ca.Size / 2.0;
+                    foreach (var (m, mx) in new[] { (l, lx), (r, rx) })
+                        if (mx > cl.X && mx < cr.X && m.Y >= cTop && m.Y <= cBottom) return false;
+                }
+                return true;
+            }
+            foreach (var (cg, _, _, _, _) in crossRootInfo)
+            {
+                if (!cg.ParentAId.HasValue || !cg.ParentBId.HasValue) continue;
+                if (!nodeMap.TryGetValue(cg.ParentAId.Value, out var pa) ||
+                    !nodeMap.TryGetValue(cg.ParentBId.Value, out var pb)) continue;
+                var (l, r) = pa.X <= pb.X ? (pa, pb) : (pb, pa);
+                if (r.X - l.X <= SpouseSpacingX) continue;
+                // How far each may travel toward the other: to the far edge of their
+                // parents' span, or unbounded with no placed parents; not at all if not a leaf.
+                double Reach(LayoutNode n, bool rightward)
+                {
+                    if (!IsLeaf(n.Person.Id)) return n.X;
+                    var parentXs = (personById[n.Person.Id].ParentIds ?? [])
+                        .Where(nodeMap.ContainsKey).Select(pid => (double)nodeMap[pid].X).ToList();
+                    if (parentXs.Count == 0) return rightward ? double.MaxValue : double.MinValue;
+                    return rightward ? Math.Max(n.X, parentXs.Max()) : Math.Min(n.X, parentXs.Min());
+                }
+                var (lHi, rLo) = (Reach(l, rightward: true), Reach(r, rightward: false));
+                (double, double) Plan(double lLimit, double rLimit)
+                {
+                    var excess = (r.X - l.X - SpouseSpacingX) / 2.0;
+                    var lx = Math.Min(l.X + excess, lLimit);
+                    var rx = Math.Max(r.X - excess, rLimit);
+                    // Whatever one side couldn't cover, the other takes up within its limit.
+                    rx = Math.Max(Math.Min(rx, lx + SpouseSpacingX), rLimit);
+                    lx = Math.Min(Math.Max(lx, rx - SpouseSpacingX), lLimit);
+                    return (lx, rx);
+                }
+                var options = new List<(double Lx, double Rx)> { Plan(lHi, rLo), Plan(l.X, rLo), Plan(lHi, r.X) };
+                foreach (var (lx, rx) in options)
+                {
+                    if ((lx, rx) == (l.X, r.X) || !Fits(l, r, lx, rx)) continue;
+                    nodeMap[l.Person.Id] = l with { X = (int)Math.Round(lx) };
+                    nodeMap[r.Person.Id] = r with { X = (int)Math.Round(rx) };
+                    break;
+                }
+            }
+
             // ── Place children of cross-root couples ──────────────────────────
             // Both partners are already placed as leaves; SetNode's guard skips
             // them and only the children get positioned at the couple's midpoint.
@@ -860,7 +1023,12 @@ public class FamilyTreeLayoutEngine
 
                 if (siblingNode != null)
                 {
-                    SetNode(person.Id, FindOpenXAdjacentTo(siblingNode, placedSiblings));
+                    var anchoredX = FindOpenXAdjacentTo(siblingNode, placedSiblings);
+                    SetNode(person.Id, anchoredX);
+                    // An anchored person can land past curX (in the orphan slack after a
+                    // cross-root run, or by walking off the end of the tree). Without this,
+                    // the next person appended at curX was drawn on top of them.
+                    curX = Math.Max(curX, anchoredX + NodeSpacingX / 2.0);
                 }
                 else
                 {
@@ -889,7 +1057,9 @@ public class FamilyTreeLayoutEngine
 
                 if (spouseNode != null)
                 {
-                    SetNode(person.Id, FindOpenXAdjacentTo(spouseNode, placedSpouses));
+                    var anchoredX = FindOpenXAdjacentTo(spouseNode, placedSpouses);
+                    SetNode(person.Id, anchoredX);
+                    curX = Math.Max(curX, anchoredX + NodeSpacingX / 2.0); // as in the sibling loop
                 }
                 else
                 {

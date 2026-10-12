@@ -130,6 +130,28 @@ public class FamilyTreeLayoutTransitionTests
             AssertChildUnderParents(after, afterLayout, c);
     }
 
+    // Two single parents marry (R2's first repro): Rose has Bud, Ellen has Ellen Jr, no
+    // shared children. Each one's own single-parent group is their primary, so the
+    // childless marriage is placed by the cross-root step, which used to keep the two
+    // families OrphanBufferX apart (partners 360px apart). Fixed 2026-10-12 with R6.
+    [Theory, InlineData(false), InlineData(true)]
+    public void TwoSingleParentsMarry_PartnersSitTogetherAboveTheirOwnChildren(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var rose = t.Add("Rose", "Kuh", 1940);
+        var bud = t.Add("Bud", "Kuh", 1965);
+        var ellen = t.Add("Ellen", "Small", 1942);
+        var ellenJr = t.Add("Ellen Jr", "Small", 1968);
+        t.Parent(rose, bud).Parent(ellen, ellenJr);
+
+        var after = t.Clone().Marry(rose, ellen);
+        var afterLayout = after.Layout(rose);
+
+        AssertSound(after, afterLayout);
+        AssertChildUnderParents(after, afterLayout, bud);
+        AssertChildUnderParents(after, afterLayout, ellenJr);
+    }
+
     // A person already in two marriages (first ended, with a child; second ended, with a
     // child) marries a third time, childless. The new spouse has no group of their own and
     // goes through the safety-net spouse anchor.
@@ -204,9 +226,7 @@ public class FamilyTreeLayoutTransitionTests
     // but Pat and Blair end up 460-660px apart. Pat is a root-group PARENT, and the
     // inner-edge sort only reorders children, so which side of his own couple Pat sits on
     // is decided by GUID order: with ascending ids, Alex sits between Pat and Blair.
-    [Theory(Skip = KnownOpen + "'[LAYOUT TRANSITIONS 2026-10-11] R12' (a root parent can't turn toward a co-parent " +
-                   "in another tree; which side he sits on is GUID order), related to R2/R6."),
-     InlineData(false), InlineData(true)]
+    [Theory, InlineData(false), InlineData(true)]
     public void HalfSiblingWithAnUnmarriedCoParent_BothChildrenStayUnderTheirOwnParents(bool reverseIds)
     {
         var t = new Tree(reverseIds);
@@ -313,6 +333,40 @@ public class FamilyTreeLayoutTransitionTests
     // SIBLINGS
     // ─────────────────────────────────────────────────────────────────────────
 
+    // Fuzz seed 154 (2026-10-12), transcribed: a dateless family where Florence Small, an
+    // orphan sister of Lauren Small, anchors off Lauren and walks one slot right, past the
+    // end of the last family placed, and Marc Lee (Ann Lee's child by nobody on the tree,
+    // placed by the safety net because Ann's primary group is her marriage) is then appended
+    // at the end of the tree. The anchor passes never advanced that append position, so
+    // Marc was drawn exactly on top of Florence. Found while fixing R6, which moved the
+    // families enough to expose it.
+    [Theory, InlineData(false), InlineData(true)]
+    public void OrphanSiblingPastTheEndOfTheTree_IsNotDrawnUnderAnAppendedPerson(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var p = new[]
+        {
+            ("Ann", "Lee"), ("Sarah", "Fleishman"), ("Harvey", "Small"), ("Florence", "Rosenberg"),
+            ("Lauren", "Rosenberg"), ("Ray", "Rosenberg"), ("Marc", "Lee"), ("Lauren", "Small"),
+            ("Ann", "Rosenberg"), ("Florence", "Small"), ("Florence", "Small"), ("Harvey", "Small"),
+            ("Willa", "Small"), ("Willa", "Rosenberg"), ("Harvey", "Lee"), ("Harvey", "Rosenberg"),
+            ("Lauren", "Diaz"), ("Rose", "Lee"), ("Gish", "Lee"),
+        }.Select(n => t.Add(n.Item1, n.Item2)).ToArray();
+        t.Parent(p[3], p[4]).Parent(p[3], p[5]).Parent(p[0], p[6]).Parent(p[2], p[7]).Parent(p[3], p[8])
+         .Parent(p[7], p[10]).Parent(p[2], p[11]).Parent(p[11], p[12]).Parent(p[5], p[13]).Parent(p[3], p[15])
+         .Parent(p[0], p[17]).Parent(p[1], p[17])
+         .Marry(p[8], p[18]).Marry(p[0], p[1], ended: new DateOnly(2000, 1, 1))
+         .Sibling(p[14], p[0]).Sibling(p[2], p[1]).Sibling(p[9], p[7]);
+
+        var layout = t.Layout(p[1]);
+
+        var nodes = ById(layout);
+        foreach (var a in p)
+            foreach (var b in p.Where(b => b != a))
+                (nodes[a].X, nodes[a].Y).Should().NotBe((nodes[b].X, nodes[b].Y),
+                    $"{t.Name(a)} and {t.Name(b)} must not be drawn on the same spot");
+    }
+
     // A Sibling link added between two people who both already have a spouse and children,
     // with no shared parent on the tree (Ray and Bill, self-service "we're brothers").
     // Neither is a root individual, so the sibling-anchor logic never runs; the link just
@@ -374,10 +428,6 @@ public class FamilyTreeLayoutTransitionTests
     // Bud and Florence (a cross-root marriage), and "Bud" sorts before both "Bill" and "Ray".
     // Bill+Gish must still land next to Ray's family without wedging between the two
     // families the cross-root step keeps adjacent for Marc and Ellen.
-    //
-    // No AssertSound here yet: Marc and Ellen sit 560px apart before and after this edit,
-    // which is the open R6 cross-root gap (docs/TodoList.md "[LAYOUT FUZZ 2026-10-10] R6"),
-    // not this transition. Add AssertSound(after, afterLayout) in the PR that fixes R6.
     [Theory, InlineData(false), InlineData(true)]
     public void OrphanSiblingMarries_NextToAFamilyWithACrossRootMarriage(bool reverseIds)
     {
@@ -399,6 +449,7 @@ public class FamilyTreeLayoutTransitionTests
         after.Marry(bill, gish);
         var afterLayout = after.Layout(ray);
 
+        AssertSound(after, afterLayout);
         AssertSameRelativePlacement(before, afterLayout, [bud, florence, marc, ray, rose, ellen],
             "Bill's marriage must not rearrange the two families joined by Marc and Ellen");
         var nodes = ById(afterLayout);

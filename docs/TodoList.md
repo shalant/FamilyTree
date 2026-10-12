@@ -299,6 +299,20 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       lays out correctly (placed beside the shared person, children under them). Still
       open when that partner has recorded parents, children by someone else, or the
       person's primary group is a single-parent group (both Rose/Ellen repros above).
+      *2026-10-12 (R6/R12 branch `fix/r6-r12-r2-split-couples`):* the Rose/Ellen repro
+      is fixed (they were 360px apart only because of the R6 slack; new test
+      `TwoSingleParentsMarry_PartnersSitTogetherAboveTheirOwnChildren` fails on the old
+      engine at exactly 360px). Over 5,000 generated families, Invariant 4 failures in
+      R2-flagged families went 2,005 → 1,826. What's left: (a) a person whose childless
+      marriage is their spouse's primary group gets placed under the spouse's parents,
+      away from their own former partner and child (fuzz seed 880, `PCG(880, 777)`: Ellen
+      Kuh married to Ellen Small, formerly married to Max Small with child Gish, ends
+      520px from Max). Likely fix: when a child's primary couple isn't the other
+      partner's primary, place only the child there and treat the couple as split. (b)
+      Couples `CoupleHelper` derives from a child with three recorded parents, often
+      across generations (a great-grandmother "co-parenting" with a grandson), which
+      can't all sit together; mostly a fuzz artifact. The `PartnerWithChildrenElsewhere`
+      flag stays.
 - [ ] **[LAYOUT FUZZ 2026-10-10] R3 — dateless birth-year inference is greedy and
       order-dependent.** Pass 1 takes the first available evidence (children, then
       siblings, then spouses, then parents) in list order and never reconciles. Results: a
@@ -328,7 +342,7 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       Historically common (a child named after a sibling who died). Fix direction: add
       `.ThenBy(p => p.Id)` in `GetAllAsync`, or sort inside the engine. Fails
       Invariants 5b, 5c.
-- [ ] **[LAYOUT FUZZ 2026-10-10] R6 — DESIGN QUESTION: cross-root couples always sit
+- [x] **[LAYOUT FUZZ 2026-10-10] R6 — DESIGN QUESTION: cross-root couples always sit
       ~360px apart.** The cross-root step reserves `OrphanBufferX` (240px) between the two
       bridged root groups on purpose (2026-07-07, so Morton-style orphan siblings have
       somewhere to land), which puts the partners about 360px apart, past
@@ -338,6 +352,32 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       *2026-10-12:* `FamilyTreeLayoutTransitionTests.OrphanSiblingMarries_NextToAFamilyWithACrossRootMarriage`
       skips `AssertSound` only because of this gap (Marc and Ellen 560px apart before and
       after the edit). Add it back in the PR that fixes R6.
+      **Fixed 2026-10-12** on `fix/r6-r12-r2-split-couples` (not deployed yet). Doug
+      approved "reserve the slack only when an orphan sibling needs it", but that turned
+      out to break the R13 transition: an orphan sibling marrying stops being a root
+      individual, the slack disappeared, and the right-hand family shifted 240px. What
+      shipped instead: (1) the slack is still always reserved, but **after** a run of
+      forced-adjacent families (and their R13 sibling followers) instead of between the
+      two families the couple joins, so the orphan still has room and nothing moves when
+      they marry; (2) after placement, a cross-root partner with nobody placed under them
+      (a leaf) slides toward the other partner, never past the far side of their own
+      parents (`CrossRootCouple_StillDetectedWhenOneSideIsNestedUnderAGrandparent` pins
+      Marc between Bud and Florence), and only if they don't land on anyone, inside
+      another couple, or with someone between the two of them. `AssertSound` is back in
+      `OrphanSiblingMarries_NextToAFamilyWithACrossRootMarriage` (Marc and Ellen now
+      200px apart); it fails on the old engine. Over 5,000 generated families, Invariant 4
+      failures in cross-root families went 706 → 571 (all families 2,184 → 1,970) and
+      Invariant 1 overlaps 884 → 799. The `CrossRootCouple` exclusion stays: the pull is
+      still blocked when a sibling sits at the partner's inner edge, or when both
+      partners head families of their own (fuzz seed 0..199 at `PinnedSeed` still
+      finds such cases).
+      Also fixed on the same branch, found by the fuzz comparison: the sibling- and
+      spouse-anchor passes never advanced the append position, so a person they placed
+      past the end of the tree could have the next appended person drawn exactly on top
+      of them (seed 154 at `PCG(154, 777)`, two people at distance 0). Latent on
+      `master`; this branch's layout changes exposed it. Test:
+      `OrphanSiblingPastTheEndOfTheTree_IsNotDrawnUnderAnAppendedPerson`, verified failing
+      without the fix.
 - [ ] **[LAYOUT FUZZ 2026-10-10] R7 — a spouse-anchored partner lands past an occupied
       slot.** The safety net anchors a partner with no group of their own (the 2026-07-07
       Harvey Fleishman shape, or anyone in 2+ couples) via `FindOpenXAdjacentTo`, which
@@ -437,7 +477,7 @@ third lands on top of the second (R4).
       someone else), 5 also carry R1/R6/R8, and 2 are a third marriage whose partner
       still goes through the safety net (R4/R7, `ThirdMarriage_...`). No KnownOpen flag
       changed: R2 and R7 are only partly fixed (see their notes).
-- [ ] **[LAYOUT TRANSITIONS 2026-10-11] R12 — a root parent can't turn toward a co-parent
+- [x] **[LAYOUT TRANSITIONS 2026-10-11] R12 — a root parent can't turn toward a co-parent
       in another tree.** Pat (married to Alex, child Kim) has a child, Kit, with Blair,
       who is unmarried to Pat and is the daughter of a separate root couple. The
       cross-root step correctly puts Kit at the Pat/Blair midpoint, but Pat and Blair sit
@@ -446,6 +486,14 @@ third lands on top of the second (R4).
       `CoupleHelper`'s GUID order. With ascending ids, Alex sits between Pat and Blair.
       Related to R2 and R6. Test:
       `HalfSiblingWithAnUnmarriedCoParent_BothChildrenStayUnderTheirOwnParents`.
+      **Fixed 2026-10-12** on `fix/r6-r12-r2-split-couples` (not deployed yet). A couple
+      with a member in a cross-root couple is turned so that member faces the other
+      family (the left family's member on its right, the right family's on its left), at
+      any depth, the same way the existing step already sorts that member's slot to the
+      inner edge of their parents' children. Then the R6 pull brings Blair beside Pat.
+      Skipped when the person has an R11 second marriage attached (it hangs on their
+      free side) or both partners want the same side. Test un-skipped; fails on the old
+      engine, passes for both GUID orders.
 - [x] **[LAYOUT TRANSITIONS 2026-10-11] R13 — DESIGN QUESTION: an orphan sibling who
       marries jumps to their own alphabetical root slot.** Unmarried, Bill (Sibling-linked
       to Ray, no parents) is a root individual anchored beside Ray. Married to Gish, the
@@ -478,6 +526,14 @@ third lands on top of the second (R4).
       and 51 newly failing, all in still-open shapes (R4 orphan-sibling Y collisions,
       R2/R6/R8). Those invariants don't measure "a marriage moves nobody", which is what
       this fixes.
+      *2026-10-12, follow-up on `fix/r6-r12-r2-split-couples`:* when two root families'
+      parents are each other's siblings (Ray's family and Bill's), the shipped rule made
+      whichever came first in the list follow the other, and list order changed when Bill
+      married (a single parent sorts after couples, a couple by name), so who followed
+      whom flipped. Now the younger sibling's family follows: a recorded birth date
+      outranks an inferred one, then the earlier year, then list order. Caught by
+      `MarryingAnOrphanSiblingRoot_DoesNotJumpTheirGroupPastUnrelatedRootsByAlphabeticalAccident`
+      once the R6 slack moved.
 - [ ] **Adoption is a dormant product gap, not a layout bug.** `RelationshipType.Adopted`
       exists, `RelationshipService` validates it and `GedcomExportService` exports it, but
       `PersonMapper` ignores it (an `Adopted` row produces no `ParentIds`/`ChildIds`), and
