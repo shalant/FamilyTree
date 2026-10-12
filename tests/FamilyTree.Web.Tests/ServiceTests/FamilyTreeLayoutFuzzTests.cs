@@ -191,17 +191,18 @@ public class FamilyTreeLayoutFuzzTests
     // 7. No exception and no NaN/infinite coordinates on malformed input: dangling ids in
     // every relationship list, self-references, duplicate ids, null lists, asymmetric
     // Parent/Child lists, spouse-who-is-also-sibling, and a dangling focus/anchor.
-    // Parent cycles are covered separately (Invariant7b) because they currently crash the
-    // test host outright.
+    // Parent cycles are covered separately (Invariants 7b and 7c): they used to crash the
+    // test host outright (R0, fixed 2026-10-11).
     [Fact]
     public void Invariant7_MalformedInputNeverThrowsOrProducesNonFiniteCoordinates() =>
         Run(GenMalformed, f => AssertFiniteLayout(f.Layout()));
 
-    // 7b. Minimal parent cycle reachable from a root. Nothing in RelationshipService/
-    // PersonService rejects a cycle (e.g. editing someone's child to also be their parent).
-    [Fact(Skip = SkipPrefix + "R0. NOT safe to un-skip before the fix: PlaceGroup/MeasureGroup/" +
-                 "MarkDescendants recurse forever and the StackOverflow kills the whole test host " +
-                 "(confirmed 2026-10-10: 'Test host process crashed : Stack overflow').")]
+    // 7b. Minimal parent cycle reachable from a root. R0 (fixed 2026-10-11): before the fix
+    // PlaceGroup/MeasureGroup/MarkDescendants recursed forever on this and the StackOverflow
+    // killed the whole test host ('Test host process crashed : Stack overflow', confirmed
+    // 2026-10-10). The write paths now refuse to record a cycle, and the engine survives one
+    // that is already in the data.
+    [Fact]
     public void Invariant7b_ParentCycleDoesNotCrash()
     {
         // Root+Root2 -> A -> B -> A. A third parent is what makes the cycle reachable: with
@@ -221,6 +222,52 @@ public class FamilyTreeLayoutFuzzTests
         AssertFiniteLayout(new FamilyTreeLayoutEngine().ComputeLayout(people, CoupleHelper.Derive(people), root));
     }
 
+    // 7c. Generalises 7b: random families (any shape the generator makes) with one or two
+    // parent cycles injected through the real PersonMapper path, including a person recorded
+    // as their own parent. A cycle must never crash or hang the engine, every person must
+    // still be drawn exactly once, coordinates must stay finite, and the layout must stay
+    // deterministic. The ONLY thing these families don't promise is a pretty layout: a
+    // cycle is bad data, and which edge the engine ignores to survive it is not specified.
+    [Fact]
+    public void Invariant7c_RandomParentCyclesNeverCrashAndEveryoneIsStillDrawn() =>
+        Run(GenCyclic, f =>
+        {
+            AssertFiniteLayout(f.Layout());
+            AssertEveryPersonOnce(f);
+            AssertDeterministic(f);
+        });
+
+    // The cyclic generator must really produce cycles, or 7c passes vacuously.
+    [Fact]
+    public void GeneratorCyclic_ActuallyProducesParentCycles()
+    {
+        var withCycle = 0;
+        for (var i = 0; i < Iterations; i++)
+            if (HasParentCycle(Build(GenCyclic.Generate(new PCG((uint)i, BaseSeed), null, out _)).People))
+                withCycle++;
+        Fail(withCycle >= Iterations * 9 / 10
+            ? []
+            : [$"only {withCycle}/{Iterations} cyclic families contained a parent cycle (need 90%)"]);
+    }
+
+    private static bool HasParentCycle(List<PersonDto> people)
+    {
+        var byId = people.ToDictionary(p => p.Id);
+        var done = new HashSet<Guid>();
+        var onPath = new HashSet<Guid>();
+        bool Visit(Guid id)
+        {
+            if (onPath.Contains(id)) return true;
+            if (!done.Add(id)) return false;
+            onPath.Add(id);
+            foreach (var parent in byId[id].ParentIds ?? [])
+                if (byId.ContainsKey(parent) && Visit(parent)) return true;
+            onPath.Remove(id);
+            return false;
+        }
+        return people.Any(p => Visit(p.Id));
+    }
+
     // Local-only soak: thousands of cases from a random base seed, every check that is
     // active in CI (known-open full-domain invariants excluded). Prints the base seed so a failure can be replayed with
     // FAMILYTREE_FUZZ_SEED.
@@ -237,6 +284,7 @@ public class FamilyTreeLayoutFuzzTests
             ("5a", GenFamily, AssertDeterministic),
             ("6 (excluding known open)", Excluding(Invariant6Exclusions), AssertLeafStability),
             ("7", GenMalformed, f => AssertFiniteLayout(f.Layout())),
+            ("7c", GenCyclic, f => { AssertFiniteLayout(f.Layout()); AssertEveryPersonOnce(f); AssertDeterministic(f); }),
         };
         foreach (var (name, gen, assert) in checks)
         {
@@ -535,7 +583,7 @@ public class FamilyTreeLayoutFuzzTests
     // DateMode: 0 = nobody has a birth date, 1 = mixed (~75% dated), 2 = everyone dated.
     public sealed record FamilySpec(
         int DateMode, PersonSeed[] Founders, OpSeed[] Ops,
-        int FocusPick, int AnchorPick, int LeafPick, int Salt, int Malform);
+        int FocusPick, int AnchorPick, int LeafPick, int Salt, int Malform, int Cycle = 0);
 
     private static readonly Gen<PersonSeed> GenPerson =
         Gen.Select(Gen.Int[0, 255], Gen.Int[0, 3], Gen.Int[0, 59], (n, d, j) => new PersonSeed(n, d, j));
@@ -552,6 +600,10 @@ public class FamilyTreeLayoutFuzzTests
     // Same families, then a non-zero Malform seed drives post-mapping corruption of the DTOs.
     private static readonly Gen<FamilySpec> GenMalformed =
         Gen.Select(GenFamily, Gen.Int[1, 1_000_000], (spec, m) => spec with { Malform = m });
+
+    // Same families, then a non-zero Cycle seed makes someone their own ancestor.
+    private static readonly Gen<FamilySpec> GenCyclic =
+        Gen.Select(GenFamily, Gen.Int[1, 1_000_000], (spec, c) => spec with { Cycle = c });
 
     private static readonly string[] FirstNames =
         ["Ann", "Bill", "Bud", "Dora", "Ellen", "Florence", "Gish", "Harvey", "Lauren", "Marc", "Max", "Ray", "Rose", "Sarah", "Willa", "Doug"];
@@ -699,6 +751,20 @@ public class FamilyTreeLayoutFuzzTests
             }
         }
 
+        // R0 injection (Invariant 7c only): record a descendant (or the person themself) as an
+        // extra parent of someone, closing a cycle. The ops above never do this on their own.
+        if (spec.Cycle != 0)
+        {
+            var rng = new Random(spec.Cycle);
+            for (var k = 0; k < 1 + rng.Next(2); k++)
+            {
+                var a = rng.Next(drafts.Count);
+                var candidates = drafts.Select(x => x.Index).Where(x => x == a || IsAncestor(a, x)).ToList();
+                var cyclePick = candidates[rng.Next(candidates.Count)];
+                if (!drafts[a].Parents.Contains(cyclePick)) drafts[a].Parents.Add(cyclePick);
+            }
+        }
+
         // Person + Relationship rows -> PersonMapper, exactly like PersonService.GetAllAsync.
         var ids = drafts.Select(d => MakeGuid(spec.Salt, d.Index)).ToList();
         var persons = drafts.Select(d => new Person
@@ -744,7 +810,7 @@ public class FamilyTreeLayoutFuzzTests
     // Corrupts mapped DTOs in ways PersonMapper itself can't produce but a future caller,
     // a stale cache, or a half-applied edit could: dangling ids, self-references, duplicate
     // entries, null lists, asymmetric Parent/Child lists, spouse-who-is-also-sibling. Never
-    // adds an EXISTING id to a ParentIds list, which could form a parent cycle (Invariant7b).
+    // adds an EXISTING id to a ParentIds list, which could form a parent cycle (that is Invariant 7c's job).
     private static (Guid focus, Guid? anchor) Malform(List<PersonDto> people, int seed, Guid focus, Guid? anchor)
     {
         var rng = new Random(seed);
@@ -982,6 +1048,7 @@ public class FamilyTreeLayoutFuzzTests
                 sb.AppendLine($"  {Label(r.PersonAId)} {verb} {Label(r.PersonBId)}");
             }
             if (Spec.Malform != 0) sb.AppendLine($"  (plus DTO corruption from Malform seed {Spec.Malform})");
+            if (Spec.Cycle != 0) sb.AppendLine($"  (plus injected parent cycle(s) from Cycle seed {Spec.Cycle})");
             return sb.ToString();
         }
     }

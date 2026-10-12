@@ -115,6 +115,7 @@ public class ClaudeImportService(
         // Pass 2: insert relationships
         var relCreated = 0;
         var seen = new HashSet<(Guid, Guid, RelationshipType)>();
+        var importedParents = new ParentGraph([]);
 
         foreach (var rel in preview.Relationships)
         {
@@ -137,6 +138,18 @@ public class ClaudeImportService(
 
             var key = (pA, pB, type.Value);
             if (!seen.Add(key)) continue;
+
+            // R0: imported data can hold a Parent loop (an inconsistent GEDCOM, a mis-parsed
+            // paste). A loop crashes the layout engine, so skip the link that would close one.
+            if (type == RelationshipType.Parent)
+            {
+                if (importedParents.WouldCreateLoop(pA, pB))
+                {
+                    logger.LogWarning("Import skipped a Parent link that would have created a loop: {Parent} -> {Child}", pA, pB);
+                    continue;
+                }
+                importedParents.Add(pA, pB);
+            }
 
             ctx.Relationships.Add(new Relationship
             {

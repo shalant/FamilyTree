@@ -1,5 +1,8 @@
 using FamilyTree.Shared.DTOs;
 using FamilyTree.Shared.DTOs.Person;
+using FamilyTree.Core.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FamilyTree.Web.Services;
 
@@ -22,6 +25,16 @@ namespace FamilyTree.Web.Services;
 /// </summary>
 public class FamilyTreeLayoutEngine
 {
+    private readonly ILogger<FamilyTreeLayoutEngine> _logger;
+
+    // Cycles already warned about by this instance (scoped per circuit), so a canvas that
+    // re-lays out on every interaction does not repeat the same warning.
+    private readonly HashSet<string> _warnedCycles = [];
+
+    // The logger is optional so tests (and anything else) can still say `new FamilyTreeLayoutEngine()`.
+    public FamilyTreeLayoutEngine(ILogger<FamilyTreeLayoutEngine>? logger = null) =>
+        _logger = logger ?? NullLogger<FamilyTreeLayoutEngine>.Instance;
+
     // ─────────────────────────────────────────────────────────────────────────
     // LAYOUT CONSTANTS
     // These are the primary knobs for visual tuning. They are intentionally
@@ -78,6 +91,8 @@ public class FamilyTreeLayoutEngine
     {
         if (!people.Any())
             return FamilyTreeLayout.Empty;
+
+        WarnAboutParentCycles(people);
 
         // ─────────────────────────────────────────────────────────────────────
         // PHASE 1: Compute generational depths (relative family positions)
@@ -267,14 +282,26 @@ public class FamilyTreeLayoutEngine
             // and whichever ran first hijacked the other's position, sprawling Marc away
             // from his real parents.
             var descendantOfRoot = new Dictionary<Guid, NuclearGroup>();
+            // Groups on the CURRENT recursion path (R0). Bad data can record a Parent cycle
+            // (someone as their own descendant's child); every recursion below follows the
+            // primaryGroup chain, so without this guard a cycle reachable from a root recursed
+            // until the process died of a StackOverflow, which can't be caught. It is the
+            // current PATH, not a global visited set, on purpose: a group legitimately reached
+            // twice by different routes (a child with three recorded parents sits under more
+            // than one group) must be walked both times exactly as before, so a tree with no
+            // cycle lays out identically. Hitting a group already on the path means a cycle;
+            // that link is not followed.
+            var markPath = new HashSet<GroupKey>();
             void MarkDescendants(NuclearGroup g, NuclearGroup root)
             {
+                if (!markPath.Add(GroupKey.Of(g))) return;
                 foreach (var cid in g.ChildIds)
                 {
                     descendantOfRoot.TryAdd(cid, root);
                     if (primaryGroup.TryGetValue(cid, out var childGroup))
                         MarkDescendants(childGroup, root);
                 }
+                markPath.Remove(GroupKey.Of(g));
             }
             foreach (var rg in rootGroups)
             {
@@ -384,8 +411,10 @@ public class FamilyTreeLayoutEngine
                     crossEdge[memberOfB] = false;
                 }
 
+                var reorderPath = new HashSet<GroupKey>(); // same cycle guard as markPath
                 void ReorderCrossEdgeChildren(NuclearGroup g, int? rootIndex)
                 {
+                    if (!reorderPath.Add(GroupKey.Of(g))) return;
                     if (g.ChildIds.Any(crossEdge.ContainsKey))
                     {
                         var reordered = g with
@@ -410,6 +439,7 @@ public class FamilyTreeLayoutEngine
                     foreach (var cid in g.ChildIds)
                         if (primaryGroup.TryGetValue(cid, out var childGroup))
                             ReorderCrossEdgeChildren(childGroup, null);
+                    reorderPath.Remove(GroupKey.Of(g));
                 }
 
                 for (int i = 0; i < rootGroups.Count; i++)
@@ -419,9 +449,14 @@ public class FamilyTreeLayoutEngine
             // ── Memoised bottom-up width measurement ─────────────────────────
             var widthCache = new Dictionary<NuclearGroup, double>();
 
+            var measurePath = new HashSet<GroupKey>(); // same cycle guard as markPath
             double MeasureGroup(NuclearGroup g)
             {
                 if (widthCache.TryGetValue(g, out var cached)) return cached;
+                // A cycle: this group is already being measured further up. Count the link
+                // that closed the loop as a plain leaf, the same width PlaceGroup gives a
+                // child with no group of its own.
+                if (!measurePath.Add(GroupKey.Of(g))) return NodeSpacingX;
 
                 double selfW = g.ParentBId.HasValue
                     ? NodeSpacingX + SpouseSpacingX
@@ -435,6 +470,7 @@ public class FamilyTreeLayoutEngine
                             : (double)NodeSpacingX);
 
                 var w = g.ChildIds.Count == 0 ? selfW : Math.Max(selfW, childrenW);
+                measurePath.Remove(GroupKey.Of(g));
                 widthCache[g] = w;
                 return w;
             }
@@ -471,7 +507,23 @@ public class FamilyTreeLayoutEngine
             var coupleGaps = new List<(double Left, double Right)>();
 
             // ── Top-down placement ────────────────────────────────────────────
+            var placePath = new HashSet<GroupKey>(); // same cycle guard as markPath
             void PlaceGroup(NuclearGroup g, double anchorX)
+            {
+                // A cycle: this group is already being placed further up, so its parents have
+                // a node already. Don't descend again.
+                if (!placePath.Add(GroupKey.Of(g))) return;
+                try
+                {
+                    PlaceGroupBody(g, anchorX);
+                }
+                finally
+                {
+                    placePath.Remove(GroupKey.Of(g));
+                }
+            }
+
+            void PlaceGroupBody(NuclearGroup g, double anchorX)
             {
                 if (g.ParentAId.HasValue && g.ParentBId.HasValue)
                 {
@@ -1205,6 +1257,33 @@ public class FamilyTreeLayoutEngine
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // PARENT CYCLES (R0)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A Parent cycle (someone recorded as their own ancestor) is invalid data that the write
+    /// paths now refuse, but rows saved before that check can still hold one. The recursions in
+    /// <see cref="ComputeLayout"/> are guarded so the tree still renders; this leaves a trace
+    /// in the logs naming who is caught in it so the data can be repaired.
+    /// </summary>
+    private void WarnAboutParentCycles(List<PersonDto> people)
+    {
+        var graph = new ParentGraph(people.SelectMany(p => (p.ParentIds ?? []).Select(parent => (parent, p.Id))));
+        var cycles = graph.FindCycles();
+        if (cycles.Count == 0) return;
+
+        var names = new Dictionary<Guid, string>();
+        foreach (var p in people) names.TryAdd(p.Id, p.FullName);
+        foreach (var cycle in cycles.Where(c => _warnedCycles.Add(string.Join(",", c))))
+            _logger.LogWarning(
+                "Parent cycle in family tree data involving {Count} people: {People}. The tree still " +
+                "renders, but the loop is ignored where the layout would otherwise recurse forever. " +
+                "Remove one of the Parent links to repair it.",
+                cycle.Count,
+                string.Join(", ", cycle.Select(id => $"{names.GetValueOrDefault(id, "(unknown)")} ({id})")));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // NUCLEAR GROUP BUILDING
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -1522,6 +1601,17 @@ public class FamilyTreeLayoutEngine
     /// Distinct from <see cref="FamilyUnit"/>, which is the SVG connector output.
     /// </summary>
     private record NuclearGroup(Guid? ParentAId, Guid? ParentBId, List<Guid> ChildIds);
+
+    /// <summary>
+    /// Identity of a <see cref="NuclearGroup"/> by its parents alone. The record's own equality
+    /// compares the ChildIds list by reference, and the cross-root reorder swaps in copies
+    /// with a new list, so the cycle guards (see MarkDescendants) key on this instead.
+    /// BuildNuclearGroups makes at most one group per parent pair or single parent.
+    /// </summary>
+    private readonly record struct GroupKey(Guid? ParentAId, Guid? ParentBId)
+    {
+        public static GroupKey Of(NuclearGroup g) => new(g.ParentAId, g.ParentBId);
+    }
 
     /// <summary>
     /// A complete visual family unit: couple (optional), stem, span (optional), and drops.

@@ -110,4 +110,6 @@ class FakeDataIntegrityService : IDataIntegrityService
 {
     public Task<ServiceResponse<List<OrphanedRelationshipFixDto>>> FixOrphanedRelationshipsAsync(CancellationToken ct = default)
         => throw new NotImplementedException();
+    public Task<ServiceResponse<List<ParentCycleDto>>> FindParentCyclesAsync(CancellationToken ct = default)
+        => throw new NotImplementedException();
 }

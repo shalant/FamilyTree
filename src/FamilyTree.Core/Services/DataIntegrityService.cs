@@ -1,6 +1,7 @@
 using FamilyTree.Core.Data;
 using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Admin;
+using FamilyTree.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -87,6 +88,64 @@ public class DataIntegrityService(
             logger.LogError(ex, "Error running orphaned-relationship integrity check.");
             return ServiceResponse<List<OrphanedRelationshipFixDto>>.Fail(
                 "An error occurred running the integrity check.");
+        }
+    }
+
+    public async Task<ServiceResponse<List<ParentCycleDto>>> FindParentCyclesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            if (currentUser.UserId.HasValue && !currentUser.IsSuperUser)
+                return ServiceResponse<List<ParentCycleDto>>.Fail("Only a super-user can run the parent-loop check.");
+
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            // Default query filters: soft-deleted people and relationships are excluded, which
+            // is exactly the set the tree is rendered from.
+            var people = await ctx.People.AsNoTracking()
+                .Select(p => new { p.Id, p.FirstName, p.LastName, p.FamilyId })
+                .ToDictionaryAsync(p => p.Id, ct);
+            var links = (await ctx.Relationships.AsNoTracking()
+                    .Where(r => r.Type == RelationshipType.Parent)
+                    .Select(r => new { r.Id, Parent = r.PersonAId, Child = r.PersonBId })
+                    .ToListAsync(ct))
+                .Where(r => people.ContainsKey(r.Parent) && people.ContainsKey(r.Child))
+                .ToList();
+
+            string Name(Guid id) => $"{people[id].FirstName} {people[id].LastName}".Trim();
+
+            var result = new ParentGraph(links.Select(l => (l.Parent, l.Child))).FindCycles()
+                .Select(cycle =>
+                {
+                    var members = cycle.ToHashSet();
+                    return new ParentCycleDto
+                    {
+                        People = [.. cycle.Select(id => new ParentCyclePersonDto
+                            { PersonId = id, Name = Name(id), FamilyId = people[id].FamilyId })],
+                        Links = [.. links.Where(l => members.Contains(l.Parent) && members.Contains(l.Child))
+                            .Select(l => new ParentCycleLinkDto
+                            {
+                                RelationshipId = l.Id,
+                                ParentId = l.Parent, ParentName = Name(l.Parent),
+                                ChildId = l.Child, ChildName = Name(l.Child),
+                            })],
+                    };
+                })
+                .ToList();
+
+            if (result.Count > 0)
+                logger.LogWarning(
+                    "Parent-loop check found {Count} loop(s) among live people: {Loops}. Remove one Parent link " +
+                    "from each to repair it.",
+                    result.Count,
+                    string.Join("; ", result.Select(c => string.Join(" -> ", c.People.Select(p => $"{p.Name} ({p.PersonId})")))));
+
+            return ServiceResponse<List<ParentCycleDto>>.Ok(result);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error running the parent-loop integrity check.");
+            return ServiceResponse<List<ParentCycleDto>>.Fail("An error occurred running the parent-loop check.");
         }
     }
 }

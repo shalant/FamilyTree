@@ -14,4 +14,14 @@ public interface IDataIntegrityService
     /// </summary>
     Task<ServiceResponse<List<OrphanedRelationshipFixDto>>> FixOrphanedRelationshipsAsync(
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Read-only: finds every group of live people caught in a Parent loop (someone recorded
+    /// as their own ancestor, R0 in docs/TodoList.md). Bad rows like this crashed the layout
+    /// engine before it was made loop-safe, and the write paths now refuse to create one, so
+    /// anything this reports predates that. Changes nothing. Only a super-user, or an
+    /// unattended caller such as startup (no signed-in user), may run it, because the result
+    /// spans every family.
+    /// </summary>
+    Task<ServiceResponse<List<ParentCycleDto>>> FindParentCyclesAsync(CancellationToken ct = default);
 }

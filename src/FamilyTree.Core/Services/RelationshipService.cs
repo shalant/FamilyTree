@@ -131,6 +131,10 @@ public class RelationshipService(
             if (ruleError != null)
                 return ServiceResponse<RelationshipDto>.Fail(ruleError);
 
+            var loopError = await ValidateNoParentLoopAsync(ctx, request, a, b, excludeRelationshipId: null, ct);
+            if (loopError != null)
+                return ServiceResponse<RelationshipDto>.Fail(loopError);
+
             var userId = currentUser.UserId;
             var relationship = new Relationship
             {
@@ -205,6 +209,10 @@ public class RelationshipService(
             var ruleError = await ValidateNewRelationshipAsync(ctx, request, ct);
             if (ruleError != null)
                 return ServiceResponse<RelationshipDto>.Fail(ruleError);
+
+            var loopError = await ValidateNoParentLoopAsync(ctx, request, a, b, excludeRelationshipId: rel.Id, ct);
+            if (loopError != null)
+                return ServiceResponse<RelationshipDto>.Fail(loopError);
 
             // Apply updates
             var userId = currentUser.UserId;
@@ -285,6 +293,38 @@ public class RelationshipService(
             return ServiceResponse.Fail(
                 "An error occurred deleting this relationship.");
         }
+    }
+
+    // Refuses a Parent link that would make someone their own ancestor (R0, docs/TodoList.md):
+    // a Parent loop sends the layout engine into unbounded recursion. A link is stored
+    // lower-GUID-first for every type (see CreateAsync), so a Parent row can land in the
+    // opposite direction to the one requested; both directions are judged, because the
+    // stored one is what the tree will actually read. When updating, the row being replaced is
+    // left out of the graph.
+    private static async Task<string?> ValidateNoParentLoopAsync(
+        AppDbContext ctx, RelationshipUpsertDto request, Guid storedA, Guid storedB,
+        Guid? excludeRelationshipId, CancellationToken ct)
+    {
+        if (request.Type != RelationshipType.Parent) return null;
+
+        var graph = new ParentGraph(
+            (await ctx.Relationships.AsNoTracking()
+                .Where(r => r.Type == RelationshipType.Parent && r.Id != excludeRelationshipId)
+                .Select(r => new { r.PersonAId, r.PersonBId })
+                .ToListAsync(ct))
+            .Select(r => (r.PersonAId, r.PersonBId)));
+
+        foreach (var (parent, child) in new[] { (request.PersonAId, request.PersonBId), (storedA, storedB) }.Distinct())
+        {
+            if (!graph.WouldCreateLoop(parent, child)) continue;
+
+            var names = await ctx.People.AsNoTracking()
+                .Where(p => p.Id == parent || p.Id == child)
+                .ToDictionaryAsync(p => p.Id, p => $"{p.FirstName} {p.LastName}", ct);
+            return $"{names.GetValueOrDefault(parent, "That person")} can't be recorded as a parent of " +
+                   $"{names.GetValueOrDefault(child, "that person")}: that would create a loop in the family tree.";
+        }
+        return null;
     }
 
     private async Task<string?> ValidateNewRelationshipAsync(
