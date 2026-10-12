@@ -192,8 +192,7 @@ public class FamilyTreeLayoutTransitionTests
     // (childless, no other relatives): the Florence/Harvey shape. Recording the Blair
     // marriage as ended moves Blair to FormerSpouseIds, and Blair's only link is now a
     // former-spouse link.
-    [Theory(Skip = KnownOpen + "'[LAYOUT FUZZ 2026-10-10] R1' (a former-spouse-only person is laid out as a separate tree)."),
-     InlineData(false), InlineData(true)]
+    [Theory, InlineData(false), InlineData(true)]
     public void ChildlessSecondMarriageEnds_FormerSpouseStaysBesidePartner(bool reverseIds)
     {
         var t = new Tree(reverseIds);
@@ -211,6 +210,31 @@ public class FamilyTreeLayoutTransitionTests
         var nodes = ById(after);
         Math.Abs(nodes[blair].X - nodes[pat].X).Should().BeLessThanOrEqualTo(2 * SpouseSpacingX,
             "ending the marriage must not send Blair to a separate tree beside the family");
+    }
+
+    // R1 repro from docs/TodoList.md: Ann is Willa's parent, Willa married Max, nobody has a
+    // date. Ending the marriage leaves Max linked only as a former spouse. The engine used to
+    // treat him as a separate tree, seed his year at the current year, and pass that on to
+    // Willa through spouse inference, which put Willa on Ann's row.
+    [Theory, InlineData(false), InlineData(true)]
+    public void DatelessMarriageEnds_ExSpouseStaysOnPartnersRowAndChildStaysBelowParent(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var ann = t.Add("Ann", "Ash");
+        var willa = t.Add("Willa", "Ash");
+        var max = t.Add("Max", "Moe");
+        t.Parent(ann, willa).Marry(willa, max);
+
+        var before = t.Layout(willa);
+        var after = t.Clone().EndMarriage(willa, max, new DateOnly(1990, 1, 1)).Layout(willa);
+
+        AssertSound(t, after);
+        AssertSamePositions(before, after, [ann, willa]);
+        var nodes = ById(after);
+        nodes[willa].Y.Should().BeGreaterThan(nodes[ann].Y, "Willa is Ann's child");
+        nodes[max].Y.Should().Be(nodes[willa].Y, "neither ex-partner has a date, so nothing separates their rows");
+        Math.Abs(nodes[max].X - nodes[willa].X).Should().BeLessThanOrEqualTo(SpouseSpacingX,
+            "Max must stay beside Willa, not move to a separate tree");
     }
 
     // ─────────────────────────────────────────────────────────────────────────

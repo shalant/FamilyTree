@@ -299,8 +299,18 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       - *Left alone, not part of R0.* The latent Parent-direction inversion in
         `RelationshipService` is still open (entry below); the new loop check just
         accounts for it.
-- [ ] **[LAYOUT FUZZ 2026-10-10] R1 — a person linked only by an ended marriage is laid
-      out as a separate tree.** `IdentifyConnectedComponents` follows Parent/Child/Spouse/
+- [x] **[LAYOUT FUZZ 2026-10-10] R1 — a person linked only by an ended marriage is laid
+      out as a separate tree.** *Fixed 2026-10-11 on `fix/r1-former-spouse-component`:*
+      `IdentifyConnectedComponents` now follows `FormerSpouseIds`. Added
+      `FamilyTreeLayoutTransitionTests.DatelessMarriageEnds_ExSpouseStaysOnPartnersRowAndChildStaysBelowParent`
+      (the Ann/Willa/Max repro as a before/after pair; fails on the old code). Un-skipped
+      `Invariant6` (it failed on the old code too) and `ChildlessSecondMarriageEnds_FormerSpouseStaysBesidePartner`
+      (passes on the old code as well, so it was never really blocked by R1), deleted the
+      `FormerSpouseOnlyLink` flag and the Invariant 6 twin, and dropped R1 from the skip
+      reasons of Invariants 1, 3 and 4, which stay skipped for R2–R9. The Doug (1900)/Harvey
+      (1908) pair on its own already sat together before the fix, so the 440px gap needed
+      more of the family around it; not reproduced separately.
+      Original report: `IdentifyConnectedComponents` follows Parent/Child/Spouse/
       Sibling but not `FormerSpouseIds`. A former spouse with no other relatives becomes their own
       component: placed 320px+ to the side, and if dateless, seeded at the current year,
       which then leaks into the ex's inferred year (spouse inference runs before parent

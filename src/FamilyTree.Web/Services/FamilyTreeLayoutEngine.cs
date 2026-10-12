@@ -1411,7 +1411,7 @@ public class FamilyTreeLayoutEngine
     /// Groups people into separate connected components using BFS.
     ///
     /// A connected component is a maximal set of people connected through
-    /// parent/child/spouse relationships. Multiple components represent
+    /// parent/child/spouse (current or former)/sibling relationships. Multiple components represent
     /// orphaned trees that are rendered side‑by‑side.
     /// </summary>
     private List<List<PersonDto>> IdentifyConnectedComponents(List<PersonDto> people)
@@ -1440,6 +1440,10 @@ public class FamilyTreeLayoutEngine
                 relatedIds.UnionWith(current.ParentIds ?? []);
                 relatedIds.UnionWith(current.ChildIds ?? []);
                 relatedIds.UnionWith(current.SpouseIds ?? []);
+                // An ended marriage still connects two people (R1, 2026-10-11): without it,
+                // someone whose only link is a former spouse became their own component,
+                // drawn 320px+ off to the side and, if dateless, seeded at the current year.
+                relatedIds.UnionWith(current.FormerSpouseIds ?? []);
                 relatedIds.UnionWith(current.SiblingIds ?? []);
 
                 foreach (var relatedId in relatedIds.Where(id => !visited.Contains(id)))
@@ -1511,8 +1515,7 @@ public class FamilyTreeLayoutEngine
         {
             if (!personById.TryGetValue(id, out var person)) yield break;
 
-            // FormerSpouseIds deliberately included (unlike IdentifyConnectedComponents)
-            // — a parent's children from an earlier marriage still belong on that
+            // FormerSpouseIds deliberately included — a parent's children from an earlier marriage still belong on that
             // parent's side of the canvas.
             var raw = (person.ParentIds ?? [])
                 .Concat(person.ChildIds ?? [])
