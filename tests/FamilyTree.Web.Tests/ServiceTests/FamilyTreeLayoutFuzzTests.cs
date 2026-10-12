@@ -55,7 +55,7 @@ public class FamilyTreeLayoutFuzzTests
 
     // 1. No two nodes overlap: center distance >= sum of radii.
     [Fact(Skip = SkipPrefix + "R4 (exact-Y collision check, the open 2026-09-09 bug), R3 (greedy dateless " +
-                 "inference puts a child just below a parent), R9 (no vertical clearance check in PlaceGroup), plus R1/R2.")]
+                 "inference puts a child just below a parent), R9 (no vertical clearance check in PlaceGroup), plus R2.")]
     public void Invariant1_NoTwoNodesOverlap() => Run(GenFamily, AssertNoOverlap);
 
     [Fact]
@@ -63,7 +63,7 @@ public class FamilyTreeLayoutFuzzTests
         Run(Excluding(Invariant1Exclusions), AssertNoOverlap);
 
     private const KnownOpen Invariant1Exclusions =
-        KnownOpen.FormerSpouseOnlyLink | KnownOpen.PartnerWithChildrenElsewhere |
+        KnownOpen.PartnerWithChildrenElsewhere |
         KnownOpen.DatelessPerson | KnownOpen.AnchorPlacedPerson | KnownOpen.SpouseAnchoredPartner |
         KnownOpen.PartnerSameEraAsInLaw | KnownOpen.CrossRootCouple;
 
@@ -91,8 +91,7 @@ public class FamilyTreeLayoutFuzzTests
     // so any inversion comes from inference/placement, not from contradictory input.
     // No _ExcludingKnownOpen twin: excluding R3 means excluding dateless people, and with
     // every date known the invariant is true by construction.
-    [Fact(Skip = SkipPrefix + "R1 (former-spouse-only person seeded at the current year) and R3 (greedy " +
-                 "dateless birth-year inference).")]
+    [Fact(Skip = SkipPrefix + "R3 (greedy dateless birth-year inference).")]
     public void Invariant3_ChildRendersBelowEveryParent() => Run(GenFamily, f =>
     {
         var nodes = f.Layout().Nodes.ToDictionary(n => n.Person.Id);
@@ -111,7 +110,7 @@ public class FamilyTreeLayoutFuzzTests
     // timeline (CLAUDE.md, ADR 001), so two DATED spouses born years apart are supposed to
     // sit at different heights. Only when the engine has no date for either partner is a
     // Y difference an artifact rather than data. The X half is asserted unconditionally.
-    [Fact(Skip = SkipPrefix + "R1, R2, R6 (cross-root partners the post-placement pull can't bring together), R7, R8.")]
+    [Fact(Skip = SkipPrefix + "R2, R6 (cross-root partners the post-placement pull can't bring together), R7, R8.")]
     public void Invariant4_CouplesSitTogether() => Run(GenFamily, AssertCouplesTogether);
 
     [Fact]
@@ -119,7 +118,7 @@ public class FamilyTreeLayoutFuzzTests
         Run(Excluding(Invariant4Exclusions), AssertCouplesTogether);
 
     private const KnownOpen Invariant4Exclusions =
-        KnownOpen.FormerSpouseOnlyLink | KnownOpen.PartnerWithChildrenElsewhere | KnownOpen.CrossRootCouple |
+        KnownOpen.PartnerWithChildrenElsewhere | KnownOpen.CrossRootCouple |
         KnownOpen.SpouseAnchoredPartner | KnownOpen.SiblingLinkedPartner | KnownOpen.DatelessCouple;
 
     // 5a. Determinism: the same input, laid out twice, gives identical output.
@@ -152,14 +151,8 @@ public class FamilyTreeLayoutFuzzTests
     // right; a new earliest/latest birth year moves the timeline origin), but nodes inside
     // it must keep their positions relative to each other. This is the general form of the
     // "classification transition" property in CLAUDE.md.
-    [Fact(Skip = SkipPrefix + "R1 (former-spouse-only person is a separate engine component).")]
-    public void Invariant6_AddingALeafDoesNotMoveUnrelatedComponents() => Run(GenFamily, AssertLeafStability);
-
     [Fact]
-    public void Invariant6_AddingALeafDoesNotMoveUnrelatedComponents_ExcludingKnownOpen() =>
-        Run(Excluding(Invariant6Exclusions), AssertLeafStability);
-
-    private const KnownOpen Invariant6Exclusions = KnownOpen.FormerSpouseOnlyLink;
+    public void Invariant6_AddingALeafDoesNotMoveUnrelatedComponents() => Run(GenFamily, AssertLeafStability);
 
     private static void AssertLeafStability(BuiltFamily f)
     {
@@ -282,7 +275,7 @@ public class FamilyTreeLayoutFuzzTests
             ("2", GenFamily, AssertEveryPersonOnce),
             ("4 (excluding known open)", Excluding(Invariant4Exclusions), AssertCouplesTogether),
             ("5a", GenFamily, AssertDeterministic),
-            ("6 (excluding known open)", Excluding(Invariant6Exclusions), AssertLeafStability),
+            ("6", GenFamily, AssertLeafStability),
             ("7", GenMalformed, f => AssertFiniteLayout(f.Layout())),
             ("7c", GenCyclic, f => { AssertFiniteLayout(f.Layout()); AssertEveryPersonOnce(f); AssertDeterministic(f); }),
         };
@@ -327,14 +320,12 @@ public class FamilyTreeLayoutFuzzTests
     [Theory]
     [InlineData(nameof(Invariant1_NoTwoNodesOverlap_ExcludingKnownOpen))]
     [InlineData(nameof(Invariant4_CouplesSitTogether_ExcludingKnownOpen))]
-    [InlineData(nameof(Invariant6_AddingALeafDoesNotMoveUnrelatedComponents_ExcludingKnownOpen))]
     public void ExcludingKnownOpenDomains_StillProduceRealTrees(string test)
     {
         var excluded = test switch
         {
             nameof(Invariant1_NoTwoNodesOverlap_ExcludingKnownOpen) => Invariant1Exclusions,
-            nameof(Invariant4_CouplesSitTogether_ExcludingKnownOpen) => Invariant4Exclusions,
-            _ => Invariant6Exclusions,
+            _ => Invariant4Exclusions,
         };
         var families = Enumerable.Range(0, Iterations)
             .Select(i => Build(Excluding(excluded).Generate(new PCG((uint)i, BaseSeed), null, out _)))
@@ -497,10 +488,6 @@ public class FamilyTreeLayoutFuzzTests
     public enum KnownOpen
     {
         None = 0,
-        // R1: IdentifyConnectedComponents ignores FormerSpouseIds, so someone linked only by
-        // an ended marriage becomes their own component (seeded at the current year, laid
-        // out off to the side). TodoList "[LAYOUT FUZZ 2026-10-10] R1".
-        FormerSpouseOnlyLink = 1,
         // R2: a couple only gets a placement slot if it is the primary group of BOTH
         // partners. When one partner also has children outside the couple, and the couple
         // has children of its own, or the other partner has children elsewhere, or the
@@ -921,10 +908,10 @@ public class FamilyTreeLayoutFuzzTests
 
         // Genealogical components (Parent, Spouse, former Spouse, Sibling), each listed in
         // stable people-list order.
-        public List<List<Guid>> Components(bool includeFormerSpouses = true)
+        public List<List<Guid>> Components()
         {
             var adj = People.ToDictionary(p => p.Id, _ => new List<Guid>());
-            foreach (var r in rels.Where(r => includeFormerSpouses || !(r.Type == RelationshipType.Spouse && r.EndDate != null)))
+            foreach (var r in rels)
             {
                 adj[r.PersonAId].Add(r.PersonBId);
                 adj[r.PersonBId].Add(r.PersonAId);
@@ -952,8 +939,6 @@ public class FamilyTreeLayoutFuzzTests
         public KnownOpen KnownOpenShapes()
         {
             var shapes = KnownOpen.None;
-            if (Components(includeFormerSpouses: false).Count != Components().Count)
-                shapes |= KnownOpen.FormerSpouseOnlyLink;
             var byId = People.ToDictionary(p => p.Id);
             bool HasParents(Guid id) => byId[id].ParentIds?.Count > 0;
             bool ChildrenOutside(Guid id, CoupleDto c) =>
