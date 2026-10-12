@@ -198,10 +198,22 @@ public class FamilyTreeLayoutEngine
             // "Rosenberg" (the couple-ordering fix from 2026-07-06 sorts by identity, with
             // no concept of which relationship actually has children on the tree). Marc
             // then had nowhere correct to anchor from, and the whole subtree sprawled.
+            //
+            // Among couples that both have children, the one with the OLDEST child wins
+            // (R11, found 2026-10-11). Before, list order decided, so the moment a
+            // childless second marriage gained its first child it could take the slot
+            // just by sorting first ("Libby" before "Lillian"), and the first family's
+            // child Ray was thrown to the right edge. A later half-sibling arriving can't
+            // change which group holds the oldest child, so the choice is stable across
+            // that edit.
             var primaryGroup = new Dictionary<Guid, NuclearGroup>();
+            int OldestChildYear(NuclearGroup g) => g.ChildIds.Count == 0
+                ? int.MaxValue
+                : g.ChildIds.Min(c => birthYears.GetValueOrDefault(c, int.MaxValue));
             foreach (var g in compGroups
                 .OrderByDescending(g => g.ChildIds.Count > 0 ? 1 : 0)
-                .ThenByDescending(g => g.ParentBId.HasValue ? 1 : 0))
+                .ThenByDescending(g => g.ParentBId.HasValue ? 1 : 0)
+                .ThenBy(OldestChildYear))
             {
                 if (g.ParentAId.HasValue) primaryGroup.TryAdd(g.ParentAId.Value, g);
                 if (g.ParentBId.HasValue) primaryGroup.TryAdd(g.ParentBId.Value, g);
@@ -446,10 +458,62 @@ public class FamilyTreeLayoutEngine
                     ReorderCrossEdgeChildren(rootGroups[i], i);
             }
 
+            // ── Second marriages placed beside their shared partner ──────────
+            // A person whose primary group is a couple can have one more couple group
+            // (a second marriage) whose other partner has no parents on the tree and no
+            // better group of their own: Louis's second wife Libby, or Florence's second
+            // husband Harvey. That group is never a root (it isn't Louis's primary), so
+            // before this its partner went through the spouse safety net, which always
+            // tried the right side first and could land on the first spouse (R7), and its
+            // children were appended at the right edge of the tree (R11). Now the partner
+            // sits SpouseSpacingX out on the shared person's free side (ParentA is always
+            // drawn on the left, so A's second marriage goes left and B's goes right) and
+            // the group's children sit under that pair, with the space reserved in
+            // MeasureGroup so nothing else lands there. The slot is reserved even while
+            // the second marriage is childless, so its first child arriving moves nobody.
+            // At most one per person; a third marriage still goes through the safety net.
+            var crossRootCouples = crossRootInfo.Select(c => c.couple).ToHashSet();
+            var attachedFor = new Dictionary<Guid, (NuclearGroup Group, Guid PartnerId)>();
+            foreach (var g in compGroups
+                .OrderByDescending(g => g.ChildIds.Count > 0 ? 1 : 0)
+                .ThenBy(OldestChildYear))
+            {
+                if (!g.ParentAId.HasValue || !g.ParentBId.HasValue || crossRootCouples.Contains(g)) continue;
+                foreach (var (x, s) in new[] { (g.ParentAId.Value, g.ParentBId.Value), (g.ParentBId.Value, g.ParentAId.Value) })
+                {
+                    if (attachedFor.ContainsKey(x)) continue;
+                    if (!primaryGroup.TryGetValue(x, out var px) || px == g || !px.ParentBId.HasValue) continue;
+                    if (primaryGroup.TryGetValue(s, out var ps) && ps != g) continue;
+                    if (childrenInGroups.Contains(s)) continue;
+                    attachedFor[x] = (g, s);
+                }
+            }
+
+            // The second marriage hanging off `parent`'s side of g, if g is that person's
+            // primary group (only the primary group carries it).
+            (NuclearGroup Group, Guid PartnerId)? AttachmentOf(NuclearGroup g, Guid? parent) =>
+                parent is { } p && primaryGroup.TryGetValue(p, out var pg) && pg == g &&
+                attachedFor.TryGetValue(p, out var att) ? att : null;
+
             // ── Memoised bottom-up width measurement ─────────────────────────
             var widthCache = new Dictionary<NuclearGroup, double>();
+            // Per group with an attached second marriage: the extra width each attachment
+            // adds left and right of the core (couple + children). MeasureGroup returns the
+            // total; PlaceGroupBody shifts the core off-centre by the difference.
+            var sideExt = new Dictionary<NuclearGroup, (double Left, double Right)>();
 
             var measurePath = new HashSet<GroupKey>(); // same cycle guard as markPath
+            double ChildrenWidth(List<Guid> childIds) => childIds.Sum(cid =>
+                primaryGroup.TryGetValue(cid, out var cg)
+                    ? MeasureGroup(cg)
+                    : (double)NodeSpacingX);
+
+            // Centre of an attached group's children, as an offset from the core anchor
+            // (sign added by the caller): under the second couple's midpoint, pushed
+            // outward only if that would overlap the core group's own children.
+            double AttachedChildrenOffset(double coreChildrenW, double attachedW) =>
+                Math.Max(SpouseSpacingX, coreChildrenW / 2.0 + attachedW / 2.0);
+
             double MeasureGroup(NuclearGroup g)
             {
                 if (widthCache.TryGetValue(g, out var cached)) return cached;
@@ -462,14 +526,31 @@ public class FamilyTreeLayoutEngine
                     ? NodeSpacingX + SpouseSpacingX
                     : NodeSpacingX;
 
-                double childrenW = g.ChildIds.Count == 0
-                    ? 0
-                    : g.ChildIds.Sum(cid =>
-                        primaryGroup.TryGetValue(cid, out var cg)
-                            ? MeasureGroup(cg)
-                            : (double)NodeSpacingX);
+                double childrenW = g.ChildIds.Count == 0 ? 0 : ChildrenWidth(g.ChildIds);
 
                 var w = g.ChildIds.Count == 0 ? selfW : Math.Max(selfW, childrenW);
+
+                if (g.ParentBId.HasValue)
+                {
+                    // How far an attachment reaches past the core's own edge: the partner's
+                    // node (SpouseSpacingX beyond the shared person, plus half a slot) or
+                    // the outer edge of its children, whichever is further.
+                    double Ext(Guid? parent)
+                    {
+                        if (AttachmentOf(g, parent) is not { } att) return 0;
+                        var attW = att.Group.ChildIds.Count == 0 ? 0 : ChildrenWidth(att.Group.ChildIds);
+                        var reach = SpouseSpacingX / 2.0 + SpouseSpacingX + NodeSpacingX / 2.0;
+                        if (attW > 0) reach = Math.Max(reach, AttachedChildrenOffset(childrenW, attW) + attW / 2.0);
+                        return Math.Max(0, reach - w / 2.0);
+                    }
+                    var (left, right) = (Ext(g.ParentAId), Ext(g.ParentBId));
+                    if (left > 0 || right > 0)
+                    {
+                        sideExt[g] = (left, right);
+                        w += left + right;
+                    }
+                }
+
                 measurePath.Remove(GroupKey.Of(g));
                 widthCache[g] = w;
                 return w;
@@ -523,8 +604,14 @@ public class FamilyTreeLayoutEngine
                 }
             }
 
+            // anchorX is the centre of the whole slot MeasureGroup(g) reserved. With an
+            // attached second marriage on one side the core couple sits off-centre in it.
             void PlaceGroupBody(NuclearGroup g, double anchorX)
             {
+                MeasureGroup(g);
+                if (sideExt.TryGetValue(g, out var ext))
+                    anchorX += (ext.Left - ext.Right) / 2.0;
+
                 if (g.ParentAId.HasValue && g.ParentBId.HasValue)
                 {
                     var leftX  = anchorX - SpouseSpacingX / 2.0;
@@ -532,6 +619,18 @@ public class FamilyTreeLayoutEngine
                     SetNode(g.ParentAId.Value, leftX);
                     SetNode(g.ParentBId.Value, rightX);
                     coupleGaps.Add((leftX, rightX));
+
+                    var childrenW = g.ChildIds.Count == 0 ? 0 : ChildrenWidth(g.ChildIds);
+                    foreach (var (parent, sharedX, dir) in new[] { (g.ParentAId, leftX, -1), (g.ParentBId, rightX, 1) })
+                    {
+                        if (AttachmentOf(g, parent) is not { } att) continue;
+                        var partnerX = sharedX + dir * SpouseSpacingX;
+                        SetNode(att.PartnerId, partnerX);
+                        coupleGaps.Add((Math.Min(sharedX, partnerX), Math.Max(sharedX, partnerX)));
+                        if (att.Group.ChildIds.Count == 0) continue;
+                        var attW = ChildrenWidth(att.Group.ChildIds);
+                        PlaceChildren(att.Group.ChildIds, anchorX + dir * AttachedChildrenOffset(childrenW, attW));
+                    }
                 }
                 else if (g.ParentAId.HasValue)
                 {
@@ -539,19 +638,23 @@ public class FamilyTreeLayoutEngine
                 }
 
                 if (g.ChildIds.Count == 0) return;
+                PlaceChildren(g.ChildIds, anchorX);
+            }
 
-                var cWidths = g.ChildIds
+            void PlaceChildren(List<Guid> childIds, double centerX)
+            {
+                var cWidths = childIds
                     .Select(cid => primaryGroup.TryGetValue(cid, out var cg)
                         ? MeasureGroup(cg)
                         : (double)NodeSpacingX)
                     .ToList();
 
                 double totalW = cWidths.Sum();
-                double startX = anchorX - totalW / 2.0;
+                double startX = centerX - totalW / 2.0;
 
-                for (int i = 0; i < g.ChildIds.Count; i++)
+                for (int i = 0; i < childIds.Count; i++)
                 {
-                    var childId    = g.ChildIds[i];
+                    var childId    = childIds[i];
                     double childAnchor = startX + cWidths[i] / 2.0;
 
                     if (primaryGroup.TryGetValue(childId, out var childGroup))

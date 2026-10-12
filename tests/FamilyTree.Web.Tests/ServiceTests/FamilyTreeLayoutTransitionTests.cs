@@ -68,10 +68,10 @@ public class FamilyTreeLayoutTransitionTests
     // Found 2026-10-11 (Leg 2): Louis's primary group flips to the Libby marriage, because
     // "Libby" sorts before "Lillian". Lillian then goes through the spouse safety net and
     // Ray is appended at the right edge instead of under his parents. The "before" state
-    // already overlaps (Libby lands on Lillian: R4, R7).
-    [Theory(Skip = KnownOpen + "'[LAYOUT TRANSITIONS 2026-10-11] R11' (a second couple gaining a child can take over " +
-                   "the primary group and move the first family), plus R4/R7 in the before state."),
-     InlineData(false), InlineData(true)]
+    // already overlaps (Libby lands on Lillian: R4, R7). Fixed 2026-10-12 (R11): the
+    // marriage with the oldest child stays primary, and the second marriage is placed on
+    // Louis's free side with its slot reserved even while it's childless.
+    [Theory, InlineData(false), InlineData(true)]
     public void ChildlessSecondMarriageGainsAChild_FirstMarriagesChildStaysUnderItsParents(bool reverseIds)
     {
         var t = new Tree(reverseIds);
@@ -93,6 +93,41 @@ public class FamilyTreeLayoutTransitionTests
         AssertSound(after, afterLayout);
         AssertChildUnderParents(after, afterLayout, ray);
         AssertChildUnderParents(after, afterLayout, sid);
+    }
+
+    // Same shape, but both marriages have several children, so the second marriage's
+    // children can't sit at the second couple's midpoint without running into the first
+    // marriage's children and are pushed outward. A third child arriving in the second
+    // marriage may move the first family, but only as a block (the second marriage needs
+    // more room beside it), never by reshuffling it.
+    [Theory, InlineData(false), InlineData(true)]
+    public void SecondMarriageWithChildrenGainsAnother_FirstFamilyMovesOnlyAsABlock(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var louis = t.Add("Louis", "Small", 1898);
+        var lillian = t.Add("Lillian", "Small", 1900);
+        var libby = t.Add("Libby", "Small", 1902);
+        var ray = t.Add("Ray", "Small", 1920);
+        var sis = t.Add("Sis", "Small", 1921);
+        var bo = t.Add("Bo", "Small", 1922);
+        var sid = t.Add("Sid", "Small", 1928);
+        var sue = t.Add("Sue", "Small", 1930);
+        t.Marry(louis, lillian, ended: new DateOnly(1923, 3, 1)).Marry(louis, libby);
+        foreach (var c in new[] { ray, sis, bo }) t.Parent(louis, c).Parent(lillian, c);
+        foreach (var c in new[] { sid, sue }) t.Parent(louis, c).Parent(libby, c);
+
+        var before = t.Layout(ray);
+        var after = t.Clone();
+        var sam = after.Add("Sam", "Small", 1932);
+        after.Parent(louis, sam).Parent(libby, sam);
+        var afterLayout = after.Layout(ray);
+
+        AssertSound(t, before);
+        AssertSound(after, afterLayout);
+        AssertSameRelativePlacement(before, afterLayout, [louis, lillian, ray, sis, bo],
+            "the first family keeps its shape when the second marriage grows");
+        foreach (var c in new[] { ray, sis, bo, sid, sue, sam })
+            AssertChildUnderParents(after, afterLayout, c);
     }
 
     // A person already in two marriages (first ended, with a child; second ended, with a
