@@ -97,4 +97,38 @@ public class MobileControlPanelTests : ComponentTestBase
 
         treeContext.MobilePanelOpen.Should().BeFalse();
     }
+
+    // Found on a real phone (2026-10-12): opening dropped the panel in with an
+    // animation, but closing unmounted it instantly. It now stays mounted with a
+    // --closing class for the close animation, then goes away.
+    [Fact]
+    [Trait("Category", "Regression")]
+    public void Closing_PlaysCloseAnimation_ThenUnmounts()
+    {
+        var treeContext = Services.GetRequiredService<TreeContextService>();
+        treeContext.ToggleMobilePanel();
+        var cut = RenderComponent<MobileControlPanel>();
+
+        cut.InvokeAsync(treeContext.CloseMobilePanel);
+
+        cut.WaitForAssertion(() => cut.Find(".ft-mobile-panel").ClassList.Should().Contain("ft-mobile-panel--closing"));
+        cut.Find(".ft-mobile-panel-backdrop").ClassList.Should().Contain("ft-mobile-panel-backdrop--closing");
+        cut.WaitForAssertion(() => cut.Markup.Should().BeEmpty(), TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public void ReopeningWhileClosing_KeepsThePanelOpen()
+    {
+        var treeContext = Services.GetRequiredService<TreeContextService>();
+        treeContext.ToggleMobilePanel();
+        var cut = RenderComponent<MobileControlPanel>();
+
+        cut.InvokeAsync(treeContext.CloseMobilePanel);
+        cut.WaitForAssertion(() => cut.Find(".ft-mobile-panel").ClassList.Should().Contain("ft-mobile-panel--closing"));
+        cut.InvokeAsync(treeContext.ToggleMobilePanel);
+
+        cut.WaitForAssertion(() => cut.Find(".ft-mobile-panel").ClassList.Should().NotContain("ft-mobile-panel--closing"));
+        Thread.Sleep(MobileControlPanel.CloseAnimationMs + 150);
+        cut.FindAll(".ft-mobile-panel").Should().HaveCount(1, "the earlier close must not unmount a reopened panel");
+    }
 }

@@ -10,23 +10,45 @@ doc for the testing legs: `docs/Testing/fuzz-and-adversarial-review-plan.md` (me
 PR #43).
 
 **Check before sending invites**
-- [ ] **Deploy the Leg 3 scoping/auth fixes** (`security/scoping-adversarial-review`):
+- [x] **Deploy the Leg 3 scoping/auth fixes** (`security/scoping-adversarial-review`):
       until then any production Admin can take over the super-user account and logged-out
-      visitors can open most pages. See "Leg 3 follow-ups" below.
+      visitors can open most pages. See "Leg 3 follow-ups" below. *Done 2026-10-12:* Doug
+      ran `deploy-web.yml` after PR #52 merged, which deployed `master` with Leg 3, R0 and
+      the layout fixes (R11, R13, R6, R12).
 - [x] **Fix R0 (parent-cycle crash) first.** Fixed 2026-10-11 on `fix/r0-parent-cycle`
       (code + tests done; **not deployed yet**, since `deploy-web.yml` is manual-only, so
       production still has the crash until this merges and is deployed). Also run
       `scripts/check-parent-cycles.sql` against production before or right after
       deploying, to see whether a loop is already saved there. See
-      `[LAYOUT FUZZ 2026-10-10] R0` below.
-- [ ] **Confirm PR #39's fixes (and everything merged since) are actually deployed.**
+      `[LAYOUT FUZZ 2026-10-10] R0` below. *2026-10-12:* deployed (see above), and
+      `check-parent-cycles.sql` returned zero rows against production: no saved loops.
+- [x] **Confirm PR #39's fixes (and everything merged since) are actually deployed.**
       `deploy-web.yml` is manual-only, so merging to `master` does not deploy.
+      *Done 2026-10-12:* the deploy above shipped `master` as of PR #52, which includes
+      PR #39 and everything since.
 - [ ] **Confirm every production user has a `UserFamily` row.** The 2026-07-04 entry below
       says production "almost certainly" lacked them (a user without one logs in fine but
       sees a permanently empty tree). The docs don't record whether the backfill was ever
       done in prod. Check the existing ~5 users, and that a new registration creates the row.
-- [ ] **Test on a real phone** (touch, mobile Safari/Chrome). Prior mobile testing was
-      emulated via viewport resize or desktop-width CSS tricks.
+      *2026-10-12:* all 5 production accounts have exactly one row, all in "My Family"
+      (two Admin plus the super-user as Admin, two Member), via the new read-only
+      `scripts/check-user-families.sql`. Not yet confirmed: that a NEW registration
+      creates the row. Rerun the script after the next real or test sign-up.
+- [x] **Test on a real phone** (touch, mobile Safari/Chrome). Prior mobile testing was
+      emulated via viewport resize or desktop-width CSS tricks. *First pass 2026-10-12
+      (Doug, on production):* "looks good so far", with two dings, fixed on
+      `fix/phone-test-polish` (not deployed yet): (1) the mobile control panel (opened
+      by the AppBar identity caret) dropped in with an animation but vanished instantly
+      on close. It now plays the same `ft-nav-close` animation as the nav drawer before
+      unmounting (`MobileControlPanelTests.Closing_PlaysCloseAnimation_ThenUnmounts`).
+      (2) A profile photo whose URL no longer loads showed the browser's alt text squeezed
+      into the avatar circle. The detail drawer now shows the initials with a
+      broken-image badge and "Photo couldn't be loaded", broken gallery thumbnails show a
+      broken-image tile, and the canvas node falls back to initials
+      (`BrokenPhotoFallbackTests`). Both are covered by bUnit tests, verified failing
+      against the old components. Neither has been looked at in a real browser yet; check
+      both on the phone after the next deploy. Why the photo URL is broken in the first
+      place hasn't been investigated (a deleted blob? an expired or external link?).
 
 **Fixed 2026-10-11 (smoke test): signed out, `/faq` -> "Go to dashboard" froze the page behind a red banner**
 - [x] Found during `docs/Testing/production-smoke-test-checklist.md` section 1. Two bugs

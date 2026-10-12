@@ -11,9 +11,9 @@
 @inject ThemeService Theme
 @implements IDisposable
 
-@if (TreeContext.MobilePanelOpen)
+@if (_shown)
 {
-    <div class="ft-mobile-panel" @onclick:stopPropagation="true">
+    <div class="@("ft-mobile-panel" + (_closing ? " ft-mobile-panel--closing" : ""))" @onclick:stopPropagation="true">
         @if (TreeContext.FocusPerson is { } panel)
         {
             <div class="ft-mobile-panel-name">@panel.FullName</div>
@@ -59,20 +59,58 @@
             @(_isDark ? "Light mode" : "Dark mode")
         </button>
     </div>
-    <div class="ft-mobile-panel-backdrop" @onclick="@(() => TreeContext.CloseMobilePanel())"></div>
+    <div class="@("ft-mobile-panel-backdrop" + (_closing ? " ft-mobile-panel-backdrop--closing" : ""))"
+         @onclick="@(() => TreeContext.CloseMobilePanel())"></div>
 }
 
 @code {
+    // Matches the ft-nav-close animation in app.css (and CustomAppBar's drawer).
+    public const int CloseAnimationMs = 250;
+
     private bool _isDark;
+    // Mounted, and mounted only to play the close animation. Closing used to just
+    // unmount the panel the instant MobilePanelOpen went false, so it vanished with no
+    // animation while opening dropped in (found on a real phone, 2026-10-12).
+    private bool _shown;
+    private bool _closing;
+    private int _closeVersion;
+    private bool _disposed;
 
     protected override void OnInitialized()
     {
         _isDark = Theme.IsDark;
+        _shown = TreeContext.MobilePanelOpen;
         TreeContext.OnChange += HandleContextChanged;
         Theme.OnChange += HandleThemeChanged;
     }
 
-    private void HandleContextChanged() => InvokeAsync(StateHasChanged);
+    private void HandleContextChanged() => InvokeAsync(SyncWithContextAsync);
+
+    private async Task SyncWithContextAsync()
+    {
+        if (TreeContext.MobilePanelOpen)
+        {
+            _closeVersion++; // reopened mid-close: cancel the pending unmount
+            _shown = true;
+            _closing = false;
+            StateHasChanged();
+            return;
+        }
+        if (!_shown || _closing)
+        {
+            StateHasChanged();
+            return;
+        }
+
+        _closing = true;
+        var version = ++_closeVersion;
+        StateHasChanged();
+        await Task.Delay(CloseAnimationMs);
+        if (_disposed || version != _closeVersion) return;
+        _shown = false;
+        _closing = false;
+        StateHasChanged();
+    }
 
     private void HandleThemeChanged()
     {
@@ -102,6 +140,7 @@
 
     public void Dispose()
     {
+        _disposed = true;
         TreeContext.OnChange -= HandleContextChanged;
         Theme.OnChange -= HandleThemeChanged;
     }
