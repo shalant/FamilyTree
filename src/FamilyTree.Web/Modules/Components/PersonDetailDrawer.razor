@@ -42,23 +42,39 @@
             @* ── Scrollable body ─────────────────────────────────────────── *@
             <div style="flex:1; overflow-y:auto; padding:20px 16px 8px;">
 
-                @* Avatar *@
-                <div style="display:flex; justify-content:center; margin-bottom:20px;">
-                    <div style="width:76px; height:76px; border-radius:50%; overflow:hidden;
-                        display:flex; align-items:center; justify-content:center;
-                        font-size:22px; font-weight:500; letter-spacing:0.02em;
-                        background:var(--ft-focus-fill); color:var(--ft-focus-text);
-                        border:2px solid var(--ft-focus-border);">
-                        @if (!string.IsNullOrWhiteSpace(Person.ProfilePhotoUrl))
+                @* Avatar. A photo that fails to load falls back to the initials, with a
+                   broken-image badge and a note, instead of the browser squeezing the
+                   alt text into the circle (found on a real phone, 2026-10-12). *@
+                @{ var photoBroken = IsBroken(Person.ProfilePhotoUrl); }
+                <div style="display:flex; flex-direction:column; align-items:center; gap:6px; margin-bottom:20px;">
+                    <div style="position:relative;">
+                        <div style="width:76px; height:76px; border-radius:50%; overflow:hidden;
+                            display:flex; align-items:center; justify-content:center;
+                            font-size:22px; font-weight:500; letter-spacing:0.02em;
+                            background:var(--ft-focus-fill); color:var(--ft-focus-text);
+                            border:2px solid var(--ft-focus-border);">
+                            @if (!string.IsNullOrWhiteSpace(Person.ProfilePhotoUrl) && !photoBroken)
+                            {
+                                <img class="ft-photo" src="@Person.ProfilePhotoUrl" alt="@Person.FullName"
+                                     @onerror="() => MarkBroken(Person.ProfilePhotoUrl)"
+                                     style="width:100%; height:100%; object-fit:cover;" />
+                            }
+                            else
+                            {
+                                @Initials
+                            }
+                        </div>
+                        @if (photoBroken)
                         {
-                            <img src="@Person.ProfilePhotoUrl" alt="@Person.FullName"
-                                 style="width:100%; height:100%; object-fit:cover;" />
-                        }
-                        else
-                        {
-                            @Initials
+                            <span class="ft-photo-broken-badge" title="Photo couldn't be loaded">
+                                <MudIcon Icon="@Icons.Material.Outlined.BrokenImage" Style="font-size:14px;" />
+                            </span>
                         }
                     </div>
+                    @if (photoBroken)
+                    {
+                        <span class="ft-photo-broken-note">Photo couldn't be loaded</span>
+                    }
                 </div>
 
                 @* Vital dates *@
@@ -287,7 +303,17 @@
                             {
                                 <div style="width:52px; height:52px; border-radius:6px; overflow:hidden;
                                     border:0.5px solid var(--ft-line-border); flex-shrink:0;">
-                                    <img src="@url" style="width:100%; height:100%; object-fit:cover;" />
+                                    @if (IsBroken(url))
+                                    {
+                                        <div class="ft-photo-broken-tile" title="Photo couldn't be loaded">
+                                            <MudIcon Icon="@Icons.Material.Outlined.BrokenImage" Style="font-size:20px;" />
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <img class="ft-photo" src="@url" alt="Photo" @onerror="() => MarkBroken(url)"
+                                             style="width:100%; height:100%; object-fit:cover;" />
+                                    }
                                 </div>
                             }
                         </div>
@@ -336,6 +362,15 @@
     private List<RelatedPerson> _related = [];
     private List<string> _previewPhotos = [];  // populated by media API when ready
     private List<StoryDto> _stories = [];
+    // Photo URLs that failed to load. Keyed by URL, so another person's photo (or a
+    // fixed URL after an edit) is tried afresh.
+    private readonly HashSet<string> _brokenPhotos = [];
+
+    private bool IsBroken(string? url) => !string.IsNullOrWhiteSpace(url) && _brokenPhotos.Contains(url);
+    private void MarkBroken(string? url)
+    {
+        if (!string.IsNullOrWhiteSpace(url)) _brokenPhotos.Add(url);
+    }
 
     protected override async Task OnParametersSetAsync()
     {

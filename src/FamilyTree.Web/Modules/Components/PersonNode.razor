@@ -9,10 +9,14 @@
      @onclick="() => OnClick.InvokeAsync(Person)"
      @onmouseenter="OnMouseEnter"
      @onmouseleave="OnMouseLeave">
-    @if (!string.IsNullOrWhiteSpace(Person.ProfilePhotoUrl))
+    @if (!string.IsNullOrWhiteSpace(Person.ProfilePhotoUrl) && Person.ProfilePhotoUrl != _brokenPhotoUrl)
     {
-        <img src="@Person.ProfilePhotoUrl"
+        @* A photo that fails to load falls back to the initials below, rather than the
+           browser drawing the alt text inside the circle (2026-10-12). *@
+        <img class="ft-photo"
+             src="@Person.ProfilePhotoUrl"
              alt="@Person.FullName"
+             @onerror="() => _brokenPhotoUrl = Person.ProfilePhotoUrl"
              style="width:100%; height:100%; border-radius:50%; object-fit:cover;" />
     }
     else
@@ -44,6 +48,7 @@
 
     private const int LabelWidth = 88;
     private bool _hovered;
+    private string? _brokenPhotoUrl;
 
     private string Initials =>
         $"{Person.FirstName?.FirstOrDefault()}{Person.LastName?.FirstOrDefault()}"
