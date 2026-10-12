@@ -346,9 +346,11 @@ public class FamilyTreeLayoutTransitionTests
     // own and take their alphabetical slot ("Bill" before "Ray"), so they jump from beside
     // Ray to the far left and Ray's whole family shifts 320px right. The "before" state
     // also overlaps with ascending ids (Bill lands on Rose: R4).
-    [Theory(Skip = KnownOpen + "'[LAYOUT TRANSITIONS 2026-10-11] R13' (DESIGN QUESTION: an orphan sibling who marries " +
-                   "jumps to their own alphabetical root slot and moves their sibling's family)."),
-     InlineData(false), InlineData(true)]
+    //
+    // Fixed 2026-10-12 (R13, Doug's call: keep the couple beside the sibling's family): a
+    // root group whose parents are Sibling-linked into another root group's family sorts
+    // right after that group, so Bill+Gish land right of Ray's family, where Bill already sat.
+    [Theory, InlineData(false), InlineData(true)]
     public void OrphanSiblingMarries_SpouseLandsBesideHimAndRaysFamilyDoesNotMove(bool reverseIds)
     {
         var t = new Tree(reverseIds);
@@ -366,6 +368,43 @@ public class FamilyTreeLayoutTransitionTests
 
         AssertSound(after, afterLayout);
         AssertSamePositions(before, afterLayout, [ray, rose, ellen], "Bill's marriage must not move Ray's family");
+    }
+
+    // Same edit with a third root family in play: Ray's daughter Ellen married Marc, son of
+    // Bud and Florence (a cross-root marriage), and "Bud" sorts before both "Bill" and "Ray".
+    // Bill+Gish must still land next to Ray's family without wedging between the two
+    // families the cross-root step keeps adjacent for Marc and Ellen.
+    //
+    // No AssertSound here yet: Marc and Ellen sit 560px apart before and after this edit,
+    // which is the open R6 cross-root gap (docs/TodoList.md "[LAYOUT FUZZ 2026-10-10] R6"),
+    // not this transition. Add AssertSound(after, afterLayout) in the PR that fixes R6.
+    [Theory, InlineData(false), InlineData(true)]
+    public void OrphanSiblingMarries_NextToAFamilyWithACrossRootMarriage(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var ray = t.Add("Ray", "Small", 1922);
+        var rose = t.Add("Rose", "Small", 1924);
+        var ellen = t.Add("Ellen", "Small", 1950);
+        var bud = t.Add("Bud", "Kuh", 1920);
+        var florence = t.Add("Florence", "Kuh", 1921);
+        var marc = t.Add("Marc", "Kuh", 1948);
+        var bill = t.Add("Bill", "Small", 1925);
+        t.Marry(ray, rose).Parent(ray, ellen).Parent(rose, ellen)
+         .Marry(bud, florence).Parent(bud, marc).Parent(florence, marc)
+         .Marry(marc, ellen).Sibling(ray, bill);
+
+        var before = t.Layout(ray);
+        var after = t.Clone();
+        var gish = after.Add("Gish", "Small", 1926);
+        after.Marry(bill, gish);
+        var afterLayout = after.Layout(ray);
+
+        AssertSameRelativePlacement(before, afterLayout, [bud, florence, marc, ray, rose, ellen],
+            "Bill's marriage must not rearrange the two families joined by Marc and Ellen");
+        var nodes = ById(afterLayout);
+        var rayFamily = new[] { ray, rose }.Select(id => nodes[id].X).ToList();
+        Math.Min(Math.Abs(nodes[bill].X - rayFamily.Min()), Math.Abs(nodes[bill].X - rayFamily.Max()))
+            .Should().BeLessThanOrEqualTo(2 * SpouseSpacingX, "Bill must sit next to his brother's family");
     }
 
     // ─────────────────────────────────────────────────────────────────────────

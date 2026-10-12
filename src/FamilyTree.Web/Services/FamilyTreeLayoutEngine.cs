@@ -322,6 +322,55 @@ public class FamilyTreeLayoutEngine
                 MarkDescendants(rg, rg);
             }
 
+            // ── Sibling-linked root groups follow their sibling's family (R13) ──
+            // A root group's parents have no parents on the tree, so any SiblingIds they
+            // carry are explicit Sibling links. Unmarried, such a person is a root
+            // individual and the sibling-anchor pass puts them just right of their
+            // sibling. Married, they become a root group and used to take their own
+            // CoupleSortKey slot: Bill (Ray's sibling) marrying Gish jumped to the far
+            // left ("Bill" before "Ray") and shifted Ray's whole family 320px. Decided
+            // 2026-10-12: such a group sorts right AFTER the root group its sibling
+            // belongs to, so the marriage moves nobody before it and keeps Bill on the
+            // side he already sat on. This is a sort key derived from structure, applied
+            // before anything is placed; it doesn't move already-placed nodes, which is
+            // what the "never reordered by sibling relationships" rule (see the
+            // place-roots loop) is about. Runs before the cross-root step, which may still
+            // make its own adjacency moves afterward.
+            {
+                var siblingTarget = new Dictionary<NuclearGroup, NuclearGroup>();
+                foreach (var rg in rootGroups)
+                {
+                    var target = new[] { rg.ParentAId, rg.ParentBId }
+                        .Where(id => id.HasValue)
+                        .SelectMany(id => personById[id!.Value].SiblingIds ?? [])
+                        .Select(sid => descendantOfRoot.GetValueOrDefault(sid))
+                        .Where(r => r is not null && r != rg)
+                        .OrderBy(r => rootGroups.IndexOf(r!))
+                        .FirstOrDefault();
+                    if (target is null) continue;
+                    // Two groups pointing at each other (or a longer loop) would have no
+                    // order to follow; the first one keeps its own slot.
+                    var t = target;
+                    while (t is not null && t != rg) t = siblingTarget.GetValueOrDefault(t);
+                    if (t == rg) continue;
+                    siblingTarget[rg] = target;
+                }
+
+                if (siblingTarget.Count > 0)
+                {
+                    var ordered = new List<NuclearGroup>();
+                    void Emit(NuclearGroup g)
+                    {
+                        ordered.Add(g);
+                        foreach (var follower in rootGroups.Where(f => siblingTarget.GetValueOrDefault(f) == g))
+                            Emit(follower);
+                    }
+                    foreach (var rg in rootGroups.Where(g => !siblingTarget.ContainsKey(g)))
+                        Emit(rg);
+                    rootGroups = ordered;
+                }
+            }
+
             var crossRootInfo = new List<(NuclearGroup couple, NuclearGroup rootA, NuclearGroup rootB, Guid memberOfA, Guid memberOfB)>();
             // Index (into the FINAL rootGroups list) of a boundary forced zero-gap by
             // step 2 below — consumed by the main placement loop to reserve OrphanBufferX

@@ -335,6 +335,9 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       `SpouseSpacingX` (200). Not changing the invariant. Doug to decide: accept the gap
       (then Invariant 4's bound needs an explicit cross-root exception, recorded as a
       decision) or only reserve the buffer when an orphan sibling actually needs it.
+      *2026-10-12:* `FamilyTreeLayoutTransitionTests.OrphanSiblingMarries_NextToAFamilyWithACrossRootMarriage`
+      skips `AssertSound` only because of this gap (Marc and Ellen 560px apart before and
+      after the edit). Add it back in the PR that fixes R6.
 - [ ] **[LAYOUT FUZZ 2026-10-10] R7 — a spouse-anchored partner lands past an occupied
       slot.** The safety net anchors a partner with no group of their own (the 2026-07-07
       Harvey Fleishman shape, or anyone in 2+ couples) via `FindOpenXAdjacentTo`, which
@@ -443,7 +446,7 @@ third lands on top of the second (R4).
       `CoupleHelper`'s GUID order. With ascending ids, Alex sits between Pat and Blair.
       Related to R2 and R6. Test:
       `HalfSiblingWithAnUnmarriedCoParent_BothChildrenStayUnderTheirOwnParents`.
-- [ ] **[LAYOUT TRANSITIONS 2026-10-11] R13 — DESIGN QUESTION: an orphan sibling who
+- [x] **[LAYOUT TRANSITIONS 2026-10-11] R13 — DESIGN QUESTION: an orphan sibling who
       marries jumps to their own alphabetical root slot.** Unmarried, Bill (Sibling-linked
       to Ray, no parents) is a root individual anchored beside Ray. Married to Gish, the
       couple becomes a root group and takes its `CoupleSortKey` slot: "Bill" sorts before
@@ -455,6 +458,26 @@ third lands on top of the second (R4).
       key, not a reorder of placed nodes). The test also records a before-state overlap
       with ascending ids (Bill lands on Rose, R4). Test:
       `OrphanSiblingMarries_SpouseLandsBesideHimAndRaysFamilyDoesNotMove`.
+      **Decided and fixed 2026-10-12** on `fix/r13-sibling-linked-couple-order` (not
+      deployed yet). Decision (Doug, 2026-10-12): keep the couple beside the sibling's
+      family rather than accept the jump. A root group whose parents have a Sibling link
+      into another root group's family now sorts right after that group (the first such
+      group in the current order, if siblings sit in several). It's a sort key applied
+      before placement, after the lineage-side sort and before the cross-root step.
+      Unmarried Bill already sat just right of Ray, so marrying keeps him on that side
+      and moves nobody before him. Known limit: if the sibling sits deep inside a bigger
+      family, the couple lands at the right edge of that whole family, not directly
+      beside the sibling. Two groups that point at each other keep the first one's own
+      slot. The test is un-skipped, and a new one
+      (`OrphanSiblingMarries_NextToAFamilyWithACrossRootMarriage`) covers the cross-root
+      step running after the new sort. Both fail on the pre-fix engine and pass for both
+      GUID orders. The new test leaves out `AssertSound` until R6 is fixed (see R6). An
+      ad-hoc fuzz comparison over 3,266 generated families with an orphan-sibling link
+      (5,000 seeds) is neutral on the general invariants: Invariant 1 failures 829 → 829,
+      Invariant 4 failures 1,751 → 1,753, Invariant 6 failures 6 → 6, with 49 cases fixed
+      and 51 newly failing, all in still-open shapes (R4 orphan-sibling Y collisions,
+      R2/R6/R8). Those invariants don't measure "a marriage moves nobody", which is what
+      this fixes.
 - [ ] **Adoption is a dormant product gap, not a layout bug.** `RelationshipType.Adopted`
       exists, `RelationshipService` validates it and `GedcomExportService` exports it, but
       `PersonMapper` ignores it (an `Adopted` row produces no `ParentIds`/`ChildIds`), and
