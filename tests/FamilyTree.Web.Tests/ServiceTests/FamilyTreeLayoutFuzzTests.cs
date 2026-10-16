@@ -65,7 +65,7 @@ public class FamilyTreeLayoutFuzzTests
     private const KnownOpen Invariant1Exclusions =
         KnownOpen.PartnerWithChildrenElsewhere |
         KnownOpen.DatelessPerson | KnownOpen.AnchorPlacedPerson |
-        KnownOpen.PartnerSameEraAsInLaw | KnownOpen.CrossRootCouple;
+        KnownOpen.PartnerSameEraAsInLaw;
 
     // 2. Every input person appears exactly once in the output, and nobody else does.
     [Fact]
@@ -512,9 +512,9 @@ public class FamilyTreeLayoutFuzzTests
         // (within their own parents' span), which fixes the common case, but the pull is
         // still blocked when a sibling holds the inner edge or both partners head families
         // of their own. TodoList "[LAYOUT FUZZ 2026-10-10] R6".
-        // R10, same shape: the post-placement pass drops a cross-root couple's children at
-        // the couple's midpoint with no collision check, so two such couples can stack
-        // their children on the same X. TodoList "[LAYOUT FUZZ 2026-10-10] R10".
+        // R10 (a cross-root couple's children dropped at the midpoint with no collision
+        // check) was fixed 2026-10-15, and Invariant 1 no longer excludes this flag; only
+        // Invariant 4 still does, for R6. TodoList "[LAYOUT FUZZ 2026-10-10] R10".
         CrossRootCouple = 16,
         // R7: someone in two or more couples, or with children outside a couple. Since
         // 2026-10-15 FindOpenXAdjacentTo takes the nearer free side and checks collisions at
