@@ -307,6 +307,17 @@ public class FamilyTreeLayoutEngine
             void MarkDescendants(NuclearGroup g, NuclearGroup root)
             {
                 if (!markPath.Add(GroupKey.Of(g))) return;
+                // A partner with no parents on the tree belongs to the family whose group is
+                // their primary one (R2 (a), 2026-10-11). Ellen Kuh, with a child by Max
+                // Small (Max Sr's son), later married Ellen Small (Florence's daughter);
+                // unmarked, that marriage wasn't seen as joining two families, and Florence's
+                // side placed Ellen Kuh on the far side from Max, 520px from him. Only
+                // parentless partners: anyone with parents gets their family from them, and
+                // claiming them here could take them from it, depending on which root is
+                // walked first (it broke CrossRootCouple_StillDetectedWhenOneSideIsNested...).
+                foreach (var p in new[] { g.ParentAId, g.ParentBId })
+                    if (p is { } pid && !childrenInGroups.Contains(pid) && primaryGroup.GetValueOrDefault(pid) == g)
+                        descendantOfRoot.TryAdd(pid, root);
                 foreach (var cid in g.ChildIds)
                 {
                     descendantOfRoot.TryAdd(cid, root);
@@ -547,8 +558,15 @@ public class FamilyTreeLayoutEngine
             // MeasureGroup so nothing else lands there. The slot is reserved even while
             // the second marriage is childless, so its first child arriving moves nobody.
             // At most one per person; a third marriage still goes through the safety net.
+            //
+            // The shared person's primary group can also be a single-parent group (R2,
+            // 2026-10-11): Ann has a son with no other parent recorded and a childless
+            // marriage to Lauren. Before, only a couple could carry an attachment, so Lauren
+            // went through the safety net and could walk off the left edge of the canvas.
+            // A single parent is drawn at the slot's centre and has no partner on either
+            // side, so the attachment goes on the right.
             var crossRootCouples = crossRootInfo.Select(c => c.couple).ToHashSet();
-            var attachedFor = new Dictionary<Guid, (NuclearGroup Group, Guid PartnerId)>();
+            var attachedFor = new Dictionary<Guid, (NuclearGroup Group, Guid? PartnerId)>();
             foreach (var g in compGroups
                 .OrderByDescending(g => g.ChildIds.Count > 0 ? 1 : 0)
                 .ThenBy(OldestChildYear))
@@ -557,16 +575,35 @@ public class FamilyTreeLayoutEngine
                 foreach (var (x, s) in new[] { (g.ParentAId.Value, g.ParentBId.Value), (g.ParentBId.Value, g.ParentAId.Value) })
                 {
                     if (attachedFor.ContainsKey(x)) continue;
-                    if (!primaryGroup.TryGetValue(x, out var px) || px == g || !px.ParentBId.HasValue) continue;
+                    if (!primaryGroup.TryGetValue(x, out var px) || px == g) continue;
                     if (primaryGroup.TryGetValue(s, out var ps) && ps != g) continue;
                     if (childrenInGroups.Contains(s)) continue;
                     attachedFor[x] = (g, s);
                 }
             }
 
-            // The second marriage hanging off `parent`'s side of g, if g is that person's
-            // primary group (only the primary group carries it).
-            (NuclearGroup Group, Guid PartnerId)? AttachmentOf(NuclearGroup g, Guid? parent) =>
+            // ── Children with no other recorded parent, beside the primary couple (R2) ──
+            // A person married with children (Pat and Alex, child Kim) can also have
+            // children whose other parent isn't on the tree (Kit and Kat). That
+            // single-parent group is never Pat's primary (a couple wins), so it was never
+            // a root and nothing placed it: Kit and Kat fell to the safety net at the right
+            // edge, ungrouped, past Pat's own siblings, and anyone they married was
+            // anchored wherever that left them (found 2026-10-11 by the layout fuzz
+            // harness). It now hangs on Pat's free side like a second marriage with no
+            // partner node: the children sit outward of the couple's own children, under
+            // Pat's side. Runs after the second-marriage loop so a person who already has
+            // an attached second marriage keeps it; their single-parent children still go
+            // through the old path.
+            foreach (var g in compGroups.Where(g => !g.ParentBId.HasValue && g.ChildIds.Count > 0))
+            {
+                if (g.ParentAId is not { } x || attachedFor.ContainsKey(x)) continue;
+                if (!primaryGroup.TryGetValue(x, out var px) || px == g || !px.ParentBId.HasValue) continue;
+                attachedFor[x] = (g, null);
+            }
+
+            // The second marriage (or single-parent group) hanging off `parent`'s side of g,
+            // if g is that person's primary group (only the primary group carries it).
+            (NuclearGroup Group, Guid? PartnerId)? AttachmentOf(NuclearGroup g, Guid? parent) =>
                 parent is { } p && primaryGroup.TryGetValue(p, out var pg) && pg == g &&
                 attachedFor.TryGetValue(p, out var att) ? att : null;
 
@@ -603,12 +640,36 @@ public class FamilyTreeLayoutEngine
                     if (wantRight.TryGetValue(partner, out var partnerRight) && partnerRight == right) continue;
                     if (attachedFor.ContainsKey(partner)) continue;
 
-                    var turned = g with { ParentAId = g.ParentBId, ParentBId = g.ParentAId };
-                    var rootIndex = rootGroups.IndexOf(g);
-                    if (rootIndex >= 0) rootGroups[rootIndex] = turned;
-                    foreach (var key in primaryGroup.Where(kv => kv.Value == g).Select(kv => kv.Key).ToList())
-                        primaryGroup[key] = turned;
+                    Turn(g);
                 }
+
+                // The same for an attachment (R2, 2026-10-11): it hangs on its holder's side
+                // of the couple, outward of the couple's own children. If one of those
+                // children is a cross-root partner sorted to that same edge, the attached
+                // family sits between them and their partner's family and blocks the pull
+                // below (Ellen's son Bill, by no recorded father, landed between her daughter
+                // Rose and Rose's husband from the next family). Turn the couple so the
+                // attachment hangs on the other side. Skipped if both parents hold an
+                // attachment or the children want both edges.
+                foreach (var g in primaryGroup.Values.Distinct().Where(g => g.ParentBId.HasValue).ToList())
+                {
+                    var holdsA = AttachmentOf(g, g.ParentAId) is not null;
+                    var holdsB = AttachmentOf(g, g.ParentBId) is not null;
+                    if (holdsA == holdsB) continue;
+                    var edges = g.ChildIds.Where(wantRight.ContainsKey).Select(c => wantRight[c]).Distinct().ToList();
+                    if (edges.Count != 1) continue;
+                    // ParentA's attachment hangs left, ParentB's right; turn if a child wants that edge.
+                    if (edges[0] == holdsB) Turn(g);
+                }
+            }
+
+            void Turn(NuclearGroup g)
+            {
+                var turned = g with { ParentAId = g.ParentBId, ParentBId = g.ParentAId };
+                var rootIndex = rootGroups.IndexOf(g);
+                if (rootIndex >= 0) rootGroups[rootIndex] = turned;
+                foreach (var key in primaryGroup.Where(kv => kv.Value == g).Select(kv => kv.Key).ToList())
+                    primaryGroup[key] = turned;
             }
 
             // ── Memoised bottom-up width measurement ─────────────────────────
@@ -624,11 +685,20 @@ public class FamilyTreeLayoutEngine
                     ? MeasureGroup(cg)
                     : (double)NodeSpacingX);
 
+            // Where each parent of g sits relative to the core anchor, and which way an
+            // attachment of theirs extends: a couple's ParentA is drawn left and ParentB
+            // right; a single parent sits at the anchor and attaches on the right.
+            (Guid? Parent, double Offset, int Dir)[] AttachSides(NuclearGroup g) => g.ParentBId.HasValue
+                ? [(g.ParentAId, SpouseSpacingX / 2.0, -1), (g.ParentBId, SpouseSpacingX / 2.0, 1)]
+                : [(g.ParentAId, 0, 1)];
+
             // Centre of an attached group's children, as an offset from the core anchor
-            // (sign added by the caller): under the second couple's midpoint, pushed
-            // outward only if that would overlap the core group's own children.
-            double AttachedChildrenOffset(double coreChildrenW, double attachedW) =>
-                Math.Max(SpouseSpacingX, coreChildrenW / 2.0 + attachedW / 2.0);
+            // (sign added by the caller): under the second couple's midpoint (or under the
+            // shared person, for a single-parent group), pushed outward only if that would
+            // overlap the core group's own children. sharedOffset is how far the shared
+            // person sits from the anchor.
+            double AttachedChildrenOffset(double coreChildrenW, double attachedW, double sharedOffset, bool hasPartner) =>
+                Math.Max(sharedOffset + (hasPartner ? SpouseSpacingX / 2.0 : 0), coreChildrenW / 2.0 + attachedW / 2.0);
 
             double MeasureGroup(NuclearGroup g)
             {
@@ -646,25 +716,24 @@ public class FamilyTreeLayoutEngine
 
                 var w = g.ChildIds.Count == 0 ? selfW : Math.Max(selfW, childrenW);
 
-                if (g.ParentBId.HasValue)
+                // How far each attachment reaches past the core's own edge: the partner's
+                // node (SpouseSpacingX beyond the shared person, plus half a slot) or the
+                // outer edge of its children, whichever is further.
+                double left = 0, right = 0;
+                foreach (var (parent, sharedOffset, dir) in AttachSides(g))
                 {
-                    // How far an attachment reaches past the core's own edge: the partner's
-                    // node (SpouseSpacingX beyond the shared person, plus half a slot) or
-                    // the outer edge of its children, whichever is further.
-                    double Ext(Guid? parent)
-                    {
-                        if (AttachmentOf(g, parent) is not { } att) return 0;
-                        var attW = att.Group.ChildIds.Count == 0 ? 0 : ChildrenWidth(att.Group.ChildIds);
-                        var reach = SpouseSpacingX / 2.0 + SpouseSpacingX + NodeSpacingX / 2.0;
-                        if (attW > 0) reach = Math.Max(reach, AttachedChildrenOffset(childrenW, attW) + attW / 2.0);
-                        return Math.Max(0, reach - w / 2.0);
-                    }
-                    var (left, right) = (Ext(g.ParentAId), Ext(g.ParentBId));
-                    if (left > 0 || right > 0)
-                    {
-                        sideExt[g] = (left, right);
-                        w += left + right;
-                    }
+                    if (AttachmentOf(g, parent) is not { } att) continue;
+                    var hasPartner = att.PartnerId.HasValue;
+                    var attW = att.Group.ChildIds.Count == 0 ? 0 : ChildrenWidth(att.Group.ChildIds);
+                    var reach = hasPartner ? sharedOffset + SpouseSpacingX + NodeSpacingX / 2.0 : 0;
+                    if (attW > 0) reach = Math.Max(reach, AttachedChildrenOffset(childrenW, attW, sharedOffset, hasPartner) + attW / 2.0);
+                    var ext = Math.Max(0, reach - w / 2.0);
+                    if (dir < 0) left = ext; else right = ext;
+                }
+                if (left > 0 || right > 0)
+                {
+                    sideExt[g] = (left, right);
+                    w += left + right;
                 }
 
                 measurePath.Remove(GroupKey.Of(g));
@@ -735,22 +804,27 @@ public class FamilyTreeLayoutEngine
                     SetNode(g.ParentAId.Value, leftX);
                     SetNode(g.ParentBId.Value, rightX);
                     coupleGaps.Add((leftX, rightX));
-
-                    var childrenW = g.ChildIds.Count == 0 ? 0 : ChildrenWidth(g.ChildIds);
-                    foreach (var (parent, sharedX, dir) in new[] { (g.ParentAId, leftX, -1), (g.ParentBId, rightX, 1) })
-                    {
-                        if (AttachmentOf(g, parent) is not { } att) continue;
-                        var partnerX = sharedX + dir * SpouseSpacingX;
-                        SetNode(att.PartnerId, partnerX);
-                        coupleGaps.Add((Math.Min(sharedX, partnerX), Math.Max(sharedX, partnerX)));
-                        if (att.Group.ChildIds.Count == 0) continue;
-                        var attW = ChildrenWidth(att.Group.ChildIds);
-                        PlaceChildren(att.Group.ChildIds, anchorX + dir * AttachedChildrenOffset(childrenW, attW));
-                    }
                 }
                 else if (g.ParentAId.HasValue)
                 {
                     SetNode(g.ParentAId.Value, anchorX);
+                }
+
+                var childrenW = g.ChildIds.Count == 0 ? 0 : ChildrenWidth(g.ChildIds);
+                foreach (var (parent, sharedOffset, dir) in AttachSides(g))
+                {
+                    if (AttachmentOf(g, parent) is not { } att) continue;
+                    var sharedX = anchorX + dir * sharedOffset;
+                    if (att.PartnerId is { } partnerId)
+                    {
+                        var partnerX = sharedX + dir * SpouseSpacingX;
+                        SetNode(partnerId, partnerX);
+                        coupleGaps.Add((Math.Min(sharedX, partnerX), Math.Max(sharedX, partnerX)));
+                    }
+                    if (att.Group.ChildIds.Count == 0) continue;
+                    var attW = ChildrenWidth(att.Group.ChildIds);
+                    PlaceChildren(att.Group.ChildIds,
+                        anchorX + dir * AttachedChildrenOffset(childrenW, attW, sharedOffset, att.PartnerId.HasValue));
                 }
 
                 if (g.ChildIds.Count == 0) return;

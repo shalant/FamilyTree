@@ -345,6 +345,46 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       across generations (a great-grandmother "co-parenting" with a grandson), which
       can't all sit together; mostly a fuzz artifact. The `PartnerWithChildrenElsewhere`
       flag stays.
+      *2026-10-11 (branch `fix/r2-blended-family-couples`):* the Ann/Doug/Dora repro above
+      was already fixed (Ann and Doug 200px apart in both GUID orders). Fixed three more
+      pieces, each with a `FamilyTreeLayoutTransitionTests` pair run under both GUID
+      orders that fails without that piece:
+      1. **Children with no other recorded parent were never placed.** A person whose
+         primary group is a couple (Pat and Alex, child Kim) can also have children with
+         nobody else recorded (Kit, Kat). That single-parent group was never a root, so
+         its children fell to the safety net at the right edge, past Pat's siblings, and
+         their spouses landed on top of other nodes. It now hangs on Pat's free side like
+         an R11 second marriage with no partner node
+         (`ChildrenWithNoOtherRecordedParent_SitUnderThatParentBesideTheirMarriage`). A
+         person who already has an attached second marriage keeps it; their
+         single-parent children still go the old way.
+      2. **A single parent couldn't carry an attached marriage.** Ann has a son with no
+         other parent recorded and marries Lauren (no other relatives); Lauren went to the
+         spouse safety net and could walk off the left edge. The attachment now also
+         works when the primary group is single-parent, on the right
+         (`SingleParentMarriesSomeoneWithNoOtherRelatives_PartnerSitsBesideThem`).
+      3. **(a) above is fixed** with a different approach from the one suggested: a
+         partner with no parents on the tree now belongs, in the cross-root check, to the
+         family whose group is their primary one, so Ellen Kuh's remarriage into
+         Florence's family is a cross-root couple and gets the existing adjacency and pull
+         (`RemarriageIntoAnotherFamily_ParentlessPartnerSitsBetweenBothPartners`).
+         Partners who have parents are left alone; claiming them too broke
+         `CrossRootCouple_StillDetectedWhenOneSideIsNestedUnderAGrandparent`.
+      Also: a couple carrying an attachment turns so it hangs away from a child's
+      cross-root marriage (`AttachedFamilyHangsAwayFromACrossRootMarriage`; fails with
+      the turn disabled). Over 5,000 generated families (base seed 777), compared with
+      the engine before this branch: in families where nobody has more than two partners
+      or a child more than two parents, Invariant 4 failures 907 → 896, split couples
+      1,078 → 1,052, overlapping nodes 665 → 584, nodes past the left edge 254 → 191,
+      children more than 600px from a parent 1,980 → 1,291. Over all families: overlaps
+      1,127 → 984, left-edge 397 → 300, far children 4,070 → 3,138, split couples
+      3,138 → 3,132. **Worse:** total excess distance of split couples, 276k → 330k px
+      (realistic) and 909k → 1,066k px (all). It's mostly a child now placed under their
+      parent, in an attached group, whose spouse heads a family elsewhere; before, both
+      were dumped at the edge near each other. The descendant walk doesn't follow
+      attached groups, so those marriages aren't cross-root couples. Making it follow
+      them was tried and made split couples worse (1,054 → 1,135 in realistic families,
+      measured before piece 3 above), because of R6's own open limits. Still open: that, and (b).
 - [ ] **[LAYOUT FUZZ 2026-10-10] R3 — dateless birth-year inference is greedy and
       order-dependent.** Pass 1 takes the first available evidence (children, then
       siblings, then spouses, then parents) in list order and never reconciles. Results: a
