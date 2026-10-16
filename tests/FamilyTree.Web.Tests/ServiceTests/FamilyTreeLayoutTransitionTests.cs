@@ -242,13 +242,11 @@ public class FamilyTreeLayoutTransitionTests
     // marriages, neither his primary) and is anchored beside the rightmost of his wives.
     // The search always tried the right side first and stepped past whoever held it.
     //
-    // Still open after the 2026-10-15 nearer-side fix: being within SpouseSpacingX of both
-    // wives needs Florence and Dora on the inner edges of two adjacent families with
-    // Harvey between them, a root-group reorder like the cross-root step's, not a better
-    // free slot. Fails identically before and after that fix.
-    [Theory(Skip = KnownOpen + "'[LAYOUT FUZZ 2026-10-10] R7' (a partner bridging two families " +
-                   "needs the families reordered, not a nearer slot)."),
-     InlineData(false), InlineData(true)]
+    // Not fixed by the 2026-10-15 nearer-side change: Harvey was actually Dora's R11
+    // attachment, with Florence's family on the far side of Max+Dora's. Fixed the same day
+    // by counting Harvey as part of Dora's family in the cross-root check, so his marriage
+    // to Florence brings the two families together, facing each other.
+    [Theory, InlineData(false), InlineData(true)]
     public void PersonMarriedIntoTwoFamilies_SitsBesideAWife(bool reverseIds)
     {
         var t = new Tree(reverseIds);
@@ -267,6 +265,47 @@ public class FamilyTreeLayoutTransitionTests
         var layout = after.Layout(marc);
 
         AssertSound(after, layout);
+    }
+
+    // R10: Al (Gus's son) marries Bet (Bo's daughter), a cross-root couple, and Bet's
+    // brother Bud has three children of his own beside her. A cross-root couple's children
+    // were dropped centred on the couple's midpoint with no collision check, so Al and
+    // Bet's fourth child arriving spread their row into Bud's children's slots.
+    [Theory, InlineData(false), InlineData(true)]
+    public void CrossRootCouplesChildren_DoNotLandOnTheirCousins(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var gus = t.Add("Gus", "Kuh", 1900);
+        var gail = t.Add("Gail", "Kuh", 1902);
+        var al = t.Add("Al", "Kuh", 1925);
+        var bo = t.Add("Bo", "Lee", 1901);
+        var bea = t.Add("Bea", "Lee", 1903);
+        var bet = t.Add("Bet", "Lee", 1926);
+        var bud = t.Add("Bud", "Lee", 1927);
+        var dot = t.Add("Dot", "Lee", 1928);
+        t.Marry(gus, gail).Parent(gus, al).Parent(gail, al)
+         .Marry(bo, bea).Parent(bo, bet).Parent(bea, bet).Parent(bo, bud).Parent(bea, bud)
+         .Marry(bud, dot).Marry(al, bet);
+        foreach (var (name, year) in new[] { ("Dee", 1950), ("Dan", 1951), ("Dru", 1952) })
+        {
+            var c = t.Add(name, "Lee", year);
+            t.Parent(bud, c).Parent(dot, c);
+        }
+        foreach (var (name, year) in new[] { ("Kim", 1950), ("Kit", 1951), ("Kay", 1952) })
+        {
+            var c = t.Add(name, "Kuh", year);
+            t.Parent(al, c).Parent(bet, c);
+        }
+
+        var after = t.Clone();
+        var kip = after.Add("Kip", "Kuh", 1953);
+        after.Parent(al, kip).Parent(bet, kip);
+
+        AssertSound(t, t.Layout(gus));
+        var afterLayout = after.Layout(gus);
+        AssertSound(after, afterLayout);
+        foreach (var c in after.People().Where(p => p.ParentIds?.Contains(al) == true))
+            AssertChildUnderParents(after, afterLayout, c.Id);
     }
 
     // An orphan sibling (no parents on the tree) is linked to Ray, who has his wife on one

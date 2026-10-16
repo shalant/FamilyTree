@@ -500,6 +500,16 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       skipped), which needs the families reordered like the cross-root step, and the
       flag stays on `Invariant4` for that and for 3+-couple people (the fuzz invariant has
       no per-person couple limit; its shrunk counterexample is Willa in three couples).
+      *2026-10-15, later (branch `fix/r7-bridge-two-families`):* the Harvey case is fixed.
+      Harvey wasn't going through the safety net: he was Dora's R11 attachment, and
+      Florence's family sat on the far side of Max+Dora's. A parentless partner whose
+      primary couple is someone's attachment now counts, in the cross-root check, as part
+      of that partner's family, so his other marriage is a cross-root couple: the
+      families are made adjacent and Florence turns to face them; Dora's couple turns so
+      Harvey hangs on that side (Bud, Florence, Harvey, Dora, Max; 120px and 200px). The
+      test is un-skipped and fails on the old engine in both GUID orders. Still open: the
+      flag stays on `Invariant4` for 3+-couple people and for two partners who each head
+      a family (Lauren, wife of Bill, formerly of Marc, 280px from Marc).
 - [ ] **[LAYOUT FUZZ 2026-10-10] R8 — an orphan sibling with a partner is anchored to the
       sibling, not the partner.** A person with no parents but an explicit Sibling link
       **and** a partner is placed by the root-individual sibling loop, which runs before
@@ -511,11 +521,22 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       parent. Repro: Willa (1926) married Ann Kuh (1916). Willa's mother Ann Small (1906)
       renders 65px above Ann Kuh at the same X. Rare (about 1 in 3,000 generated families). Fails
       Invariant 1.
-- [ ] **[LAYOUT FUZZ 2026-10-10] R10 — cross-root couples' children can stack on the same
+- [x] **[LAYOUT FUZZ 2026-10-10] R10 — cross-root couples' children can stack on the same
       X.** The post-placement pass drops each cross-root couple's children at the couple's
       midpoint with no collision check. With two cross-root couples side by side, Ellen Kuh
       (1970) and Ellen Rosenberg (1969) rendered at the same X, 7px apart. Fails
       Invariant 1.
+      **Fixed 2026-10-15** on `fix/r7-bridge-two-families`: the pass tries the midpoint,
+      then one slot further out at a time, alternating sides (up to 6 slots), undoing any
+      try whose children land on an already-placed node; if none is clear the midpoint is
+      kept, as before. New test `CrossRootCouplesChildren_DoNotLandOnTheirCousins` (Al and
+      Bet's children landed on Bet's brother's children, 40px apart) fails without it.
+      `CrossRootCouple` is off `Invariant1`'s exclusions. Over 5,000 generated families
+      (base seed 777), compared with the engine before this branch: overlaps 262 → 189,
+      split couples 1,742 → 1,735, no family's couples newly split. Three families
+      newly overlap (seeds 1800, 2973, 4789): children with three recorded parents and
+      people married into their parents' couples, where which marriages count as
+      cross-root changed; not chased.
 - [ ] **[LAYOUT FUZZ 2026-10-10] Possible extra invariants (not in the plan's 7):**
       "children sit within their parents' subtree span" (a child of a non-primary couple
       group goes through the safety net and can land far from both parents with no

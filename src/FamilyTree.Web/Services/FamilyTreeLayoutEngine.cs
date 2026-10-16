@@ -333,6 +333,22 @@ public class FamilyTreeLayoutEngine
                 MarkDescendants(rg, rg);
             }
 
+            // A parentless partner whose primary couple isn't a placed group (it's the
+            // other partner's second marriage, hung beside them below) belongs to that
+            // partner's family (R7, 2026-10-15). Harvey, married to Dora (Max's ex) and to
+            // Florence (Bud's ex), hung beside Dora while Florence's family sat on the far
+            // side of Max+Dora's, 320-520px from him. Marked, his other marriage is a
+            // cross-root couple: the two families are made adjacent and turned to face
+            // each other, and Dora's couple turns so Harvey hangs on that side.
+            foreach (var p in component)
+            {
+                if (descendantOfRoot.ContainsKey(p.Id) || childrenInGroups.Contains(p.Id)) continue;
+                if (!primaryGroup.TryGetValue(p.Id, out var pg) || !pg.ParentAId.HasValue || !pg.ParentBId.HasValue) continue;
+                var partner = pg.ParentAId == p.Id ? pg.ParentBId.Value : pg.ParentAId.Value;
+                if (descendantOfRoot.TryGetValue(partner, out var partnerRoot))
+                    descendantOfRoot[p.Id] = partnerRoot;
+            }
+
             // ── Sibling-linked root groups follow their sibling's family (R13) ──
             // A root group's parents have no parents on the tree, so any SiblingIds they
             // carry are explicit Sibling links. Unmarried, such a person is a root
@@ -630,9 +646,22 @@ public class FamilyTreeLayoutEngine
                     wantRight.TryAdd(memberOfA, true);
                     wantRight.TryAdd(memberOfB, false);
                 }
-                foreach (var (person, right) in wantRight)
+                // A cross-root member who is someone's attached partner (Harvey) has no side
+                // of their own: they hang on their holder's free side. Turning the holder
+                // (Dora) to the side Harvey wants puts her free side, and Harvey, there.
+                var holderOf = new Dictionary<Guid, Guid>();
+                foreach (var (holder, att) in attachedFor)
+                    if (att.PartnerId is { } partnerId) holderOf.TryAdd(partnerId, holder);
+
+                foreach (var (member, right) in wantRight)
                 {
-                    if (attachedFor.ContainsKey(person)) continue;
+                    var person = member;
+                    if (holderOf.TryGetValue(member, out var holder))
+                    {
+                        if (wantRight.ContainsKey(holder)) continue;
+                        person = holder;
+                    }
+                    else if (attachedFor.ContainsKey(person)) continue;
                     if (!primaryGroup.TryGetValue(person, out var g) || !g.ParentBId.HasValue) continue;
                     var isRight = g.ParentBId == person;
                     if (isRight == right) continue;
@@ -1080,12 +1109,40 @@ public class FamilyTreeLayoutEngine
             // ── Place children of cross-root couples ──────────────────────────
             // Both partners are already placed as leaves; SetNode's guard skips
             // them and only the children get positioned at the couple's midpoint.
+            //
+            // Nothing reserved that space, so the children could land on people already
+            // there (R10, 2026-10-15): two cross-root couples side by side stacked their
+            // children on one X, 0-26px apart. Each try that hits an already-placed node
+            // is undone (PlaceGroup only adds nodes and couple gaps) and the next slot
+            // out is tried, alternating sides, nearest first. If none is clear within
+            // MaxCrossRootChildShift slots, the midpoint is kept, as before.
+            const int MaxCrossRootChildShift = 6;
             foreach (var (cg, _, _, _, _) in crossRootInfo)
             {
                 if (!cg.ParentAId.HasValue || !cg.ParentBId.HasValue) continue;
                 if (!nodeMap.TryGetValue(cg.ParentAId.Value, out var nA) ||
                     !nodeMap.TryGetValue(cg.ParentBId.Value, out var nB)) continue;
-                PlaceGroup(cg, (nA.X + nB.X) / 2.0);
+                var mid = (nA.X + nB.X) / 2.0;
+                var existing = nodeMap.Values.ToList();
+                var placedBefore = nodeMap.Keys.ToHashSet();
+                var gapsBefore = coupleGaps.Count;
+                bool Clear() => nodeMap.Values.Where(n => !placedBefore.Contains(n.Person.Id)).All(added =>
+                    existing.All(n => Math.Sqrt(Math.Pow(n.X - added.X, 2) + Math.Pow(n.Y - added.Y, 2)) >= (n.Size + added.Size) / 2.0 + 10));
+                void Undo()
+                {
+                    foreach (var id in nodeMap.Keys.Where(id => !placedBefore.Contains(id)).ToList()) nodeMap.Remove(id);
+                    coupleGaps.RemoveRange(gapsBefore, coupleGaps.Count - gapsBefore);
+                }
+
+                var placed = false;
+                for (var step = 0; step <= 2 * MaxCrossRootChildShift && !placed; step++)
+                {
+                    var shift = (step + 1) / 2 * NodeSpacingX * (step % 2 == 1 ? 1 : -1);
+                    PlaceGroup(cg, mid + shift);
+                    if (Clear()) placed = true;
+                    else Undo();
+                }
+                if (!placed) PlaceGroup(cg, mid);
             }
 
             foreach (var person in rootIndividuals)
