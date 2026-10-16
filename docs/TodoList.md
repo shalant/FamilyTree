@@ -385,17 +385,28 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       attached groups, so those marriages aren't cross-root couples. Making it follow
       them was tried and made split couples worse (1,054 → 1,135 in realistic families,
       measured before piece 3 above), because of R6's own open limits. Still open: that, and (b).
-- [ ] **[LAYOUT FUZZ 2026-10-10] R3 — dateless birth-year inference is greedy and
-      order-dependent.** Pass 1 takes the first available evidence (children, then
-      siblings, then spouses, then parents) in list order and never reconciles. Results: a
-      child on the **same row** as a parent (Marc → Bud, Gish; Bud → Bud Jr; Gish →
-      Doug; Bud Jr + Gish co-parent Ray → Ray takes half-sibling Doug's year = Bud Jr's
-      year). A child inferred only 3 years after a parent, overlapping them (Willa inferred
-      from her own child, her father Marc from a different child). Dateless partners on
-      different rows (Ann inferred from 1 dated child, husband Marc from 2). New families
-      start fully dateless, so this hits exactly the people being invited. Fix direction: a
-      constraint pass after inference (child ≥ parent + N, partners equal), or depth-based
-      Y for dateless people (see `bulk-import-deactivated.md`). Fails Invariants 1, 3, 4.
+- [x] **[LAYOUT FUZZ 2026-10-10] R3 — dateless birth-year inference is greedy and
+      order-dependent. FIXED 2026-10-15.** Pass 1 takes the first available evidence
+      (children, then siblings, then spouses, then parents) in list order and never
+      reconciles. Results were: a child on the **same row** as a parent (Marc → Bud, Gish;
+      Bud → Bud Jr; Gish → Doug; Bud Jr + Gish co-parent Ray → Ray takes half-sibling
+      Doug's year = Bud Jr's year), a child inferred only 3 years after a parent, and
+      dateless partners on different rows (Ann from 1 dated child, husband Marc from 2).
+      New families start fully dateless, so this hit exactly the people being invited.
+      **Fix:** inference is unchanged; `EnforceGenerationConstraints` runs after it. It
+      never moves anyone with a recorded birth date. A parent/child gap under 20 years
+      moves the undated child down, or, when a dated descendant below the child forbids
+      that (its "ceiling"), the undated parent up. Dateless current/former spouses and
+      co-parents of one child are then brought to a single year, no higher than their
+      dated descendants allow. The loop ends on a parent/child pass, so a child never
+      renders level with a parent even for contradictory data (a woman married to both a
+      father and his son). `Invariant3` is active with no exclusions, and the
+      `DatelessCouple` flag is gone from the fuzz harness. Regression pairs:
+      `FamilyTreeLayoutTransitionTests.DatelessChildInferredFromHerOwnChild_...` and
+      `DatelessHusbandGainsAnOlderChildByAnother_...`. Not fixed: the `DatelessPerson`
+      exclusion on `Invariant1`'s twin stays, because dateless families also reach the
+      R4/R9 placement collisions (e.g. a former-spouse partner placed 55px from a dated
+      person, found at 3,000 iterations); that is R4/R9's work, not inference.
 - [ ] **[LAYOUT FUZZ 2026-10-10] R4 — refinements to the open 2026-09-09 near-miss-Y
       overlap bug (entry below).** The fuzzer confirms it and adds two details: (1) the
       suggested fix `Math.Abs(n.Y - anchor.Y) < diameter` is not enough. The collision has

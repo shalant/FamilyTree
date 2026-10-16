@@ -625,6 +625,56 @@ public class FamilyTreeLayoutTransitionTests
         AssertSound(after, afterLayout);
     }
 
+    // R3 (fixed 2026-10-15): dateless birth-year inference took the first evidence it found,
+    // so a dateless child could be inferred only a couple of years after a dateless parent.
+    // x
+    [Theory, InlineData(false), InlineData(true)]
+    public void DatelessChildInferredFromHerOwnChild_StillRendersWellBelowHerDatelessParent(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var marc = t.Add("Marc", "Kuh");
+        var willa = t.Add("Willa", "Kuh");
+        var kim = t.Add("Kim", "Kuh", 1968);
+        t.Parent(marc, willa).Parent(marc, kim);
+
+        var before = t.Layout(kim);
+        var zed = t.Clone();
+        var zedId = zed.Add("Zed", "Kuh", 1970);
+        zed.Parent(willa, zedId);
+        var after = zed.Layout(kim);
+
+        AssertSound(t, before);
+        AssertSound(zed, after);
+        var nodes = ById(after);
+        (nodes[willa].Y - nodes[marc].Y).Should().BeGreaterThanOrEqualTo(20 * 6, "Willa is at least a generation below Marc");
+    }
+
+    // R3 (fixed 2026-10-15): two dateless partners were each inferred from whichever of their
+    // children had a year, so a husband with two dated children and a wife with one landed on
+    // different rows. Before: both partners share their one child. After: the husband gains a
+    // second, older child from another relationship, which gives him different evidence. The
+    // couple is dateless on both sides, so a Y difference is an artifact, not data.
+    [Theory, InlineData(false), InlineData(true)]
+    public void DatelessHusbandGainsAnOlderChildByAnother_CoupleStaysOnOneRow(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var marc = t.Add("Marc", "Small");
+        var ann = t.Add("Ann", "Small");
+        var kim = t.Add("Kim", "Small", 1960);
+        t.Marry(marc, ann).Parent(marc, kim).Parent(ann, kim);
+
+        var before = t.Layout(kim);
+        var more = t.Clone();
+        var lee = more.Add("Lee", "Small", 1950);
+        more.Parent(marc, lee);
+        var after = more.Layout(kim);
+
+        AssertSound(t, before);
+        AssertSound(more, after);
+        ById(before)[marc].Y.Should().Be(ById(before)[ann].Y);
+        ById(after)[marc].Y.Should().Be(ById(after)[ann].Y, "dateless partners render on the same row");
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // FOCUS
     // ─────────────────────────────────────────────────────────────────────────
