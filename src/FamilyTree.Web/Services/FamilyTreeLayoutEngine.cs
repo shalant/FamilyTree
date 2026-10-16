@@ -742,19 +742,20 @@ public class FamilyTreeLayoutEngine
             }
 
             // ── Node creation ─────────────────────────────────────────────────
+            int YOf(Guid id) => PaddingY + (int)((birthYears.GetValueOrDefault(id, minYear) - minYear) * PxPerYear);
+            int SizeOf(Guid id)
+            {
+                var relDepth = depths.GetValueOrDefault(id, 0) - focusDepth;
+                return id == focusPersonId ? FocusSize
+                     : Math.Abs(relDepth) <= 1 ? Gen1Size
+                     : DefaultSize;
+            }
+
             void SetNode(Guid id, double x)
             {
                 if (nodeMap.ContainsKey(id)) return; // cross-root couples: don't overwrite
-                var person   = personById[id];
-                var isFocus  = id == focusPersonId;
-                var depth    = depths.GetValueOrDefault(id, 0);
-                var relDepth = depth - focusDepth;
-                var size     = isFocus ? FocusSize
-                             : Math.Abs(relDepth) <= 1 ? Gen1Size
-                             : DefaultSize;
-                var year = birthYears.GetValueOrDefault(id, minYear);
-                var y    = PaddingY + (int)((year - minYear) * PxPerYear);
-                nodeMap[id] = new LayoutNode(person, (int)Math.Round(x), y, depth, isFocus, size);
+                nodeMap[id] = new LayoutNode(personById[id], (int)Math.Round(x), YOf(id),
+                    depths.GetValueOrDefault(id, 0), id == focusPersonId, SizeOf(id));
             }
 
             // Reserved [left, right] interval between every couple's own two spouse-nodes,
@@ -930,13 +931,38 @@ public class FamilyTreeLayoutEngine
             // spot. Fixed by unioning safe territory across ALL of a person's relatives,
             // and (see OrphanBufferX below) reserving actual slack at forced-adjacency
             // boundaries so there's genuinely somewhere to land.
-            double FindOpenXAdjacentTo(LayoutNode anchor, IReadOnlyList<LayoutNode> relatives)
+            //
+            // Occupancy is judged at the placed person's OWN row, against every node whose
+            // circle would come near theirs (R4, 2026-10-15). It used to look only at nodes
+            // on exactly the anchor's Y, so a third spouse born a few years after their
+            // partner landed on top of a second spouse a row or two below (Casey on Blair,
+            // ThirdMarriage_NewSpouseLandsBesidePartnerAndNobodyElseMoves).
+            //
+            // Both directions are searched and the nearer open slot wins, the right one on
+            // a tie (R7, 2026-10-15). Trying the right first and taking whatever it found
+            // put a partner past someone already on that side even with the left side free.
+            double FindOpenXAdjacentTo(Guid placedId, LayoutNode anchor, IReadOnlyList<LayoutNode> relatives)
             {
+                var (myY, mySize) = (YOf(placedId), SizeOf(placedId));
+                bool Occupied(double x) => nodeMap.Values.Any(n =>
+                    Math.Abs(n.X - x) < NodeSpacingX && Math.Abs(n.Y - myY) < (n.Size + mySize) / 2.0 + 10);
+
                 var safeExtents = rootGroupExtents
                     .Where(e => relatives.Any(r => r.X >= e.Left && r.X <= e.Right))
                     .ToList();
 
-                if (safeExtents.Count == 0) return UnboundedExtend(anchor, NodeSpacingX);
+                if (safeExtents.Count == 0)
+                    return Nearer(UnboundedExtend(NodeSpacingX), UnboundedExtend(-NodeSpacingX));
+
+                double UnboundedExtend(double step)
+                {
+                    var x = anchor.X + step;
+                    while (Occupied(x)) x += step;
+                    return x;
+                }
+
+                double Nearer(double right, double left) =>
+                    Math.Abs(left - anchor.X) < Math.Abs(right - anchor.X) ? left : right;
 
                 var safeMin = safeExtents.Min(e => e.Left);
                 var safeMax = safeExtents.Max(e => e.Right);
@@ -955,31 +981,23 @@ public class FamilyTreeLayoutEngine
                 double? TryDirection(double step)
                 {
                     var x = anchor.X + step;
-                    while (!IsOutOfBounds(x) && (InCoupleGap(x) ||
-                           nodeMap.Values.Any(n => n.Y == anchor.Y && Math.Abs(n.X - x) < NodeSpacingX)))
+                    while (!IsOutOfBounds(x) && (InCoupleGap(x) || Occupied(x)))
                         x += step;
                     return IsOutOfBounds(x) ? null : x;
                 }
 
-                if (TryDirection(NodeSpacingX) is { } right) return right;
-                if (TryDirection(-NodeSpacingX) is { } left) return left;
+                var (right, left) = (TryDirection(NodeSpacingX), TryDirection(-NodeSpacingX));
+                if (right is { } r && left is { } l) return Nearer(r, l);
+                if ((right ?? left) is { } found) return found;
 
                 // Both directions ran out of safe room — scan the whole safe union for
                 // any open slot at all, rather than tunnelling into foreign territory or
                 // wandering off-canvas. Extremely rare in practice.
                 for (var x = safeMin; x <= safeMax; x += NodeSpacingX)
-                    if (!InCoupleGap(x) && !nodeMap.Values.Any(n => n.Y == anchor.Y && Math.Abs(n.X - x) < NodeSpacingX))
+                    if (!InCoupleGap(x) && !Occupied(x))
                         return x;
 
                 return (safeMin + safeMax) / 2.0; // last resort: accept overlap over foreign placement
-            }
-
-            double UnboundedExtend(LayoutNode anchor, double step)
-            {
-                var x = anchor.X + step;
-                while (nodeMap.Values.Any(n => n.Y == anchor.Y && Math.Abs(n.X - x) < NodeSpacingX))
-                    x += step;
-                return x;
             }
 
             // ── Pull cross-root partners together (R6/R12) ─────────────────────
@@ -1097,7 +1115,7 @@ public class FamilyTreeLayoutEngine
 
                 if (siblingNode != null)
                 {
-                    var anchoredX = FindOpenXAdjacentTo(siblingNode, placedSiblings);
+                    var anchoredX = FindOpenXAdjacentTo(person.Id, siblingNode, placedSiblings);
                     SetNode(person.Id, anchoredX);
                     // An anchored person can land past curX (in the orphan slack after a
                     // cross-root run, or by walking off the end of the tree). Without this,
@@ -1131,7 +1149,7 @@ public class FamilyTreeLayoutEngine
 
                 if (spouseNode != null)
                 {
-                    var anchoredX = FindOpenXAdjacentTo(spouseNode, placedSpouses);
+                    var anchoredX = FindOpenXAdjacentTo(person.Id, spouseNode, placedSpouses);
                     SetNode(person.Id, anchoredX);
                     curX = Math.Max(curX, anchoredX + NodeSpacingX / 2.0); // as in the sibling loop
                 }
