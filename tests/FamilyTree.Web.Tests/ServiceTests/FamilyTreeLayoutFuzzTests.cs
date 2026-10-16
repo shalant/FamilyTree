@@ -64,7 +64,7 @@ public class FamilyTreeLayoutFuzzTests
 
     private const KnownOpen Invariant1Exclusions =
         KnownOpen.PartnerWithChildrenElsewhere |
-        KnownOpen.DatelessPerson | KnownOpen.AnchorPlacedPerson | KnownOpen.SpouseAnchoredPartner |
+        KnownOpen.DatelessPerson | KnownOpen.AnchorPlacedPerson |
         KnownOpen.PartnerSameEraAsInLaw | KnownOpen.CrossRootCouple;
 
     // 2. Every input person appears exactly once in the output, and nobody else does.
@@ -516,14 +516,13 @@ public class FamilyTreeLayoutFuzzTests
         // the couple's midpoint with no collision check, so two such couples can stack
         // their children on the same X. TodoList "[LAYOUT FUZZ 2026-10-10] R10".
         CrossRootCouple = 16,
-        // R7: a partner the engine places with the spouse-anchor safety net (someone in two
-        // or more couples, or the partner of someone whose primary group is a different
-        // child-bearing group: the 2026-07-07 Harvey Fleishman shape) goes through
-        // FindOpenXAdjacentTo, which only steps rightward first and skips past whatever
-        // already holds the adjacent slot (the first spouse, a sibling of the partner), so
-        // they land 240-360px away even when the slot on the other side is free. The
-        // Florence/Harvey fix only holds when the adjacent slot happens to be empty.
-        // TodoList "[LAYOUT FUZZ 2026-10-10] R7".
+        // R7: someone in two or more couples, or with children outside a couple. Since
+        // 2026-10-15 FindOpenXAdjacentTo takes the nearer free side and checks collisions at
+        // the placed person's own row, so these families no longer overlap and Invariant 1
+        // no longer excludes them. Invariant 4 still does: a person in three couples can't
+        // sit within SpouseSpacingX of all three, and a partner bridging two families that
+        // each have their own group (Harvey married to Florence and Dora) needs the
+        // families reordered, not a better slot. TodoList "[LAYOUT FUZZ 2026-10-10] R7".
         SpouseAnchoredPartner = 32,
         // R8: a person with no recorded parents who has BOTH an explicit Sibling link and a
         // partner is placed by the root-individual sibling-anchor loop, which runs before

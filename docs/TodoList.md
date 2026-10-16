@@ -415,6 +415,12 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       anchor-Y version). (2) The `FindOpenXAdjacentTo` "last resort: accept overlap" return
       is reachable in generated families. Spouse-anchored partners hit it too: Rose,
       married to Max 1935, overlapped Max's co-parent Dora 1944. Fails Invariant 1.
+      *2026-10-15 (with R7):* detail (1) is fixed: `FindOpenXAdjacentTo` checks at the
+      placed person's own Y with real node sizes. The `AnchorPlacedPerson` exclusion stays
+      on `Invariant1`'s twin: at 3,000 iterations without it, the fuzzer still finds two
+      root groups drawn at the same X a few rows apart (Willa Fleishman 1885 on Willa Lee
+      1882, with Harvey Lee in three couples and two sibling links), which isn't the
+      anchor search.
 - [ ] **[LAYOUT FUZZ 2026-10-10] R5 — layout depends on the order of the people list.**
       `CoupleSortKey`, `ComputeDepths` (first person), Pass 0.5 seeding (`component[0]`),
       inference order (R3) and component order all read list position. Shuffling the list
@@ -473,6 +479,27 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       no other group) no longer goes through the safety net; they're placed on the shared
       person's free side. The safety net still places a third partner, and the partners
       in the Ann/Rose repro, and still tries rightward first.
+      *2026-10-15 (branch `fix/r6-r7-cross-root-pull`):* both repros above already pass on
+      `master` (R11 and R2 fixed them); they're now guard tests
+      (`SecondChildlessMarriage_NewSpouseTakesTheFreeSideOfTheirPartner`,
+      `SingleParentWithASiblingMarries_SpouseSitsBesideThem`). Fixed in
+      `FindOpenXAdjacentTo`, used by both the sibling and the spouse anchor: (1) it
+      searches both directions and takes the nearer free slot, the right one on a tie
+      (`OrphanSiblingOfAMarriedMan_LandsOnHisFreeSide`: Morton was stepped 360px past
+      Ray's wife with Ray's other side free; fails with right-first restored); (2) it
+      judges a slot occupied at the placed person's own row against every node whose
+      circle would come near theirs, not only nodes on exactly the anchor's Y (the R4
+      half; Casey, Pat's third wife, was drawn on top of Blair). `ThirdMarriage_...` is
+      un-skipped; it fails on the old engine. Its `AssertSound` no longer checks "nobody
+      between partners" for a person in more than `maxCouplesPerPerson` couples, the same
+      exemption the distance check already had: with both of Pat's sides taken, the third
+      partner must have someone between. Fuzz: `SpouseAnchoredPartner` is off
+      `Invariant1`'s exclusions (3,000 iterations pass; fails on the old engine). **Still
+      open:** a partner bridging two families that each have a group of their own
+      (Harvey married to Florence and Dora, `PersonMarriedIntoTwoFamilies_SitsBesideAWife`,
+      skipped), which needs the families reordered like the cross-root step, and the
+      flag stays on `Invariant4` for that and for 3+-couple people (the fuzz invariant has
+      no per-person couple limit; its shrunk counterexample is Willa in three couples).
 - [ ] **[LAYOUT FUZZ 2026-10-10] R8 — an orphan sibling with a partner is anchored to the
       sibling, not the partner.** A person with no parents but an explicit Sibling link
       **and** a partner is placed by the root-individual sibling loop, which runs before

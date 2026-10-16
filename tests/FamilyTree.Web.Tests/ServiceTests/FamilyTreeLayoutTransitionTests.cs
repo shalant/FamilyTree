@@ -29,6 +29,7 @@ public class FamilyTreeLayoutTransitionTests
 {
     // Mirror of the private constant in FamilyTreeLayoutEngine.
     private const int SpouseSpacingX = 200;
+    private const int NodeSpacingX = 120;
 
     private const string KnownOpen = "Known open, see docs/TodoList.md ";
 
@@ -159,10 +160,10 @@ public class FamilyTreeLayoutTransitionTests
     // Found 2026-10-11 (Leg 2): the "before" state is already wrong. Pat's second partner
     // Blair goes through the safety net and lands right of Pat even when Alex holds that
     // side (R7), and Casey then lands on top of Blair because the collision check only
-    // looks at nodes on exactly Pat's Y (R4).
-    [Theory(Skip = KnownOpen + "'[LAYOUT FUZZ 2026-10-10] R4' (collision check only at the anchor's exact Y) and " +
-                   "'R7' (spouse-anchored partner always tries the right side first)."),
-     InlineData(false), InlineData(true)]
+    // looks at nodes on exactly Pat's Y (R4). Blair has been placed on Pat's free side
+    // since R11 (2026-10-12); the overlap was fixed 2026-10-15 by checking collisions at
+    // the placed person's own row.
+    [Theory, InlineData(false), InlineData(true)]
     public void ThirdMarriage_NewSpouseLandsBesidePartnerAndNobodyElseMoves(bool reverseIds)
     {
         var t = new Tree(reverseIds);
@@ -185,6 +186,110 @@ public class FamilyTreeLayoutTransitionTests
         var nodes = ById(afterLayout);
         Math.Abs(nodes[casey].X - nodes[pat].X).Should().BeLessThanOrEqualTo(2 * SpouseSpacingX,
             "Casey must land beside Pat, not at the far edge of the tree");
+    }
+
+    // R7's first repro: Bud is married to Bud Lee (childless) and then also to Harvey
+    // (childless, no other relatives, no end date recorded). Harvey has no group of his
+    // own and goes through the spouse safety net, which always tried the right side
+    // first and stepped past whoever held it, so Harvey landed past Bud Lee, 360px from
+    // Bud, with Bud's left side free.
+    [Theory, InlineData(false), InlineData(true)]
+    public void SecondChildlessMarriage_NewSpouseTakesTheFreeSideOfTheirPartner(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var gus = t.Add("Gus", "Kuh", 1920);
+        var bud = t.Add("Bud", "Kuh", 1950);
+        var budLee = t.Add("Bud Lee", "Kuh", 1951);
+        t.Parent(gus, bud).Marry(bud, budLee);
+
+        var before = t.Layout(bud);
+        var after = t.Clone();
+        var harvey = after.Add("Harvey", "Kuh", 1949);
+        after.Marry(bud, harvey);
+        var afterLayout = after.Layout(bud);
+
+        AssertSound(t, before);
+        AssertSound(after, afterLayout);
+        // Harvey's slot is reserved beside the group (R11), so the couple may shift as a block.
+        AssertSameRelativePlacement(before, afterLayout, [bud, budLee], "a second childless marriage must not rearrange the first");
+    }
+
+    // R7's second repro: Ann (sibling Bill beside her) has a child alone, then marries
+    // Rose (no other relatives). Rose landed 240px from Ann because the slot to Ann's
+    // right was taken.
+    [Theory, InlineData(false), InlineData(true)]
+    public void SingleParentWithASiblingMarries_SpouseSitsBesideThem(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var gus = t.Add("Gus", "Kuh", 1920);
+        var ann = t.Add("Ann", "Kuh", 1950);
+        var bill = t.Add("Bill", "Kuh", 1952);
+        var kit = t.Add("Kit", "Kuh", 1975);
+        t.Parent(gus, ann).Parent(gus, bill).Parent(ann, kit);
+
+        var before = t.Layout(ann);
+        var after = t.Clone();
+        var rose = after.Add("Rose", "Small", 1951);
+        after.Marry(ann, rose);
+        var afterLayout = after.Layout(ann);
+
+        AssertSound(t, before);
+        AssertSound(after, afterLayout);
+        AssertChildUnderParents(after, afterLayout, kit);
+    }
+
+    // R7 through the spouse safety net: Harvey has no group of his own (two childless
+    // marriages, neither his primary) and is anchored beside the rightmost of his wives.
+    // The search always tried the right side first and stepped past whoever held it.
+    //
+    // Still open after the 2026-10-15 nearer-side fix: being within SpouseSpacingX of both
+    // wives needs Florence and Dora on the inner edges of two adjacent families with
+    // Harvey between them, a root-group reorder like the cross-root step's, not a better
+    // free slot. Fails identically before and after that fix.
+    [Theory(Skip = KnownOpen + "'[LAYOUT FUZZ 2026-10-10] R7' (a partner bridging two families " +
+                   "needs the families reordered, not a nearer slot)."),
+     InlineData(false), InlineData(true)]
+    public void PersonMarriedIntoTwoFamilies_SitsBesideAWife(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var bud = t.Add("Bud", "Rosenberg", 1900);
+        var florence = t.Add("Florence", "Kuh", 1902);
+        var marc = t.Add("Marc", "Rosenberg", 1925);
+        var max = t.Add("Max", "Lee", 1898);
+        var dora = t.Add("Dora", "Lee", 1903);
+        var gish = t.Add("Gish", "Lee", 1928);
+        t.Marry(bud, florence, ended: new DateOnly(1930, 1, 1)).Parent(bud, marc).Parent(florence, marc)
+         .Marry(max, dora, ended: new DateOnly(1932, 1, 1)).Parent(max, gish).Parent(dora, gish);
+
+        var after = t.Clone();
+        var harvey = after.Add("Harvey", "Fleishman", 1901);
+        after.Marry(harvey, florence, ended: new DateOnly(1935, 1, 1)).Marry(harvey, dora);
+        var layout = after.Layout(marc);
+
+        AssertSound(after, layout);
+    }
+
+    // An orphan sibling (no parents on the tree) is linked to Ray, who has his wife on one
+    // side and nobody on the other. The anchor search tried the right side first, so when
+    // Rose held it Morton was stepped past her instead of taking the free slot by Ray.
+    [Theory, InlineData(false), InlineData(true)]
+    public void OrphanSiblingOfAMarriedMan_LandsOnHisFreeSide(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var ray = t.Add("Ray", "Small", 1910);
+        var rose = t.Add("Rose", "Small", 1912);
+        var ellen = t.Add("Ellen", "Small", 1935);
+        t.Marry(ray, rose).Parent(ray, ellen).Parent(rose, ellen);
+
+        var after = t.Clone();
+        var morton = after.Add("Morton", "Small", 1908);
+        after.Sibling(ray, morton);
+        var layout = after.Layout(ray);
+
+        AssertSound(after, layout);
+        var nodes = ById(layout);
+        Math.Abs(nodes[morton].X - nodes[ray].X).Should().BeLessThanOrEqualTo(NodeSpacingX,
+            "Morton must take the free slot beside Ray, not be stepped past Rose");
     }
 
     // Plan item: "a second marriage ending (EndDate set) while a first is still active."
@@ -713,8 +818,9 @@ public class FamilyTreeLayoutTransitionTests
     // The fuzz harness's general invariants (1-4), plus the two its first run suggested
     // for Leg 2 (docs/TodoList.md, "Possible extra invariants"): nobody sits between two
     // spouses. A person in three couples can't be within SpouseSpacingX of all three
-    // partners without an overlap, so couple distance is only checked for people in at
-    // most maxCouplesPerPerson couples.
+    // partners without an overlap, and with both sides taken one partner must have another
+    // between them, so couple distance and "nobody between" are only checked for people
+    // in at most maxCouplesPerPerson couples.
     private static void AssertSound(Tree t, FamilyTreeLayout layout, int maxCouplesPerPerson = 2)
     {
         var people = t.People();
@@ -748,8 +854,9 @@ public class FamilyTreeLayoutTransitionTests
         foreach (var c in couples)
         {
             var (a, b) = (nodes[c.PersonAId], nodes[c.PersonBId]);
-            if (CoupleCount(a.Person.Id) <= maxCouplesPerPerson && CoupleCount(b.Person.Id) <= maxCouplesPerPerson &&
-                Math.Abs(a.X - b.X) > SpouseSpacingX)
+            if (CoupleCount(a.Person.Id) > maxCouplesPerPerson || CoupleCount(b.Person.Id) > maxCouplesPerPerson)
+                continue;
+            if (Math.Abs(a.X - b.X) > SpouseSpacingX)
                 errors.Add($"couple {t.Name(a.Person.Id)} x={a.X} and {t.Name(b.Person.Id)} x={b.X} are {Math.Abs(a.X - b.X)}px apart");
 
             var (left, right) = a.X < b.X ? (a, b) : (b, a);
