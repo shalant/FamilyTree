@@ -54,8 +54,8 @@ public class FamilyTreeLayoutFuzzTests
     // ─────────────────────────────────────────────────────────────────────────
 
     // 1. No two nodes overlap: center distance >= sum of radii.
-    [Fact(Skip = SkipPrefix + "R4 (exact-Y collision check, the open 2026-09-09 bug), R3 (greedy dateless " +
-                 "inference puts a child just below a parent), R9 (no vertical clearance check in PlaceGroup), plus R2.")]
+    [Fact(Skip = SkipPrefix + "R4 (exact-Y collision check, the open 2026-09-09 bug, which also " +
+                 "hits dateless families), R9 (no vertical clearance check in PlaceGroup), plus R2.")]
     public void Invariant1_NoTwoNodesOverlap() => Run(GenFamily, AssertNoOverlap);
 
     [Fact]
@@ -89,9 +89,9 @@ public class FamilyTreeLayoutFuzzTests
     // 3. A child's Y is strictly below every parent's Y, including when nobody has a date.
     // Generated birth years are always consistent (child >= 20 years after each parent),
     // so any inversion comes from inference/placement, not from contradictory input.
-    // No _ExcludingKnownOpen twin: excluding R3 means excluding dateless people, and with
+    // No _ExcludingKnownOpen twin: the shape this guards (dateless people) is R3, now fixed, and with
     // every date known the invariant is true by construction.
-    [Fact(Skip = SkipPrefix + "R3 (greedy dateless birth-year inference).")]
+    [Fact]
     public void Invariant3_ChildRendersBelowEveryParent() => Run(GenFamily, f =>
     {
         var nodes = f.Layout().Nodes.ToDictionary(n => n.Person.Id);
@@ -119,7 +119,7 @@ public class FamilyTreeLayoutFuzzTests
 
     private const KnownOpen Invariant4Exclusions =
         KnownOpen.PartnerWithChildrenElsewhere | KnownOpen.CrossRootCouple |
-        KnownOpen.SpouseAnchoredPartner | KnownOpen.SiblingLinkedPartner | KnownOpen.DatelessCouple;
+        KnownOpen.SpouseAnchoredPartner | KnownOpen.SiblingLinkedPartner;
 
     // 5a. Determinism: the same input, laid out twice, gives identical output.
     [Fact]
@@ -497,9 +497,10 @@ public class FamilyTreeLayoutFuzzTests
         // 240px+ apart. (Harvey-style partners with no parents and no children are fine:
         // the safety net anchors them next to their spouse.) TodoList "[LAYOUT FUZZ 2026-10-10] R2".
         PartnerWithChildrenElsewhere = 2,
-        // R3: dateless birth-year inference is greedy (child/sibling/spouse evidence before
-        // parents, first match wins), so a child can land on or just below a parent's row.
-        // TodoList "[LAYOUT FUZZ 2026-10-10] R3".
+        // Any person with no birth date. R3 (greedy inference) is fixed, so this now only
+        // covers the placement collisions R4/R9 that dateless families also reach (a
+        // former-spouse partner placed ~55px from a dated person). Only Invariant 1's twin
+        // and the dateless-person richness check still use it.
         DatelessPerson = 4,
         // R4: people placed by FindOpenXAdjacentTo (explicit-sibling orphans, extra spouses;
         // spouse-anchored partners are flagged separately as SpouseAnchoredPartner and must be
@@ -529,12 +530,6 @@ public class FamilyTreeLayoutFuzzTests
         // the spouse-anchor safety net, so they land next to their sibling and 240px+ from
         // their partner. TodoList "[LAYOUT FUZZ 2026-10-10] R8".
         SiblingLinkedPartner = 64,
-        // R3, partner variant: two dateless partners are each inferred independently and
-        // greedily (from whichever children/parents already have a year at that point in the
-        // list), so they can land on different rows: Ann inferred from one dated child, her
-        // husband later from two. Excluding this leaves the Invariant 4 twin checking only
-        // the X half; the skipped full-domain test still owns the Y half.
-        DatelessCouple = 128,
         // R9: PlaceGroup positions purely by tree structure and never checks vertical
         // clearance, while Y is a birth-year timeline. A partner placed at their spouse's
         // slot +/-100px can land right under the spouse's parent, and if the two were born
@@ -975,8 +970,6 @@ public class FamilyTreeLayoutFuzzTests
                     rels.Any(r => r.Type == RelationshipType.Sibling && (r.PersonAId == p.Id || r.PersonBId == p.Id)) &&
                     Couples.Any(c => c.PersonAId == p.Id || c.PersonBId == p.Id)))
                 shapes |= KnownOpen.SiblingLinkedPartner;
-            if (Couples.Any(c => byId[c.PersonAId].BirthDate is null && byId[c.PersonBId].BirthDate is null))
-                shapes |= KnownOpen.DatelessCouple;
             bool SameEraAsInLaw(Guid partner, Guid other) =>
                 byId[other].BirthDate is { } b && (byId[partner].ParentIds ?? []).Any(p =>
                     byId.TryGetValue(p, out var parent) && parent.BirthDate is { } pb && Math.Abs(pb.Year - b.Year) <= 12);

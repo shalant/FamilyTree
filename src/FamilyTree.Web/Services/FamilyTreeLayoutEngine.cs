@@ -1474,7 +1474,135 @@ public class FamilyTreeLayoutEngine
                 years[person.Id] = fallbackYear;
         }
 
+        EnforceGenerationConstraints(people, years);
+
         return years;
+    }
+
+    /// <summary>Smallest birth-year gap the layout accepts between a parent and a child
+    /// when at least one of them has no recorded date.</summary>
+    private const int MinParentChildGap = 20;
+
+    /// <summary>
+    /// R3 (2026-10-15): the inference passes above are greedy and take the first evidence
+    /// they find, so two dateless people can land on the same year as their parent, or a
+    /// child a few years below one, or partners on different rows. This pass reconciles
+    /// afterwards. It never moves anyone with a recorded birth date. For each parent/child
+    /// link whose gap is under <see cref="MinParentChildGap"/>, an inferred child moves
+    /// down; failing that, an inferred parent moves up. Then partners with no recorded date
+    /// are brought to the same year, no higher than their dated children allow. Contradictory
+    /// recorded dates are left alone, and the iteration cap keeps a conflicting set from
+    /// looping.
+    /// </summary>
+    private static void EnforceGenerationConstraints(List<PersonDto> people, Dictionary<Guid, int> years)
+    {
+        var dated = people.Where(p => p.BirthDate.HasValue).Select(p => p.Id).ToHashSet();
+        if (dated.Count == people.Count) return;
+
+        var byId = people.ToDictionary(p => p.Id);
+
+        // Pairs the layout draws as a couple: current and former spouses, plus two people
+        // recorded as parents of the same child. Only pairs with no recorded date on either
+        // side are equalised; a dated partner keeps their own row.
+        var couples = new List<(PersonDto A, PersonDto B)>();
+        var seen = new HashSet<(Guid, Guid)>();
+        void AddCouple(Guid x, Guid y)
+        {
+            if (x == y || !byId.TryGetValue(x, out var px) || !byId.TryGetValue(y, out var py)) return;
+            if (dated.Contains(x) || dated.Contains(y)) return;
+            if (seen.Add(x.CompareTo(y) < 0 ? (x, y) : (y, x))) couples.Add((px, py));
+        }
+        foreach (var person in people)
+        {
+            foreach (var sid in (person.SpouseIds ?? []).Concat(person.FormerSpouseIds ?? []))
+                AddCouple(person.Id, sid);
+            var parents = person.ParentIds ?? [];
+            for (var i = 0; i < parents.Count; i++)
+                for (var j = i + 1; j < parents.Count; j++)
+                    AddCouple(parents[i], parents[j]);
+        }
+
+        // Latest year each undated person can have without pushing a descendant with a
+        // recorded date too close (a transitive "child year - gap", shared across a couple).
+        // Resolving a clash between two undated people uses it to pick the side that can move.
+        var ceiling = new Dictionary<Guid, int>();
+        for (var round = 0; round <= people.Count; round++)
+        {
+            var moved = false;
+            void Lower(Guid id, int value)
+            {
+                if (dated.Contains(id) || (ceiling.TryGetValue(id, out var cur) && cur <= value)) return;
+                ceiling[id] = value;
+                moved = true;
+            }
+            foreach (var person in people)
+                foreach (var cid in person.ChildIds ?? [])
+                {
+                    if (dated.Contains(cid)) Lower(person.Id, years[cid] - MinParentChildGap);
+                    else if (ceiling.TryGetValue(cid, out var c)) Lower(person.Id, c - MinParentChildGap);
+                }
+            foreach (var (a, b) in couples)
+            {
+                if (ceiling.TryGetValue(a.Id, out var ca)) Lower(b.Id, ca);
+                if (ceiling.TryGetValue(b.Id, out var cb)) Lower(a.Id, cb);
+            }
+            if (!moved) break;
+        }
+
+        bool EnforceParentGaps()
+        {
+            var changed = false;
+
+            foreach (var child in people)
+            {
+                foreach (var pid in child.ParentIds ?? [])
+                {
+                    if (!years.ContainsKey(pid) || !years.ContainsKey(child.Id)) continue;
+                    if (years[child.Id] - years[pid] >= MinParentChildGap) continue;
+
+                    var raised = years[pid] + MinParentChildGap;
+                    var childCanMove = !dated.Contains(child.Id) &&
+                                       (!ceiling.TryGetValue(child.Id, out var cap) || raised <= cap);
+                    if (childCanMove)
+                        years[child.Id] = raised;
+                    else if (!dated.Contains(pid))
+                        years[pid] = years[child.Id] - MinParentChildGap;
+                    else if (!dated.Contains(child.Id))
+                        years[child.Id] = raised;
+                    else
+                        continue;
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
+
+        for (var iteration = 0; iteration < 50; iteration++)
+        {
+            var changed = EnforceParentGaps();
+
+            foreach (var (a, b) in couples)
+            {
+                if (years[a.Id] == years[b.Id]) continue;
+
+                var target = Math.Max(years[a.Id], years[b.Id]);
+                if (ceiling.TryGetValue(a.Id, out var capA)) target = Math.Min(target, capA);
+                if (ceiling.TryGetValue(b.Id, out var capB)) target = Math.Min(target, capB);
+
+                if (years[a.Id] == target && years[b.Id] == target) continue;
+                years[a.Id] = target;
+                years[b.Id] = target;
+                changed = true;
+            }
+
+            if (!changed) break;
+        }
+
+        // Parent/child order outranks partner equality: dateless people married across a
+        // generation (a woman married to both a father and his son) can't satisfy both, so
+        // finish on the parent pass and a child never renders level with or above a parent.
+        for (var i = 0; i < 50 && EnforceParentGaps(); i++) { }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
