@@ -2,6 +2,48 @@
 
 ---
 
+## Deploy/outage experience (2026-10-16)
+
+Context: after a manual `deploy-web.yml` run on 2026-10-16, arborkin.com showed Chrome's
+bare "This page isn't working / HTTP ERROR 502" page. The App Service (Linux, B1, single
+instance) has no backend to route to while it restarts (startup includes EF migrations and
+possibly a serverless SQL resume), so Azure's front end returns 502 before the app ever sees
+the request. Goal: a branded, calm page during deploys that also covers outages and server
+errors. Note that `app_offline.htm` doesn't help here: it's an IIS/ANCM feature and this app
+runs on Linux.
+
+- [ ] **Hold open tabs on the reconnect card until the server is healthy (in-repo, $0).**
+      The branded reconnect modal (`App.razor`) already exists, but on
+      `components-reconnect-rejected` `ftUtils.js` counts down 3s and calls
+      `location.reload()` blindly. Mid-deploy, that reload lands on the raw 502, so the nice
+      card hands people straight to Chrome's error page. Fix: add a cheap anonymous
+      `/healthz` endpoint (add it to `PageAuthorizationTests`' allow-list if it's a page, or
+      map it as a minimal endpoint), keep the card up with "tending the tree" copy, poll
+      `/healthz` every ~2s, and reload only on a 200. Add a test for the endpoint, and check
+      the polling in a real browser by stopping/starting the local app.
+- [ ] **Put a Cloudflare Worker in front of arborkin.com to cover fresh visits during
+      outages (infra, $0).** Needed because a new visit or hard refresh during an outage
+      never reaches the app, and GoDaddy DNS can't serve a fallback. Plan: move DNS from
+      GoDaddy to Cloudflare's free plan, then route arborkin.com through a Worker that
+      passes requests to Azure and, on a 502/503/504 or timeout, serves an inline branded
+      ArborKin page that polls in the background and reloads itself once the site is
+      back. That covers deploys, crashes, a failed startup migration (the app deliberately
+      refuses to start) and Azure incidents. Risks to handle: `/_blazor` WebSocket
+      traffic must pass through untouched, and the App Service custom-domain/managed-cert
+      setup has to change under a proxy. Do the DNS cutover on a weekend, and record it in
+      `career-development/docs/SITE_OPS_REGISTRY.md` and `docs/deployment.md`.
+      Alternatives considered: a service worker (returning visitors only, so it misses
+      first-time invitees), Azure Front Door (~$35+/mo) and deployment slots (need S1,
+      ~$70/mo). Both paid options undo the July 2026 cost cuts.
+- [ ] **Shorten the restart window.** Measure cold-start time after a deploy (EF
+      migrations plus serverless SQL auto-resume) and trim what's avoidable, so whatever
+      page covers the gap shows for as short a time as possible.
+
+Already covered, so not a gap: errors while the app is running render the app's own pages
+via `UseExceptionHandler("/Error")` and `UseStatusCodePagesWithReExecute` (`Program.cs`).
+
+---
+
 ## Pre-invite hardening and testing (2026-10-10)
 
 Context: deciding whether arborkin.com is ready to invite more selected family members.
