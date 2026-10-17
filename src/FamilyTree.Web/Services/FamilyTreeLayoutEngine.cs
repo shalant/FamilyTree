@@ -92,6 +92,8 @@ public class FamilyTreeLayoutEngine
         if (!people.Any())
             return FamilyTreeLayout.Empty;
 
+        (people, couples) = CanonicalOrder(people, couples);
+
         WarnAboutParentCycles(people);
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1883,6 +1885,45 @@ public class FamilyTreeLayoutEngine
                 "Remove one of the Parent links to repair it.",
                 cycle.Count,
                 string.Join(", ", cycle.Select(id => $"{names.GetValueOrDefault(id, "(unknown)")} ({id})")));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CANONICAL INPUT ORDER
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Much of the engine reads list position (CoupleSortKey, ComputeDepths' first person,
+    // birth-year seeding, inference order, component order), so the same family handed over
+    // in a different order could render differently. PersonService.GetAllAsync sorts by
+    // LastName, FirstName only, and SQL Server returns rows tied on both in no guaranteed
+    // order: two children both named "Gish Kuh" could swap sides between page loads (R5,
+    // found by the layout fuzzer 2026-10-10, fixed 2026-10-17). Sorting here, with Id as the
+    // final key, makes the layout a function of the family alone. Callers already pass
+    // name order, so this only changes the order of exact name ties. Inputs aren't mutated.
+    private static (List<PersonDto> People, List<CoupleDto> Couples) CanonicalOrder(
+        List<PersonDto> people, List<CoupleDto> couples)
+    {
+        var ordered = people
+            .OrderBy(p => p.LastName, StringComparer.InvariantCultureIgnoreCase)
+            .ThenBy(p => p.FirstName, StringComparer.InvariantCultureIgnoreCase)
+            .ThenBy(p => p.Id)
+            .ToList();
+        var index = new Dictionary<Guid, int>();
+        for (var i = 0; i < ordered.Count; i++) index.TryAdd(ordered[i].Id, i);
+        int Pos(Guid id) => index.TryGetValue(id, out var i) ? i : int.MaxValue;
+
+        var orderedCouples = couples
+            .Select(c => new CoupleDto
+            {
+                PersonAId = c.PersonAId,
+                PersonBId = c.PersonBId,
+                ChildIds  = [.. c.ChildIds.OrderBy(Pos).ThenBy(id => id)],
+                IsFormer  = c.IsFormer,
+            })
+            .OrderBy(c => Math.Min(Pos(c.PersonAId), Pos(c.PersonBId)))
+            .ThenBy(c => Math.Max(Pos(c.PersonAId), Pos(c.PersonBId)))
+            .ThenBy(c => c.IsFormer)
+            .ToList();
+        return (ordered, orderedCouples);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
