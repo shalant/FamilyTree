@@ -207,8 +207,8 @@ PR #43).
 
 ## Layout Fuzz Harness: first-run findings (2026-10-10)
 
-*2026-10-17:* PRs #53-#59 deployed. R5 fixed on `fix/r5-same-name-tiebreak` (item 1
-below); R8 is next.
+*2026-10-17:* PRs #53-#59 deployed. R5 fixed (PR #60, item 1 below). R8 no longer
+reproduces (item 2, `fix/r8-orphan-sibling-partner`). Next: the R7/R6 leftovers (item 3).
 
 **Status as of 2026-10-16.** Fixed and merged: R0, R1, R3, R6, R10, R11, R12, R13, plus
 the R2, R4 and R7 parts noted in their entries (PRs up to #58). **Deployed** only through
@@ -541,11 +541,23 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       test is un-skipped and fails on the old engine in both GUID orders. Still open: the
       flag stays on `Invariant4` for 3+-couple people and for two partners who each head
       a family (Lauren, wife of Bill, formerly of Marc, 280px from Marc).
-- [ ] **[LAYOUT FUZZ 2026-10-10] R8 — an orphan sibling with a partner is anchored to the
+- [x] **[LAYOUT FUZZ 2026-10-10] R8 — an orphan sibling with a partner is anchored to the
       sibling, not the partner.** A person with no parents but an explicit Sibling link
       **and** a partner is placed by the root-individual sibling loop, which runs before
       the spouse safety net, so they end up 240px+ from their partner. Matches the
       "orphan sibling gains a spouse" classification transition. Fails Invariant 4.
+      **No longer reproduced, 2026-10-17** (`fix/r8-orphan-sibling-partner`), fixed along
+      the way by R13's sibling-follower sort and the R2/R7 attachments, with no engine
+      change in this branch. Evidence: over 5,000 generated families (pinned seed), the
+      engine before R13 (`ecb60be`) split 10 of 315 orphan-sibling couples where both
+      partners are in one couple and no R2 shape is present; the current engine splits 0.
+      Every remaining orphan-sibling split carries `PartnerWithChildrenElsewhere` (R2) or
+      someone in 2+ couples (R7). The `SiblingLinkedPartner` flag is retired from
+      `Invariant4`'s twin (passes at 5,000 iterations without it), and `Invariant4`'s skip
+      reason no longer names R8. Pinned by
+      `FamilyTreeLayoutTransitionTests.OrphanSiblingMarriesASingleParent_SitsBesideHisWife`
+      (fuzz seed 834, simplified), which fails on `ecb60be` (Bill 440-640px from Rose)
+      and passes now.
 - [ ] **[LAYOUT FUZZ 2026-10-10] R9 — no vertical clearance check in `PlaceGroup`.** X
       comes from tree structure, Y from birth year, and nothing checks the combination. A
       married-in partner at their spouse's slot ±100px can sit right under the spouse's
