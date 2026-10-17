@@ -740,6 +740,37 @@ public class FamilyTreeLayoutTransitionTests
             .Should().BeLessThanOrEqualTo(2 * SpouseSpacingX, "Bill must sit next to his brother's family");
     }
 
+    // An orphan sibling's marriage to a single parent is recorded (already ended): Bill
+    // (Max's brother, neither has parents on the tree) and Rose, undated, whose daughter
+    // Dora has no other recorded parent. R8 (fuzz, 2026-10-10, seed 834): the
+    // root-individual sibling loop placed Bill beside Max before the spouse safety net ran,
+    // so he landed 440-640px from Rose. No longer reproduced by 2026-10-17 (fixed along the
+    // way by R13's sibling-follower sort and the R2/R7 attachments); this pins it. Fails
+    // on the engine before R13 (ecb60be).
+    [Theory, InlineData(false), InlineData(true)]
+    public void OrphanSiblingMarriesASingleParent_SitsBesideHisWife(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var max = t.Add("Max", "Kuh", 1948);
+        var lauren = t.Add("Lauren", "Kuh", 1981);
+        var rayKuh = t.Add("Ray", "Kuh");
+        var florence = t.Add("Florence", "Kuh", 2050);
+        var bill = t.Add("Bill", "Kuh", 1952);
+        var rose = t.Add("Rose", "Fleishman");
+        var dora = t.Add("Dora", "Fleishman", 1999);
+        var rayF = t.Add("Ray", "Fleishman", 2040);
+        t.Parent(max, lauren).Parent(lauren, rayKuh).Parent(rayKuh, florence).Sibling(max, bill)
+         .Parent(rose, dora).Parent(dora, rayF);
+
+        var before = t.Layout(max);
+        var after = t.Clone().Marry(bill, rose, new DateOnly(2000, 1, 1));
+        var afterLayout = after.Layout(max);
+
+        AssertSound(after, afterLayout);
+        AssertSameRelativePlacement(before, afterLayout, [max, lauren],
+            "Bill's marriage must not rearrange his brother's family");
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // DATES
     // ─────────────────────────────────────────────────────────────────────────

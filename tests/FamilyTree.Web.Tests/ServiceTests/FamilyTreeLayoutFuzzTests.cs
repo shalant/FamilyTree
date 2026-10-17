@@ -110,7 +110,7 @@ public class FamilyTreeLayoutFuzzTests
     // timeline (CLAUDE.md, ADR 001), so two DATED spouses born years apart are supposed to
     // sit at different heights. Only when the engine has no date for either partner is a
     // Y difference an artifact rather than data. The X half is asserted unconditionally.
-    [Fact(Skip = SkipPrefix + "R2, R6 (cross-root partners the post-placement pull can't bring together), R7, R8.")]
+    [Fact(Skip = SkipPrefix + "R2, R6 (cross-root partners the post-placement pull can't bring together), R7.")]
     public void Invariant4_CouplesSitTogether() => Run(GenFamily, AssertCouplesTogether);
 
     [Fact]
@@ -119,7 +119,7 @@ public class FamilyTreeLayoutFuzzTests
 
     private const KnownOpen Invariant4Exclusions =
         KnownOpen.PartnerWithChildrenElsewhere | KnownOpen.CrossRootCouple |
-        KnownOpen.SpouseAnchoredPartner | KnownOpen.SiblingLinkedPartner;
+        KnownOpen.SpouseAnchoredPartner;
 
     // 5a. Determinism: the same input, laid out twice, gives identical output.
     [Fact]
@@ -524,11 +524,8 @@ public class FamilyTreeLayoutFuzzTests
         // each have their own group (Harvey married to Florence and Dora) needs the
         // families reordered, not a better slot. TodoList "[LAYOUT FUZZ 2026-10-10] R7".
         SpouseAnchoredPartner = 32,
-        // R8: a person with no recorded parents who has BOTH an explicit Sibling link and a
-        // partner is placed by the root-individual sibling-anchor loop, which runs before
-        // the spouse-anchor safety net, so they land next to their sibling and 240px+ from
-        // their partner. TodoList "[LAYOUT FUZZ 2026-10-10] R8".
-        SiblingLinkedPartner = 64,
+        // 64 was SiblingLinkedPartner (R8, an orphan sibling placed beside their sibling
+        // instead of their partner), retired 2026-10-17: no family free of R2 still splits.
         // R9: PlaceGroup positions purely by tree structure and never checks vertical
         // clearance, while Y is a birth-year timeline. A partner placed at their spouse's
         // slot +/-100px can land right under the spouse's parent, and if the two were born
@@ -965,10 +962,6 @@ public class FamilyTreeLayoutFuzzTests
             if (People.Any(p => Couples.Count(c => c.PersonAId == p.Id || c.PersonBId == p.Id) > 1) ||
                 Couples.Any(c => ChildrenOutside(c.PersonAId, c) || ChildrenOutside(c.PersonBId, c)))
                 shapes |= KnownOpen.SpouseAnchoredPartner;
-            if (People.Any(p => !HasParents(p.Id) &&
-                    rels.Any(r => r.Type == RelationshipType.Sibling && (r.PersonAId == p.Id || r.PersonBId == p.Id)) &&
-                    Couples.Any(c => c.PersonAId == p.Id || c.PersonBId == p.Id)))
-                shapes |= KnownOpen.SiblingLinkedPartner;
             bool SameEraAsInLaw(Guid partner, Guid other) =>
                 byId[other].BirthDate is { } b && (byId[partner].ParentIds ?? []).Any(p =>
                     byId.TryGetValue(p, out var parent) && parent.BirthDate is { } pb && Math.Abs(pb.Year - b.Year) <= 12);
