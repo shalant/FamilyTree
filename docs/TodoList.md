@@ -210,6 +210,16 @@ PR #43).
 *2026-10-17:* PRs #53-#59 deployed. R5 fixed (PR #60, item 1 below). R8 no longer
 reproduces (item 2, `fix/r8-orphan-sibling-partner`). Next: the R7/R6 leftovers (item 3).
 
+*2026-10-16:* PRs #60-#62 merged and deployed. Item 3 partly done on `fix/r7-r6-leftovers`:
+the "sibling at the inner edge" block is fixed (see R6). Over 5,000 generated families free
+of the R2 shape (base seed 777), families with a split couple went 59 → 47; cross-root
+splits 12 → 2. What's left of item 3 is mostly geometry, not placement: 17 of the 47 are
+three people all coupled to each other, 11 have someone in three or more couples. Neither
+can meet Invariant 4 with couples drawn `SpouseSpacingX` apart and nobody between spouses.
+Decision for Doug: give the fuzz invariant the same per-person exemption `AssertSound`
+already has. The other ~19 are partners who each head a family of their own (Doug Lee,
+centered over his children, can't slide toward his ex-wife), which is item 3's real rest.
+
 **Status as of 2026-10-16.** Fixed and merged: R0, R1, R3, R6, R10, R11, R12, R13, plus
 the R2, R4 and R7 parts noted in their entries (PRs up to #58). **Deployed** only through
 PR #52 (2026-10-12). PRs #53-#58 (phone polish, R1, R2, R3, R7/R4 part, R7 bridge/R10)
@@ -220,8 +230,8 @@ suggested order:
    fix (sort by `Id` as the last key, ideally inside the engine). Invariants 5b/5c.
 2. **R8**: an orphan sibling with a partner is anchored to the sibling, not the partner.
 3. **R7/R6 leftovers**: Invariant 4 still excludes `SpouseAnchoredPartner` (people in
-   3+ couples; two partners who each head a family, e.g. Lauren 280px from Marc), and a
-   sibling at the inner edge still blocks the cross-root pull.
+   3+ couples; two partners who each head a family, e.g. Lauren 280px from Marc).
+   *2026-10-16:* the sibling-at-the-inner-edge block is fixed; see the note above.
 4. **R4 rest** (`AnchorPlacedPerson`: two root groups at one X), **R9**, **R2 (b)**, and
    the shape where two marriages cross between the same two sibling sets (partners 440px
    apart with the other couple between them; found 2026-10-15, no test yet).
@@ -491,6 +501,24 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       still blocked when a sibling sits at the partner's inner edge, or when both
       partners head families of their own (fuzz seed 0..199 at `PinnedSeed` still
       finds such cases).
+      *2026-10-16 (branch `fix/r7-r6-leftovers`):* the sibling-at-the-inner-edge block is
+      fixed, in two pieces. (1) Step 3's inner-edge sort only reordered the group holding
+      the cross-root partner directly. It now also sorts any child whose own descendants
+      hold one, so the whole line down to the partner hugs the edge (Rose, Lauren's
+      granddaughter through her middle child Florence, ended 240px from her wife because
+      Florence's brother Bill held the edge;
+      `GrandchildMarriesIntoTheNextFamily_HerParentsLineMovesToTheInnerEdge`). A subtree
+      holding partners for both edges sorts to neither. (2) A single parent's attachment
+      always hung on the right; it now hangs left when one of their children needs the
+      right edge (Lauren's childless husband Doug sat between her son Max and Max's
+      husband from her brother's family, 320px apart;
+      `SingleParentsSonMarriesIntoHerBrothersFamily_HerHusbandHangsOnTheFarSide`). Both
+      tests fail on the old engine in both GUID orders. Over 5,000 generated families
+      (base seed 777): split couples 3,074 → 3,037, excess distance 1,049k → 1,037k px,
+      overlaps unchanged at 250 (three families newly overlap, two stop; all three new
+      ones are ~61px near-misses involving an orphan sibling or a spouse-anchored partner,
+      R4's shapes). Still open: partners who both head families of their own. The
+      `CrossRootCouple` flag stays on `Invariant4` for that.
       Also fixed on the same branch, found by the fuzz comparison: the sibling- and
       spouse-anchor passes never advanced the append position, so a person they placed
       past the end of the tree could have the next appended person drawn exactly on top

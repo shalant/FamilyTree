@@ -495,6 +495,56 @@ public class FamilyTreeLayoutTransitionTests
         AssertSound(after, after.Layout(bill));
     }
 
+    // R6 (2026-10-16, fuzz seed 1060 at PCG(1060, 777), simplified): Rose, Lauren's
+    // granddaughter through her middle child Florence, marries Ann from Ray's family. The
+    // inner-edge sort only moved the group holding Rose herself (Florence's, where she's
+    // the only child), so Florence stayed between Bill and Max and Bill held Lauren's
+    // inner edge: Rose ended 240px from Ann. Florence's line now sorts to the edge too.
+    [Theory, InlineData(false), InlineData(true)]
+    public void GrandchildMarriesIntoTheNextFamily_HerParentsLineMovesToTheInnerEdge(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var ray = t.Add("Ray", "Kuh", 1964);
+        var annLee = t.Add("Ann", "Lee", 1966);
+        var ann = t.Add("Ann", "Kuh", 1999);
+        var lauren = t.Add("Lauren", "Kuh", 1950);
+        var bill = t.Add("Bill", "Kuh", 1975);
+        var florence = t.Add("Florence", "Kuh", 1979);
+        var max = t.Add("Max", "Kuh", 1970);
+        var rose = t.Add("Rose", "Kuh", 2008);
+        t.Marry(ray, annLee).Parent(ray, ann).Parent(annLee, ann)
+         .Parent(lauren, bill).Parent(lauren, florence).Parent(lauren, max).Parent(florence, rose);
+
+        var after = t.Clone().Marry(rose, ann);
+        var gish = after.Add("Gish", "Kuh", 2029);
+        after.Parent(rose, gish).Parent(ann, gish);
+
+        AssertSound(t, t.Layout(bill));
+        AssertSound(after, after.Layout(bill));
+    }
+
+    // R6 (2026-10-16, fuzz seed 522 at PCG(522, 777), simplified): Lauren has a son, Max,
+    // with no other parent recorded, and a childless marriage to Doug. A single parent's
+    // attachment always hung on the right, so when Max married Bud from her younger
+    // brother Harvey's family (which follows hers, R13), Doug sat between them and Max
+    // ended 320px from Bud. The attachment now hangs left when a child needs the right edge.
+    [Theory, InlineData(false), InlineData(true)]
+    public void SingleParentsSonMarriesIntoHerBrothersFamily_HerHusbandHangsOnTheFarSide(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var lauren = t.Add("Lauren", "Small", 1967);
+        var doug = t.Add("Doug", "Fleishman", 1968);
+        var harvey = t.Add("Harvey", "Small", 1968);
+        var max = t.Add("Max", "Small", 1991);
+        var bud = t.Add("Bud", "Small", 1999);
+        t.Parent(lauren, max).Marry(lauren, doug).Sibling(lauren, harvey).Parent(harvey, bud);
+
+        var after = t.Clone().Marry(max, bud);
+
+        AssertSound(t, t.Layout(harvey));
+        AssertSound(after, after.Layout(harvey));
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // PARENTS AND CHILDREN
     // ─────────────────────────────────────────────────────────────────────────
