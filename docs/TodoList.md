@@ -237,6 +237,15 @@ suggested order:
    apart with the other couple between them; found 2026-10-15, no test yet).
 5. Housekeeping: bump `SixLabors.ImageSharp` 3.1.11 in the test project (NU1902/NU1903
    advisory warnings on every build).
+6. **DECISION DEFERRED (2026-10-16): exempt impossible shapes from fuzz Invariant 4?**
+   Triangles (three people all coupled to each other) and people in 3+ couples can't be
+   laid out with couples 200px apart and nobody between spouses; they are 28 of the 47
+   remaining failing families. Options: A (no change), B (`AssertSound`'s per-person
+   exemption), C (recommended: a person's two nearest partners, or two of a triangle's
+   three couples, must be within 200px). Also open: whether partners who each head a
+   family may sit off-center over their children. Write-up with the geometry, numbers
+   and a checklist: [Layout fuzz: Invariant 4 exemption decision](https://claude.ai/code/artifact/e8d80e9a-f093-48ed-834a-c4b10082109f).
+   Doug deferred it to work on layout issues seen live.
 
 Added `tests/FamilyTree.Web.Tests/ServiceTests/FamilyTreeLayoutFuzzTests.cs` (Leg 1 of
 `docs/Testing/fuzz-and-adversarial-review-plan.md`, branch `testing/layout-fuzz-harness`):
