@@ -207,6 +207,24 @@ PR #43).
 
 ## Layout Fuzz Harness: first-run findings (2026-10-10)
 
+**Status as of 2026-10-16.** Fixed and merged: R0, R1, R3, R6, R10, R11, R12, R13, plus
+the R2, R4 and R7 parts noted in their entries (PRs up to #58). **Deployed** only through
+PR #52 (2026-10-12). PRs #53-#58 (phone polish, R1, R2, R3, R7/R4 part, R7 bridge/R10)
+are on `master` but not live until `deploy-web.yml` is run again. Still open, in
+suggested order:
+1. **R5**: same-named people can swap sides between page loads (`GetAllAsync` has no
+   tiebreak after LastName/FirstName). Production-reachable with an ordinary tree; small
+   fix (sort by `Id` as the last key, ideally inside the engine). Invariants 5b/5c.
+2. **R8**: an orphan sibling with a partner is anchored to the sibling, not the partner.
+3. **R7/R6 leftovers**: Invariant 4 still excludes `SpouseAnchoredPartner` (people in
+   3+ couples; two partners who each head a family, e.g. Lauren 280px from Marc), and a
+   sibling at the inner edge still blocks the cross-root pull.
+4. **R4 rest** (`AnchorPlacedPerson`: two root groups at one X), **R9**, **R2 (b)**, and
+   the shape where two marriages cross between the same two sibling sets (partners 440px
+   apart with the other couple between them; found 2026-10-15, no test yet).
+5. Housekeeping: bump `SixLabors.ImageSharp` 3.1.11 in the test project (NU1902/NU1903
+   advisory warnings on every build).
+
 Added `tests/FamilyTree.Web.Tests/ServiceTests/FamilyTreeLayoutFuzzTests.cs` (Leg 1 of
 `docs/Testing/fuzz-and-adversarial-review-plan.md`, branch `testing/layout-fuzz-harness`):
 CsCheck generates random genealogies, runs them through the production path
