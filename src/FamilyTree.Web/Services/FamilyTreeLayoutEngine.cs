@@ -527,16 +527,35 @@ public class FamilyTreeLayoutEngine
                     crossEdge[memberOfB] = false;
                 }
 
+                // A child whose own descendants hold a cross-root member sorts to that
+                // member's edge too, so the whole line down to them hugs the inner edge
+                // (R6, 2026-10-16). Rose, Lauren's granddaughter through Florence, married
+                // into the next family; Florence sat between her siblings Bill and Max, so
+                // Bill held Lauren's inner edge and Rose couldn't be pulled within
+                // SpouseSpacingX of her wife. A member's own entry wins; a subtree holding
+                // members for both edges sorts to neither.
+                var subtreeEdge = new Dictionary<Guid, bool?>();
+                var edgePath = new HashSet<Guid>(); // cycle guard, as markPath
+                bool? EdgeOf(Guid cid)
+                {
+                    if (crossEdge.TryGetValue(cid, out var own)) return own;
+                    if (subtreeEdge.TryGetValue(cid, out var memo)) return memo;
+                    if (!primaryGroup.TryGetValue(cid, out var cg) || !edgePath.Add(cid)) return null;
+                    var edges = cg.ChildIds.Select(EdgeOf).Where(e => e.HasValue).Distinct().ToList();
+                    edgePath.Remove(cid);
+                    return subtreeEdge[cid] = edges.Count == 1 ? edges[0] : null;
+                }
+
                 var reorderPath = new HashSet<GroupKey>(); // same cycle guard as markPath
                 void ReorderCrossEdgeChildren(NuclearGroup g, int? rootIndex)
                 {
                     if (!reorderPath.Add(GroupKey.Of(g))) return;
-                    if (g.ChildIds.Any(crossEdge.ContainsKey))
+                    if (g.ChildIds.Any(cid => EdgeOf(cid).HasValue))
                     {
                         var reordered = g with
                         {
                             ChildIds = [.. g.ChildIds.OrderBy(cid =>
-                                crossEdge.TryGetValue(cid, out var isA) ? (isA ? 2 : 0) : 1)]
+                                EdgeOf(cid) is { } isA ? (isA ? 2 : 0) : 1)]
                         };
 
                         // NuclearGroup is a record (structural equality) — reordering
@@ -582,7 +601,8 @@ public class FamilyTreeLayoutEngine
             // marriage to Lauren. Before, only a couple could carry an attachment, so Lauren
             // went through the safety net and could walk off the left edge of the canvas.
             // A single parent is drawn at the slot's centre and has no partner on either
-            // side, so the attachment goes on the right.
+            // side, so the attachment goes on the right (left when a child of theirs is a
+            // cross-root partner who needs the right edge; see attachLeft).
             var crossRootCouples = crossRootInfo.Select(c => c.couple).ToHashSet();
             var attachedFor = new Dictionary<Guid, (NuclearGroup Group, Guid? PartnerId)>();
             foreach (var g in compGroups
@@ -640,6 +660,7 @@ public class FamilyTreeLayoutEngine
             // Not done for a sibling-linked follower group (R13): turning it would flip a
             // married couple the moment a Sibling link is added to one of them
             // (SiblingLinkBetweenTwoMarriedParents_BothFamiliesKeepTheirShape).
+            var attachLeft = new HashSet<Guid>(); // single parents whose attachment hangs left (see below)
             if (crossRootInfo.Count > 0)
             {
                 var wantRight = new Dictionary<Guid, bool>();
@@ -692,6 +713,18 @@ public class FamilyTreeLayoutEngine
                     // ParentA's attachment hangs left, ParentB's right; turn if a child wants that edge.
                     if (edges[0] == holdsB) Turn(g);
                 }
+
+                // A single parent's attachment hangs on the right by default; when one of
+                // their own children wants the right edge, it hangs left instead (R6,
+                // 2026-10-16). Lauren's son Max married into her brother Harvey's family,
+                // right of hers, but her husband Doug (no child with her) hung between them,
+                // leaving Max 320px from his husband.
+                foreach (var g in primaryGroup.Values.Distinct().Where(g => !g.ParentBId.HasValue).ToList())
+                {
+                    if (g.ParentAId is not { } parent || AttachmentOf(g, parent) is null) continue;
+                    var edges = g.ChildIds.Where(wantRight.ContainsKey).Select(c => wantRight[c]).Distinct().ToList();
+                    if (edges is [true]) attachLeft.Add(parent);
+                }
             }
 
             void Turn(NuclearGroup g)
@@ -718,10 +751,11 @@ public class FamilyTreeLayoutEngine
 
             // Where each parent of g sits relative to the core anchor, and which way an
             // attachment of theirs extends: a couple's ParentA is drawn left and ParentB
-            // right; a single parent sits at the anchor and attaches on the right.
+            // right; a single parent sits at the anchor and attaches on the right, unless
+            // attachLeft says otherwise.
             (Guid? Parent, double Offset, int Dir)[] AttachSides(NuclearGroup g) => g.ParentBId.HasValue
                 ? [(g.ParentAId, SpouseSpacingX / 2.0, -1), (g.ParentBId, SpouseSpacingX / 2.0, 1)]
-                : [(g.ParentAId, 0, 1)];
+                : [(g.ParentAId, 0, g.ParentAId is { } p && attachLeft.Contains(p) ? -1 : 1)];
 
             // Centre of an attached group's children, as an offset from the core anchor
             // (sign added by the caller): under the second couple's midpoint (or under the

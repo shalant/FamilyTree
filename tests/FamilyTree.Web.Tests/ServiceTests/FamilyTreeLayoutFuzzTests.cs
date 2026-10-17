@@ -110,7 +110,7 @@ public class FamilyTreeLayoutFuzzTests
     // timeline (CLAUDE.md, ADR 001), so two DATED spouses born years apart are supposed to
     // sit at different heights. Only when the engine has no date for either partner is a
     // Y difference an artifact rather than data. The X half is asserted unconditionally.
-    [Fact(Skip = SkipPrefix + "R2, R6 (cross-root partners the post-placement pull can't bring together), R7.")]
+    [Fact(Skip = SkipPrefix + "R2, R6 (cross-root partners who both head families of their own), R7.")]
     public void Invariant4_CouplesSitTogether() => Run(GenFamily, AssertCouplesTogether);
 
     [Fact]
@@ -509,9 +509,10 @@ public class FamilyTreeLayoutFuzzTests
         AnchorPlacedPerson = 8,
         // R6: partners anchored under two different root groups. Since 2026-10-12 the orphan
         // slack sits after the joined families and a leaf partner slides toward the other
-        // (within their own parents' span), which fixes the common case, but the pull is
-        // still blocked when a sibling holds the inner edge or both partners head families
-        // of their own. TodoList "[LAYOUT FUZZ 2026-10-10] R6".
+        // (within their own parents' span), which fixes the common case. Since 2026-10-16
+        // a sibling no longer holds the inner edge (the whole line down to the partner sorts
+        // there), but the pull is still blocked when both partners head families of their
+        // own. TodoList "[LAYOUT FUZZ 2026-10-10] R6".
         // R10 (a cross-root couple's children dropped at the midpoint with no collision
         // check) was fixed 2026-10-15, and Invariant 1 no longer excludes this flag; only
         // Invariant 4 still does, for R6. TodoList "[LAYOUT FUZZ 2026-10-10] R10".
