@@ -847,6 +847,27 @@ public class FamilyTreeLayoutTransitionTests
         onNobody.Nodes.Should().NotContain(n => n.IsFocus);
     }
 
+    // Not an edit: the same family read twice. GetAllAsync sorts by LastName, FirstName,
+    // and SQL Server returns rows tied on both in no guaranteed order. Two children with the
+    // same name (common historically: a child named after a sibling who died) used to swap
+    // sides between page loads (R5, fixed 2026-10-17 by sorting inside the engine with Id
+    // as the last key).
+    [Theory, InlineData(false), InlineData(true)]
+    public void SameNamedChildrenReturnedInEitherOrder_NobodyMoves(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var doug = t.Add("Doug", "Kuh", 1960);
+        var ann = t.Add("Ann", "Kuh", 1962);
+        var older = t.Add("Gish", "Kuh", 1990);
+        var younger = t.Add("Gish", "Kuh", 1990);
+        t.Marry(doug, ann).Parent(doug, older).Parent(ann, older).Parent(doug, younger).Parent(ann, younger);
+
+        var asReturned = t.Layout(doug);
+        var tiesReversed = t.Layout(doug, reverseNameTies: true);
+
+        AssertSamePositions(asReturned, tiesReversed, t.Ids, "same-named rows coming back in the other order");
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // ASSERTIONS
     // ═════════════════════════════════════════════════════════════════════════
@@ -1024,9 +1045,13 @@ public class FamilyTreeLayoutTransitionTests
             .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
             .ToList();
 
-        public FamilyTreeLayout Layout(Guid focus)
+        // reverseNameTies reverses the order of rows tied on LastName and FirstName, the
+        // part of the list order SQL Server doesn't guarantee.
+        public FamilyTreeLayout Layout(Guid focus, bool reverseNameTies = false)
         {
             var people = People();
+            if (reverseNameTies)
+                people = [.. people.GroupBy(p => (p.LastName, p.FirstName)).SelectMany(g => g.Reverse())];
             return new FamilyTreeLayoutEngine().ComputeLayout(people, CoupleHelper.Derive(people), focus);
         }
 

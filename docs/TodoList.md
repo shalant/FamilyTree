@@ -207,6 +207,9 @@ PR #43).
 
 ## Layout Fuzz Harness: first-run findings (2026-10-10)
 
+*2026-10-17:* PRs #53-#59 deployed. R5 fixed on `fix/r5-same-name-tiebreak` (item 1
+below); R8 is next.
+
 **Status as of 2026-10-16.** Fixed and merged: R0, R1, R3, R6, R10, R11, R12, R13, plus
 the R2, R4 and R7 parts noted in their entries (PRs up to #58). **Deployed** only through
 PR #52 (2026-10-12). PRs #53-#58 (phone polish, R1, R2, R3, R7/R4 part, R7 bridge/R10)
@@ -439,7 +442,7 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       root groups drawn at the same X a few rows apart (Willa Fleishman 1885 on Willa Lee
       1882, with Harvey Lee in three couples and two sibling links), which isn't the
       anchor search.
-- [ ] **[LAYOUT FUZZ 2026-10-10] R5 — layout depends on the order of the people list.**
+- [x] **[LAYOUT FUZZ 2026-10-10] R5 — layout depends on the order of the people list.**
       `CoupleSortKey`, `ComputeDepths` (first person), Pass 0.5 seeding (`component[0]`),
       inference order (R3) and component order all read list position. Shuffling the list
       swaps unrelated trees left/right, which is just design. The production-reachable part:
@@ -449,6 +452,16 @@ replace `FamilyTreeLayoutEngineTests`. It covers ground those tests don't.
       Historically common (a child named after a sibling who died). Fix direction: add
       `.ThenBy(p => p.Id)` in `GetAllAsync`, or sort inside the engine. Fails
       Invariants 5b, 5c.
+      **Fixed 2026-10-17** on `fix/r5-same-name-tiebreak` (not deployed yet).
+      `ComputeLayout` now starts with `CanonicalOrder`: people sorted by LastName,
+      FirstName (invariant culture, case-insensitive, close to SQL Server's collation),
+      then `Id`; couples by their partners' positions in that order, children within a
+      couple likewise. Inputs aren't mutated. Sorting in the engine rather than in
+      `GetAllAsync` also covers whole-list shuffles (5b), not just name ties. Callers
+      already pass name order, so a live tree only changes where two people share a full
+      name. Invariants 5b and 5c are un-skipped; both failed with the sort disabled.
+      Added `FamilyTreeLayoutTransitionTests.SameNamedChildrenReturnedInEitherOrder_NobodyMoves`
+      (the Gish Kuh repro), also confirmed failing without the fix.
 - [x] **[LAYOUT FUZZ 2026-10-10] R6 — DESIGN QUESTION: cross-root couples always sit
       ~360px apart.** The cross-root step reserves `OrphanBufferX` (240px) between the two
       bridged root groups on purpose (2026-07-07, so Morton-style orphan siblings have

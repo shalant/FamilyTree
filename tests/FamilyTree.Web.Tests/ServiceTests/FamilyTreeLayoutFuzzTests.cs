@@ -134,7 +134,7 @@ public class FamilyTreeLayoutFuzzTests
 
     // 5b. Shuffling the input list does not change relative placement (the left/right and
     // above/below order of every pair of nodes).
-    [Fact(Skip = SkipPrefix + "R5 (layout depends on people-list order).")]
+    [Fact]
     public void Invariant5b_ShufflingInputDoesNotChangeRelativePlacement() =>
         Run(GenFamily, f => AssertSameRelativePlacement(f, f.Shuffled(tiesOnly: false)));
 
@@ -142,7 +142,7 @@ public class FamilyTreeLayoutFuzzTests
     // FirstName, and SQL Server returns rows that tie on both in no guaranteed order. The
     // same family must render the same way whichever order the tied rows come back in.
     // No _ExcludingKnownOpen twin: without name ties the reorder is a no-op.
-    [Fact(Skip = SkipPrefix + "R5 (layout depends on people-list order; name ties make it nondeterministic in production).")]
+    [Fact]
     public void Invariant5c_ReorderingNameTiesDoesNotChangeRelativePlacement() =>
         Run(GenFamily, f => AssertSameRelativePlacement(f, f.Shuffled(tiesOnly: true)));
 
