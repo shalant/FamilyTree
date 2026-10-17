@@ -44,6 +44,18 @@ public abstract class ComponentTestBase : TestContext
         JSInterop.Setup<dynamic>("mudElementRef.getBoundingClientRect", _ => true)
             .SetResult(new { width = 0, height = 0, left = 0, top = 0, bottom = 0, right = 0, x = 0, y = 0 });
     }
+
+    // Use these, not bUnit's synchronous Change()/Click(), when a later step depends on the
+    // handler having finished. The synchronous versions discard the handler's Task, and
+    // MudTextField pushes its value to @bind-Value through async code, so a Save clicked
+    // right after Change() could still see blank names. Found as a CI flake 2026-10-17:
+    // PersonFormTests.Submit_InvokesOnSubmit_WhenRequiredFieldsAreFilled failed on one run
+    // of a commit that passed on the next.
+    protected static Task ChangeAsync(AngleSharp.Dom.IElement element, string value) =>
+        element.ChangeAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = value });
+
+    protected static Task ClickAsync(AngleSharp.Dom.IElement element) =>
+        element.ClickAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
 }
 
 //// Example fake service

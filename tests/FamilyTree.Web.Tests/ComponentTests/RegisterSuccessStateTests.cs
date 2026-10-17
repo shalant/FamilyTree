@@ -21,17 +21,17 @@ public class RegisterSuccessStateTests : ComponentTestBase
     // fold and read as cut off. The form is now replaced by the success block.
     [Fact]
     [Trait("Category", "Regression")]
-    public void AfterRegistering_FormIsReplacedBySuccessBlock_SoTheNextStepStaysOnScreen()
+    public async Task AfterRegistering_FormIsReplacedBySuccessBlock_SoTheNextStepStaysOnScreen()
     {
         var cut = RenderComponent<Register>();
 
         var fields = cut.FindAll("input");
-        fields[0].Change("Test");
-        fields[1].Change("Person");
-        fields[2].Change("test.person@example.com");
-        fields[3].Change("A-long-enough-pass1");
-        fields[4].Change("A-long-enough-pass1");
-        cut.Find("button.mud-button-filled").Click();
+        await ChangeAsync(fields[0], "Test");
+        await ChangeAsync(fields[1], "Person");
+        await ChangeAsync(fields[2], "test.person@example.com");
+        await ChangeAsync(fields[3], "A-long-enough-pass1");
+        await ChangeAsync(fields[4], "A-long-enough-pass1");
+        await ClickAsync(cut.Find("button.mud-button-filled"));
 
         cut.Markup.Should().Contain("You're all set!");
         cut.Markup.Should().Contain("Link to your tree");
