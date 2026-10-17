@@ -39,13 +39,13 @@ public class ParentLoopRejectionUiTests : ComponentTestBase
     }
 
     [Fact]
-    public void EditPage_ShowsTheLoopMessageAsAnErrorToast_WhenTheSaveIsRejected()
+    public async Task EditPage_ShowsTheLoopMessageAsAnErrorToast_WhenTheSaveIsRejected()
     {
         var nav = Services.GetRequiredService<Bunit.TestDoubles.FakeNavigationManager>();
         var cut = RenderComponent<PersonEdit>(p => p.Add(x => x.Id, _personId));
         var uriBefore = nav.Uri;
 
-        cut.FindAll("button").First(b => b.TextContent.Trim() == "Save changes").Click();
+        await ClickAsync(cut.FindAll("button").First(b => b.TextContent.Trim() == "Save changes"));
 
         _people.UpdateCalls.Should().Be(1);
         var toasts = Services.GetRequiredService<ToastService>().Toasts;
@@ -55,13 +55,13 @@ public class ParentLoopRejectionUiTests : ComponentTestBase
     }
 
     [Fact]
-    public void AddPage_ShowsTheLoopMessageAsAnErrorToastAndInline_WhenTheSaveIsRejected()
+    public async Task AddPage_ShowsTheLoopMessageAsAnErrorToastAndInline_WhenTheSaveIsRejected()
     {
         var cut = RenderComponent<PersonAdd>();
-        cut.Find("input[placeholder='e.g. Margaret']").Change("Xavier");
-        cut.Find("input[placeholder='e.g. Rosenberg']").Change("Test");
+        await ChangeAsync(cut.Find("input[placeholder='e.g. Margaret']"), "Xavier");
+        await ChangeAsync(cut.Find("input[placeholder='e.g. Rosenberg']"), "Test");
 
-        cut.FindAll("button").First(b => b.TextContent.Trim() == "Add person").Click();
+        await ClickAsync(cut.FindAll("button").First(b => b.TextContent.Trim() == "Add person"));
 
         _people.CreateCalls.Should().Be(1);
         Services.GetRequiredService<ToastService>().Toasts

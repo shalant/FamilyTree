@@ -55,12 +55,12 @@ public class PersonFormTests : ComponentTestBase
 
     [Fact]
     [Trait("Category", "Regression")]
-    public void AvatarInitialsPreview_ShowsBothInitials_WhenNamesAreFilled()
+    public async Task AvatarInitialsPreview_ShowsBothInitials_WhenNamesAreFilled()
     {
         var cut = RenderComponent<PersonForm>();
 
-        cut.Find("input[placeholder='e.g. Margaret']").Change("John");
-        cut.Find("input[placeholder='e.g. Rosenberg']").Change("Smith");
+        await ChangeAsync(cut.Find("input[placeholder='e.g. Margaret']"), "John");
+        await ChangeAsync(cut.Find("input[placeholder='e.g. Rosenberg']"), "Smith");
 
         var initialsDiv = cut.Find("div[style*='letter-spacing:0.02em']");
         initialsDiv.TextContent.Should().Be("JS");
@@ -72,14 +72,14 @@ public class PersonFormTests : ComponentTestBase
     // now sets _firstNameError/_lastNameError explicitly before bailing out.
     [Fact]
     [Trait("Category", "Regression")]
-    public void Submit_ShowsRequiredErrors_AndDoesNotInvokeOnSubmit_WhenNamesAreBlank()
+    public async Task Submit_ShowsRequiredErrors_AndDoesNotInvokeOnSubmit_WhenNamesAreBlank()
     {
         var submittedDtos = new List<PersonUpsertDto>();
         var cut = RenderComponent<PersonForm>(parameters => parameters
             .Add(p => p.OnSubmit, EventCallback.Factory.Create<PersonUpsertDto>(this, dto => submittedDtos.Add(dto))));
 
         var saveButton = cut.FindAll("button").First(b => b.TextContent.Trim() == "Save");
-        saveButton.Click();
+        await ClickAsync(saveButton);
 
         submittedDtos.Should().BeEmpty();
         cut.Markup.Should().Contain("First name is required.");
@@ -88,17 +88,17 @@ public class PersonFormTests : ComponentTestBase
 
     [Fact]
     [Trait("Category", "Regression")]
-    public void Submit_InvokesOnSubmit_WhenRequiredFieldsAreFilled()
+    public async Task Submit_InvokesOnSubmit_WhenRequiredFieldsAreFilled()
     {
         var submittedDtos = new List<PersonUpsertDto>();
         var cut = RenderComponent<PersonForm>(parameters => parameters
             .Add(p => p.OnSubmit, EventCallback.Factory.Create<PersonUpsertDto>(this, dto => submittedDtos.Add(dto))));
 
-        cut.Find("input[placeholder='e.g. Margaret']").Change("John");
-        cut.Find("input[placeholder='e.g. Rosenberg']").Change("Smith");
+        await ChangeAsync(cut.Find("input[placeholder='e.g. Margaret']"), "John");
+        await ChangeAsync(cut.Find("input[placeholder='e.g. Rosenberg']"), "Smith");
 
         var saveButton = cut.FindAll("button").First(b => b.TextContent.Trim() == "Save");
-        saveButton.Click();
+        await ClickAsync(saveButton);
 
         submittedDtos.Should().ContainSingle();
         submittedDtos[0].FirstName.Should().Be("John");
