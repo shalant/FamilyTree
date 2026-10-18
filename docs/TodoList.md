@@ -23,9 +23,21 @@ stopping placement patches and replacing the placement algorithm, measured first
       Ellen + Marc are ~680 layout units apart live. Doug runs the export (production DB).
       Also check whether PR #63 is deployed: the screenshot was taken after it merged, but
       deploys are manual.
-- [ ] **Step 2: decide birth-year timeline vs generation rows** (Doug, product call).
-- [ ] **Step 3: time-boxed layered-layout prototype** (family nodes, crossing
-      minimisation, solved X positions). Check MSAGL first.
+- [x] **Step 2: decide birth-year timeline vs generation rows** (2026-10-17). Doug keeps the
+      timeline; option 1 (exact birth-year Y, generation layers only for ordering, X solved
+      with separation only where blocks overlap in height). See ADR 004, "Step 2 decision".
+- [x] **Archive the current engine** (2026-10-17). `FamilyTreeLayoutEngine` frozen behind
+      `IFamilyTreeLayoutEngine`, still the default; `Layout:Engine=Timeline` switches.
+- [ ] **Step 3: prototype** — first version done 2026-10-17 (`TimelineLayoutEngine`,
+      `TimelineLayoutEngineTests`). MSAGL wasn't evaluated: option 1 needs every person at
+      a fixed Y (their birth year), which a stock layered layout doesn't assume, so a small
+      hand-written solver came first. Revisit MSAGL (or VPSC) if the solver becomes the
+      bottleneck. On 500 generated families: 0 overlaps
+      (archived 15), 107 families with a loose couple (164), 14% narrower, 12% less
+      connector, but 13% more crossings. On `two-bridges`: 1620 → 1022 wide, every couple
+      at 200, worst off-centre 1000 → 127. Next, in order: crossings (dummy nodes for long
+      edges, transpose pass), speed (~500 ms at 500 people), 3+ partner blocks, connectors
+      as obstacles, the anchor. Then Doug tries it on the live tree (Step 1b first).
 - [ ] **Step 4: run both engines side by side** behind one interface; switch only when the
       new one wins on the scores and in the gallery.
 

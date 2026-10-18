@@ -42,7 +42,7 @@ public class BrokenPhotoFallbackTests : ComponentTestBase
     public void DetailDrawer_ShowsInitialsAndANote_WhenPhotoFailsToLoad()
     {
         Services.AddSingleton<ToastService>();
-        Services.AddSingleton<FamilyTreeLayoutEngine>();
+        Services.AddSingleton<IFamilyTreeLayoutEngine, FamilyTreeLayoutEngine>();
         Services.AddSingleton<IMediumService>(new FakeMediumService());
         Services.AddSingleton<IStoryService>(new FakeStoryService());
 

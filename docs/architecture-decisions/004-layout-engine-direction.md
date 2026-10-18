@@ -1,7 +1,8 @@
 # ADR 004 — Direction for the tree layout engine: measure, then replace placement
 
 **Date:** 2026-10-17
-**Status:** Proposed (step 1 under way; steps 2-4 need a decision first)
+**Status:** Accepted 2026-10-17. The archived engine is frozen, step 2 is decided (keep the
+birth-year timeline, option 1 below), and the step 3 prototype exists behind a switch.
 
 ## Context
 
@@ -43,7 +44,7 @@ The shape of the problem is the engine, not this one couple:
   away from their parents and order-dependence. Nothing scores compactness or partner
   distance, so every test can pass while the tree looks loose.
 
-## Decision (proposed)
+## Decision
 
 Stop adding placement rules to the current engine. Keep its test harness, and replace the
 placement algorithm, in this order:
@@ -108,6 +109,80 @@ gap moved the cost to another family, which is the pattern this ADR is about.
 
 Still to do for step 1: export the live tree and find out why it shows a much wider gap
 than the reconstruction (`docs/TodoList.md`, "Layout engine direction").
+
+## Step 2 decision (2026-10-17)
+
+Doug keeps the birth-year timeline. Of the three ways considered to keep it:
+
+1. **Exact timeline, generations used only behind the scenes** (chosen). Y stays the birth
+   year. Generation layers decide left-to-right order only, and X is solved so two blocks
+   must keep apart only if they share a layer or overlap in height.
+2. Generation bands with a birth-year nudge inside each band (fallback if 1 doesn't look
+   good).
+3. Generation rows spaced by time; individual years shown only as labels.
+
+How generation layers cope with families whose generations don't line up: layers aren't
+counted from the top. They're solved from "partners share a layer" and "a child is at least
+one layer below each parent", and a family with no recorded parents floats down to just
+above its children. Bud + Florence (no parents on the tree) therefore sit one layer above
+Marc, whatever depth Ellen's side reaches. A marriage across generations is handled by the
+"at least": one side's child sits two layers down. Only a cycle (someone their own ancestor
+through a marriage) can't be solved; that cluster's incoming edges are dropped.
+
+## The archived engine (2026-10-17)
+
+`FamilyTreeLayoutEngine` stays in place and stays the production default, but is frozen: no
+new placement rules, fixes only if production breaks. Its connector builder and output
+records are shared with the new engine. Both implement `IFamilyTreeLayoutEngine`;
+`Layout:Engine` picks one (`Legacy`, the default, or `Timeline`). Its tests stay as they are
+and keep running.
+
+## Step 3 status: `TimelineLayoutEngine` prototype (2026-10-17)
+
+`src/FamilyTree.Web/Services/TimelineLayoutEngine.cs`, about 650 lines. Generation layers
+(partner clusters, longest path, then pulled down toward children, with childless families
+placed last), one rigid block per set of partners, DFS order plus barycentre sweeps keeping
+the order with the fewest crossings, birth years inferred from relatives, then a two-phase
+X solve (layer neighbours only, then also blocks overlapping in height), each phase ending
+in a pass that makes every separation constraint hold. Tests:
+`TimelineLayoutEngineTests` (exact birth-year Y, every couple at partner spacing,
+parentless in-laws float down, children centred, dateless inference, input-order
+independence, parent cycles, and no overlaps over 200 generated families).
+
+First comparison (500 generated families, seed 20261010):
+
+| Score | Archived | Prototype |
+|---|---|---|
+| Families with a couple over 200 apart | 164 | 107 |
+| Max partner gap (mean / worst) | 285 / 1690 | 218 / 1200 |
+| Crossings (total / families with any) | 792 / 183 | 894 / 202 |
+| Lines through nodes (total / families) | 674 / 212 | 672 / 230 |
+| Node overlaps (total / families) | 15 / 13 | 0 / 0 |
+| Family off-centre, mean of max | 263 | 215 |
+| Width, mean | 1403 | 1201 |
+| Connector length, mean | 3275 | 2893 |
+
+`two-bridges` (the screenshot reconstruction): width 1620 → 1022, crossings 1 → 0, every
+couple at 200, worst family off-centre 1000 → 127.
+
+Known gaps, roughly in the order to tackle them:
+
+- **Crossings are worse** on random families. The ordering is a basic barycentre heuristic;
+  the next step is proper long-edge handling (dummy nodes) and a transpose pass.
+- **Speed:** 41 ms at 100 people, 121 ms at 250, ~500 ms at 500 (archived: 9 / 23 / 84 ms,
+  Release build). Fine for a family-sized tree, too slow for a large one on every click.
+  The crossing count and the polish loop are the likely costs.
+- **Three or more partners in one block** sit in a line, so two partners who aren't each
+  other's spouse can be 400+ apart, and a remarriage chain in random data can stretch a block
+  (the 107 "loose couples" are these).
+- **Connectors aren't obstacles yet:** a family's sibling line can still run through a
+  person at another height (lines through nodes unchanged).
+- **The anchor isn't used** (the archived engine puts the logged-in user's father's side on
+  the left).
+- **The X solver is coordinate descent**, which can stall when blocks press against each
+  other. The VPSC algorithm (merging blocks that touch) is the standard fix if it shows up.
+- Not yet checked against the fuzz invariants or the transition pairs; those run against
+  the archived engine only. Running them against both is part of step 4.
 
 ## Consequences
 

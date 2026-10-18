@@ -132,38 +132,51 @@ public class LayoutFixtureTests(ITestOutputHelper output)
 
 // Local-only: writes artifacts/layout-gallery/index.html (ADR 004, step 1; how to run it is
 // in docs/Testing/layout-quality-gallery.md). Every fixture, then the worst generated
-// families by each score, plus aggregate scores over all the generated ones as a baseline.
+// families by each score under the archived engine, each drawn by both engines one above
+// the other, plus aggregate scores for both engines over all the generated families.
 public class LayoutGalleryTests(ITestOutputHelper output)
 {
     private const int WorstPerScore = 4;
+
+    private static readonly (string Name, Func<IFamilyTreeLayoutEngine> Make)[] Engines =
+        [("archived", () => new FamilyTreeLayoutEngine()), ("timeline prototype", () => new TimelineLayoutEngine())];
 
     [GalleryFact]
     public void WriteGallery()
     {
         var entries = new List<LayoutGallery.Entry>();
         foreach (var fixture in LayoutFixture.LoadAll())
-        {
-            var (layout, people, couples) = fixture.Layout();
-            entries.Add(new(fixture.Name!, "fixture", layout, LayoutQualityMetrics.Compute(layout, people, couples)));
-        }
+            foreach (var (name, make) in Engines)
+            {
+                var (layout, people, couples) = fixture.Layout(make());
+                entries.Add(new($"{fixture.Name} — {name}", "fixture", layout, LayoutQualityMetrics.Compute(layout, people, couples)));
+            }
 
         var cases = int.TryParse(Environment.GetEnvironmentVariable("FAMILYTREE_LAYOUT_GALLERY_CASES"), out var n) ? n : 500;
         var seed = FamilyTreeLayoutFuzzTests.DefaultSeed;
         var generated = Enumerable.Range(0, cases).Select(i =>
         {
             var f = FamilyTreeLayoutFuzzTests.Generated(i, seed);
-            var layout = f.Layout();
-            return (Index: i, Layout: layout, Report: LayoutQualityMetrics.Compute(layout, f.People, f.Couples));
+            var focus = f.Focus;
+            var reports = Engines.Select(e =>
+            {
+                var layout = e.Make().ComputeLayout(f.People, f.Couples, focus, f.Anchor);
+                return (Layout: layout, Report: LayoutQualityMetrics.Compute(layout, f.People, f.Couples));
+            }).ToArray();
+            return (Index: i, Results: reports);
         }).ToList();
 
         var picked = new HashSet<int>();
         void Worst(string score, Func<LayoutQualityReport, double> by)
         {
-            foreach (var g in generated.Where(g => by(g.Report) > 0).OrderByDescending(g => by(g.Report)).ThenBy(g => g.Index)
+            foreach (var g in generated.Where(g => by(g.Results[0].Report) > 0)
+                         .OrderByDescending(g => by(g.Results[0].Report)).ThenBy(g => g.Index)
                          .Where(g => !picked.Contains(g.Index)).Take(WorstPerScore))
             {
                 picked.Add(g.Index);
-                entries.Add(new($"generated #{g.Index} (seed {seed})", $"among the worst by {score}", g.Layout, g.Report));
+                for (var e = 0; e < Engines.Length; e++)
+                    entries.Add(new($"generated #{g.Index} (seed {seed}) — {Engines[e].Name}",
+                        $"among the worst by {score} under the archived engine", g.Results[e].Layout, g.Results[e].Report));
             }
         }
         Worst("partner gap", r => r.MaxPartnerGap > LayoutQualityMetrics.SpouseSpacingX ? r.MaxPartnerGap : 0);
@@ -176,15 +189,19 @@ public class LayoutGalleryTests(ITestOutputHelper output)
             ?? Path.Combine(RepoRoot(), "artifacts", "layout-gallery", "index.html");
         LayoutGallery.Write(path, entries);
 
-        var reports = generated.Select(g => g.Report).ToList();
         output.WriteLine($"Wrote {path}");
-        output.WriteLine($"Baseline over {cases} generated families (seed {seed}):");
-        output.WriteLine($"  with a loose couple (> {LayoutQualityMetrics.SpouseSpacingX}): {reports.Count(r => r.LooseCouples.Any())}");
-        output.WriteLine($"  max partner gap: mean {reports.Average(r => r.MaxPartnerGap):0}, worst {reports.Max(r => r.MaxPartnerGap):0}");
-        output.WriteLine($"  crossings: total {reports.Sum(r => r.Crossings)}, families with any {reports.Count(r => r.Crossings > 0)}");
-        output.WriteLine($"  lines through nodes: total {reports.Sum(r => r.LinesThroughNodes)}, families with any {reports.Count(r => r.LinesThroughNodes > 0)}");
-        output.WriteLine($"  node overlaps: total {reports.Sum(r => r.NodeOverlaps)}, families with any {reports.Count(r => r.NodeOverlaps > 0)}");
-        output.WriteLine($"  family off-centre: mean of max {reports.Average(r => r.MaxFamilyOffCenter):0}");
+        for (var e = 0; e < Engines.Length; e++)
+        {
+            var reports = generated.Select(g => g.Results[e].Report).ToList();
+            output.WriteLine($"{Engines[e].Name}, over {cases} generated families (seed {seed}):");
+            output.WriteLine($"  with a loose couple (> {LayoutQualityMetrics.SpouseSpacingX}): {reports.Count(r => r.LooseCouples.Any())}");
+            output.WriteLine($"  max partner gap: mean {reports.Average(r => r.MaxPartnerGap):0}, worst {reports.Max(r => r.MaxPartnerGap):0}");
+            output.WriteLine($"  crossings: total {reports.Sum(r => r.Crossings)}, families with any {reports.Count(r => r.Crossings > 0)}");
+            output.WriteLine($"  lines through nodes: total {reports.Sum(r => r.LinesThroughNodes)}, families with any {reports.Count(r => r.LinesThroughNodes > 0)}");
+            output.WriteLine($"  node overlaps: total {reports.Sum(r => r.NodeOverlaps)}, families with any {reports.Count(r => r.NodeOverlaps > 0)}");
+            output.WriteLine($"  family off-centre: mean of max {reports.Average(r => r.MaxFamilyOffCenter):0}");
+            output.WriteLine($"  width: mean {reports.Average(r => r.Width):0}; connector length: mean {reports.Average(r => r.ConnectorLength):0}");
+        }
     }
 
     private static string RepoRoot()

@@ -12,7 +12,7 @@ public abstract class ComponentTestBase : TestContext
     {
         // App services
         Services.AddSingleton<ToastService>();
-        Services.AddSingleton<FamilyTreeLayoutEngine>();
+        Services.AddSingleton<IFamilyTreeLayoutEngine, FamilyTreeLayoutEngine>();
         Services.AddSingleton<TreeContextService>();
         Services.AddSingleton<ThemeService>();
 

@@ -58,8 +58,9 @@ $env:FAMILYTREE_LAYOUT_GALLERY = "1"; dotnet test tests/FamilyTree.Web.Tests --f
 ```
 
 The gallery writes `artifacts/layout-gallery/index.html` (gitignored): every fixture, then
-the four worst generated families for each score, each with its scores and an SVG drawn from
-the same connectors the canvas draws. Couples wider than 200 are labelled in red; overlapping
+the four worst generated families for each score (judged under the archived engine). Since
+2026-10-17 each one is drawn twice, by the archived engine and by the `TimelineLayoutEngine`
+prototype, each with its scores and an SVG drawn from the same connectors the canvas draws. Couples wider than 200 are labelled in red; overlapping
 people get a red ring. The test output also prints aggregate scores over all generated
 families. Options: `FAMILYTREE_LAYOUT_GALLERY_CASES` (default 500) and
 `FAMILYTREE_LAYOUT_GALLERY_OUT` (output path); generated families use the fuzz harness's
@@ -77,6 +78,20 @@ seed (`FAMILYTREE_FUZZ_SEED`, default 20261010).
 | Lines through nodes | 674 in total, in 212 families |
 | Node overlaps | 15 in total, in 13 families |
 | Family off-centre (max per family) | mean 263 |
+
+## Trying the prototype in the real app
+
+The app picks its engine from `Layout:Engine` (`Legacy` by default, or `Timeline`). Locally:
+
+```
+dotnet user-secrets set "Layout:Engine" "Timeline" --project src/FamilyTree.Web
+cd src/FamilyTree.Web && dotnet watch
+```
+
+Sign in as yourself (the dev sign-in has no family and no linked person, so it shows an
+empty tree). `dotnet user-secrets remove "Layout:Engine" --project src/FamilyTree.Web`
+switches back. Nothing changes in production unless `Layout__Engine` is set on the App
+Service.
 
 ## What it showed on day one
 

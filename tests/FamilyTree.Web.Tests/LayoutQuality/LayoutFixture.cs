@@ -73,11 +73,12 @@ public sealed record LayoutFixture(
             .ToList();
     }
 
-    public (FamilyTreeLayout Layout, List<PersonDto> People, List<CoupleDto> Couples) Layout()
+    // The archived engine unless another is given.
+    public (FamilyTreeLayout Layout, List<PersonDto> People, List<CoupleDto> Couples) Layout(IFamilyTreeLayoutEngine? engine = null)
     {
         var people = MapPeople();
         var couples = CoupleHelper.Derive(people);
         var focus = Focus ?? people[0].Id;
-        return (new FamilyTreeLayoutEngine().ComputeLayout(people, couples, focus), people, couples);
+        return ((engine ?? new FamilyTreeLayoutEngine()).ComputeLayout(people, couples, focus), people, couples);
     }
 }

@@ -166,6 +166,14 @@ builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<TreeContextService>();
 builder.Services.AddScoped<FamilyTreeLayoutEngine>();
+builder.Services.AddScoped<TimelineLayoutEngine>();
+// Which layout engine draws the tree (ADR 004): "Legacy" (default, the archived
+// FamilyTreeLayoutEngine) or "Timeline" (the prototype). Set Layout:Engine in user secrets
+// or Layout__Engine on the App Service to switch.
+builder.Services.AddScoped<IFamilyTreeLayoutEngine>(sp =>
+    string.Equals(builder.Configuration["Layout:Engine"], "Timeline", StringComparison.OrdinalIgnoreCase)
+        ? sp.GetRequiredService<TimelineLayoutEngine>()
+        : sp.GetRequiredService<FamilyTreeLayoutEngine>());
 builder.Services.AddScoped<SvgExportService>();
 builder.Services.AddScoped<IGedcomExportService, GedcomExportService>();
 builder.Services.AddSingleton(_ =>
