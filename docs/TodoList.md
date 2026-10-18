@@ -2,6 +2,35 @@
 
 ---
 
+## Layout engine direction (ADR 004, 2026-10-17)
+
+Context: after R0-R13 every fuzz invariant passes, but the live tree still looks loose
+(2026-10-16 screenshot: Ellen + Marc ~830 screen px apart while other couples sit at the
+normal spacing). [ADR 004](architecture-decisions/004-layout-engine-direction.md) proposes
+stopping placement patches and replacing the placement algorithm, measured first.
+
+- [x] **Step 1a: quality scores, fixtures and a gallery** (2026-10-17,
+      `feat/layout-quality-metrics`). Added `LayoutQualityMetrics` (partner gap, crossings,
+      lines through nodes, overlaps, connector length, family off-centre), `LayoutFixture`
+      (JSON Person + Relationship rows through `PersonMapper`), the checked-in
+      `two-bridges.json` reconstruction, `scripts/export-layout-fixture.sql`, and the local
+      gallery (`FAMILYTREE_LAYOUT_GALLERY=1`). Baseline and how-to:
+      `docs/Testing/layout-quality-gallery.md`. First finding: on `master`, `two-bridges`
+      has Ellen + Marc at 200 but Ray 1000 off-centre from Louis + Lillian; before PR #63
+      it was Ellen + Marc at 360.
+- [ ] **Step 1b: export the live tree** into `Fixtures/private/live.json` (gitignored;
+      steps in `docs/Testing/layout-quality-gallery.md`), run the gallery, and record why
+      Ellen + Marc are ~680 layout units apart live. Doug runs the export (production DB).
+      Also check whether PR #63 is deployed: the screenshot was taken after it merged, but
+      deploys are manual.
+- [ ] **Step 2: decide birth-year timeline vs generation rows** (Doug, product call).
+- [ ] **Step 3: time-boxed layered-layout prototype** (family nodes, crossing
+      minimisation, solved X positions). Check MSAGL first.
+- [ ] **Step 4: run both engines side by side** behind one interface; switch only when the
+      new one wins on the scores and in the gallery.
+
+---
+
 ## Deploy/outage experience (2026-10-16)
 
 Context: after a manual `deploy-web.yml` run on 2026-10-16, arborkin.com showed Chrome's

@@ -600,6 +600,13 @@ public class FamilyTreeLayoutFuzzTests
         public List<int> Parents { get; } = [];
     }
 
+    // The family the invariants see for case `index` of `seed`, for the layout gallery
+    // (LayoutQuality/LayoutGalleryTests), which scores generated families for looks.
+    internal static BuiltFamily Generated(int index, ulong seed) =>
+        Build(GenFamily.Generate(new PCG((uint)index, seed), null, out _));
+
+    internal static ulong DefaultSeed => BaseSeed;
+
     private static BuiltFamily Build(FamilySpec spec)
     {
         var drafts = new List<Draft>();

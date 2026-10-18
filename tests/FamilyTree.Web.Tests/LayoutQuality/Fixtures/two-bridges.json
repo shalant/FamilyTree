@@ -1,0 +1,308 @@
+{
+  "name": "two-bridges (2026-10-16 screenshot)",
+  "focus": "00000013-0000-0000-0000-000000000000",
+  "people": [
+    {
+      "id": "00000001-0000-0000-0000-000000000000",
+      "firstName": "Gimpel",
+      "lastName": "Schumevith",
+      "birthDate": null
+    },
+    {
+      "id": "00000002-0000-0000-0000-000000000000",
+      "firstName": "Rebecca",
+      "lastName": "Schumevith",
+      "birthDate": null
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000000",
+      "firstName": "Joseph",
+      "lastName": "Schumevith",
+      "birthDate": "1895-06-01"
+    },
+    {
+      "id": "00000004-0000-0000-0000-000000000000",
+      "firstName": "Ex",
+      "lastName": "Placeholder",
+      "birthDate": null
+    },
+    {
+      "id": "00000005-0000-0000-0000-000000000000",
+      "firstName": "Louis",
+      "lastName": "Small",
+      "birthDate": null
+    },
+    {
+      "id": "00000006-0000-0000-0000-000000000000",
+      "firstName": "Lillian",
+      "lastName": "Small",
+      "birthDate": "1903-06-01"
+    },
+    {
+      "id": "00000007-0000-0000-0000-000000000000",
+      "firstName": "Libby",
+      "lastName": "Small",
+      "birthDate": "1902-06-01"
+    },
+    {
+      "id": "00000008-0000-0000-0000-000000000000",
+      "firstName": "William",
+      "lastName": "Small",
+      "birthDate": null
+    },
+    {
+      "id": "00000009-0000-0000-0000-000000000000",
+      "firstName": "Ray",
+      "lastName": "Small",
+      "birthDate": "1922-06-01"
+    },
+    {
+      "id": "0000000a-0000-0000-0000-000000000000",
+      "firstName": "Rose",
+      "lastName": "Small",
+      "birthDate": "1923-06-01"
+    },
+    {
+      "id": "0000000b-0000-0000-0000-000000000000",
+      "firstName": "Fannie",
+      "lastName": "Schumevith",
+      "birthDate": null
+    },
+    {
+      "id": "0000000c-0000-0000-0000-000000000000",
+      "firstName": "Max",
+      "lastName": "Schumevith",
+      "birthDate": "1924-06-01"
+    },
+    {
+      "id": "0000000d-0000-0000-0000-000000000000",
+      "firstName": "Sarah",
+      "lastName": "Small",
+      "birthDate": null
+    },
+    {
+      "id": "0000000e-0000-0000-0000-000000000000",
+      "firstName": "Ellen",
+      "lastName": "Rosenberg",
+      "birthDate": "1950-06-01"
+    },
+    {
+      "id": "0000000f-0000-0000-0000-000000000000",
+      "firstName": "Bud",
+      "lastName": "Rosenberg",
+      "birthDate": null
+    },
+    {
+      "id": "00000010-0000-0000-0000-000000000000",
+      "firstName": "Florence",
+      "lastName": "Rosenberg",
+      "birthDate": null
+    },
+    {
+      "id": "00000011-0000-0000-0000-000000000000",
+      "firstName": "Marc",
+      "lastName": "Rosenberg",
+      "birthDate": "1948-06-01"
+    },
+    {
+      "id": "00000012-0000-0000-0000-000000000000",
+      "firstName": "Elliot",
+      "lastName": "Rosenberg",
+      "birthDate": null
+    },
+    {
+      "id": "00000013-0000-0000-0000-000000000000",
+      "firstName": "Douglas",
+      "lastName": "Rosenberg",
+      "birthDate": "1978-06-01"
+    },
+    {
+      "id": "00000014-0000-0000-0000-000000000000",
+      "firstName": "Lauren",
+      "lastName": "Rosenberg",
+      "birthDate": null
+    }
+  ],
+  "relationships": [
+    {
+      "personAId": "00000001-0000-0000-0000-000000000000",
+      "personBId": "00000002-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000002-0000-0000-0000-000000000000",
+      "personBId": "00000003-0000-0000-0000-000000000000",
+      "type": "Spouse",
+      "endDate": null
+    },
+    {
+      "personAId": "00000003-0000-0000-0000-000000000000",
+      "personBId": "00000004-0000-0000-0000-000000000000",
+      "type": "Spouse",
+      "endDate": "1920-01-01"
+    },
+    {
+      "personAId": "00000002-0000-0000-0000-000000000000",
+      "personBId": "0000000a-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000002-0000-0000-0000-000000000000",
+      "personBId": "0000000b-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000002-0000-0000-0000-000000000000",
+      "personBId": "0000000c-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000003-0000-0000-0000-000000000000",
+      "personBId": "0000000a-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000003-0000-0000-0000-000000000000",
+      "personBId": "0000000b-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000003-0000-0000-0000-000000000000",
+      "personBId": "0000000c-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000005-0000-0000-0000-000000000000",
+      "personBId": "00000006-0000-0000-0000-000000000000",
+      "type": "Spouse",
+      "endDate": "1925-01-01"
+    },
+    {
+      "personAId": "00000005-0000-0000-0000-000000000000",
+      "personBId": "00000007-0000-0000-0000-000000000000",
+      "type": "Spouse",
+      "endDate": null
+    },
+    {
+      "personAId": "00000005-0000-0000-0000-000000000000",
+      "personBId": "00000009-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000005-0000-0000-0000-000000000000",
+      "personBId": "00000008-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000006-0000-0000-0000-000000000000",
+      "personBId": "00000009-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000007-0000-0000-0000-000000000000",
+      "personBId": "00000008-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000009-0000-0000-0000-000000000000",
+      "personBId": "0000000a-0000-0000-0000-000000000000",
+      "type": "Spouse",
+      "endDate": null
+    },
+    {
+      "personAId": "00000009-0000-0000-0000-000000000000",
+      "personBId": "0000000d-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000009-0000-0000-0000-000000000000",
+      "personBId": "0000000e-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "0000000a-0000-0000-0000-000000000000",
+      "personBId": "0000000d-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "0000000a-0000-0000-0000-000000000000",
+      "personBId": "0000000e-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "0000000f-0000-0000-0000-000000000000",
+      "personBId": "00000010-0000-0000-0000-000000000000",
+      "type": "Spouse",
+      "endDate": null
+    },
+    {
+      "personAId": "0000000f-0000-0000-0000-000000000000",
+      "personBId": "00000011-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "0000000f-0000-0000-0000-000000000000",
+      "personBId": "00000012-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000010-0000-0000-0000-000000000000",
+      "personBId": "00000011-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000010-0000-0000-0000-000000000000",
+      "personBId": "00000012-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "0000000e-0000-0000-0000-000000000000",
+      "personBId": "00000011-0000-0000-0000-000000000000",
+      "type": "Spouse",
+      "endDate": null
+    },
+    {
+      "personAId": "00000011-0000-0000-0000-000000000000",
+      "personBId": "00000013-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "00000011-0000-0000-0000-000000000000",
+      "personBId": "00000014-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "0000000e-0000-0000-0000-000000000000",
+      "personBId": "00000013-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    },
+    {
+      "personAId": "0000000e-0000-0000-0000-000000000000",
+      "personBId": "00000014-0000-0000-0000-000000000000",
+      "type": "Parent",
+      "endDate": null
+    }
+  ]
+}
