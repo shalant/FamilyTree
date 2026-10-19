@@ -42,7 +42,7 @@ public class TimelineLayoutEngineTests
             return this;
         }
 
-        public LayoutFixture Fixture(Guid? focus = null) => new("test", focus ?? _people[0].Id, [.. _people], [.. _rels]);
+        public LayoutFixture Fixture(Guid? focus = null) => new("test", focus ?? _people[0].Id, null, [.. _people], [.. _rels]);
     }
 
     private static Dictionary<Guid, FamilyTreeLayoutEngine.LayoutNode> Lay(LayoutFixture f) =>

@@ -17,9 +17,15 @@ namespace FamilyTree.Web.Tests.LayoutQuality;
 // Checked-in fixtures live in LayoutQuality/Fixtures. Live exports go in
 // LayoutQuality/Fixtures/private, which is gitignored: the repo is public and a live
 // export holds real names and birth dates.
+//
+// Optional "focus" and "anchor" (person ids) match what the site passes: focus sets node
+// sizes, anchor is the signed-in user's own person, which decides which lineage the
+// archived engine draws on which side. Without an anchor a fixture can lay out mirrored
+// from what that user sees.
 public sealed record LayoutFixture(
     string? Name,
     Guid? Focus,
+    Guid? Anchor,
     List<LayoutFixture.FixturePerson> People,
     List<LayoutFixture.FixtureRelationship> Relationships)
 {
@@ -79,6 +85,6 @@ public sealed record LayoutFixture(
         var people = MapPeople();
         var couples = CoupleHelper.Derive(people);
         var focus = Focus ?? people[0].Id;
-        return ((engine ?? new FamilyTreeLayoutEngine()).ComputeLayout(people, couples, focus), people, couples);
+        return ((engine ?? new FamilyTreeLayoutEngine()).ComputeLayout(people, couples, focus, Anchor), people, couples);
     }
 }

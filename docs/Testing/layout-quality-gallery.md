@@ -41,8 +41,10 @@ and `CoupleHelper` exactly as the site loads it.
    Or paste the script into the portal's Query editor (replace `$(FamilyId)` with the id),
    copy the single result cell, and save it as `Fixtures/private/live.json`. Header lines or
    stray text around the JSON are ignored by the loader.
-3. Optionally add `"focus": "<your person guid>"` to the JSON so node sizes match what you
-   see on the site.
+3. Add `"focus": "<your person guid>", "anchor": "<your person guid>"` after the opening `{`.
+   Focus sets node sizes; anchor is the signed-in user's own person, which the archived
+   engine uses to choose each lineage's side. Without it the layout can be mirrored from
+   what you see on the site (added 2026-10-18, after it hid the live Ellen + Marc gap).
 
 The script is read-only and exports only ids, first/last names, birth dates and relationship
 type/end date.
@@ -111,24 +113,33 @@ the `DECLARE` line with the family's id first; the portal doesn't substitute sql
 variables and fails with "Conversion failed when converting from a character string to
 uniqueidentifier"). The copied result cell loaded without truncation.
 
-| Score | Pre-#63 (636389e) | Archived, `master` | Prototype |
-|---|---|---|---|
-| Couples over 200 | 1 (Ellen + Marc, 360) | 0 | 0 |
-| Width | | 1900 | 1400 |
-| Family off-centre, worst | 780 (Ray) | 1020 (Ray) | 300 (William) |
-| Node overlaps | 1 | 1 | 0 |
-| Crossings | 0 | 2 | 1 |
-| Lines through nodes | 5 | 5 | 6 |
-| Connector length | 7107 | 7307 | 6709 |
+Set `"focus"` and `"anchor"` to your own person id. The site passes the signed-in user's
+person as the anchor, and the archived engine uses it to choose which lineage goes on which
+side; without it this tree laid out mirrored and looked fine.
 
-- **Why Ellen + Marc were wide:** on pre-#63 code Ray + Rose's family sits with Fannie and
-  Max between Rose and the edge facing Bud + Florence, so Ellen can't reach Marc. PR #63's
-  ancestor-line inner-edge sort moves Rose to that edge. #63 was deployed at 2026-10-17
-  03:17 UTC, half an hour after 636389e, so the 2026-10-16 screenshot most likely predates it.
-- **What the archived engine still gets wrong on `master`:** Ray sits under Rose's family,
-  1020 from under Louis + Lillian, and a sibling of Louis with no parents on the tree is
-  drawn 10 units from Louis on the same row (the overlap).
-- **The prototype:** Ray sits 20 from under Louis + Lillian, with Rose beside him and her
-  siblings beside her. The remaining weak spots are William 300 from under Libby + Louis,
-  and Rebecca's sibling-only relative placed far from her, since a Sibling link with no
-  shared parent doesn't pull in the ordering yet.
+| Score | Archived, `master` (deployed) | Prototype |
+|---|---|---|
+| Couples over 200 | 1 (Ellen + Marc, 680) | 0 |
+| Width | 1900 | 1400 |
+| Family off-centre, worst | 287 (Rose's siblings) | 300 (William) |
+| Node overlaps | 1 | 0 |
+| Crossings | 1 | 1 |
+| Lines through nodes | 1 | 6 |
+| Connector length | 6727 | 6709 |
+
+- **Why Ellen + Marc are wide:** the archived engine reproduces the 2026-10-18 live
+  screenshot node for node. With the anchor, Rose's family sits between Louis + Lillian's
+  and Bud + Florence's; Rose takes the edge next to Ray, so Fannie and Max land between
+  Ellen and Marc. Ellen can't move past Ray, nor Marc past Florence, which is the mechanism
+  described in ADR 004's Context. PR #63 is deployed (8b18c70, 2026-10-17 03:17 UTC) and
+  doesn't change this. (A first pass without the anchor wrongly concluded the gap was
+  pre-#63 code.)
+- **The overlap:** a sibling of Louis with no parents on the tree is drawn 10 units from
+  Louis on the same row, also visible live.
+- **The prototype** doesn't use the anchor yet, so its layout is the same either way: Ray 20
+  from under Louis + Lillian, Rose beside him, her siblings beside her. Its weak spots are
+  William 300 from under Libby + Louis, more lines through people (6), and Rebecca's
+  sibling-only relative placed far from her, since a Sibling link with no shared parent
+  doesn't pull in the ordering yet.
+- `two-bridges.json` has no anchor, so its archived-engine numbers above aren't what Doug
+  sees either.

@@ -107,12 +107,14 @@ Ray sits 1000 units away from under his parents, Louis + Lillian, with Rebecca +
 family between them. Before PR #63 the same fixture had Ellen + Marc 360 apart. Fixing one
 gap moved the cost to another family, which is the pattern this ADR is about.
 
-Live export (2026-10-18): the screenshot's gap came from the code deployed before PR #63.
-On that code the live tree has Ellen + Marc 360 apart; on `master` they sit at 200, but Ray
-is 1020 off-centre from his parents and a sibling of Louis is drawn on top of him. The
-prototype lays the same tree out 1400 wide (archived: 1900), every couple at 200, worst
-off-centre 300, no overlaps. Details: `docs/Testing/layout-quality-gallery.md`, "The live
-tree".
+Live export (2026-10-18): with Doug's own person as the anchor, as the site passes it, the
+archived engine on `master` (deployed, PR #63 included) reproduces the live screenshot
+exactly: Ellen + Marc 680 apart for the reason given under Context, and a sibling of Louis
+drawn on top of him. The anchor matters: without it the same tree lays out mirrored, with
+Ellen + Marc at 200, so fixtures now carry an optional `anchor`. The prototype (which
+ignores the anchor so far) lays the tree out 1400 wide instead of 1900, every couple at
+200, worst off-centre 300, no overlaps. Details: `docs/Testing/layout-quality-gallery.md`,
+"The live tree".
 
 ## Step 2 decision (2026-10-17)
 

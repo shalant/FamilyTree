@@ -20,16 +20,18 @@ stopping placement patches and replacing the placement algorithm, measured first
       it was Ellen + Marc at 360.
 - [x] **Step 1b: export the live tree** (2026-10-18). Doug exported it through the portal
       Query editor into `Fixtures/private/live.json` (gitignored; 30 people, 8 couples).
-      The wide gap was the pre-#63 code: on 636389e (deployed 2026-10-17 02:47 UTC) the live
-      tree has Ellen + Marc 360 apart with Fannie and Max between them; PR #63 (8b18c70) was
-      deployed 30 minutes later, 03:17 UTC, and on it they sit at 200, so the screenshot most
-      likely predates that deploy. Current scores on the live tree, archived vs prototype:
-      width 1900 vs 1400, worst family off-centre 1020 (Ray under Louis + Lillian) vs 300,
-      node overlaps 1 vs 0, crossings 2 vs 1, lines through nodes 5 vs 6. Details:
-      `docs/Testing/layout-quality-gallery.md`, "The live tree".
+      With Doug's own person as the anchor (what the site passes when he's signed in), the
+      archived engine on `master` reproduces the 2026-10-18 live screenshot exactly: Ellen +
+      Marc 680 apart, Fannie and Max between them. PR #63 is deployed (8b18c70, 2026-10-17
+      03:17 UTC) and doesn't close the gap for this anchor. A first pass without the anchor
+      wrongly blamed pre-#63 code; `LayoutFixture` now takes an optional `anchor`. Scores,
+      archived vs prototype: couples over 200 1 (680) vs 0, width 1900 vs 1400, worst family
+      off-centre 287 vs 300, node overlaps 1 vs 0, crossings 1 vs 1, lines through nodes 1
+      vs 6. Details: `docs/Testing/layout-quality-gallery.md`, "The live tree".
 - [ ] **Archived engine draws Louis's sister on top of Louis** (found 2026-10-18 in the live
-      export, on `master` and on pre-#63 code): a sibling-only person with no parents on the
-      tree lands 10 units from Louis on the same row. ADR 004 freezes the archived engine
+      export and visible on the live site; on `master` and on pre-#63 code, with or without
+      an anchor): a sibling-only person with no parents on the tree lands 10 units from Louis
+      on the same row. ADR 004 freezes the archived engine
       except for production breakage; decide whether this counts, or whether switching to
       `TimelineLayoutEngine` (no overlap on the live tree) is the fix.
 - [x] **Step 2: decide birth-year timeline vs generation rows** (2026-10-17). Doug keeps the
