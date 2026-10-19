@@ -103,3 +103,32 @@ pattern ADR 004 describes. The live screenshot's gap is wider than either: about
 pixels, roughly 680 layout units if Rebecca + Joseph (245 screen pixels apart) are at the
 standard 200. So the live tree has relatives the reconstruction lacks, and a live export is
 needed to see why.
+
+## The live tree (exported 2026-10-18)
+
+30 people, 8 couples, exported through the portal Query editor (replace `'$(FamilyId)'` on
+the `DECLARE` line with the family's id first; the portal doesn't substitute sqlcmd
+variables and fails with "Conversion failed when converting from a character string to
+uniqueidentifier"). The copied result cell loaded without truncation.
+
+| Score | Pre-#63 (636389e) | Archived, `master` | Prototype |
+|---|---|---|---|
+| Couples over 200 | 1 (Ellen + Marc, 360) | 0 | 0 |
+| Width | | 1900 | 1400 |
+| Family off-centre, worst | 780 (Ray) | 1020 (Ray) | 300 (William) |
+| Node overlaps | 1 | 1 | 0 |
+| Crossings | 0 | 2 | 1 |
+| Lines through nodes | 5 | 5 | 6 |
+| Connector length | 7107 | 7307 | 6709 |
+
+- **Why Ellen + Marc were wide:** on pre-#63 code Ray + Rose's family sits with Fannie and
+  Max between Rose and the edge facing Bud + Florence, so Ellen can't reach Marc. PR #63's
+  ancestor-line inner-edge sort moves Rose to that edge. #63 was deployed at 2026-10-17
+  03:17 UTC, half an hour after 636389e, so the 2026-10-16 screenshot most likely predates it.
+- **What the archived engine still gets wrong on `master`:** Ray sits under Rose's family,
+  1020 from under Louis + Lillian, and a sibling of Louis with no parents on the tree is
+  drawn 10 units from Louis on the same row (the overlap).
+- **The prototype:** Ray sits 20 from under Louis + Lillian, with Rose beside him and her
+  siblings beside her. The remaining weak spots are William 300 from under Libby + Louis,
+  and Rebecca's sibling-only relative placed far from her, since a Sibling link with no
+  shared parent doesn't pull in the ordering yet.
