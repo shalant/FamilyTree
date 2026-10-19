@@ -212,7 +212,7 @@ public class FamilyTreeLayoutFuzzTests
             new() { Id = a, FirstName = "A", LastName = "Cycle", ParentIds = [root, root2, b], ChildIds = [b] },
             new() { Id = b, FirstName = "B", LastName = "Cycle", ParentIds = [a], ChildIds = [a] },
         };
-        AssertFiniteLayout(new FamilyTreeLayoutEngine().ComputeLayout(people, CoupleHelper.Derive(people), root));
+        AssertFiniteLayout(LayoutEngineOverride.Create().ComputeLayout(people, CoupleHelper.Derive(people), root));
     }
 
     // 7c. Generalises 7b: random families (any shape the generator makes) with one or two
@@ -600,6 +600,13 @@ public class FamilyTreeLayoutFuzzTests
         public List<int> Parents { get; } = [];
     }
 
+    // The family the invariants see for case `index` of `seed`, for the layout gallery
+    // (LayoutQuality/LayoutGalleryTests), which scores generated families for looks.
+    internal static BuiltFamily Generated(int index, ulong seed) =>
+        Build(GenFamily.Generate(new PCG((uint)index, seed), null, out _));
+
+    internal static ulong DefaultSeed => BaseSeed;
+
     private static BuiltFamily Build(FamilySpec spec)
     {
         var drafts = new List<Draft>();
@@ -868,7 +875,7 @@ public class FamilyTreeLayoutFuzzTests
         private FamilyTreeLayout? _layout;
 
         public FamilyTreeLayout Layout() =>
-            _layout ??= new FamilyTreeLayoutEngine().ComputeLayout(People, Couples, Focus, Anchor);
+            _layout ??= LayoutEngineOverride.Create().ComputeLayout(People, Couples, Focus, Anchor);
 
         public string Label(Guid id) => labels.GetValueOrDefault(id, id.ToString()[..8]);
 

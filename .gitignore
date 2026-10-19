@@ -21,3 +21,7 @@ Thumbs.db
 
 # Publish output
 publish/
+
+# Layout quality (ADR 004): live family exports hold real names and dates; the gallery is generated
+tests/FamilyTree.Web.Tests/LayoutQuality/Fixtures/private/
+artifacts/

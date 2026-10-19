@@ -17,6 +17,10 @@
     <PackageReference Include="FluentAssertions" Version="7.0.0" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Layout fixtures (ADR 004). Fixtures/private holds live exports and is gitignored. -->
+    <None Include="LayoutQuality\Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\FamilyTree.Web\FamilyTree.Web.csproj" />
   </ItemGroup>
 </Project>
