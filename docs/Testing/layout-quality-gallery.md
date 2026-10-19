@@ -117,15 +117,15 @@ Set `"focus"` and `"anchor"` to your own person id. The site passes the signed-i
 person as the anchor, and the archived engine uses it to choose which lineage goes on which
 side; without it this tree laid out mirrored and looked fine.
 
-| Score | Archived, `master` (deployed) | Prototype |
-|---|---|---|
-| Couples over 200 | 1 (Ellen + Marc, 680) | 0 |
-| Width | 1900 | 1400 |
-| Family off-centre, worst | 287 (Rose's siblings) | 300 (William) |
-| Node overlaps | 1 | 0 |
-| Crossings | 1 | 1 |
-| Lines through nodes | 1 | 6 |
-| Connector length | 6727 | 6709 |
+| Score | Archived, `master` (deployed) | Prototype, 2026-10-17 | Prototype, 2026-10-18 |
+|---|---|---|---|
+| Couples over 200 | 1 (Ellen + Marc, 680) | 0 | 0 |
+| Width | 1900 | 1400 | 1240 |
+| Family off-centre, worst | 287 (Rose's siblings) | 300 (William) | 274 (Rebecca's nephews) |
+| Node overlaps | 1 | 0 | 0 |
+| Crossings | 1 | 1 | 0 |
+| Lines through nodes | 1 | 6 | 4, all dashed sibling links |
+| Connector length | 6727 | 6709 | 5911 |
 
 - **Why Ellen + Marc are wide:** the archived engine reproduces the 2026-10-18 live
   screenshot node for node. With the anchor, Rose's family sits between Louis + Lillian's
@@ -136,10 +136,11 @@ side; without it this tree laid out mirrored and looked fine.
   pre-#63 code.)
 - **The overlap:** a sibling of Louis with no parents on the tree is drawn 10 units from
   Louis on the same row, also visible live.
-- **The prototype** doesn't use the anchor yet, so its layout is the same either way: Ray 20
-  from under Louis + Lillian, Rose beside him, her siblings beside her. Its weak spots are
-  William 300 from under Libby + Louis, more lines through people (6), and Rebecca's
-  sibling-only relative placed far from her, since a Sibling link with no shared parent
-  doesn't pull in the ordering yet.
+- **The prototype** (second round, 2026-10-18) uses the anchor too: Rebecca's family on the
+  left, then Louis's, then Bud + Florence's. Ray sits under Louis + Lillian with Rose beside
+  him, Louis's two orphan siblings sit beside Louis's block, and Ellen + Marc are
+  at 200. Weak spots: Rebecca's nephews (her sibling's sons) sit 274 from under their
+  parent, and the four lines through people are dashed sibling links crossing a block (the
+  Libby↔Lillian link crosses their husband Louis).
 - `two-bridges.json` has no anchor, so its archived-engine numbers above aren't what Doug
   sees either.

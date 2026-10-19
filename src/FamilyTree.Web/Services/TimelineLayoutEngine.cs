@@ -16,17 +16,22 @@ namespace FamilyTree.Web.Services;
 ///   2. Everyone married to each other forms one rigid block, partners SpouseSpacingX apart,
 ///      so a couple from two different families (Ellen + Marc) can't be pulled apart.
 ///   3. Blocks are ordered within each layer to reduce crossings (DFS start, then barycentre
-///      sweeps, keeping the best order seen).
-///   4. Y is the birth year. A dateless person's year comes from relatives, else from their
-///      layer.
+///      sweeps, keeping the best order seen). An orphan sibling (no parents on the tree)
+///      shares their sibling's layer and stays beside them in every order tried. The anchor
+///      (the signed-in user's own person) puts their first parent's side on the left, as the
+///      archived engine does, by mirroring the finished order.
+///   4. Y is the birth year. A dateless person's year comes from relatives, held between
+///      their parents' and children's years with MinParentChildGap either side; dateless
+///      partners share one year.
 ///   5. X positions are solved together: children are pulled under their parents and parents
 ///      over their children. Two blocks must keep NodeSpacingX apart only if they share a
 ///      layer or actually overlap in height, so a family can use empty space at a different
 ///      height.
 ///
 /// Connectors are built by the archived engine's own connector builder, so the canvas draws
-/// both engines identically. The anchor (logged-in user's person) isn't used yet.
-/// Known gaps are listed in docs/architecture-decisions/004-layout-engine-direction.md.
+/// both engines identically. TimelineEngineSuiteTests reruns the fuzz invariants and the
+/// transition pairs against this engine (ADR 004 step 4). Known gaps are listed in
+/// docs/architecture-decisions/004-layout-engine-direction.md.
 /// </summary>
 public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
 {
@@ -71,12 +76,13 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
         var minYear = years.Min() / 10 * 10;
         var maxYear = (years.Max() + 9) / 10 * 10;
         var canvasHeight = (int)((maxYear - minYear + 1) * PxPerYear + PaddingY * 2);
-        var y = years.Select(yr => PaddingY + (int)((yr - minYear) * PxPerYear)).ToArray();
 
         var components = g.Components();
         var componentOf = new int[g.N];
         for (var c = 0; c < components.Count; c++)
             foreach (var i in components[c]) componentOf[i] = c;
+
+        var y = years.Select(yr => PaddingY + (int)((yr - minYear) * PxPerYear)).ToArray();
 
         // Depth reported to the canvas: the layer, counted from the top of each family tree.
         var depth = new int[g.N];
@@ -93,6 +99,8 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
                 : focus >= 0 && componentOf[i] == componentOf[focus] && Math.Abs(layer[i] - layer[focus]) <= 1 ? Gen1Size
                 : DefaultSize;
 
+        var side = LineageSides(g, anchorPersonId);
+
         // Each family tree is solved on its own, then they sit side by side.
         var x = new double[g.N];
         var dividers = new List<ComponentDivider>();
@@ -100,7 +108,7 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
         double? previousEnd = null;
         foreach (var comp in components)
         {
-            var local = PlaceComponent(g, comp, layer, years, y, size);
+            var local = PlaceComponent(g, comp, layer, years, y, size, side);
             var minX = comp.Min(i => local[i]);
             if (previousEnd is { } end)
                 dividers.Add(new ComponentDivider((end + cursor) / 2, 0, canvasHeight));
@@ -286,11 +294,35 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
             var kids = outE[k].Where(o => Kept(k, o) && !Leaf(o)).ToList();
             if (kids.Count > 0) level[k] = Math.Max(level[k], kids.Min(o => level[o]) - 1);
         }
-        foreach (var k in order.Where(Leaf))
+        void PlaceLeaves()
         {
-            var parents = inE[k].Where(u => Kept(u, k)).ToList();
-            if (parents.Count > 0) level[k] = parents.Max(u => level[u]) + 1;
+            foreach (var k in order.Where(Leaf))
+            {
+                var parents = inE[k].Where(u => Kept(u, k)).ToList();
+                if (parents.Count > 0) level[k] = parents.Max(u => level[u]) + 1;
+            }
         }
+
+        // A family with no recorded parents but a Sibling link (an orphan sibling, like Bill
+        // beside his brother Ray) takes their sibling's layer, as far as its own children
+        // allow, so ordering can put the two side by side. Childless children don't limit it
+        // (they're placed below their parents afterwards), so an orphan sibling with a
+        // childless daughter still joins their sibling's layer.
+        var siblingClusters = Enumerable.Range(0, c).Select(_ => new SortedSet<int>()).ToArray();
+        for (var i = 0; i < g.N; i++)
+            foreach (var s in g.Siblings[i].Where(s => cl[s] != cl[i])) siblingClusters[cl[i]].Add(cl[s]);
+        for (var round = 0; round < 2; round++)
+        {
+            PlaceLeaves();
+            foreach (var k in order.Where(k => siblingClusters[k].Count > 0 && !inE[k].Any(u => Kept(u, k))))
+            {
+                var target = siblingClusters[k].Max(s => level[s]);
+                var kids = outE[k].Where(o => Kept(k, o) && !Leaf(o)).ToList();
+                if (kids.Count > 0) target = Math.Min(target, kids.Min(o => level[o]) - 1);
+                level[k] = target;
+            }
+        }
+        PlaceLeaves();
 
         return [.. Enumerable.Range(0, g.N).Select(i => level[cl[i]])];
     }
@@ -336,19 +368,84 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
             var offset = dated.Count > 0
                 ? dated[dated.Count / 2]
                 : DateTime.Today.Year - 20 - GenerationYears * layer.Max();
+            // Even, so when a dateless tree shifts with the others' dates it moves a whole
+            // number of pixels (2 years = 13px) and nobody in it moves a pixel more than the rest.
+            offset = Math.Floor(offset / 2) * 2;
             for (var i = 0; i < g.N; i++) year[i] ??= offset + GenerationYears * layer[i];
         }
 
+        // The dateless members of one partner cluster share a year (the invariant that dateless
+        // couples share a row), and every dateless group is then held inside hard bounds: at
+        // least MinParentChildGap after every parent and before every child, following chains
+        // of dateless relatives to the nearest recorded year. Nudging one edge at a time
+        // instead oscillated between a dateless person's parent and their dated child.
+        // A cluster that is its own ancestor through its children (a parent and their own child
+        // who are co-parents, or a partner who is also a grandchild of the other partner) can't
+        // share a year: everyone must stay below their parents, so its dateless members are
+        // bounded one by one instead.
+        var clusterKids = new Dictionary<int, HashSet<int>>();
+        for (var i = 0; i < g.N; i++)
+            foreach (var p in g.Parents[i])
+                (clusterKids.TryGetValue(g.Cluster[p], out var set) ? set : clusterKids[g.Cluster[p]] = []).Add(g.Cluster[i]);
+        bool OnCycle(int k)
+        {
+            var seen = new HashSet<int>();
+            var stack = new Stack<int>(clusterKids.GetValueOrDefault(k) ?? []);
+            while (stack.Count > 0)
+            {
+                var x = stack.Pop();
+                if (x == k) return true;
+                if (seen.Add(x)) foreach (var y in clusterKids.GetValueOrDefault(x) ?? []) stack.Push(y);
+            }
+            return false;
+        }
+        var cyclic = g.Cluster.Distinct().Where(OnCycle).ToHashSet();
+        var unit = new int[g.N];
+        for (var i = 0; i < g.N; i++)
+            unit[i] = known[i] ? -1 : cyclic.Contains(g.Cluster[i]) ? g.N + i : g.Cluster[i];
+        var units = Enumerable.Range(0, g.N).Where(i => !known[i]).GroupBy(i => unit[i])
+            .ToDictionary(gr => gr.Key, gr => gr.ToList());
+        var lo = units.Keys.ToDictionary(u => u, _ => double.NegativeInfinity);
+        var hi = units.Keys.ToDictionary(u => u, _ => double.PositiveInfinity);
+        double Lo(int i) => known[i] ? year[i]!.Value : lo[unit[i]];
+        double Hi(int i) => known[i] ? year[i]!.Value : hi[unit[i]];
+        for (var pass = 0; pass < g.N + 1; pass++)
+        {
+            var changed = false;
+            foreach (var (u, members) in units)
+            {
+                var l = members.SelectMany(m => g.Parents[m]).Where(p => unit[p] != u)
+                    .Select(p => Lo(p) + MinParentChildGap).DefaultIfEmpty(double.NegativeInfinity).Max();
+                var h = members.SelectMany(m => g.Children[m]).Where(c => unit[c] != u)
+                    .Select(c => Hi(c) - MinParentChildGap).DefaultIfEmpty(double.PositiveInfinity).Min();
+                if (l > lo[u]) { lo[u] = l; changed = true; }
+                if (h < hi[u]) { hi[u] = h; changed = true; }
+            }
+            if (!changed) break; // a parent cycle (bad data) never settles; the cap ends it
+        }
+
         var result = year.Select(v => (int)Math.Round(v!.Value)).ToArray();
+        foreach (var (u, members) in units)
+        {
+            var v = members.Average(m => year[m]!.Value);
+            v = lo[u] <= hi[u] ? Math.Clamp(v, lo[u], hi[u])
+                : double.IsFinite(hi[u]) ? hi[u] : lo[u]; // contradictory recorded dates: stay above the children
+            foreach (var m in members) result[m] = (int)Math.Round(v);
+        }
+
+        // Dateless relatives with no recorded year anywhere along the chain have no bounds
+        // above; this keeps them in generation order too (a parent and child who are also
+        // co-parents share a layer, so their inferred years can tie).
+        void Set(int i, int v) { foreach (var m in units[unit[i]]) result[m] = v; }
         for (var pass = 0; pass < 20; pass++)
         {
             var moved = false;
-            for (var c = 0; c < g.N; c++)
-                foreach (var p in g.Parents[c])
+            for (var ch = 0; ch < g.N; ch++)
+                foreach (var p in g.Parents[ch])
                 {
-                    if (result[c] - result[p] >= MinParentChildGap) continue;
-                    if (!known[c]) { result[c] = result[p] + MinParentChildGap; moved = true; }
-                    else if (!known[p]) { result[p] = result[c] - MinParentChildGap; moved = true; }
+                    if (result[ch] - result[p] >= MinParentChildGap || unit[ch] == unit[p] && unit[ch] >= 0) continue;
+                    if (!known[ch] && result[p] + MinParentChildGap <= hi[unit[ch]]) { Set(ch, result[p] + MinParentChildGap); moved = true; }
+                    else if (!known[p]) { Set(p, result[ch] - MinParentChildGap); moved = true; }
                 }
             if (!moved) break;
         }
@@ -364,12 +461,13 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
         public List<int> Members = members;
         public readonly int Layer = layer;
         public double Width => (Members.Count - 1) * SpouseSpacingX;
-        public double Top, Bottom; // vertical extent incl. labels
+        public double Top, Bottom; // vertical extent incl. labels, Bottom also its line zone
+        public double NodeBottom;  // vertical extent of the people alone
     }
 
     private sealed record Family(List<int> Parents, List<int> Children);
 
-    private static double[] PlaceComponent(Graph g, List<int> comp, int[] layer, int[] years, int[] y, int[] size)
+    private static double[] PlaceComponent(Graph g, List<int> comp, int[] layer, int[] years, int[] y, int[] size, int[] side)
     {
         var inComp = new HashSet<int>(comp);
 
@@ -382,7 +480,7 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
         foreach (var bl in blocks)
         {
             bl.Top = bl.Members.Min(m => y[m] - size[m] / 2.0) - VerticalMargin / 2.0;
-            bl.Bottom = bl.Members.Max(m => y[m] + size[m] / 2.0 + LabelHeight) + VerticalMargin / 2.0;
+            bl.Bottom = bl.NodeBottom = bl.Members.Max(m => y[m] + size[m] / 2.0 + LabelHeight) + VerticalMargin / 2.0;
         }
 
         var families = comp.Where(i => g.Parents[i].Count > 0)
@@ -390,13 +488,25 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
             .Select(gr => new Family(g.Parents[gr.First()], [.. gr]))
             .ToList();
 
-        var rows = OrderLayers(g, comp, blocks, blockOf, years);
+        // A family's line runs from its parents straight down to just above the highest child
+        // (the connector builder's span sits 18 above the child's circle). The parents' block
+        // counts as reaching down that far when deciding which blocks overlap in height, so
+        // nobody from another family is packed into the path of that line.
+        foreach (var f in families)
+        {
+            var spanY = f.Children.Min(c => y[c] - size[c] / 2.0) - 18;
+            foreach (var b in f.Parents.Where(inComp.Contains).Select(p => blockOf[p]).Distinct())
+                blocks[b].Bottom = Math.Max(blocks[b].Bottom, spanY);
+        }
+
+        var rows = OrderLayers(g, comp, blocks, blockOf, years, side);
         return SolveX(g, blocks, blockOf, rows, families);
     }
 
     // Partners side by side. With more than two (second marriages), the person with the most
     // partners goes in the middle, their partners alternating right and left, anyone else
-    // beside their own partner on the outside.
+    // beside their own partner on the outside, so a chain of marriages lays out as a chain.
+    // A person with three or more partners can't have them all beside them.
     private static List<int> BlockOrder(List<int> members, Graph g)
     {
         members.Sort();
@@ -421,7 +531,7 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
     // the oldest families (keeps each family's descendants together), then alternate
     // barycentre sweeps down and up, turning couples so each partner faces their own parents,
     // and keep whichever order had the fewest crossings.
-    private static Dictionary<int, List<int>> OrderLayers(Graph g, List<int> comp, List<Block> blocks, Dictionary<int, int> blockOf, int[] years)
+    private static Dictionary<int, List<int>> OrderLayers(Graph g, List<int> comp, List<Block> blocks, Dictionary<int, int> blockOf, int[] years, int[] side)
     {
         var inComp = new HashSet<int>(comp);
         var rows = blocks.Select(b => b.Layer).Distinct().ToDictionary(l => l, _ => new List<int>());
@@ -430,19 +540,84 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
         var childBlocks = blocks.Select(bl => bl.Members.SelectMany(m => g.Children[m]).Where(inComp.Contains)
             .OrderBy(ch => years[ch]).ThenBy(ch => ch).Select(ch => blockOf[ch]).Distinct().ToList()).ToList();
         var hasParent = blocks.Select(bl => bl.Members.Any(m => g.Parents[m].Any(inComp.Contains))).ToList();
+
+        // An orphan sibling (no parents on the tree, only a Sibling link) follows the sibling
+        // with the stronger place in the tree: one with parents, else one with children, else
+        // the first in canonical order. Followers sit right after their leader in every order
+        // tried, so Bill marrying can't land his couple on the far side of Ray's family.
+        var sibBlocks = blocks.Select((bl, b) => bl.Members.SelectMany(m => g.Siblings[m]).Where(inComp.Contains)
+            .Select(s => blockOf[s]).Where(sb => sb != b).Distinct().Order().ToList()).ToList();
+        (int, int, int) Strength(int b) => (hasParent[b] ? 1 : 0, childBlocks[b].Count > 0 ? 1 : 0, -b);
+        var leader = Enumerable.Range(0, blocks.Count).Select(b => hasParent[b] ? -1
+            : sibBlocks[b].Where(s => Strength(s).CompareTo(Strength(b)) > 0)
+                .OrderByDescending(Strength).Select(s => (int?)s).FirstOrDefault() ?? -1).ToArray();
+        var followers = Enumerable.Range(0, blocks.Count).Select(b => Enumerable.Range(0, blocks.Count)
+            .Where(f => leader[f] == b).ToList()).ToList();
+
         var visited = new HashSet<int>();
         void Visit(int b)
         {
             if (!visited.Add(b)) return;
             rows[blocks[b].Layer].Add(b);
+            foreach (var f in followers[b]) Visit(f);
             foreach (var cb in childBlocks[b]) Visit(cb);
         }
-        for (var b = 0; b < blocks.Count; b++) if (!hasParent[b]) Visit(b);
+        for (var b = 0; b < blocks.Count; b++) if (!hasParent[b] && leader[b] < 0) Visit(b);
         for (var b = 0; b < blocks.Count; b++) Visit(b);
 
         var rowIndex = new int[blocks.Count];
         void Reindex() { foreach (var row in rows.Values) for (var k = 0; k < row.Count; k++) rowIndex[row[k]] = k; }
-        Reindex();
+
+        // Puts each follower back beside its leader when the two share a layer: on the side
+        // of the leader's block where their sibling sits (Morton beside his brother Ray, not
+        // past Ray's wife Rose), else on the right.
+        // A sibling in the middle of a block (Louis between his two wives) has no free side;
+        // the follower takes the quieter end, the one whose descendants (and their partners)
+        // reach less of the tree, so his sister doesn't land between Lillian and her son Ray's line.
+        var reach = new Dictionary<int, int>();
+        int Reach(int m)
+        {
+            if (reach.TryGetValue(m, out var r)) return r;
+            var seen = new HashSet<int>();
+            var stack = new Stack<int>(g.Children[m].Where(inComp.Contains));
+            while (stack.Count > 0)
+            {
+                var x = stack.Pop();
+                if (!seen.Add(x)) continue;
+                foreach (var p in g.Partners[x].Where(inComp.Contains)) seen.Add(p);
+                foreach (var ch in g.Children[x].Where(inComp.Contains)) stack.Push(ch);
+            }
+            return reach[m] = seen.Count;
+        }
+        bool OnLeft(int f)
+        {
+            var mem = blocks[leader[f]].Members;
+            var sib = mem.FindIndex(m => blocks[f].Members.Any(fm => g.Siblings[fm].Contains(m)));
+            if (sib < 0) return false;
+            if (mem.Count > 2 && sib * 2 == mem.Count - 1) return Reach(mem[0]) < Reach(mem[^1]);
+            return sib < (mem.Count - 1) / 2.0;
+        }
+        List<int> Glue(List<int> row)
+        {
+            var inRow = row.ToHashSet();
+            bool Glued(int b) => leader[b] >= 0 && inRow.Contains(leader[b]);
+            var result = new List<int>();
+            void Put(int b)
+            {
+                var mine = followers[b].Where(inRow.Contains).ToList();
+                foreach (var f in Enumerable.Reverse(mine).Where(OnLeft)) Put(f);
+                result.Add(b);
+                foreach (var f in mine.Where(f => !OnLeft(f))) Put(f);
+            }
+            foreach (var b in row.Where(b => !Glued(b))) Put(b);
+            return result;
+        }
+        void GlueAll()
+        {
+            foreach (var l in layers) rows[l] = Glue(rows[l]);
+            Reindex();
+        }
+        GlueAll();
 
         double Pos(int b) => (rowIndex[b] + 0.5) / rows[blocks[b].Layer].Count;
         double MPos(int m)
@@ -466,14 +641,37 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
                 for (var k = 0; k < mem.Count; k++)
                 {
                     var m = mem[k];
-                    var side = k - (mem.Count - 1) / 2.0;
+                    var half = k - (mem.Count - 1) / 2.0;
                     var ps = g.Parents[m].Where(inComp.Contains).ToList();
-                    if (ps.Count > 0) score += (ps.Average(MPos) - Pos(b)) * side;
-                    // Children this partner has with nobody else in the block (a first marriage's).
-                    var own = g.Children[m].Where(ch => inComp.Contains(ch) && !g.Parents[ch].Any(p => p != m && mem.Contains(p))).ToList();
-                    if (own.Count > 0) score += (own.Average(MPos) - Pos(b)) * side;
+                    if (ps.Count > 0) score += (ps.Average(MPos) - Pos(b)) * half;
+                    // Each child pulls their own parents' end of the block towards them: Ray, son
+                    // of Louis + Lillian in [Libby, Louis, Lillian], turns the block so Lillian
+                    // faces Ray. A child of the whole couple pulls neither way.
+                    foreach (var ch in g.Children[m].Where(inComp.Contains))
+                    {
+                        var inBlock = g.Parents[ch].Where(mem.Contains).ToList();
+                        var centre = inBlock.Average(p => mem.IndexOf(p) - (mem.Count - 1) / 2.0);
+                        score += (MPos(ch) - Pos(b)) * centre / inBlock.Count;
+                    }
+                    // A partner with an orphan sibling following this block faces right, so the
+                    // sibling (and later their own marriage) grows outward instead of pushing
+                    // the couple over. Small, so parents and children decide first.
+                    if (followers[b].Any(f => blocks[f].Members.Any(fm => g.Siblings[fm].Contains(m)))) score += 1e-6 * half;
                 }
                 if (score < -1e-9) mem.Reverse();
+
+                // A partner with no other relatives here who can't sit beside their spouse
+                // anyway (Pat's third wife Casey, past Alex) goes on the right end, so turning
+                // the block for the children never moves them to the left and pushes the
+                // whole tree over.
+                if (mem.Count > 2)
+                {
+                    bool Loose(int m) => !g.Parents[m].Concat(g.Children[m]).Concat(g.Siblings[m]).Any(inComp.Contains);
+                    bool BesidePartner(int k) =>
+                        (k > 0 && g.Partners[mem[k]].Contains(mem[k - 1])) || (k + 1 < mem.Count && g.Partners[mem[k]].Contains(mem[k + 1]));
+                    var moving = mem.Where((m, k) => k < mem.Count - 1 && Loose(m) && !BesidePartner(k)).ToList();
+                    foreach (var m in moving) { mem.Remove(m); mem.Add(m); }
+                }
             }
         }
 
@@ -494,6 +692,7 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
         }
 
         Orient();
+        GlueAll(); // a couple that turned moves its follower to the other side; score what's drawn
         var best = (Score: Crossings(), Rows: rows.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()),
                     Members: blocks.Select(bl => bl.Members.ToList()).ToList());
         void Keep()
@@ -507,22 +706,69 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
         {
             foreach (var l in layers.Skip(1))
             {
-                rows[l] = [.. rows[l].OrderBy(b => Bary(b, up: true)).ThenBy(b => rowIndex[b])];
+                rows[l] = Glue([.. rows[l].OrderBy(b => Bary(b, up: true)).ThenBy(b => rowIndex[b])]);
                 Reindex();
             }
             Orient();
+            GlueAll();
             Keep();
             foreach (var l in Enumerable.Reverse(layers).Skip(1))
             {
-                rows[l] = [.. rows[l].OrderBy(b => Bary(b, up: false)).ThenBy(b => rowIndex[b])];
+                rows[l] = Glue([.. rows[l].OrderBy(b => Bary(b, up: false)).ThenBy(b => rowIndex[b])]);
                 Reindex();
             }
             Orient();
+            GlueAll();
             Keep();
         }
 
         for (var b = 0; b < blocks.Count; b++) blocks[b].Members = best.Members[b];
-        return best.Rows;
+        rows = best.Rows;
+
+        // The anchor's first parent's side goes on the left, as in the archived engine
+        // (Doug's mother's family left, his father's right). Mirroring keeps every crossing.
+        Reindex();
+        var lean = comp.Where(m => side[m] != 0).Sum(m => side[m] * (MPos(m) - 0.5));
+        if (lean < -1e-9)
+        {
+            foreach (var row in rows.Values) row.Reverse();
+            foreach (var bl in blocks) bl.Members.Reverse();
+        }
+        return rows;
+    }
+
+    // Which side of the anchor's family each person belongs to: -1 nearer the anchor's first
+    // parent (canonical order), +1 nearer the second, 0 for a tie, no anchor, or an anchor
+    // with fewer than two parents. Hop distances over every relation, never through the
+    // anchor or the two parents' own partnership, as in the archived engine's
+    // ComputeLineageSideDistances.
+    private static int[] LineageSides(Graph g, Guid? anchorPersonId)
+    {
+        var side = new int[g.N];
+        if (anchorPersonId is not { } aid || !g.Index.TryGetValue(aid, out var anchor) || g.Parents[anchor].Count < 2)
+            return side;
+        var (p1, p2) = (g.Parents[anchor][0], g.Parents[anchor][1]);
+        int[] Hops(int from)
+        {
+            var dist = Enumerable.Repeat(int.MaxValue, g.N).ToArray();
+            dist[from] = 0;
+            var queue = new Queue<int>([from]);
+            while (queue.Count > 0)
+            {
+                var i = queue.Dequeue();
+                foreach (var j in g.Parents[i].Concat(g.Children[i]).Concat(g.Partners[i]).Concat(g.Siblings[i]))
+                {
+                    if (j == anchor || dist[j] != int.MaxValue) continue;
+                    if ((i == p1 && j == p2) || (i == p2 && j == p1)) continue;
+                    dist[j] = dist[i] + 1;
+                    queue.Enqueue(j);
+                }
+            }
+            return dist;
+        }
+        var (d1, d2) = (Hops(p1), Hops(p2));
+        for (var i = 0; i < g.N; i++) side[i] = d1[i] < d2[i] ? -1 : d2[i] < d1[i] ? 1 : 0;
+        return side;
     }
 
     // Block left edges (bx) solved for: each child as close as possible to under the centre
@@ -561,9 +807,12 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
             foreach (var ch in f.Children) asChild[blockOf[ch]].Add((f, ch));
             foreach (var b in f.Parents.Select(p => blockOf[p]).Distinct()) asParent[b].Add(f);
         }
+        // Only siblings with no shared parent on the tree pull on each other: children of the
+        // same parents are already held together under them, and pulling half-siblings
+        // together moved a first marriage's child when a second marriage's child arrived.
         var siblingPairs = Enumerable.Range(0, nb).Select(b => blocks[b].Members
             .SelectMany(m => g.Siblings[m].Where(blockOf.ContainsKey).Select(s => (Me: m, Sib: s)))
-            .Where(t => blockOf[t.Sib] != b).ToList()).ToArray();
+            .Where(t => blockOf[t.Sib] != b && !g.Parents[t.Me].Intersect(g.Parents[t.Sib]).Any()).ToList()).ToArray();
 
         double Target(int b)
         {
@@ -644,12 +893,19 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
         Polish();
 
         // Phase 2: blocks in different layers that overlap in height must not collide either.
+        var parentOf = families.SelectMany(f => f.Parents.Where(blockOf.ContainsKey).Select(p => blockOf[p]).Distinct()
+            .SelectMany(pb => f.Children.Select(ch => (pb, blockOf[ch])))).ToHashSet();
         var center = Enumerable.Range(0, nb).Select(b => bx[b] + blocks[b].Width / 2).ToArray();
         for (var i = 0; i < nb; i++)
             for (var j = i + 1; j < nb; j++)
             {
                 if (blocks[i].Layer == blocks[j].Layer) continue;
-                if (blocks[i].Bottom <= blocks[j].Top || blocks[j].Bottom <= blocks[i].Top) continue;
+                // A block's line zone (see PlaceComponent) is only kept clear of other
+                // families: its own children, from any of its marriages, hang from it, so
+                // between parent and child only the people themselves must not collide.
+                var related = parentOf.Contains((i, j)) || parentOf.Contains((j, i));
+                var (bi, bj) = related ? (blocks[i].NodeBottom, blocks[j].NodeBottom) : (blocks[i].Bottom, blocks[j].Bottom);
+                if (bi <= blocks[j].Top || bj <= blocks[i].Top) continue;
                 var (l, r) = center[i] < center[j] || (center[i] == center[j] && i < j) ? (i, j) : (j, i);
                 cons.Add((l, r, blocks[l].Width + NodeSpacingX));
             }

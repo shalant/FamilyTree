@@ -28,6 +28,13 @@ stopping placement patches and replacing the placement algorithm, measured first
       archived vs prototype: couples over 200 1 (680) vs 0, width 1900 vs 1400, worst family
       off-centre 287 vs 300, node overlaps 1 vs 0, crossings 1 vs 1, lines through nodes 1
       vs 6. Details: `docs/Testing/layout-quality-gallery.md`, "The live tree".
+- [ ] **Collapse ancestors' siblings** (decided 2026-10-18, not started). Siblings of the
+      focus person's ancestors (Fannie and Max beside Rose) collapse by default into a "+2"
+      marker beside the ancestor that opens on click, the way most genealogy apps handle
+      the conflict described in ADR 004, "Collapsing ancestors' siblings". Open questions:
+      whose ancestors (the focus person's or the signed-in user's), whether expanded
+      branches are remembered (per viewer, localStorage), and how the layout engine takes
+      a collapsed person (left out of the input, plus a marker node).
 - [ ] **Archived engine draws Louis's sister on top of Louis** (found 2026-10-18 in the live
       export and visible on the live site; on `master` and on pre-#63 code, with or without
       an anchor): a sibling-only person with no parents on the tree lands 10 units from Louis
@@ -49,8 +56,27 @@ stopping placement patches and replacing the placement algorithm, measured first
       at 200, worst off-centre 1000 → 127. Next, in order: crossings (dummy nodes for long
       edges, transpose pass), speed (~500 ms at 500 people), 3+ partner blocks, connectors
       as obstacles, the anchor. Then Doug tries it on the live tree (Step 1b first).
-- [ ] **Step 4: run both engines side by side** behind one interface; switch only when the
-      new one wins on the scores and in the gallery.
+  Second round 2026-10-18 (Doug: "go ahead with step 2" of the plan to try it live): uses
+      the anchor; orphan siblings share their sibling's layer and stay beside them (on the
+      quieter end when the sibling stands between two partners); dateless years held between
+      parents and children, partners sharing one; a family's line down to its children is
+      kept clear of other families; a child pulls their own parents' end of a block; a loose
+      extra partner stays on the right end. Live tree: 1240 wide (archived 1900), every
+      couple at 200, 0 crossings, 4 lines through people (all dashed sibling links), worst
+      off-centre 274. 500 generated families: crossings 894 → 683, lines through people
+      672 → 582, still 0 overlaps, 107 loose couples. Still open: 3+ partner blocks (worst
+      partner gap 1600), speed not re-measured, Kat past her uncle Sam (ordering ignores
+      free space), dashed sibling links crossing a block.
+- [x] **Step 4: run both engines side by side** (2026-10-18). Both engines sit behind
+      `IFamilyTreeLayoutEngine` (`Layout:Engine`), and `TimelineEngineSuiteTests` reruns
+      every fuzz invariant and transition pair against the prototype through
+      `LayoutEngineOverride`: all pass, including the no-overlap invariant on the full
+      domain that the archived engine still skips, except three listed with reasons
+      (`Invariant4` full domain; Kat past Sam, both GUID orders) and one test judged not
+      applicable (the prototype turns Bill + Gish so newly linked brothers sit together).
+- [ ] **Try the prototype live**: PR and deploy (production stays on `Legacy`), then set
+      `Layout__Engine=Timeline` on the App Service; delete the setting to switch back.
+      Doug's call, after looking at the gallery.
 
 ---
 

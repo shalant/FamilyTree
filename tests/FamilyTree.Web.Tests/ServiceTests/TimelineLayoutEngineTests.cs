@@ -42,7 +42,15 @@ public class TimelineLayoutEngineTests
             return this;
         }
 
-        public LayoutFixture Fixture(Guid? focus = null) => new("test", focus ?? _people[0].Id, null, [.. _people], [.. _rels]);
+        public Family Sibling(Guid a, Guid b)
+        {
+            if (b.CompareTo(a) < 0) (a, b) = (b, a);
+            _rels.Add(new(a, b, RelationshipType.Sibling, null));
+            return this;
+        }
+
+        public LayoutFixture Fixture(Guid? focus = null, Guid? anchor = null) =>
+            new("test", focus ?? _people[0].Id, anchor, [.. _people], [.. _rels]);
     }
 
     private static Dictionary<Guid, FamilyTreeLayoutEngine.LayoutNode> Lay(LayoutFixture f) =>
@@ -146,6 +154,78 @@ public class TimelineLayoutEngineTests
         t.Parent(a, b).Parent(b, c).Parent(c, a);
 
         Lay(t.Fixture()).Should().HaveCount(3);
+    }
+
+    // The anchor's first parent (canonical order: here the one whose first name sorts first)
+    // gets the left, whichever of the two that is, as in the archived engine.
+    [Theory, InlineData("Ellen", "Marc"), InlineData("Zoe", "Adam")]
+    public void Anchor_PutsTheirFirstParentsFamilyOnTheLeft(string mother, string father)
+    {
+        var t = new Family();
+        var ray = t.Add("Ray", 1922);
+        var rose = t.Add("Rose", 1923);
+        var bud = t.Add("Bud", 1920);
+        var florence = t.Add("Florence", 1921);
+        var mom = t.Add(mother, 1950);
+        var dad = t.Add(father, 1948);
+        var kid = t.Add("Kid", 1978);
+        t.Marry(ray, rose).Parent(ray, mom).Parent(rose, mom)
+         .Marry(bud, florence).Parent(bud, dad).Parent(florence, dad)
+         .Marry(mom, dad).Parent(mom, kid).Parent(dad, kid);
+
+        var nodes = Lay(t.Fixture(kid, anchor: kid));
+
+        var (first, second) = string.CompareOrdinal(mother, father) < 0
+            ? ((ray, rose), (bud, florence)) : ((bud, florence), (ray, rose));
+        Math.Max(nodes[first.Item1].X, nodes[first.Item2].X).Should().BeLessThan(
+            Math.Min(nodes[second.Item1].X, nodes[second.Item2].X), "the anchor's first parent's parents sit left");
+    }
+
+    // Bill has no parents on the tree, only a Sibling link to Ray. He sits beside Ray, on the
+    // far side from Ray's wife, and his marriage grows outward without moving Ray's family.
+    [Fact]
+    public void OrphanSibling_SitsBesideTheirSibling_AndTheirMarriageDoesNotMoveTheSiblingsFamily()
+    {
+        var t = new Family();
+        var ray = t.Add("Ray", 1922);
+        var rose = t.Add("Rose", 1924);
+        var ellen = t.Add("Ellen", 1950);
+        var bill = t.Add("Bill", 1925);
+        t.Marry(ray, rose).Parent(ray, ellen).Parent(rose, ellen).Sibling(ray, bill);
+        var before = Lay(t.Fixture(ray));
+
+        var gish = t.Add("Gish", 1926);
+        t.Marry(bill, gish);
+        var after = Lay(t.Fixture(ray));
+
+        foreach (var nodes in new[] { before, after })
+        {
+            Math.Abs(nodes[bill].X - nodes[ray].X).Should().Be(NodeSpacingX, "brothers sit side by side");
+            Math.Sign(nodes[bill].X - nodes[ray].X).Should().Be(Math.Sign(nodes[ray].X - nodes[rose].X), "Bill takes Ray's free side");
+        }
+        foreach (var id in new[] { ray, rose, ellen })
+            after[id].X.Should().Be(before[id].X, "Bill's marriage must not move Ray's family");
+    }
+
+    // Two dateless partners share a row even when their evidence differs, and an inferred
+    // year never comes within 20 years of a parent or child, following a chain of dateless
+    // relatives to the nearest recorded year (R3's shape in the archived engine).
+    [Fact]
+    public void DatelessPartners_ShareARow_InsideTheirRelativesBounds()
+    {
+        var t = new Family();
+        var marc = t.Add("Marc");
+        var wife = t.Add("Wife");
+        var willa = t.Add("Willa");
+        var kim = t.Add("Kim", 1968);
+        var zed = t.Add("Zed", 1970);
+        t.Marry(marc, wife).Parent(marc, willa, kim).Parent(wife, willa).Parent(willa, zed);
+
+        var nodes = Lay(t.Fixture(kim));
+
+        nodes[marc].Y.Should().Be(nodes[wife].Y);
+        (nodes[willa].Y - nodes[marc].Y).Should().BeGreaterThanOrEqualTo((int)(20 * PxPerYear));
+        (nodes[zed].Y - nodes[willa].Y).Should().BeGreaterThanOrEqualTo((int)(20 * PxPerYear));
     }
 
     // Safety net over the fuzz harness's random families: everyone placed, nobody drawn on

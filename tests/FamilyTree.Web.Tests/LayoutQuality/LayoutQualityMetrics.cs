@@ -38,13 +38,13 @@ public static class LayoutQualityMetrics
                     crossings++;
 
         // A line through a node it doesn't start or end at. Touching the rim doesn't count.
-        var throughNodes = 0;
+        var throughNodes = new List<string>();
         foreach (var s in segments)
             foreach (var n in layout.Nodes)
             {
                 var r = n.Size / 2.0;
                 if (Dist(n.X, n.Y, s.X1, s.Y1) <= r + 6 || Dist(n.X, n.Y, s.X2, s.Y2) <= r + 6) continue;
-                if (DistToSegment(n.X, n.Y, s) < r - 2) throughNodes++;
+                if (DistToSegment(n.X, n.Y, s) < r - 2) throughNodes.Add($"{s.Kind} through {n.Person.FirstName}");
             }
 
         var overlaps = 0;
@@ -78,13 +78,14 @@ public static class LayoutQualityMetrics
             ys.Max() - ys.Min(),
             gaps,
             crossings,
+            throughNodes.Count,
             throughNodes,
             overlaps,
             segments.Sum(s => Dist(s.X1, s.Y1, s.X2, s.Y2)),
             offCenter);
     }
 
-    public sealed record Segment(int Owner, double X1, double Y1, double X2, double Y2);
+    public sealed record Segment(int Owner, double X1, double Y1, double X2, double Y2, string Kind = "line");
 
     // Each FamilyUnit's lines share one owner (they meet by design); each sibling link is its own.
     public static List<Segment> Segments(FamilyTreeLayout layout)
@@ -93,13 +94,13 @@ public static class LayoutQualityMetrics
         var owner = 0;
         foreach (var f in layout.Connectors)
         {
-            if (f.Couple is { } c) list.Add(new(owner, c.PartnerAX, c.PartnerAY, c.PartnerBX, c.PartnerBY));
-            if (f.Stem.TopY < f.Stem.BotY) list.Add(new(owner, f.Stem.X, f.Stem.TopY, f.Stem.X, f.Stem.BotY));
-            if (f.Span is { } s) list.Add(new(owner, s.LeftX, s.Y, s.RightX, s.Y));
-            foreach (var d in f.Drops) list.Add(new(owner, d.CenterX, f.Stem.BotY, d.CenterX, d.BotY));
+            if (f.Couple is { } c) list.Add(new(owner, c.PartnerAX, c.PartnerAY, c.PartnerBX, c.PartnerBY, "couple line"));
+            if (f.Stem.TopY < f.Stem.BotY) list.Add(new(owner, f.Stem.X, f.Stem.TopY, f.Stem.X, f.Stem.BotY, "stem"));
+            if (f.Span is { } s) list.Add(new(owner, s.LeftX, s.Y, s.RightX, s.Y, "sibling span"));
+            foreach (var d in f.Drops) list.Add(new(owner, d.CenterX, f.Stem.BotY, d.CenterX, d.BotY, "child drop"));
             owner++;
         }
-        foreach (var l in layout.SiblingLinks) list.Add(new(owner++, l.AX, l.AY, l.BX, l.BY));
+        foreach (var l in layout.SiblingLinks) list.Add(new(owner++, l.AX, l.AY, l.BX, l.BY, "sibling link"));
         return list.Where(s => Dist(s.X1, s.Y1, s.X2, s.Y2) > 0.5).ToList();
     }
 
@@ -139,6 +140,7 @@ public sealed record LayoutQualityReport(
     IReadOnlyList<PartnerGap> PartnerGaps,  // every drawn couple, widest first
     int Crossings,
     int LinesThroughNodes,
+    IReadOnlyList<string> LinesThroughNodeDetails,  // "stem through Ray", in segment order
     int NodeOverlaps,
     double ConnectorLength,
     IReadOnlyList<FamilyOffset> FamilyOffsets)  // every set of children sharing parents, most off-centre first
@@ -159,6 +161,8 @@ public sealed record LayoutQualityReport(
         foreach (var g in LooseCouples.Take(5))
             sb.AppendLine($"  {g.A} + {g.B}: {g.Distance:0}{(g.IsFormer ? " (former)" : "")}");
         sb.AppendLine($"crossings: {Crossings}, lines through nodes: {LinesThroughNodes}, node overlaps: {NodeOverlaps}");
+        foreach (var t in LinesThroughNodeDetails.Take(5))
+            sb.AppendLine($"  {t}");
         sb.AppendLine($"connector length: {ConnectorLength:0}, family off-centre: max {MaxFamilyOffCenter:0}, mean {MeanFamilyOffCenter:0}");
         foreach (var f in FamilyOffsets.Where(f => f.Offset > LayoutQualityMetrics.SpouseSpacingX).Take(3))
             sb.AppendLine($"  {f.Children} under {f.Parents}: {f.Offset:0}");

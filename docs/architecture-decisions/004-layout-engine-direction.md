@@ -2,7 +2,8 @@
 
 **Date:** 2026-10-17
 **Status:** Accepted 2026-10-17. The archived engine is frozen, step 2 is decided (keep the
-birth-year timeline, option 1 below), and the step 3 prototype exists behind a switch.
+birth-year timeline, option 1 below), the step 3 prototype exists behind a switch, and step 4
+(both engines through the same tests) is done as of 2026-10-18.
 
 ## Context
 
@@ -171,24 +172,69 @@ First comparison (500 generated families, seed 20261010):
 `two-bridges` (the screenshot reconstruction): width 1620 → 1022, crossings 1 → 0, every
 couple at 200, worst family off-centre 1000 → 127.
 
+### Second round (2026-10-18)
+
+- **Anchor:** the anchor's first parent's side goes on the left (the same rule as the
+  archived engine), by mirroring the finished order, which keeps every crossing.
+- **Orphan siblings** take their sibling's layer and stay beside them in every order tried,
+  on the sibling's free side, or the quieter end of a block when the sibling stands between
+  two partners. Their marriages then grow outward without moving the sibling's family.
+- **Dateless years** are held between parents and children (at least 20 years either side,
+  following chains of dateless relatives to the nearest recorded year), and dateless
+  partners share one year unless they are also parent and child.
+- **Connectors as obstacles, partly:** a family's line from the parents down to their
+  children is kept clear of other families.
+- **Block turning:** each child pulls their own parents' end of a block, and a partner with
+  no other relatives who can't sit beside their spouse stays on the right end.
+
+Scores, 500 generated families: crossings 894 → 683 (archived 792), lines through people
+672 → 582 (archived 674), still no overlaps, 107 loose couples. Live tree: 1240 wide
+(archived 1900), every couple at 200 (archived: Ellen + Marc 680 apart), no crossings, 4 lines
+through people, all dashed sibling links (archived 1), worst off-centre 274 (archived 287).
+
+**Step 4 done:** `TimelineEngineSuiteTests` reruns every fuzz invariant and transition pair
+against the prototype. All pass except `Invariant4` on the full domain (a person with three
+or more partners; a parent and child who are co-parents), and Kat landing past her uncle Sam.
+One test is judged not applicable: the prototype turns a couple so newly linked brothers sit
+side by side.
+
 Known gaps, roughly in the order to tackle them:
 
-- **Crossings are worse** on random families. The ordering is a basic barycentre heuristic;
-  the next step is proper long-edge handling (dummy nodes) and a transpose pass.
-- **Speed:** 41 ms at 100 people, 121 ms at 250, ~500 ms at 500 (archived: 9 / 23 / 84 ms,
-  Release build). Fine for a family-sized tree, too slow for a large one on every click.
-  The crossing count and the polish loop are the likely costs.
 - **Three or more partners in one block** sit in a line, so two partners who aren't each
-  other's spouse can be 400+ apart, and a remarriage chain in random data can stretch a block
-  (the 107 "loose couples" are these).
-- **Connectors aren't obstacles yet:** a family's sibling line can still run through a
-  person at another height (lines through nodes unchanged).
-- **The anchor isn't used** (the archived engine puts the logged-in user's father's side on
-  the left).
+  other's spouse can be 400+ apart (the 107 "loose couples"; worst 1600 in random data).
+- **Dashed sibling links** (siblings with no shared parent) are straight lines, so one can
+  cross a block (Libby and Lillian are sisters, with their husband Louis between them).
+  Curving them in the canvas is the likely fix, not placement.
+- **Ordering ignores free space:** it minimises crossings only, so a childless uncle isn't
+  moved aside to make room for his brother's children (Kat past Sam).
+- **Speed** was 41 ms at 100 people, 121 ms at 250, ~500 ms at 500 (archived 9 / 23 / 84 ms,
+  Release build) before the second round; not re-measured since.
 - **The X solver is coordinate descent**, which can stall when blocks press against each
   other. The VPSC algorithm (merging blocks that touch) is the standard fix if it shows up.
-- Not yet checked against the fuzz invariants or the transition pairs; those run against
-  the archived engine only. Running them against both is part of step 4.
+
+## Collapsing ancestors' siblings (decided 2026-10-18)
+
+The live tree showed a conflict no placement can remove. Ray + Rose's daughter Ellen married
+Marc, from Bud + Florence's family. Ray's siblings sit on one side of Ray + Rose and Rose's
+siblings on the other, so whichever side Bud + Florence take, a set of siblings ends up
+between the two sets of parents. A layout then has to give up one of three things:
+
+1. children directly under their parents, letting the couple drift apart (the archived
+   engine: Ellen + Marc 680 apart on the live tree);
+2. the couple together, letting a child sit off-centre from their parents (the prototype:
+   Ellen about 210 to one side of Ray + Rose);
+3. drawing everyone at once.
+
+Most genealogy apps take the third way (from general knowledge of these products, not
+checked against their current versions). Ancestry's and FamilySearch's default views show a person's direct
+ancestors and their children, and you open an ancestor to see their siblings. MyHeritage
+and Geni draw a wider tree but let branches collapse.
+
+Doug's call: collapsing older generations is the least-bad approach. The plan is that
+ancestors' siblings (Fannie and Max beside Rose, William beside Ray) collapse by default
+into a small "+2" marker beside the ancestor that opens on click. Until that's built, the
+prototype uses option 2. The cost is losing the at-a-glance whole-family view the site
+draws today. Not started; see `docs/TodoList.md`, "Layout engine direction".
 
 ## Consequences
 
