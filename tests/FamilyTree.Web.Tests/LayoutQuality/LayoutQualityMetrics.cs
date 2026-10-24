@@ -7,7 +7,7 @@ namespace FamilyTree.Web.Tests.LayoutQuality;
 
 // How a layout looks, as numbers (ADR 004, step 1). The fuzz invariants check that a layout
 // is correct; these score how loose or tangled a correct layout is, so a replacement engine
-// has a baseline to beat. Nothing fails on them yet.
+// has a baseline to beat. LayoutRatchetTests holds TimelineLayoutEngine to them (2026-10-23).
 //
 // All distances are in layout units (the coordinates FamilyTreeCanvas draws at zoom 1).
 // Lines are the same segments FamilyTreeCanvas draws: couple lines, stems, sibling spans,
@@ -47,6 +47,39 @@ public static class LayoutQualityMetrics
                 if (DistToSegment(n.X, n.Y, s) < r - 2) throughNodes.Add($"{s.Kind} through {n.Person.FirstName}");
             }
 
+        // Lines from two families drawn on top of each other read as one family, which states a
+        // relationship that isn't there: on the live tree (found 2026-10-23) Ray's line from
+        // Louis + Lillian ran along Morry and Isador's line from their mother, so the three looked
+        // like brothers. Crossings and lines through nodes both miss it. Two sibling links that
+        // share a person may merge, since everyone on them is a sibling (Louis, Tilly, David).
+        var linkEnds = layout.SiblingLinks.Select(l => new[] { (l.AX, l.AY), (l.BX, l.BY) }).ToList();
+        bool SiblingsOnly(int a, int b)
+        {
+            var (ka, kb) = (a - layout.Connectors.Count, b - layout.Connectors.Count);
+            return ka >= 0 && kb >= 0 && linkEnds[ka].Intersect(linkEnds[kb]).Any();
+        }
+        string At(double x, double y) => layout.Nodes.OrderBy(n => Dist(n.X, n.Y, x, y)).FirstOrDefault()?.Person.FirstName ?? "?";
+        string OwnerName(int o)
+        {
+            if (o >= layout.Connectors.Count)
+            {
+                var l = layout.SiblingLinks[o - layout.Connectors.Count];
+                return $"the {At(l.AX, l.AY)}–{At(l.BX, l.BY)} sibling link";
+            }
+            var f = layout.Connectors[o];
+            if (f.Drops.Count > 0) return $"{string.Join(", ", f.Drops.Select(d => At(d.CenterX, d.BotY)))}'s line";
+            return f.Couple is { } c ? $"{At(c.PartnerAX, c.PartnerAY)} + {At(c.PartnerBX, c.PartnerBY)}" : "a line";
+        }
+        var merged = new List<string>();
+        for (var i = 0; i < segments.Count; i++)
+            for (var j = i + 1; j < segments.Count; j++)
+            {
+                var (a, b) = (segments[i], segments[j]);
+                if (a.Owner == b.Owner || SiblingsOnly(a.Owner, b.Owner)) continue;
+                if (Overlap(a, b) > MergeMinLength)
+                    merged.Add($"{OwnerName(a.Owner)} on {OwnerName(b.Owner)}");
+            }
+
         var overlaps = 0;
         for (var i = 0; i < layout.Nodes.Count; i++)
             for (var j = i + 1; j < layout.Nodes.Count; j++)
@@ -82,7 +115,8 @@ public static class LayoutQualityMetrics
             throughNodes,
             overlaps,
             segments.Sum(s => Dist(s.X1, s.Y1, s.X2, s.Y2)),
-            offCenter);
+            offCenter,
+            merged);
     }
 
     public sealed record Segment(int Owner, double X1, double Y1, double X2, double Y2, string Kind = "line");
@@ -102,6 +136,22 @@ public static class LayoutQualityMetrics
         }
         foreach (var l in layout.SiblingLinks) list.Add(new(owner++, l.AX, l.AY, l.BX, l.BY, "sibling link"));
         return list.Where(s => Dist(s.X1, s.Y1, s.X2, s.Y2) > 0.5).ToList();
+    }
+
+    // Two lines read as one when both run the same way within MergeDistance of each other
+    // (the canvas draws 1.2 wide); returns how far they run together, 0 if they don't.
+    private const double MergeDistance = 3;
+    private const double MergeMinLength = 2;
+
+    private static double Overlap(Segment a, Segment b)
+    {
+        static bool Flat(Segment s) => Math.Abs(s.Y1 - s.Y2) < 0.5;
+        static bool Upright(Segment s) => Math.Abs(s.X1 - s.X2) < 0.5;
+        static double Shared(double a1, double a2, double b1, double b2) =>
+            Math.Min(Math.Max(a1, a2), Math.Max(b1, b2)) - Math.Max(Math.Min(a1, a2), Math.Min(b1, b2));
+        if (Flat(a) && Flat(b) && Math.Abs(a.Y1 - b.Y1) < MergeDistance) return Math.Max(0, Shared(a.X1, a.X2, b.X1, b.X2));
+        if (Upright(a) && Upright(b) && Math.Abs(a.X1 - b.X1) < MergeDistance) return Math.Max(0, Shared(a.Y1, a.Y2, b.Y1, b.Y2));
+        return 0;
     }
 
     // Strict crossing: each segment's ends lie strictly on opposite sides of the other.
@@ -143,8 +193,12 @@ public sealed record LayoutQualityReport(
     IReadOnlyList<string> LinesThroughNodeDetails,  // "stem through Ray", in segment order
     int NodeOverlaps,
     double ConnectorLength,
-    IReadOnlyList<FamilyOffset> FamilyOffsets)  // every set of children sharing parents, most off-centre first
+    IReadOnlyList<FamilyOffset> FamilyOffsets,  // every set of children sharing parents, most off-centre first
+    IReadOnlyList<string> MergedLineDetails)    // "Ray's line on Morry, Isador's line", in segment order
 {
+    // Pieces of two different families' lines drawn on top of each other.
+    public int MergedLines => MergedLineDetails.Count;
+
     public double MaxFamilyOffCenter => FamilyOffsets.Count == 0 ? 0 : FamilyOffsets[0].Offset;
     public double MeanFamilyOffCenter => FamilyOffsets.Count == 0 ? 0 : FamilyOffsets.Average(f => f.Offset);
 
@@ -163,6 +217,9 @@ public sealed record LayoutQualityReport(
         sb.AppendLine($"crossings: {Crossings}, lines through nodes: {LinesThroughNodes}, node overlaps: {NodeOverlaps}");
         foreach (var t in LinesThroughNodeDetails.Take(5))
             sb.AppendLine($"  {t}");
+        sb.AppendLine($"lines on top of another family's: {MergedLines}");
+        foreach (var m in MergedLineDetails.Take(5))
+            sb.AppendLine($"  {m}");
         sb.AppendLine($"connector length: {ConnectorLength:0}, family off-centre: max {MaxFamilyOffCenter:0}, mean {MeanFamilyOffCenter:0}");
         foreach (var f in FamilyOffsets.Where(f => f.Offset > LayoutQualityMetrics.SpouseSpacingX).Take(3))
             sb.AppendLine($"  {f.Children} under {f.Parents}: {f.Offset:0}");

@@ -74,6 +74,35 @@ stopping placement patches and replacing the placement algorithm, measured first
       domain that the archived engine still skips, except three listed with reasons
       (`Invariant4` full domain; Kat past Sam, both GUID orders) and one test judged not
       applicable (the prototype turns Bill + Gish so newly linked brothers sit together).
+- [x] **Step 5: measure the prototype against common practice** (2026-10-23,
+      `feat/layout-baseline-msagl`). Added `LayeredBaselineEngine` (tests only): MSAGL's
+      standard layered layout on the same families, in generation rows and with birth-year
+      Y. Over 500 generated families the prototype has fewer crossings (683 vs 1010), is
+      narrower (1197 vs 1472) and centres families better (207 vs 219); it trails on lines
+      through nodes (582 vs 529). MSAGL with birth-year Y has 33 overlaps, so the
+      prototype's height-aware X phase is the step that pays for keeping the timeline. The
+      107 loose couples are identical under both, so they come from drawing 3+ partners in
+      a line, not from placement. Details: ADR 004, "Step 5".
+- [x] **Quality ratchet** (2026-10-23, same branch). `LayoutRatchetTests` fails if any of
+      the prototype's scores (500 generated families, every fixture) gets worse than
+      `LayoutQuality/ratchet.json`; `FAMILYTREE_RATCHET_UPDATE=1` tightens, never loosens.
+      Verified by widening node spacing 120 → 130: 13 scores failed. Each layout round from
+      here: one gap, ratchet, gallery. Next gaps, in order: dashed sibling links (most of
+      the 582 lines through people), Rebecca's nephews 274 off-centre on the live tree,
+      people with 3+ partners (the 107 loose couples).
+- [x] **Score lines drawn on top of each other** (2026-10-23). Doug saw Ray drawn as a
+      brother of Morry and Isador on the prototype's live tree: their mother's line ran along
+      Ray's. Added the "lines on top of another family's" score (sibling links sharing a
+      person excluded) and its ratchet limits: prototype 646 over 500 generated families and
+      1 on the live tree; archived engine 0 on the live tree. See ADR 004, "Lines on top of
+      each other".
+- [ ] **Get the prototype's merged lines to 0 on the live tree** — first gap, ahead of the
+      rest; blocks trying the prototype live.
+- [ ] **Bracket-shaped sibling links: rework or drop** (tried 2026-10-23, not merged; patch
+      in the gitignored `artifacts/sibling-bracket-2026-10-23.patch` on Doug's machine,
+      `git apply` to bring it back). Lines through people 582 → 309, but crossings 683 → 753 and
+      merged lines 646 → 827. Retry only with "lying on another line" as the first thing a
+      route avoids.
 - [ ] **Try the prototype live**: PR and deploy (production stays on `Legacy`), then set
       `Layout__Engine=Timeline` on the App Service; delete the setting to switch back.
       Doug's call, after looking at the gallery.

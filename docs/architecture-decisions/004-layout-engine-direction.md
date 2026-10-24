@@ -212,6 +212,82 @@ Known gaps, roughly in the order to tackle them:
 - **The X solver is coordinate descent**, which can stall when blocks press against each
   other. The VPSC algorithm (merging blocks that touch) is the standard fix if it shows up.
 
+## Step 5: the common-practice baseline (2026-10-23)
+
+The prototype is hand-written at every stage, so its scores only said it beat the archived
+engine. To check it against the standard algorithm, `LayeredBaselineEngine` (tests only,
+never shipped) lays the same families out with MSAGL, Microsoft's open-source layered
+(Sugiyama) layout, which is the same family of algorithm as dagre and ELK. Partners are one
+box, as in the prototype, and node sizes come from the prototype, so only placement differs.
+It runs twice: with MSAGL's own generation rows, and with MSAGL's X but the birth-year Y.
+
+500 generated families (seed 20261010):
+
+| Score | Archived | Prototype | Baseline, generations | Baseline, birth years |
+|---|---|---|---|---|
+| Families with a couple over 200 | 164 | 107 | 107 | 107 |
+| Max partner gap (mean / worst) | 285 / 1690 | 220 / 1600 | 218 / 1200 | 218 / 1200 |
+| Crossings (total / families) | 792 / 183 | **683 / 168** | 1010 / 201 | 1094 / 229 |
+| Lines through nodes (total / families) | 674 / 212 | 582 / 205 | **529 / 209** | 958 / 263 |
+| Node overlaps (total) | 15 | **0** | **0** | 33 |
+| Family off-centre (mean of max) | 263 | **207** | 219 | 219 |
+| Width (mean) | 1403 | **1197** | 1472 | 1472 |
+| Connector length (mean) | 3275 | **2780** | 3644 | 3403 |
+
+The live tree (30 people, with the anchor):
+
+| Score | Archived | Prototype | Baseline, generations | Baseline, birth years |
+|---|---|---|---|---|
+| Width x height | 1900 x 988 | **1240** x 994 | 2045 x 1490 | 2045 x 994 |
+| Couples over 200 | 1 | 0 | 0 | 0 |
+| Crossings | 1 | **0** | 9 | **0** |
+| Lines through nodes | **1** | 4 | 3 | 7 |
+| Family off-centre, worst | 287 | 274 | **100** | **100** |
+| Connector length | 6727 | **5911** | 9154 | 8283 |
+
+What it shows:
+
+- **The prototype meets the common-practice bar.** It beats the standard algorithm on
+  crossings, width, connector length and family centring over the generated families, and
+  on the live tree. It is behind on lines through nodes (582 vs 529), most of them the
+  dashed sibling links already listed as a gap.
+- **The birth-year axis is what standard tools don't handle.** MSAGL's placement with
+  birth-year Y has 33 overlaps and nearly twice the lines through nodes, because rows that
+  were apart in generations collide once moved to their years. The prototype's second X
+  phase (blocks in different layers keep apart only when they overlap in height) is the
+  custom step that pays for keeping the timeline; it isn't reinventing something standard.
+- **The 107 loose couples are the block model, not placement.** Two different X solvers
+  give exactly the same count, because both draw three or more partners in a line. Better
+  placement can't fix them; a different way of drawing multi-partner people would.
+- **Where the baseline is better:** on the live tree it centres every family within 100
+  (the prototype has Rebecca's nephews 274 off-centre). Over random families the prototype
+  centres better, so this is one case to look at, not a general weakness.
+
+Limits of the comparison: the baseline ignores the anchor and draws orphan siblings as
+separate trees (a Sibling link isn't an edge), which makes it wider on the live tree. MSAGL
+minimises crossings between boxes, not between drawn connector lines, and runs on its
+default settings.
+
+## Lines on top of each other (found 2026-10-23)
+
+Looking at the live tree side by side, Doug saw relationships that aren't in the data: Ray
+appeared to have brothers Morry and Isador. In the prototype, the line from their mother
+("Unknown Polish Victim" Eisenberg) ran along Ray's line from Louis + Lillian at the same
+height, so the two families read as one. None of the scores caught it; crossings and lines
+through people don't count lines lying on top of each other. A new score, "lines on top of
+another family's", does, and the ratchet now holds it:
+
+| Engine | Live tree | 500 generated families |
+|---|---|---|
+| Archived (production) | 0 | 721, in 149 families |
+| Prototype | 1 (Ray and the Eisenbergs) | 646 |
+| Prototype with bracket-shaped sibling links (not merged) | 1 | 827 |
+
+Consequences: the switch to the prototype waits until this is 0 on the live tree, because a
+tree that states wrong relationships is worse than a loose one. This is now the first gap to
+close, ahead of the list above. The bracket-shaped sibling links (tried the same day; fewer
+lines through people, 582 to 309) also raised this score by 28%, so they weren't merged.
+
 ## Collapsing ancestors' siblings (decided 2026-10-18)
 
 The live tree showed a conflict no placement can remove. Ray + Rose's daughter Ellen married
@@ -238,8 +314,14 @@ draws today. Not started; see `docs/TodoList.md`, "Layout engine direction".
 
 ## Consequences
 
-- The scores give a baseline to beat; nothing fails on them yet. Once a replacement
-  engine exists, the scores can become regression thresholds.
+- The scores give a baseline to beat. Since 2026-10-23 they are also a ratchet for the
+  prototype: `LayoutRatchetTests` fails if any of `TimelineLayoutEngine`'s scores (500
+  generated families and every fixture) is worse than its limit in
+  `tests/FamilyTree.Web.Tests/LayoutQuality/ratchet.json`. Improvements are tightened with
+  `FAMILYTREE_RATCHET_UPDATE=1`, which never loosens; loosening a limit is a hand edit with
+  the reason in the commit message. Checked by widening the prototype's node spacing
+  (120 to 130): 13 scores failed, while crossings and lines through nodes improved, the
+  trade-off this is meant to surface. The archived engine isn't ratcheted; it's frozen.
 - The live fixture never enters git. Anyone else working on layout needs their own export.
 - Steps 3 and 4 are a real rewrite of placement. The connector-building code and the
   `FamilyTreeLayout` output records can likely stay as they are, so `FamilyTreeCanvas`

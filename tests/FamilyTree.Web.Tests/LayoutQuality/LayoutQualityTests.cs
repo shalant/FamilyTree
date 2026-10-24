@@ -89,6 +89,45 @@ public class LayoutQualityMetricsTests
         report.MaxFamilyOffCenter.Should().Be(300);
     }
 
+    // Ray's line from Louis + Lillian ran along Morry and Isador's line from their mother on the
+    // live tree (2026-10-23), so the three looked like brothers.
+    [Fact]
+    [Trait("Category", "Regression")]
+    public void TwoFamiliesLinesOnTopOfEachOther_CountAsMerged()
+    {
+        var report = Score(Layout([], [Span(530, 656, 300), Span(436, 770, 300)]));
+
+        report.MergedLines.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(100, 200, 300, "bars that only meet at an end")]
+    [InlineData(50, 150, 310, "bars 10 apart in height")]
+    public void LinesThatDontRunTogether_AreNotMerged(double left, double right, double y, string why)
+    {
+        var report = Score(Layout([], [Span(0, 100, 300), Span(left, right, y)]));
+
+        report.MergedLines.Should().Be(0, why);
+    }
+
+    [Fact]
+    public void OneFamilysOwnLines_AreNotMerged()
+    {
+        var family = new FamilyUnit(null, new StemLine(100, 0, 200), new SiblingSpan(0, 200, 200), [new ChildDrop(100, 260)]);
+
+        Score(Layout([], [family])).MergedLines.Should().Be(0);
+    }
+
+    [Fact]
+    public void SiblingLinksSharingAPerson_MayMerge_ButUnrelatedOnesMayNot()
+    {
+        var shared = new List<SiblingLink> { new(756, 211, 1076, 211), new(756, 211, 1330, 211) }; // Louis to Tilly, Louis to David
+        var unrelated = new List<SiblingLink> { new(0, 211, 400, 211), new(200, 211, 600, 211) };
+
+        Score(Layout([], [], shared)).MergedLines.Should().Be(0, "Louis, Tilly and David are all siblings");
+        Score(Layout([], [], unrelated)).MergedLines.Should().Be(1);
+    }
+
     [Fact]
     public void OverlappingNodes_Count()
     {
@@ -128,6 +167,30 @@ public class LayoutFixtureTests(ITestOutputHelper output)
             output.WriteLine(LayoutQualityMetrics.Compute(layout, people, couples).Summary());
         }
     }
+
+    // The common-practice baseline (LayeredBaselineEngine) only means something if it lays
+    // out the same families: everyone placed, nobody twice, partners SpouseSpacingX apart.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LayeredBaseline_PlacesEveryoneWithPartnersSideBySide(bool birthYearY)
+    {
+        var engine = new LayeredBaselineEngine(birthYearY);
+        var families = LayoutFixture.LoadAll().Select(f => (f.Name, Data: f.Layout(engine)))
+            .Concat(Enumerable.Range(0, 50).Select(i =>
+            {
+                var g = FamilyTreeLayoutFuzzTests.Generated(i, FamilyTreeLayoutFuzzTests.DefaultSeed);
+                return ((string?)$"generated #{i}", Data: (engine.ComputeLayout(g.People, g.Couples, g.Focus, g.Anchor), g.People, g.Couples));
+            }));
+
+        foreach (var (name, (layout, people, couples)) in families)
+        {
+            layout.Nodes.Select(n => n.Person.Id).Should().BeEquivalentTo(people.Select(p => p.Id), $"{name} must place everyone once");
+            var at = layout.Nodes.ToDictionary(n => n.Person.Id);
+            foreach (var c in couples.Where(c => c.PersonAId != c.PersonBId))
+                Math.Abs(at[c.PersonAId].X - at[c.PersonBId].X).Should().BeGreaterThanOrEqualTo(LayoutQualityMetrics.SpouseSpacingX, $"{name}: partners are never stacked");
+        }
+    }
 }
 
 // Local-only: writes artifacts/layout-gallery/index.html (ADR 004, step 1; how to run it is
@@ -139,7 +202,9 @@ public class LayoutGalleryTests(ITestOutputHelper output)
     private const int WorstPerScore = 4;
 
     private static readonly (string Name, Func<IFamilyTreeLayoutEngine> Make)[] Engines =
-        [("archived", () => new FamilyTreeLayoutEngine()), ("timeline prototype", () => new TimelineLayoutEngine())];
+        [("archived", () => new FamilyTreeLayoutEngine()), ("timeline prototype", () => new TimelineLayoutEngine()),
+         ("layered baseline, generations", () => new LayeredBaselineEngine(birthYearY: false)),
+         ("layered baseline, birth years", () => new LayeredBaselineEngine(birthYearY: true))];
 
     [GalleryFact]
     public void WriteGallery()
@@ -183,6 +248,7 @@ public class LayoutGalleryTests(ITestOutputHelper output)
         Worst("crossings", r => r.Crossings);
         Worst("lines through nodes", r => r.LinesThroughNodes);
         Worst("node overlaps", r => r.NodeOverlaps);
+        Worst("lines on top of another family's", r => r.MergedLines);
         Worst("family off-centre", r => r.MaxFamilyOffCenter);
 
         var path = Environment.GetEnvironmentVariable("FAMILYTREE_LAYOUT_GALLERY_OUT")
@@ -199,12 +265,13 @@ public class LayoutGalleryTests(ITestOutputHelper output)
             output.WriteLine($"  crossings: total {reports.Sum(r => r.Crossings)}, families with any {reports.Count(r => r.Crossings > 0)}");
             output.WriteLine($"  lines through nodes: total {reports.Sum(r => r.LinesThroughNodes)}, families with any {reports.Count(r => r.LinesThroughNodes > 0)}");
             output.WriteLine($"  node overlaps: total {reports.Sum(r => r.NodeOverlaps)}, families with any {reports.Count(r => r.NodeOverlaps > 0)}");
+            output.WriteLine($"  lines on top of another family's: total {reports.Sum(r => r.MergedLines)}, families with any {reports.Count(r => r.MergedLines > 0)}");
             output.WriteLine($"  family off-centre: mean of max {reports.Average(r => r.MaxFamilyOffCenter):0}");
             output.WriteLine($"  width: mean {reports.Average(r => r.Width):0}; connector length: mean {reports.Average(r => r.ConnectorLength):0}");
         }
     }
 
-    private static string RepoRoot()
+    internal static string RepoRoot()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
             if (File.Exists(Path.Combine(dir.FullName, "FamilyTree.sln"))) return dir.FullName;

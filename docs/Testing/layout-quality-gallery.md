@@ -14,6 +14,7 @@ All in layout units (canvas pixels at zoom 1). Nothing fails on them yet; they'r
 | Crossings | Connector lines from two different families that cross. Lines that only touch or meet at an end don't count. |
 | Lines through nodes | A connector passing through a person it doesn't start or end at. |
 | Node overlaps | Two people's circles overlapping. |
+| Lines on top of another family's (added 2026-10-23) | Pieces of two different families' lines running together (same direction, within 3 units). They read as one family, so the drawing states a relationship that isn't there: on the live tree Ray's line from Louis + Lillian ran along Morry and Isador's, so they looked like brothers. Two sibling links that share a person may merge (everyone on them is a sibling). |
 | Connector length | Total length of all connector lines. Lower means more compact. |
 | Family off-centre | For each set of children sharing the same parents, how far the children's centre sits from the parents' centre. |
 
@@ -59,10 +60,33 @@ dotnet test tests/FamilyTree.Web.Tests --filter "FullyQualifiedName~LayoutFixtur
 $env:FAMILYTREE_LAYOUT_GALLERY = "1"; dotnet test tests/FamilyTree.Web.Tests --filter "FullyQualifiedName~LayoutGalleryTests" --logger "console;verbosity=detailed"
 ```
 
+### The ratchet (added 2026-10-23)
+
+`LayoutRatchetTests` runs in CI with the rest of the suite. It scores `TimelineLayoutEngine`
+on the 500 generated families and on every fixture, and fails if any score is worse than its
+limit in `LayoutQuality/ratchet.json` (all scores are lower-is-better, compared rounded to a
+whole unit). The test output lists every worse score as `WORSE:` and every improvement as
+`better:`. Private fixtures are checked only where the file exists, so `live` is checked on
+your machine and skipped in CI.
+
+```
+# After a change that improves scores, tighten the limits (never loosens), PowerShell:
+$env:FAMILYTREE_RATCHET_UPDATE = "1"; dotnet test tests/FamilyTree.Web.Tests --filter "FullyQualifiedName~LayoutRatchet"; Remove-Item Env:FAMILYTREE_RATCHET_UPDATE
+```
+
+A round of layout work: pick one gap, change the prototype, run the ratchet and look at the
+gallery. If a score has to get worse for a better-looking result, edit `ratchet.json` by
+hand and give the reason in the commit message. Run the update with the live export present
+so its limits tighten too.
+
 The gallery writes `artifacts/layout-gallery/index.html` (gitignored): every fixture, then
 the four worst generated families for each score (judged under the archived engine). Since
 2026-10-17 each one is drawn twice, by the archived engine and by the `TimelineLayoutEngine`
-prototype, each with its scores and an SVG drawn from the same connectors the canvas draws. Couples wider than 200 are labelled in red; overlapping
+prototype, each with its scores and an SVG drawn from the same connectors the canvas draws.
+Since 2026-10-23 there are two more rows per family, from `LayeredBaselineEngine`: an
+off-the-shelf layered layout (MSAGL, the same kind of algorithm as dagre and ELK), once in
+generation rows and once with the birth-year Y. It's the common-practice yardstick for the
+prototype; results are in ADR 004, "Step 5". Couples wider than 200 are labelled in red; overlapping
 people get a red ring. The test output also prints aggregate scores over all generated
 families. Options: `FAMILYTREE_LAYOUT_GALLERY_CASES` (default 500) and
 `FAMILYTREE_LAYOUT_GALLERY_OUT` (output path); generated families use the fuzz harness's
