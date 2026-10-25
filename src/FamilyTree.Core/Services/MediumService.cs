@@ -385,7 +385,8 @@ public class MediumService(
     {
         Id = medium.Id,
         PersonId = medium.PersonId,
-        Url = medium.Url,
+        // Served through the app, never the blob URL (S8): MediaPaths.
+        Url = MediaPaths.ToAppPath(medium.Url)!,
         FileName = medium.FileName,
         Caption = medium.Caption,
         MimeType = medium.MimeType,

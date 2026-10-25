@@ -113,9 +113,39 @@ Work A in order before the first invite; B and C can follow.
         down. Side finding: the AppBar's search box renders signed out too, so it can't
         prove a session is signed in; `CsrfLogoutIsolatedTests` relies on it and may pass
         for the wrong reason.
-  - [ ] **S8 blob privacy** (its own PR next): serve media through an authenticated,
-        family-scoped endpoint instead of raw blob URLs (about 20 places, plus the story
-        invite email's photo), then make the container private (Doug, in Azure).
+  - [x] **S8 blob privacy, code** (2026-10-25, `feat/a4-s8-private-media`). Photos were
+        shown straight from blob URLs, so the container had to allow anonymous reads:
+        checked 2026-10-25, a raw photo URL returned 200 with no credentials, to anyone,
+        even after the person was deleted. Media are now served by the app:
+        `/media/{blob}` (signed in; `MediaAccessService.OpenAsync` serves a file only if it
+        is a media row or profile photo of a person in the caller's family, so a deleted
+        person's photos stop with them) and `/media/invite/{token}` (anonymous; the story
+        invite token unlocks its subject's photo until the invite expires, for the invite
+        email and the signed-out respond page). Read DTOs carry `/media/...`
+        (`MediaPaths.ToAppPath` in `PersonMapper`, `MediumService`, `AdminUserService`,
+        `StoryInviteService`), so every screen picked it up without touching Razor; the
+        database keeps blob URLs (`PersonService` turns a `/media/...` photo sent back by
+        the edit form into the blob URL it stands for). Only the four upload image types
+        are served inline; anything else downloads as `application/octet-stream`, with a
+        sandbox CSP, so an odd upload can't run as a page on the app's origin. Checked in
+        the running app (local, dev auth as super-user, real storage): the tree's three
+        photos load from `/media/...`, no blob URL anywhere in the page, the JPEG comes back
+        with `image/jpeg`, `nosniff`, `private` caching and the sandbox CSP; unknown names,
+        `..%2F` and bad tokens are 404. Tests: `MediaPathsTests`, `MediaAccessServiceTests`,
+        `CrossTenantMatrixTests` rows (+ positive controls),
+        `PeopleControllerTests.UpdateAsync_PhotoSentAsAppPath_StoresTheBlobUrl`, E2E
+        `MediaAccessTests` (signed out is sent to sign in; unknown token 404). Not
+        covered: uploading in E2E (no blob storage there). Cost: every photo is now a
+        request to the app (one DB query plus a blob read); fine at family scale, cached an
+        hour per browser.
+  - [ ] **S8, make the container private (Doug, after deploying the above).** Order
+        matters: deploy first, or every photo breaks until it is. Then in the portal:
+        storage account `familytreemediadr` > Containers > `media` > Change access level >
+        Private (and, optionally, account Configuration > "Allow Blob anonymous access" >
+        Disabled). Or `az storage container set-permission --name media --account-name
+        familytreemediadr --public-access off`. Check: a raw photo URL now fails (409/404)
+        and the tree still shows photos. Story invite emails sent before the deploy carry
+        raw URLs, so their photo stops showing; the link itself still works.
   - [ ] **Google sign-in on prod** (Doug, with a real Google account): see "Google
         sign-in" below.
 - [x] **A5: Louis's sister drawn on top of Louis** in the archived engine the family sees.
@@ -584,9 +614,8 @@ PR #43).
       password ends existing sessions; Blazor circuits also need a revalidating
       `AuthenticationStateProvider`. Remove or surface the second Admin source,
       `AppUser.IsAdmin` (the Users tab can't see or clear it).
-- [ ] **S8: blob privacy.** Check the live container's public-access level (not done:
-      no live Azure access). Media URLs are raw blob URIs with no SAS, one shared
-      container, still served after a person is deleted; `security.md` claims SAS tokens.
+- [ ] **S8: blob privacy.** Code done 2026-10-25 (A4, see Outreach readiness); making the
+      container private is Doug's step there.
 - [ ] **S5 remainder:** the super-user's own invites, Google sign-up in Open mode and
       plain Open-mode signup still land in the oldest family (documented as a
       single-family assumption). Needs a family picker or per-family invites before a

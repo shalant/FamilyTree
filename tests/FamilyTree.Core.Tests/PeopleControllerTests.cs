@@ -528,4 +528,25 @@ public class PersonServiceTests
         await using var ctx = factory.CreateDbContext();
         ctx.People.Single(p => p.Id == bill.Data.Id).ProfilePhotoUrl.Should().BeNull();
     }
+
+    // S8 (2026-10-25): read DTOs carry /media/{blob}, so the edit form sends that back as
+    // the profile photo. The stored value must stay the blob URL.
+    [Fact]
+    public async Task UpdateAsync_PhotoSentAsAppPath_StoresTheBlobUrl()
+    {
+        const string blobUrl = "https://arborkin.blob.core.windows.net/media/photo-9.jpg";
+        var (service, factory, _) = CreateSut(userId: Guid.NewGuid());
+        var bill = await service.CreateAsync(new PersonUpsertDto { FirstName = "Bill", LastName = "Small" });
+        await AddPhotoAsync(factory, bill.Data!.Id, blobUrl);
+
+        var result = await service.UpdateAsync(bill.Data.Id, new PersonUpsertDto
+        {
+            FirstName = "Bill", LastName = "Small", ProfilePhotoUrl = "/media/photo-9.jpg",
+        });
+
+        result.Success.Should().BeTrue(result.Message);
+        result.Data!.ProfilePhotoUrl.Should().Be("/media/photo-9.jpg");
+        await using var ctx = factory.CreateDbContext();
+        ctx.People.Single().ProfilePhotoUrl.Should().Be(blobUrl);
+    }
 }

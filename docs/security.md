@@ -6,7 +6,7 @@
 >
 > **Status note (2026-10-10):** much of the design below (visibility tiers, minor
 > protection, `PersonClaimStatus` approval, email-confirmation gating, MFA, per-family
-> `UserFamily.Role` admins, SAS-token blob URLs, HaveIBeenPwned) is **not implemented**;
+> `UserFamily.Role` admins, SAS-token blob URLs (replaced by the app's `/media` endpoint, S8), HaveIBeenPwned) is **not implemented**;
 > treat those sections as the target design, not current behaviour. What is actually
 > enforced today is recorded in "Scoping and auth adversarial review (2026-10-10)" below.
 
@@ -161,7 +161,7 @@ Viewer      Unauthenticated public access to public families; read-only, visibil
 
 - **App Service**: force HTTPS; set `ASPNETCORE_ENVIRONMENT=Production`
 - **Azure SQL**: connection string in App Service Configuration; Azure Defender enabled; 7-day backup retention; app user has `db_datareader + db_datawriter + EXECUTE` only
-- **Blob Storage**: private container; SAS tokens with short expiry for photo URLs; blob soft delete enabled (7 days)
+- **Blob Storage**: private container (once S8's Azure step is done); the app reads blobs with its own credentials and serves them at `/media/...` to the person's family, no SAS tokens; blob soft delete enabled (7 days, not verified)
 - **TLS**: managed certificate; TLS 1.2 minimum
 
 ---
@@ -274,7 +274,7 @@ covered by `tests/FamilyTree.Web.Tests/ComponentTests/PageAuthorizationTests.cs`
 | S5 | High | New users always joined the oldest family: admin invites, story-invite responses, Open-mode registration with an invite (the invite was ignored). | **Fixed** for story responses (the subject's family, else the sender's) and Open-mode invites (the invite's family). **By design, documented:** the super-user's own invites, Google sign-up in Open mode and plain Open-mode signup still use the oldest family, because the super-user has no family claim and those paths carry no family. Fix before a second family uses Open mode. |
 | S6 | Medium | Name/existence oracles: validators quoted another family's person (name, death date, marital status); different messages for "not found" vs "no permission"/"exists elsewhere". | **Fixed** on every path above. |
 | S7 | Medium | Role and `FamilyId` claims sit in a 14-day sliding cookie with no security-stamp validation, so demoting an Admin or resetting a password doesn't end existing sessions. `AppUser.IsAdmin` is a second, UI-invisible source of the Admin role. | **Fixed 2026-10-25** (A4). The cookie checks the security stamp (`SecurityStampValidator`) and `SecurityStampRevalidatingAuthStateProvider` re-checks open Blazor circuits, both every 5 minutes (`Auth:SessionCheckInterval`); a stale stamp signs the session out, a current one refreshes the claims. A password reset or an Admin change (`AdminUserService.SetAdminAsync`) rotates the stamp. `IsAdmin` is now the only Admin source: the Users tab read nothing and wrote Identity roles that were never created; migration `FoldAdminRoleIntoIsAdmin` moves any such membership onto `IsAdmin`. Limit: services read claims from the circuit's `HttpContext`, so a revoked circuit stops rendering protected pages but isn't torn down. |
-| S8 | Medium | Media are stored as raw blob URIs with no SAS token, in one shared container; anyone holding a URL can fetch the photo, including after the person is deleted. This contradicts "Blob Storage" under Infrastructure below. The live container's access level was **not** checked (no live Azure access in this review); it must allow anonymous blob reads, since the browser loads these unsigned URLs directly and photos display. | **Open**, TodoList (A4, its own PR). |
+| S8 | Medium | Media are stored as raw blob URIs with no SAS token, in one shared container; anyone holding a URL can fetch the photo, including after the person is deleted. This contradicts "Blob Storage" under Infrastructure below. The live container's access level was **not** checked (no live Azure access in this review); it must allow anonymous blob reads, since the browser loads these unsigned URLs directly and photos display. | **Fixed in code 2026-10-25** (A4): media are served by the app, `/media/{blob}` to the person's own family and `/media/invite/{token}` for a story invite (`MediaAccessService`, `MediaPaths`); deleted people's media stop with them; only the four image types render inline. Checked 2026-10-25: a raw URL was readable with no credentials. **Open until the container is made private** (Doug, after deploy; TodoList). |
 | S9 | Low | `Auth:RegistrationMode` fails open (missing or mis-cased → Open); story-invite `IsUsed` check-then-set race; CR/LF in names/places injects GEDCOM records; a null MIME type skips the upload allow-list; `/auth/do-login` ignores `ReturnUrl`. | **Partly fixed 2026-10-25** (A4): the mode fails closed (unrecognised → InviteOnly, case-insensitive) and sign-in follows `ReturnUrl` for local paths only (`LoginRedirect`). The rest **Open**, TodoList. |
 
 **Accepted by design (raise before changing):** any Member can send a story invite to any

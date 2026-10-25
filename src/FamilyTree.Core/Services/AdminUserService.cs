@@ -130,7 +130,7 @@ public class AdminUserService(
                 DeathDate = p.DeathDate,
                 Gender = p.Gender,
                 BiographyNotes = p.BiographyNotes,
-                ProfilePhotoUrl = p.ProfilePhotoUrl,
+                ProfilePhotoUrl = MediaPaths.ToAppPath(p.ProfilePhotoUrl),
                 BirthPlace = p.BirthPlace,
                 DeathPlace = p.DeathPlace,
             }).ToList();

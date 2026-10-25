@@ -86,7 +86,7 @@ public class StoryInviteService(
             var html = StoryInviteEmailBuilder.Build(
                 inviterName: inviterName ?? "A family member",
                 personName: personName,
-                personPhotoUrl: person?.ProfilePhotoUrl,
+                personPhotoUrl: InvitePhotoUrl(person?.ProfilePhotoUrl, token, baseUrl),
                 birthYear: person?.BirthDate?.Year,
                 deathYear: person?.DeathDate?.Year,
                 personalNote: dto.PersonalNote,
@@ -202,7 +202,7 @@ public class StoryInviteService(
                 PersonName = invite.Person is not null
                     ? $"{invite.Person.FirstName} {invite.Person.LastName}".Trim()
                     : null,
-                PersonPhotoUrl = invite.Person?.ProfilePhotoUrl,
+                PersonPhotoUrl = InvitePhotoUrl(invite.Person?.ProfilePhotoUrl, token),
                 BirthYear = invite.Person?.BirthDate?.Year,
                 DeathYear = invite.Person?.DeathDate?.Year,
                 UnlinkedPersonName = invite.UnlinkedPersonName,
@@ -329,5 +329,17 @@ public class StoryInviteService(
             logger.LogError(ex, "Error submitting story invite response");
             return ServiceResponse<StoryDto>.Fail("An error occurred submitting your memory.");
         }
+    }
+
+    // The subject's photo for someone who isn't signed in (S8): the invite token unlocks it
+    // through /media/invite/{token} (IMediaAccessService), since /media/{blob} needs a
+    // signed-in family member. The email needs an absolute URL; the respond page doesn't.
+    // A photo that isn't a stored blob (an outside URL) is passed through unchanged.
+    public static string? InvitePhotoUrl(string? storedUrl, string token, string? baseUrl = null)
+    {
+        if (string.IsNullOrWhiteSpace(storedUrl)) return null;
+        if (MediaPaths.BlobName(storedUrl) == null) return storedUrl;
+        var path = $"{MediaPaths.Prefix}invite/{Uri.EscapeDataString(token)}";
+        return baseUrl == null ? path : baseUrl.TrimEnd('/') + path;
     }
 }

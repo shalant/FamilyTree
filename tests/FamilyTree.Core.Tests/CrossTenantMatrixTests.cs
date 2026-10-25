@@ -439,6 +439,26 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.Relationships.AnyAsync(x => x.Id == w.RelB))).Should().BeTrue();
     }
 
+    // ── MediaAccessService (S8: the /media endpoint) ────────────────────────────
+
+    private static MediaAccessService MediaSvc(World w, ICurrentUserService u) =>
+        new(w.Db, new FakeBlobStorageService(), NullLogger<MediaAccessService>.Instance, u);
+
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    public async Task Media_OpenAsync_FamilyBFile_Fails(Caller c)
+    {
+        var w = await SeedAsync();
+        (await MediaSvc(w, w.As(c)).OpenAsync("b1.jpg")).Success.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Media_OpenAsync_PositiveControls()
+    {
+        var w = await SeedAsync();
+        (await MediaSvc(w, w.MemberB).OpenAsync("b1.jpg")).Success.Should().BeTrue();
+        (await MediaSvc(w, w.SuperUser).OpenAsync("b1.jpg")).Success.Should().BeTrue();
+    }
+
     // ── MediumService ───────────────────────────────────────────────────────────
 
     [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]

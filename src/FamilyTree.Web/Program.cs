@@ -153,6 +153,7 @@ builder.Services.AddHttpClient("anthropic");
 builder.Services.AddScoped<IPersonService, PersonService>();
 builder.Services.AddScoped<IRelationshipService, RelationshipService>();
 builder.Services.AddScoped<IMediumService, MediumService>();
+builder.Services.AddScoped<IMediaAccessService, MediaAccessService>();
 builder.Services.AddScoped<IStoryService, StoryService>();
 builder.Services.AddScoped<IStoryInviteService, StoryInviteService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
@@ -585,6 +586,33 @@ if (!string.IsNullOrWhiteSpace(superUserEmail))
         await userMgr.UpdateAsync(su);
         app.Logger.LogInformation("Bootstrapped super-user: {Email}", superUserEmail);
     }
+}
+
+// ── Media (S8, docs/security.md, 2026-10-25) ────────────────────
+// Photos are served here, not from public blob URLs, so the storage container can be
+// private: read DTOs carry /media/{blob} (MediaPaths), and IMediaAccessService serves a
+// file only to the family of the person it belongs to. The invite route is for the story
+// invite email and the signed-out respond page; the invite token is the credential.
+app.MapGet("/media/{blobName}", async (string blobName, HttpContext ctx, IMediaAccessService media, CancellationToken ct) =>
+    MediaResult(ctx, await media.OpenAsync(blobName, ct)))
+   .RequireAuthorization();
+
+app.MapGet("/media/invite/{token}", async (string token, HttpContext ctx, IMediaAccessService media, CancellationToken ct) =>
+    MediaResult(ctx, await media.OpenInvitePhotoAsync(token, ct)))
+   .AllowAnonymous();
+
+static IResult MediaResult(HttpContext ctx, FamilyTree.Shared.ServiceResponse<MediaContent> result)
+{
+    if (!result.Success || result.Data is null) return Results.NotFound();
+
+    // Private: the browser may keep it, shared caches may not (access depends on who asks).
+    // The sandbox CSP stops a file that somehow isn't an image from running as a page.
+    ctx.Response.Headers.CacheControl = "private, max-age=3600";
+    ctx.Response.Headers.ContentSecurityPolicy = "default-src 'none'; sandbox";
+    var file = result.Data;
+    return file.Inline
+        ? Results.Stream(file.Content, file.ContentType)
+        : Results.File(file.Content, file.ContentType, fileDownloadName: "download");
 }
 
 // ── GEDCOM export endpoint ──────────────────────────────────────

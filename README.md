@@ -28,10 +28,10 @@ Designed as both a genuine family tool (actively used by 5+ family members) and 
 
 | Metric | Status |
 |--------|--------|
-| **Core Tests** | 258/258 ✅ |
+| **Core Tests** | 282/282 ✅ |
 | **Web Tests** (components, layout, services) | 324/329 ✅ (5 skipped) |
-| **E2E Tests** (Playwright, real SQL Server) | 11/11 ✅ |
-| **Total** | 593 passing (as of 2026-10-25) |
+| **E2E Tests** (Playwright, real SQL Server) | 13/13 ✅ |
+| **Total** | 619 passing (as of 2026-10-25) |
 | **Build (Debug + Release)** | ✅ |
 | **CI Pipeline** | ✅ [View Latest Run](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml) |
 | **Branch Protection** | ✅ Master requires PR + passing CI |
@@ -183,7 +183,7 @@ Invite management, user roles, linked-person assignment, audit log.
 - EF migrations run automatically on startup via `MigrateAsync()`
 
 **Media & Export**
-- Azure Blob Storage for photo uploads; falls back to Azurite for local dev
+- Azure Blob Storage for photo uploads (falls back to Azurite for local dev); photos are served by the app at `/media/...`, only to the person's own family, so the container can stay private
 - SVG tree export (full canvas), CSV and JSON person export
 
 **CI/CD**
