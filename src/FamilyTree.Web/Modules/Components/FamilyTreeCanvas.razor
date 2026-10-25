@@ -54,15 +54,22 @@
                     @* Horizontal couple connector *@
                     @if (family.Couple is { } arc)
                     {
+                        @* An ended marriage keeps the look of a marriage (long dashes and a
+                           broken heart at the midpoint), so it can't be mistaken for a sibling
+                           link: until 2026-10-24 both were grey 4-3 dashes, and on the live tree
+                           Ray hung from what read as a sibling line. *@
                         @if (arc.IsFormer)
                         {
-                            <g>
+                            <g class="ft-line-former">
                                 <title>Former spouse</title>
                                 <path d="M @F(arc.PartnerAX) @F(arc.PartnerAY) L @F(arc.PartnerBX) @F(arc.PartnerBY)"
                                       fill="none"
                                       stroke="var(--ft-gray-400)"
                                       stroke-width="1.2"
-                                      stroke-dasharray="4 3" />
+                                      stroke-dasharray="6 4" />
+                                <svg:text x="@F(arc.MidX)" y="@F(arc.HeartY - 4)"
+                                          font-size="9"
+                                          text-anchor="middle">💔</svg:text>
                             </g>
                         }
                         else
@@ -105,14 +112,19 @@
                     }
                 }
 
-                @* Sibling-only connectors — no shared parent on the tree yet *@
+                @* Sibling-only connectors — no shared parent on the tree yet. Round dots in
+                   a lighter grey, never the dashes an ended marriage uses. *@
                 @foreach (var link in _layout.SiblingLinks)
                 {
-                    <path d="M @F(link.AX) @F(link.AY) L @F(link.BX) @F(link.BY)"
-                          fill="none"
-                          stroke="var(--ft-gray-400)"
-                          stroke-width="1.2"
-                          stroke-dasharray="4 3" />
+                    <g class="ft-line-sibling">
+                        <title>Siblings</title>
+                        <path d="M @F(link.AX) @F(link.AY) L @F(link.BX) @F(link.BY)"
+                              fill="none"
+                              stroke="var(--ft-gray-300)"
+                              stroke-width="1.6"
+                              stroke-linecap="round"
+                              stroke-dasharray="0.1 4" />
+                    </g>
                 }
             </svg>
 

@@ -88,7 +88,7 @@ Canvas pan/zoom state lives in JS (`canvas-interaction.js`). Drag positions for 
 For bidirectional relationship types (Spouse, Sibling), `PersonAId < PersonBId` is always enforced. A unique DB constraint on `(PersonAId, PersonBId, Type)` prevents duplicates.
 
 ### Former/Active Spouse Distinction
-`Relationship.EndDate` (nullable `DateOnly`) distinguishes active spouses (`EndDate = null`) from former spouses (`EndDate` set). `PersonDto` exposes both `SpouseIds` and `FormerSpouseIds`. The canvas renders former couples with a dashed grey 💔 connector vs. solid green ❤.
+`Relationship.EndDate` (nullable `DateOnly`) distinguishes active spouses (`EndDate = null`) from former spouses (`EndDate` set). `PersonDto` exposes both `SpouseIds` and `FormerSpouseIds`. The canvas renders former couples with a long-dashed (`6 4`) grey connector and a 💔 at its midpoint, vs. a solid line with ❤. Sibling links (siblings with no shared parent on the tree) are light grey round dots (`0.1 4`, round caps), never dashes: until 2026-10-24 both were grey `4 3` dashes and couldn't be told apart on the live tree (`RelationshipLineStyleTests`). `SvgExportService` draws both the same way; it left sibling links out until then.
 
 ### Cross-Root Couple Layout
 When a descendant of one root group marries a descendant of another (e.g. siblings-in-law) — at **any** nesting depth, not just a direct child of the root — `FamilyTreeLayoutEngine` detects the cross-root couple, removes it from the recursive placement loop, places each partner as a leaf under their own parent group (at the inner edges), then positions their children at the couple's midpoint in a post-placement pass. Prevents connector tangles.

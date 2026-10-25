@@ -84,10 +84,12 @@ public class SvgExportService(IFamilyTreeLayoutEngine layoutEngine)
                 var by    = arc.PartnerBY + titleH;
                 var hy    = arc.HeartY    + titleH;
                 var color = arc.IsFormer  ? palette.DeadTop : palette.Couple;
-                var dash  = arc.IsFormer  ? """ stroke-dasharray="5 3" """ : " ";
+                var dash  = arc.IsFormer  ? """ stroke-dasharray="6 4" """ : " ";
                 sb.AppendLine($"""<line x1="{F(arc.PartnerAX)}" y1="{F(ay)}" x2="{F(arc.PartnerBX)}" y2="{F(by)}" stroke="{color}" stroke-width="1.5"{dash}/>""");
-                if (!arc.IsFormer)
-                    sb.AppendLine($"""<text x="{F(arc.MidX)}" y="{F(hy - 3)}" text-anchor="middle" font-size="9" fill="{palette.Couple}">&#x2665;</text>""");
+                // Same marks as the canvas: a heart for a marriage, a broken heart for an ended one.
+                sb.AppendLine(arc.IsFormer
+                    ? $"""<text x="{F(arc.MidX)}" y="{F(hy - 3)}" text-anchor="middle" font-size="9">&#x1F494;</text>"""
+                    : $"""<text x="{F(arc.MidX)}" y="{F(hy - 3)}" text-anchor="middle" font-size="9" fill="{palette.Couple}">&#x2665;</text>""");
             }
 
             var stem = family.Stem;
@@ -101,6 +103,11 @@ public class SvgExportService(IFamilyTreeLayoutEngine layoutEngine)
             foreach (var drop in family.Drops)
                 sb.AppendLine($"""<line x1="{F(drop.CenterX)}" y1="{F(dropTop)}" x2="{F(drop.CenterX)}" y2="{F(drop.BotY + titleH)}" stroke="{palette.Parent}" stroke-width="1.2"/>""");
         }
+
+        // Sibling links with no shared parent on the tree, dotted as on the canvas (the export
+        // left them out until 2026-10-24).
+        foreach (var link in layout.SiblingLinks)
+            sb.AppendLine($"""<line x1="{F(link.AX)}" y1="{F(link.AY + titleH)}" x2="{F(link.BX)}" y2="{F(link.BY + titleH)}" stroke="{palette.DeadTop}" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="0.1 4"/>""");
 
         // ── Person nodes ──────────────────────────────────────────────────
         foreach (var node in layout.Nodes)
