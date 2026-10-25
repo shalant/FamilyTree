@@ -90,7 +90,7 @@ class FakeAuthService : IAuthService
         => throw new NotImplementedException();
     public Task<ServiceResponse<bool>> UserExistsAsync(string email)
         => throw new NotImplementedException();
-    public Task<ServiceResponse> EnsureUserFamilyAsync(Guid userId)
+    public Task<ServiceResponse<Guid>> RegisterExternalAsync(string email, string firstName, string lastName, bool emailVerified)
         => throw new NotImplementedException();
     public Task<ServiceResponse<Guid>> CreateInviteAsync(string email)
         => throw new NotImplementedException();

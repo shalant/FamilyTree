@@ -254,6 +254,9 @@ else
         {
             options.ClientId     = googleId;
             options.ClientSecret = googleSecret;
+            // Not mapped by default; an invite is claimed by address alone, so only a
+            // verified one may (AuthService.RegisterExternalAsync).
+            options.ClaimActions.MapJsonKey("email_verified", "email_verified");
         });
     }
 }
@@ -542,31 +545,30 @@ if (!devAuthEnabled)
             return Results.LocalRedirect(LoginRedirect.AfterSignIn(returnUrl, existing.FocusPersonId ?? existing.PersonId));
         }
 
-        // Brand-new user — check registration mode
-        var mode = authService.GetRegistrationMode();
-        if (mode == "Closed")   return Results.LocalRedirect(LoginRedirect.LoginError("closed", returnUrl));
-        if (mode == "InviteOnly") return Results.LocalRedirect(LoginRedirect.LoginError("noinvite", returnUrl));
-
-        // Open mode — create account from Google profile
+        // Brand-new user: an account if the registration mode allows it, which in
+        // invite-only mode means an open invite for this (verified) address.
         var firstName = info.Principal.FindFirstValue(ClaimTypes.GivenName) ?? "";
         var lastName  = info.Principal.FindFirstValue(ClaimTypes.Surname)   ?? "";
         if (string.IsNullOrWhiteSpace(firstName) && string.IsNullOrWhiteSpace(lastName))
             firstName = email.Split('@')[0];
+        var verified = string.Equals(
+            info.Principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase);
 
-        var newUser = new AppUser
+        var registered = await authService.RegisterExternalAsync(email, firstName, lastName, verified);
+        if (!registered.Success)
         {
-            UserName       = email,
-            Email          = email,
-            DisplayName    = $"{firstName} {lastName}".Trim(),
-            EmailConfirmed = true,
-            CreatedAt      = DateTime.UtcNow,
-        };
+            var code = registered.Message switch
+            {
+                AuthService.RegistrationClosed        => "closed",
+                AuthService.NoInviteForExternalSignIn => "noinvite",
+                _                                     => "google_error",
+            };
+            return Results.LocalRedirect(LoginRedirect.LoginError(code, returnUrl));
+        }
 
-        var created = await userManager.CreateAsync(newUser);
-        if (!created.Succeeded)
+        var newUser = await userManager.FindByIdAsync(registered.Data.ToString());
+        if (newUser == null)
             return Results.LocalRedirect(LoginRedirect.LoginError("google_error", returnUrl));
-
-        await authService.EnsureUserFamilyAsync(newUser.Id);
         await userManager.AddLoginAsync(newUser, info);
         await signInManager.SignInAsync(newUser, isPersistent: true);
         return Results.LocalRedirect(LoginRedirect.AfterSignIn(returnUrl, null));

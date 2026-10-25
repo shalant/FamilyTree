@@ -138,7 +138,9 @@ Work A in order before the first invite; B and C can follow.
         covered: uploading in E2E (no blob storage there). Cost: every photo is now a
         request to the app (one DB query plus a blob read); fine at family scale, cached an
         hour per browser.
-  - [ ] **S8, make the container private (Doug, after deploying the above).** Order
+  - [x] **S8, make the container private** (done 2026-10-25: #81 deployed, then Doug set
+        `media` to Private; two real raw photo URLs that returned 200 earlier now return
+        404, signed-out `/media/x` redirects to sign-in). Order
         matters: deploy first, or every photo breaks until it is. Then in the portal:
         storage account `familytreemediadr` > Containers > `media` > Change access level >
         Private (and, optionally, account Configuration > "Allow Blob anonymous access" >
@@ -147,13 +149,40 @@ Work A in order before the first invite; B and C can follow.
         and the tree still shows photos. Story invite emails sent before the deploy carry
         raw URLs, so their photo stops showing; the link itself still works.
   - [ ] **Google sign-in on prod** (Doug, with a real Google account): see "Google
-        sign-in" below.
+        sign-in" below. Configured 2026-10-25: Doug created the OAuth client and set
+        `Google__ClientId`/`Google__ClientSecret` on the App Service; checked from outside
+        that `/auth/google` now redirects to Google with `https://arborkin.com/signin-google`
+        and Google shows its account picker (no redirect or client error). Left: Doug signs
+        in with his own Google account, and a Google account with no invite is refused.
 - [x] **A5: Louis's sister drawn on top of Louis** in the archived engine the family sees.
       Decided 2026-10-25: no change for now. The family stays on the archived engine;
       Doug switches them later by setting `Layout__Engine=TimelineBest` on the App
       Service (the prototype doesn't have this overlap).
-- [ ] **A6: walk the invitee journey on prod**, invite email to first tree view, on a phone
-      as well as desktop.
+- [ ] **A6: walk the invitee journey**, invite email to first tree view, on a phone as well
+      as desktop. **Done locally 2026-10-25** (`feat/a6-invitee-journey`): the walk is now
+      `InviteeJourneyTests` (E2E, invite-only like production, desktop and a 390px touch
+      phone; `FAMILYTREE_E2E_SCREENSHOTS=<dir>` saves every step). It found and fixed:
+  - [x] Invitees couldn't sign up with Google: the register page hid the button in
+        invite-only mode and the callback refused every new account. Now a first Google
+        sign-in whose verified address has an open invite gets an account in that invite's
+        family (`AuthService.RegisterExternalAsync`); the register page offers Google when
+        the invite is valid and says which account to use.
+  - [x] Someone already sent a link from Admin › Users who then answered a story invite got
+        a "Create a free account" button pointing at `/register?invite=` with no ID,
+        "Invitation required". A story response now reuses the address's open invite.
+  - [x] An expired, used or cancelled invite link showed the blank form and failed only
+        after it was filled in; it now says the link no longer works, before the form.
+  - [x] The linking dialog's pickers ran 34px off a 390px phone (`min-width:400px`).
+  - [x] The tree tip said "Scroll to zoom" on a phone; it says "Pinch to zoom" on touch
+        screens.
+  - [x] A green focus box sat offset from the linking dialog's picker after a tap (the
+        global keyboard ring on MudBlazor's inner input); fields show focus by their border.
+  - [ ] **Left for Doug on prod (about 10 minutes):** send one story invite to a Gmail "+"
+        address of his own and check the email arrives, its photo shows (the
+        `/media/invite/` route) and the link opens; open an invite link on his real phone
+        (touch input and phone browser quirks don't show in an emulator).
+  - [ ] Not done: Admin › Users "Generate link" still only gives a link to copy and send;
+        it doesn't email the invite.
 
 **B. Battle-testing**
 - [x] **B7 step 0: neutral test families** (2026-10-25, `feat/b7-neutral-test-families`).
@@ -569,7 +598,8 @@ PR #43).
 
 **Google sign-in**
 - [ ] **Verify Google sign-in end to end in production, and add automated coverage.**
-      Already built (`/auth/google`, callback with its three cases, `EnsureUserFamilyAsync`)
+      Already built (`/auth/google`, callback with its three cases; new accounts go through
+      `AuthService.RegisterExternalAsync` since 2026-10-25)
       but only registered when `Google:ClientId`/`Google:ClientSecret` are set, and listed
       under "Not covered this pass" in the 2026-09-11 section. Confirm production
       credentials and redirect URIs for arborkin.com, then test with a real Google

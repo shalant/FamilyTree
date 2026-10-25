@@ -483,7 +483,10 @@ else
                 var seen = await JS.InvokeAsync<string?>("localStorage.getItem", "ft-treehint");
                 if (seen != "1")
                 {
-                    Toast.Info("Tip: Drag to explore the tree. Scroll to zoom.");
+                    var touch = await JS.InvokeAsync<bool>("ftIsTouchScreen");
+                    Toast.Info(touch
+                        ? "Tip: Drag to explore the tree. Pinch to zoom."
+                        : "Tip: Drag to explore the tree. Scroll to zoom.");
                     await JS.InvokeVoidAsync("localStorage.setItem", "ft-treehint", "1");
                 }
             }

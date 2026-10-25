@@ -28,10 +28,10 @@ Designed as both a genuine family tool (actively used by 5+ family members) and 
 
 | Metric | Status |
 |--------|--------|
-| **Core Tests** | 282/282 ✅ |
+| **Core Tests** | 287/287 ✅ |
 | **Web Tests** (components, layout, services) | 324/329 ✅ (5 skipped) |
-| **E2E Tests** (Playwright, real SQL Server) | 13/13 ✅ |
-| **Total** | 619 passing (as of 2026-10-25) |
+| **E2E Tests** (Playwright, real SQL Server) | 18/18 ✅ |
+| **Total** | 629 passing (as of 2026-10-25) |
 | **Build (Debug + Release)** | ✅ |
 | **CI Pipeline** | ✅ [View Latest Run](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml) |
 | **Branch Protection** | ✅ Master requires PR + passing CI |
@@ -243,7 +243,7 @@ Confidence in code comes from rigorous constraints, not subjective review. This 
 - `AdminUserServiceTests`, `SecurityStampRevalidationTests`, `LoginRedirectTests`: session revocation and sign-in redirects
 - Tests for bugs found live are tagged `[Trait("Category", "Regression")]`
 
-**E2E tests**: launch the built app against a disposable SQL Server database and drive it with headless Chromium: invite-to-tree signup, CSRF on login/logout, session revocation, sign-in deep links, mobile layout. The security-stamp check runs on every request in every E2E test. Locally they need SQL Server Express (`E2E_ConnectionString` overrides the default) and a trusted dev certificate (`dotnet dev-certs https --trust`).
+**E2E tests**: launch the built app against a disposable SQL Server database and drive it with headless Chromium: invite-to-tree signup, the story-invite journey under invite-only registration on a desktop and a phone, CSRF on login/logout, session revocation, sign-in deep links, mobile layout. The security-stamp check runs on every request in every E2E test. Locally they need SQL Server Express (`E2E_ConnectionString` overrides the default) and a trusted dev certificate (`dotnet dev-certs https --trust`).
 
 ### Run Tests Locally
 

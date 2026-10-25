@@ -159,7 +159,9 @@ public sealed class TestDataSeeder(string connectionString)
         return person.Id;
     }
 
-    public async Task<string> CreateStoryInviteAsync(string invitedEmail, Guid invitedByUserId, string unlinkedPersonName, int ttlDays = 30)
+    // About a person on the tree when personId is given, else a free-text name.
+    public async Task<string> CreateStoryInviteAsync(
+        string invitedEmail, Guid invitedByUserId, string? unlinkedPersonName, int ttlDays = 30, Guid? personId = null)
     {
         await using var db = NewContext();
         var token = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
@@ -168,7 +170,8 @@ public sealed class TestDataSeeder(string connectionString)
         {
             Id = Guid.NewGuid(),
             Token = token,
-            UnlinkedPersonName = unlinkedPersonName,
+            PersonId = personId,
+            UnlinkedPersonName = personId.HasValue ? null : unlinkedPersonName,
             InvitedEmail = invitedEmail,
             InvitedByUserId = invitedByUserId,
             CreatedAt = DateTime.UtcNow,

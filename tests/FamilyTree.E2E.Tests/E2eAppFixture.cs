@@ -15,8 +15,14 @@ namespace FamilyTree.E2E.Tests;
 /// Shared once across the whole E2E test run via ICollectionFixture — the app boots
 /// once, not once per test class.
 /// </summary>
-public sealed class E2eAppFixture : IAsyncLifetime
+public class E2eAppFixture : IAsyncLifetime
 {
+    /// <summary>
+    /// <c>Auth:RegistrationMode</c> for this app instance. Open, so plain /register works;
+    /// <see cref="InviteOnlyAppFixture"/> runs the production setting.
+    /// </summary>
+    protected virtual string RegistrationMode => "Open";
+
     private const int Port = 44777;
     public string BaseUrl { get; } = $"https://localhost:{Port}";
     public string ConnectionString { get; private set; } = "";
@@ -155,9 +161,9 @@ public sealed class E2eAppFixture : IAsyncLifetime
         psi.Environment["AzureStorage__ConnectionString"] = ""; // forces the UseDevelopmentStorage=true fallback
         // Explicit, not inherited: the app runs with this process's working directory as its
         // content root, so appsettings*.json are never loaded here. A missing mode used to
-        // mean Open; since it fails closed (InviteOnly), plain /register needs this set.
+        // mean Open; since it fails closed (InviteOnly), plain /register needs it set.
         // Locally user secrets hid that; CI has none (found 2026-10-25, PR #80).
-        psi.Environment["Auth__RegistrationMode"] = "Open";
+        psi.Environment["Auth__RegistrationMode"] = RegistrationMode;
         psi.Environment["Auth__SessionCheckInterval"] = "00:00:00"; // check the security stamp on every
                                                                      // request, so every test exercises it
         psi.Environment["DevAuth__Enabled"] = "false";           // see class remarks: DevAuth replaces the
@@ -236,4 +242,14 @@ public sealed class E2eAppFixture : IAsyncLifetime
         KillAppProcess();
         _appProcess?.Dispose();
     }
+}
+
+/// <summary>
+/// The app as production runs it: registration by invitation only. For the invitee
+/// journey (A6, 2026-10-25), which in Open mode would show sign-up options a relative
+/// on arborkin.com never sees.
+/// </summary>
+public sealed class InviteOnlyAppFixture : E2eAppFixture
+{
+    protected override string RegistrationMode => "InviteOnly";
 }

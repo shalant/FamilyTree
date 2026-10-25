@@ -128,30 +128,63 @@ public class AuthService(
         }
     }
 
-    public async Task<ServiceResponse> EnsureUserFamilyAsync(Guid userId)
+    public const string NoInviteForExternalSignIn = "No invitation for this address.";
+    public const string RegistrationClosed = "Registration is closed.";
+
+    public async Task<ServiceResponse<Guid>> RegisterExternalAsync(
+        string email, string firstName, string lastName, bool emailVerified)
     {
         try
         {
+            var mode = GetRegistrationMode();
+            if (mode == "Closed") return ServiceResponse<Guid>.Fail(RegistrationClosed);
+
             await using var ctx = await dbFactory.CreateDbContextAsync();
 
-            var alreadyAssigned = await ctx.UserFamilies.AnyAsync(uf => uf.UserId == userId);
-            if (alreadyAssigned) return ServiceResponse.Ok();
+            // The address is the whole credential here (there's no invite link in hand),
+            // so only an address Google has verified can claim an invite.
+            var normalized = email.Trim().ToLower();
+            var invite = emailVerified
+                ? await ctx.UserInvites
+                    .Where(i => i.Email.ToLower() == normalized
+                        && i.AcceptedAt == null
+                        && i.CancelledAt == null
+                        && i.ExpiresAt > DateTime.UtcNow)
+                    .OrderByDescending(i => i.CreatedAt)
+                    .FirstOrDefaultAsync()
+                : null;
 
-            var familyId = await GetOrCreateDefaultFamilyIdAsync(ctx);
+            if (invite == null && mode == "InviteOnly")
+                return ServiceResponse<Guid>.Fail(NoInviteForExternalSignIn);
+
+            var user = new AppUser
+            {
+                UserName       = email,
+                Email          = email,
+                DisplayName    = $"{firstName} {lastName}".Trim(),
+                EmailConfirmed = emailVerified,
+                CreatedAt      = DateTime.UtcNow,
+            };
+            var created = await userManager.CreateAsync(user);
+            if (!created.Succeeded)
+                return ServiceResponse<Guid>.Fail(created.Errors.First().Description);
+
+            if (invite != null) invite.AcceptedAt = DateTime.UtcNow;
             ctx.UserFamilies.Add(new UserFamily
             {
-                UserId = userId,
-                FamilyId = familyId,
-                Role = "Member",
+                UserId   = user.Id,
+                FamilyId = invite?.FamilyId ?? await GetOrCreateDefaultFamilyIdAsync(ctx),
+                Role     = "Member",
                 JoinedAt = DateTime.UtcNow,
             });
             await ctx.SaveChangesAsync();
-            return ServiceResponse.Ok();
+
+            return ServiceResponse<Guid>.Ok(user.Id);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "EnsureUserFamilyAsync failed for userId {UserId}", userId);
-            return ServiceResponse.Fail("Failed to set up family assignment.");
+            logger.LogError(ex, "RegisterExternalAsync failed for email {Email}", email);
+            return ServiceResponse<Guid>.Fail("Registration failed. Please try again.");
         }
     }
 
@@ -216,10 +249,14 @@ public class AuthService(
     // Not caller-gated: StoryInviteService.SubmitResponseAsync runs in the anonymous
     // /story/respond circuit and offers the responder an account. Only server-side code
     // reaches it with an email taken from an existing StoryInvite row.
+    // An address that already has an open invite (sent from Admin > Users, or by an
+    // earlier story) gets that invite back: failing here left the response page's
+    // "Create a free account" button pointing at /register?invite= with no ID, a dead
+    // end in invite-only mode (A6, 2026-10-25).
     public Task<ServiceResponse<Guid>> CreateInviteForStoryResponseAsync(string email, Guid? familyId) =>
-        CreateInviteCoreAsync(email, familyId);
+        CreateInviteCoreAsync(email, familyId, reuseOpenInvite: true);
 
-    private async Task<ServiceResponse<Guid>> CreateInviteCoreAsync(string email, Guid? familyId)
+    private async Task<ServiceResponse<Guid>> CreateInviteCoreAsync(string email, Guid? familyId, bool reuseOpenInvite = false)
     {
         try
         {
@@ -233,6 +270,8 @@ public class AuthService(
                 && i.CancelledAt == null
                 && i.ExpiresAt > DateTime.UtcNow);
 
+            if (existing != null && reuseOpenInvite)
+                return ServiceResponse<Guid>.Ok(existing.Id);
             if (existing != null)
                 return ServiceResponse<Guid>.Fail(
                     "An active invite already exists for this email — use the existing link below.");

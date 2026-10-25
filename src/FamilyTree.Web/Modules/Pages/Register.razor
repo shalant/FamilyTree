@@ -54,6 +54,29 @@
                 Back to sign in
             </MudButton>
         }
+        else if (_checkingInvite)
+        {
+            <div style="text-align:center; padding:32px 0;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Success" />
+            </div>
+        }
+        else if (_mode == "InviteOnly" && _invite == null)
+        {
+            @* A link that's expired, been used or been cancelled. It used to show the
+               blank form, which failed only after it was filled in (A6, 2026-10-25). *@
+            <div style="font-size:20px; font-weight:600; color:var(--ft-text-primary); margin-bottom:8px;">
+                This invite link no longer works
+            </div>
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4">
+                Invite links expire, and each one works once. If you already made your account
+                with this one, sign in. Otherwise ask whoever invited you for a new link.
+            </MudAlert>
+            <MudButton Variant="Variant.Text"
+                       StartIcon="@Icons.Material.Outlined.ArrowBack"
+                       OnClick='() => Nav.NavigateTo("/")'>
+                Back to sign in
+            </MudButton>
+        }
         else
         {
             @* Once the account exists the form is dead weight: left on screen it pushed the
@@ -76,7 +99,9 @@
             }
 
             @* ── Google sign-up ────────────────────────────────────────────── *@
-            @if (_mode != "InviteOnly")
+            @* An invitee can use Google too: the callback finds the open invite for the
+               Google account's address (AuthService.RegisterExternalAsync). *@
+            @if (_mode != "InviteOnly" || _invite != null)
             {
                 <button class="auth-google-btn" @onclick="SignUpWithGoogle" disabled="@_loading">
                     <svg viewBox="0 0 24 24" width="18" height="18" style="flex-shrink:0;">
@@ -87,6 +112,10 @@
                     </svg>
                     Continue with Google
                 </button>
+                @if (_invite != null)
+                {
+                    <div class="auth-hint">Use the Google account for @_invite.Email.</div>
+                }
                 <div class="auth-or-divider"><span>or</span></div>
             }
 
@@ -232,6 +261,7 @@
     private Guid? _inviteId; // saved from query param before URL strip
     private string _mode = "Open";
     private UserInvite? _invite;
+    private bool _checkingInvite;
 
     private string _firstName = "";
     private string _lastName = "";
@@ -263,8 +293,10 @@
         if (InviteId.HasValue)
         {
             _inviteId = InviteId;
+            _checkingInvite = true;
             var inviteResult = await AuthService.ValidateInviteAsync(InviteId.Value);
             _invite = inviteResult.Success ? inviteResult.Data : null;
+            _checkingInvite = false;
             if (_invite != null)
             {
                 _email = _invite.Email;

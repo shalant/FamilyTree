@@ -10,7 +10,8 @@
 
 <MudDialog>
     <DialogContent>
-        <div style="min-width:400px;">
+        @* Capped by the screen: a fixed 400px pushed the pickers off a 390px phone (A6). *@
+        <div style="min-width:min(400px, calc(100vw - 64px));">
             @if (_loading)
             {
                 <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
