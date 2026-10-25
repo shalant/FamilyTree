@@ -205,8 +205,8 @@ public class PersonService(
             var scopeError = await ValidateRelativesInScopeAsync(ctx, dto, ct);
             if (scopeError != null) return ServiceResponse<PersonDto>.Fail(scopeError);
 
-            var parentError = await ValidateParentRelationshipsAsync(ctx, dto, ct);
-            if (parentError != null) return ServiceResponse<PersonDto>.Fail(parentError);
+            var lifeError = await ValidateParentChildDatesAsync(ctx, Guid.Empty, dto, datesChanged: true, ct);
+            if (lifeError != null) return ServiceResponse<PersonDto>.Fail(lifeError);
 
             // The person doesn't exist yet, so Guid.Empty stands in for them.
             var loopError = await ValidateNoParentLoopAsync(ctx, Guid.Empty, $"{dto.FirstName} {dto.LastName}".Trim(), dto, ct);
@@ -317,8 +317,10 @@ public class PersonService(
             var scopeError = await ValidateRelativesInScopeAsync(ctx, dto, ct);
             if (scopeError != null) return ServiceResponse<PersonDto>.Fail(scopeError);
 
-            var parentError = await ValidateParentRelationshipsAsync(ctx, dto, ct);
-            if (parentError != null) return ServiceResponse<PersonDto>.Fail(parentError);
+            var datesChanged = person.BirthDate != dto.BirthDate || person.DeathDate != dto.DeathDate ||
+                               person.Gender != dto.Gender;
+            var lifeError = await ValidateParentChildDatesAsync(ctx, id, dto, datesChanged, ct);
+            if (lifeError != null) return ServiceResponse<PersonDto>.Fail(lifeError);
 
             var loopError = await ValidateNoParentLoopAsync(ctx, id, $"{person.FirstName} {person.LastName}".Trim(), dto, ct);
             if (loopError != null) return ServiceResponse<PersonDto>.Fail(loopError);
@@ -886,37 +888,48 @@ public class PersonService(
         return null;
     }
 
-    private static async Task<string?> ValidateParentRelationshipsAsync(
-        AppDbContext ctx, PersonUpsertDto dto, CancellationToken ct)
+    // Refuses a parent or child link whose dates are impossible (PlausibilityRules errors;
+    // its warnings are the form's to show). Checks the person's children as well as their
+    // parents: until 2026-10-25 only parents were checked, so a parent's death date, or a
+    // child added from the parent's own form, went unchecked. Judges only the links this
+    // save adds, unless the person's own dates or gender changed, so someone whose existing
+    // data already breaks a rule can still be edited (the same reasoning as the loop check).
+    private static async Task<string?> ValidateParentChildDatesAsync(
+        AppDbContext ctx, Guid personId, PersonUpsertDto dto, bool datesChanged, CancellationToken ct)
     {
-        if (dto.ParentIds.Count == 0) return null;
+        var parentIds = dto.ParentIds.Distinct().ToList();
+        var childIds = dto.ChildIds.Distinct().ToList();
+        if (parentIds.Count == 0 && childIds.Count == 0) return null;
+        // Every rule needs one of this person's dates.
+        if (!dto.BirthDate.HasValue && !dto.DeathDate.HasValue) return null;
 
-        var parents = await ctx.People
-            .AsNoTracking()
-            .Where(p => dto.ParentIds.Contains(p.Id))
-            .ToListAsync(ct);
-
-        foreach (var parent in parents)
+        if (!datesChanged)
         {
-            if (parent.DeathDate.HasValue && dto.BirthDate.HasValue &&
-                dto.BirthDate.Value > parent.DeathDate.Value.AddMonths(9))
-                return $"{parent.FirstName} {parent.LastName} died on {parent.DeathDate:d} " +
-                       $"and cannot be the parent of a child born on {dto.BirthDate:d}.";
-
-            if (parent.BirthDate.HasValue && dto.BirthDate.HasValue)
-            {
-                var ageGap = dto.BirthDate.Value.Year - parent.BirthDate.Value.Year;
-                if (ageGap < 12)
-                    return $"{parent.FirstName} {parent.LastName} would have been {ageGap} year(s) old " +
-                           "at this child's birth — too young to be a parent.";
-                if (ageGap > 80)
-                    return $"{parent.FirstName} {parent.LastName} would have been {ageGap} years old " +
-                           "at this child's birth — too large an age gap.";
-            }
+            var existing = await ctx.Relationships.AsNoTracking()
+                .Where(r => r.Type == RelationshipType.Parent && (r.PersonAId == personId || r.PersonBId == personId))
+                .Select(r => new { Parent = r.PersonAId, Child = r.PersonBId })
+                .ToListAsync(ct);
+            parentIds = parentIds.Where(p => !existing.Any(e => e.Parent == p && e.Child == personId)).ToList();
+            childIds = childIds.Where(c => !existing.Any(e => e.Parent == personId && e.Child == c)).ToList();
+            if (parentIds.Count == 0 && childIds.Count == 0) return null;
         }
 
-        return null;
+        var relativeIds = parentIds.Concat(childIds).ToList();
+        var relatives = await ctx.People.AsNoTracking()
+            .Where(p => relativeIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, ct);
+
+        var subject = new LifeDates($"{dto.FirstName} {dto.LastName}".Trim(), dto.BirthDate, dto.DeathDate, dto.Gender);
+        var findings = parentIds.Where(relatives.ContainsKey)
+            .SelectMany(p => PlausibilityRules.CheckParentChild(ToLifeDates(relatives[p]), subject))
+            .Concat(childIds.Where(relatives.ContainsKey)
+                .SelectMany(c => PlausibilityRules.CheckParentChild(subject, ToLifeDates(relatives[c]))));
+
+        return findings.FirstOrDefault(f => f.Severity == PlausibilitySeverity.Error)?.Message;
     }
+
+    internal static LifeDates ToLifeDates(Person p) =>
+        new($"{p.FirstName} {p.LastName}".Trim(), p.BirthDate, p.DeathDate, p.Gender);
 
     // Refuses a save that would make someone their own ancestor (R0, docs/TodoList.md): a Parent
     // loop sends the layout engine into unbounded recursion. Judges the tree as it will be AFTER

@@ -499,6 +499,32 @@
                       Variant="Variant.Outlined" />
     </MudPaper>
 
+    @if (_plausibilityErrors.Count > 0)
+    {
+        <MudAlert Severity="Severity.Error" Class="ft-plausibility-errors">
+            <div>These dates can't all be right:</div>
+            <ul class="mb-0">
+                @foreach (var message in _plausibilityErrors)
+                {
+                    <li>@message</li>
+                }
+            </ul>
+        </MudAlert>
+    }
+    else if (WarningsAwaitConfirmation)
+    {
+        <MudAlert Severity="Severity.Warning" Class="ft-plausibility-warnings">
+            <div>Please check before saving:</div>
+            <ul class="mb-0">
+                @foreach (var message in _plausibilityWarnings)
+                {
+                    <li>@message</li>
+                }
+            </ul>
+            <div class="mt-1">If this is right, press Save anyway.</div>
+        </MudAlert>
+    }
+
     <!-- Actions -->
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center"
               Style="border-top:0.5px solid var(--ft-line-border); padding-top:8px;">
@@ -515,7 +541,7 @@
             {
                 <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
             }
-            @SubmitLabel
+            @(WarningsAwaitConfirmation ? "Save anyway" : SubmitLabel)
         </MudButton>
     </MudStack>
 
@@ -867,35 +893,96 @@
             return;
         }
 
+        var dto = BuildDto();
+        if (!PassesPlausibilityCheck(dto))
+        {
+            StateHasChanged();
+            return;
+        }
+
         _saving = true;
         try
         {
-            var dto = new PersonUpsertDto
-            {
-                FirstName = _firstName.Trim(),
-                LastName = _lastName.Trim(),
-                MiddleName = string.IsNullOrWhiteSpace(_middleName) ? null : _middleName.Trim(),
-                MaidenName = string.IsNullOrWhiteSpace(_maidenName) ? null : _maidenName.Trim(),
-                BirthDate = _birthDate.HasValue ? DateOnly.FromDateTime(_birthDate.Value) : null,
-                DeathDate = _deathDate.HasValue ? DateOnly.FromDateTime(_deathDate.Value) : null,
-                BirthPlace = string.IsNullOrWhiteSpace(_birthPlace) ? null : _birthPlace.Trim(),
-                DeathPlace = string.IsNullOrWhiteSpace(_deathPlace) ? null : _deathPlace.Trim(),
-                BiographyNotes = _notes.Trim(),
-                ProfilePhotoUrl = string.IsNullOrWhiteSpace(_photoUrl) ? null : _photoUrl.Trim(),
-                Email = string.IsNullOrWhiteSpace(_email) ? null : _email.Trim(),
-                Gender = _gender,
-                ParentIds = [.._parentIds],
-                SpouseIds = [.._spouseIds],
-                FormerSpouseIds = [.._formerSpouseIds],
-                SiblingIds = [.._siblingIds],
-                ChildIds = [.._childIds]
-            };
-
             await OnSubmit.InvokeAsync(dto);
         }
         finally
         {
             _saving = false;
         }
+    }
+
+    // ── entry guardrails (Outreach readiness A3, 2026-10-25) ────────
+    // PlausibilityRules, the same rules the server applies. An impossible date on a link
+    // the server will judge blocks the save here with the server's own message; anything
+    // implausible (or impossible but already saved that way) is shown as "please check",
+    // and pressing "Save anyway" with the same findings saves. Changing anything that
+    // changes the findings asks again.
+    private List<string> _plausibilityErrors = [];
+    private List<string> _plausibilityWarnings = [];
+    private string? _acknowledgedWarnings;
+
+    private bool PassesPlausibilityCheck(PersonUpsertDto dto)
+    {
+        var isNew = !EditingId.HasValue || Initial is null;
+        var datesChanged = isNew || Initial!.BirthDate != dto.BirthDate || Initial.DeathDate != dto.DeathDate ||
+                           Initial.Gender != dto.Gender;
+        var oldParents = isNew ? [] : Initial!.ParentIds.ToHashSet();
+        var oldChildren = isNew ? [] : Initial!.ChildIds.ToHashSet();
+
+        var subject = new LifeDates($"{dto.FirstName} {dto.LastName}".Trim(), dto.BirthDate, dto.DeathDate, dto.Gender);
+        var findings = new List<(PlausibilityFinding Finding, bool Judged)>();
+        findings.AddRange(PlausibilityRules.CheckPerson(subject, DateOnly.FromDateTime(DateTime.Today))
+            .Select(f => (f, true)));
+        foreach (var parent in dto.ParentIds.Distinct().Select(Find).OfType<PersonDto>())
+            findings.AddRange(PlausibilityRules.CheckParentChild(ToLifeDates(parent), subject)
+                .Select(f => (f, datesChanged || !oldParents.Contains(parent.Id))));
+        foreach (var child in dto.ChildIds.Distinct().Select(Find).OfType<PersonDto>())
+            findings.AddRange(PlausibilityRules.CheckParentChild(subject, ToLifeDates(child))
+                .Select(f => (f, datesChanged || !oldChildren.Contains(child.Id))));
+
+        _plausibilityErrors = findings
+            .Where(x => x.Finding.Severity == PlausibilitySeverity.Error && x.Judged)
+            .Select(x => x.Finding.Message).ToList();
+        _plausibilityWarnings = findings
+            .Where(x => x.Finding.Severity == PlausibilitySeverity.Warning || !x.Judged)
+            .Select(x => x.Finding.Message).ToList();
+        if (_plausibilityErrors.Count > 0) return false;
+        if (_plausibilityWarnings.Count == 0) return true;
+
+        var key = string.Join("\n", _plausibilityWarnings);
+        if (key == _acknowledgedWarnings) return true;
+        _acknowledgedWarnings = key;
+        return false;
+    }
+
+    private bool WarningsAwaitConfirmation =>
+        _plausibilityWarnings.Count > 0 && _acknowledgedWarnings == string.Join("\n", _plausibilityWarnings);
+
+    private PersonDto? Find(Guid id) => AllPeople.FirstOrDefault(p => p.Id == id);
+
+    private static LifeDates ToLifeDates(PersonDto p) => new(p.FullName, p.BirthDate, p.DeathDate, p.Gender);
+
+    private PersonUpsertDto BuildDto()
+    {
+        return new PersonUpsertDto
+        {
+            FirstName = _firstName.Trim(),
+            LastName = _lastName.Trim(),
+            MiddleName = string.IsNullOrWhiteSpace(_middleName) ? null : _middleName.Trim(),
+            MaidenName = string.IsNullOrWhiteSpace(_maidenName) ? null : _maidenName.Trim(),
+            BirthDate = _birthDate.HasValue ? DateOnly.FromDateTime(_birthDate.Value) : null,
+            DeathDate = _deathDate.HasValue ? DateOnly.FromDateTime(_deathDate.Value) : null,
+            BirthPlace = string.IsNullOrWhiteSpace(_birthPlace) ? null : _birthPlace.Trim(),
+            DeathPlace = string.IsNullOrWhiteSpace(_deathPlace) ? null : _deathPlace.Trim(),
+            BiographyNotes = _notes.Trim(),
+            ProfilePhotoUrl = string.IsNullOrWhiteSpace(_photoUrl) ? null : _photoUrl.Trim(),
+            Email = string.IsNullOrWhiteSpace(_email) ? null : _email.Trim(),
+            Gender = _gender,
+            ParentIds = [.._parentIds],
+            SpouseIds = [.._spouseIds],
+            FormerSpouseIds = [.._formerSpouseIds],
+            SiblingIds = [.._siblingIds],
+            ChildIds = [.._childIds]
+        };
     }
 }

@@ -345,7 +345,9 @@ public class RelationshipService(
             request.StartDate.Value >= request.EndDate.Value)
             return "Start date must be before end date.";
 
-        if (request.Type is RelationshipType.Parent or RelationshipType.Adopted)
+        // Impossible dates only (PlausibilityRules errors); the implausible ones are warnings,
+        // shown by the person form. Biological links only: an adoptive parent can be any age.
+        if (request.Type == RelationshipType.Parent)
         {
             var parent = await ctx.People.AsNoTracking()
                 .FirstOrDefaultAsync(p => p.Id == request.PersonAId, ct);
@@ -354,21 +356,9 @@ public class RelationshipService(
 
             if (parent != null && child != null)
             {
-                if (parent.DeathDate.HasValue && child.BirthDate.HasValue &&
-                    child.BirthDate.Value > parent.DeathDate.Value.AddMonths(9))
-                    return $"{parent.FirstName} {parent.LastName} died on {parent.DeathDate:d} " +
-                           $"and cannot be the parent of {child.FirstName}, born {child.BirthDate:d}.";
-
-                if (parent.BirthDate.HasValue && child.BirthDate.HasValue)
-                {
-                    var ageGap = child.BirthDate.Value.Year - parent.BirthDate.Value.Year;
-                    if (ageGap < 12)
-                        return $"{parent.FirstName} would have been {ageGap} year(s) old when " +
-                               $"{child.FirstName} was born — too young to be a parent.";
-                    if (ageGap > 80)
-                        return $"{parent.FirstName} would have been {ageGap} years old when " +
-                               $"{child.FirstName} was born — too large an age gap.";
-                }
+                var error = PlausibilityRules.CheckParentChild(PersonService.ToLifeDates(parent), PersonService.ToLifeDates(child))
+                    .FirstOrDefault(f => f.Severity == PlausibilitySeverity.Error);
+                if (error != null) return error.Message;
             }
         }
 
