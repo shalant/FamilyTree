@@ -232,6 +232,10 @@ PR #43).
 - [ ] **Package advisories:** `dotnet build` warns NU1902/NU1903 for
       `SixLabors.ImageSharp` 3.1.11 (high) and `AngleSharp` 1.1.2 (moderate) via
       `FamilyTree.Web.Tests`; check whether Core's ImageSharp reference is affected too.
+      *2026-10-24:* Core is affected. Bumped to 3.1.12 (still vulnerable) and limited
+      server-side decoding to JPEG/PNG/WebP/GIF by actual file bytes, which closes the
+      TIFF advisories. The ICC-profile one stays open until ImageSharp 4.1.2+, which needs
+      a Six Labors license key (`docs/security.md`, A03).
 - [ ] **Non-security bugs found by the same review (not fixed, not verified by test):**
       PersonAdd's post-create `UpdateAsync` (photo back-fill, sibling linking) fails
       silently for Members yet toasts success; `RelationshipService` canonical GUID
