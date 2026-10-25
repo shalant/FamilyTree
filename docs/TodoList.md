@@ -98,7 +98,10 @@ Work A in order before the first invite; B and C can follow.
         (`LoginRedirect`: no `//`, `/\`, other hosts, control characters or `/auth/`), and
         a failed attempt keeps it for the next try. (4) **RegistrationMode** fails closed:
         missing or unrecognised means InviteOnly with a logged warning, and case and spaces
-        are forgiven. Tests: `LoginRedirectTests`, `LoginOverlayReturnUrlTests`,
+        are forgiven. That broke two E2E tests in CI only: the fixture starts the app with
+        the test runner's directory as content root, so `appsettings*.json` were never
+        loaded and the mode had always been missing (silently Open); locally, user secrets
+        hid it. The fixture now sets `Auth__RegistrationMode=Open` explicitly. Tests: `LoginRedirectTests`, `LoginOverlayReturnUrlTests`,
         `AdminUserServiceTests`, `SecurityStampRevalidationTests`, two
         `AuthServiceTreeLinkingTests` theories, `CrossTenantMatrixTests` rows for
         `SetAdminAsync`, and two E2E tests: `ReturnUrlIsolatedTests` (Regression; fails

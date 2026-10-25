@@ -28,9 +28,10 @@ Designed as both a genuine family tool (actively used by 5+ family members) and 
 
 | Metric | Status |
 |--------|--------|
-| **Core Tests** | 75/75 ✅ |
-| **Web Tests** | 49/53 ✅ (4 skipped) |
-| **Total** | 124 passing |
+| **Core Tests** | 258/258 ✅ |
+| **Web Tests** (components, layout, services) | 324/329 ✅ (5 skipped) |
+| **E2E Tests** (Playwright, real SQL Server) | 11/11 ✅ |
+| **Total** | 593 passing (as of 2026-10-25) |
 | **Build (Debug + Release)** | ✅ |
 | **CI Pipeline** | ✅ [View Latest Run](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml) |
 | **Branch Protection** | ✅ Master requires PR + passing CI |
@@ -156,9 +157,12 @@ Invite management, user roles, linked-person assignment, audit log.
 
 **Auth & Security**
 - ASP.NET Core Identity with cookie auth and optional Google OAuth
-- Registration modes: `Open`, `InviteOnly` (production default), `Closed`
+- Registration modes: `Open`, `InviteOnly` (production default), `Closed`; a missing or unrecognised setting fails closed to `InviteOnly`
 - Token-based invite flow with configurable TTL; admin-generated invite URLs
 - Login rate limiting (5 req / 15 min per IP) + Identity account lockout
+- Sessions re-checked against the user's security stamp every 5 minutes, on requests and in open Blazor circuits: a password reset or a role change signs other sessions out
+- Signed-out deep links return to the requested page after sign-in (local paths only, no open redirect)
+- One Admin source (`AppUser.IsAdmin`), set by the site owner from the Users tab
 - `ICurrentUserService` interface in Core, implemented in Web — no `HttpContext` in the service layer
 - Super-user bootstrap on startup via config (idempotent)
 
@@ -174,7 +178,7 @@ Invite management, user roles, linked-person assignment, audit log.
 **Data**
 - Soft delete on `Person`, `Relationship`, `Medium` — global EF query filters
 - `Relationship` canonical ordering: lower `Guid` is always `PersonAId`; unique DB constraint prevents duplicates
-- `Relationship.EndDate` distinguishes active from former spouses
+- `Relationship.IsEnded` / `EndDate` distinguish active from former spouses; an ended marriage with no known date stays undated
 - Filtered performance indexes on `People`, `Relationships`, `AuditLogs`
 - EF migrations run automatically on startup via `MigrateAsync()`
 
@@ -183,7 +187,7 @@ Invite management, user roles, linked-person assignment, audit log.
 - SVG tree export (full canvas), CSV and JSON person export
 
 **CI/CD**
-- GitHub Actions CI: build + test on every push to `master`
+- GitHub Actions CI on every push and PR: build + unit/component tests, plus a separate E2E job (Playwright against a disposable SQL Server container)
 - Manual deploy to Azure App Service (B1 Linux) via `workflow_dispatch`
 
 ---
@@ -228,57 +232,31 @@ Confidence in code comes from rigorous constraints, not subjective review. This 
 
 | Test Type | Framework | Runs | Command |
 |-----------|-----------|-------|---------|
-| **Unit Tests** (Core services) | xUnit + FluentAssertions | ✅ CI on every PR | `dotnet test` |
-| **Component Tests** (Blazor) | bUnit | ✅ CI on every PR | `dotnet test` |
-| **UI Tests** (E2E) | Playwright | 🖥️ Local only | `dotnet run` + `dotnet test` |
+| **Unit / integration** (Core services) | xUnit + FluentAssertions, EF Core InMemory, real `UserManager` | ✅ CI on every PR | `dotnet test FamilyTree.sln` |
+| **Component + layout** (Blazor, layout engines) | bUnit, CsCheck property tests | ✅ CI on every PR | `dotnet test FamilyTree.sln` |
+| **E2E** (real browser, real app process) | Playwright + SQL Server | ✅ CI on every PR (own job) | `dotnet test tests/FamilyTree.E2E.Tests` |
 
-**Unit & Component Tests** — Automated in CI
-- Run on every PR and push to any branch
-- In-memory EF Core provider; each test gets isolated database
-- ~2–3 min total
+**Unit, integration and component tests**: in-memory EF Core with each test on its own database. Highlights:
+- `CrossTenantMatrixTests`: every public method of the family-scoped services, called from one family against another's IDs, must fail or return nothing
+- `FamilyTreeLayoutFuzzTests` / `FamilyTreeLayoutTransitionTests`: property tests and before/after edit pairs for the layout engines
+- `PlausibilityRulesTests`, `EntryGuardrailServiceTests`: date sanity rules shared by the server and the form
+- `AdminUserServiceTests`, `SecurityStampRevalidationTests`, `LoginRedirectTests`: session revocation and sign-in redirects
+- Tests for bugs found live are tagged `[Trait("Category", "Regression")]`
 
-**UI Tests** — Manual local testing
-- Require running app server + browser
-- Run locally before pushing: `dotnet watch` + `dotnet test --filter "UiTests"`
-
-### Core Test Coverage
-
-**`PersonServiceTests` (8 tests)**
-- Create returns person with correct name
-- `CreatedBy` and `FamilyId` are stamped on every create
-- Whitespace-only first name is rejected
-- Birth date after death date returns a failure message
-- Soft delete sets `DeletedAt` + `DeletedBy`; record invisible to normal queries
-- Restore clears those fields; record becomes visible again
-- Family scoping: user with `FamilyId = X` only sees family X
-- Super-user with no `FamilyId` sees all persons across families
-
-**`RelationshipServiceTests` (3 tests)**
-- Canonical ordering: lower GUID always stored as `PersonA`
-- Duplicate relationship creation returns failure (not DB exception)
-- Delete hard-removes relationship record
-
-**`ComponentTests` (4 tests, 4 skipped)**
-- FamilyTreeCanvas renders without errors
-- HeroOverlay displays when visible
-- ToastService shows notifications
-- PersonDetailDrawer (skipped — complex MudBlazor dependencies)
-
-**`StoryTests` (3 tests)**
-- Story submission validation
-- Invite token expiry checks
-- Auth focus state persistence
+**E2E tests**: launch the built app against a disposable SQL Server database and drive it with headless Chromium: invite-to-tree signup, CSRF on login/logout, session revocation, sign-in deep links, mobile layout. The security-stamp check runs on every request in every E2E test. Locally they need SQL Server Express (`E2E_ConnectionString` overrides the default) and a trusted dev certificate (`dotnet dev-certs https --trust`).
 
 ### Run Tests Locally
 
 ```bash
-# Unit + component tests (same as CI)
+# Everything, including E2E (needs local SQL Server)
+dotnet build FamilyTree.sln
 dotnet test FamilyTree.sln
 
-# UI tests (requires running server)
-dotnet watch  # Terminal 1
-dotnet test --filter "UiTests"  # Terminal 2
+# Only the tests for bugs found live
+dotnet test FamilyTree.sln --filter "Category=Regression"
 ```
+
+The login rate limit (5 per 15 minutes per IP) applies to E2E runs too: running the E2E suite several times in a row can fail with `?loginError=toomany`.
 
 ---
 

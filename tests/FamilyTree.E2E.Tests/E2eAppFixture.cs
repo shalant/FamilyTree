@@ -153,6 +153,11 @@ public sealed class E2eAppFixture : IAsyncLifetime
         psi.Environment["Google__ClientId"] = "";
         psi.Environment["Google__ClientSecret"] = "";
         psi.Environment["AzureStorage__ConnectionString"] = ""; // forces the UseDevelopmentStorage=true fallback
+        // Explicit, not inherited: the app runs with this process's working directory as its
+        // content root, so appsettings*.json are never loaded here. A missing mode used to
+        // mean Open; since it fails closed (InviteOnly), plain /register needs this set.
+        // Locally user secrets hid that; CI has none (found 2026-10-25, PR #80).
+        psi.Environment["Auth__RegistrationMode"] = "Open";
         psi.Environment["Auth__SessionCheckInterval"] = "00:00:00"; // check the security stamp on every
                                                                      // request, so every test exercises it
         psi.Environment["DevAuth__Enabled"] = "false";           // see class remarks: DevAuth replaces the
