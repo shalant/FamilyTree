@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using FamilyTree.Core.Data;
@@ -227,8 +228,22 @@ else
             options.ExpireTimeSpan = TimeSpan.FromDays(14);
             options.SlidingExpiration = true;
             options.LoginPath = "/";
+            // S7 (docs/security.md, 2026-10-25): re-read the user every few minutes, so a
+            // password reset or a role change (both rotate the security stamp) ends other
+            // sessions, and changed claims (Admin, FamilyId) reach the cookie, instead of
+            // the 14-day cookie carrying them unchecked.
+            options.Events.OnValidatePrincipal = SecurityStampValidator.ValidatePrincipalAsync;
         })
-        .AddCookie(IdentityConstants.ExternalScheme);
+        .AddCookie(IdentityConstants.ExternalScheme)
+        // Never used (no 2FA), but SecurityStampValidator signs out of the remember-me
+        // scheme when it rejects a cookie, and threw (500) while it wasn't registered.
+        .AddCookie(IdentityConstants.TwoFactorRememberMeScheme)
+        .AddCookie(IdentityConstants.TwoFactorUserIdScheme);
+
+    builder.Services.Configure<SecurityStampValidatorOptions>(o =>
+        o.ValidationInterval = builder.Configuration.GetValue("Auth:SessionCheckInterval", TimeSpan.FromMinutes(5)));
+    // The cookie check above only runs on HTTP requests; this one re-checks open circuits.
+    builder.Services.AddScoped<AuthenticationStateProvider, SecurityStampRevalidatingAuthStateProvider>();
 
     var googleId     = builder.Configuration["Google:ClientId"];
     var googleSecret = builder.Configuration["Google:ClientSecret"];
@@ -436,25 +451,26 @@ if (!devAuthEnabled)
         }
 
         var form = await ctx.Request.ReadFormAsync();
-        var email    = form["email"].ToString();
-        var password = form["password"].ToString();
+        var email     = form["email"].ToString();
+        var password  = form["password"].ToString();
+        var returnUrl = form["returnUrl"].ToString();
 
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
-            return Results.LocalRedirect("/?loginError=missing");
+            return Results.LocalRedirect(LoginRedirect.LoginError("missing", returnUrl));
 
         var result = await signInManager.PasswordSignInAsync(email, password,
             isPersistent: true, lockoutOnFailure: true);
 
         if (result.IsLockedOut)
-            return Results.LocalRedirect("/?loginError=locked");
+            return Results.LocalRedirect(LoginRedirect.LoginError("locked", returnUrl));
 
         if (!result.Succeeded)
-            return Results.LocalRedirect("/?loginError=invalid");
+            return Results.LocalRedirect(LoginRedirect.LoginError("invalid", returnUrl));
 
+        // A deep link (/?ReturnUrl=/admin from the cookie challenge) wins over the saved
+        // focus person; LoginRedirect only honours paths on this site (S9, 2026-10-25).
         var user = await userManager.FindByEmailAsync(email);
-        var focusId = user?.FocusPersonId ?? user?.PersonId;
-        var redirect = focusId.HasValue ? $"/?focus={focusId}" : "/";
-        return Results.LocalRedirect(redirect);
+        return Results.LocalRedirect(LoginRedirect.AfterSignIn(returnUrl, user?.FocusPersonId ?? user?.PersonId));
     }).RequireRateLimiting("login");
 
     app.MapPost("/auth/do-logout", async (
@@ -477,30 +493,35 @@ if (!devAuthEnabled)
 
     // ── Google OAuth ───────────────────────────────────────────────
     app.MapGet("/auth/google", async (
+        string? returnUrl,
         Microsoft.AspNetCore.Identity.SignInManager<FamilyTree.Core.Models.AppUser> signInManager,
         IAuthenticationSchemeProvider schemes) =>
     {
         var scheme = await schemes.GetSchemeAsync("Google");
         if (scheme == null)
-            return Results.LocalRedirect("/?loginError=google_unavailable");
+            return Results.LocalRedirect(LoginRedirect.LoginError("google_unavailable", returnUrl));
 
-        var props = signInManager.ConfigureExternalAuthenticationProperties(
-            "Google", "/auth/google-callback");
+        var safeReturn = LoginRedirect.SafeReturnUrl(returnUrl);
+        var callback = safeReturn == null
+            ? "/auth/google-callback"
+            : $"/auth/google-callback?returnUrl={Uri.EscapeDataString(safeReturn)}";
+        var props = signInManager.ConfigureExternalAuthenticationProperties("Google", callback);
         return Results.Challenge(props, ["Google"]);
     });
 
     app.MapGet("/auth/google-callback", async (
+        string? returnUrl,
         Microsoft.AspNetCore.Identity.SignInManager<FamilyTree.Core.Models.AppUser> signInManager,
         Microsoft.AspNetCore.Identity.UserManager<FamilyTree.Core.Models.AppUser> userManager,
         IAuthService authService) =>
     {
         var info = await signInManager.GetExternalLoginInfoAsync();
         if (info == null)
-            return Results.LocalRedirect("/?loginError=google_error");
+            return Results.LocalRedirect(LoginRedirect.LoginError("google_error", returnUrl));
 
         var email = info.Principal.FindFirstValue(ClaimTypes.Email);
         if (string.IsNullOrWhiteSpace(email))
-            return Results.LocalRedirect("/?loginError=google_error");
+            return Results.LocalRedirect(LoginRedirect.LoginError("google_error", returnUrl));
 
         // Existing external login → sign straight in
         var signInResult = await signInManager.ExternalLoginSignInAsync(
@@ -508,8 +529,7 @@ if (!devAuthEnabled)
         if (signInResult.Succeeded)
         {
             var u = await userManager.FindByEmailAsync(email);
-            var fid = u?.FocusPersonId ?? u?.PersonId;
-            return Results.LocalRedirect(fid.HasValue ? $"/?focus={fid}" : "/");
+            return Results.LocalRedirect(LoginRedirect.AfterSignIn(returnUrl, u?.FocusPersonId ?? u?.PersonId));
         }
 
         // Email account exists but Google not yet linked → link and sign in
@@ -518,14 +538,13 @@ if (!devAuthEnabled)
         {
             await userManager.AddLoginAsync(existing, info);
             await signInManager.SignInAsync(existing, isPersistent: true);
-            var fid2 = existing.FocusPersonId ?? existing.PersonId;
-            return Results.LocalRedirect(fid2.HasValue ? $"/?focus={fid2}" : "/");
+            return Results.LocalRedirect(LoginRedirect.AfterSignIn(returnUrl, existing.FocusPersonId ?? existing.PersonId));
         }
 
         // Brand-new user — check registration mode
         var mode = authService.GetRegistrationMode();
-        if (mode == "Closed")   return Results.LocalRedirect("/?loginError=closed");
-        if (mode == "InviteOnly") return Results.LocalRedirect("/?loginError=noinvite");
+        if (mode == "Closed")   return Results.LocalRedirect(LoginRedirect.LoginError("closed", returnUrl));
+        if (mode == "InviteOnly") return Results.LocalRedirect(LoginRedirect.LoginError("noinvite", returnUrl));
 
         // Open mode — create account from Google profile
         var firstName = info.Principal.FindFirstValue(ClaimTypes.GivenName) ?? "";
@@ -544,12 +563,12 @@ if (!devAuthEnabled)
 
         var created = await userManager.CreateAsync(newUser);
         if (!created.Succeeded)
-            return Results.LocalRedirect("/?loginError=google_error");
+            return Results.LocalRedirect(LoginRedirect.LoginError("google_error", returnUrl));
 
         await authService.EnsureUserFamilyAsync(newUser.Id);
         await userManager.AddLoginAsync(newUser, info);
         await signInManager.SignInAsync(newUser, isPersistent: true);
-        return Results.LocalRedirect("/");
+        return Results.LocalRedirect(LoginRedirect.AfterSignIn(returnUrl, null));
     });
 }
 

@@ -778,6 +778,9 @@ public class CrossTenantMatrixTests
         (await svc.GetPeopleAsync()).Data.Should().BeNullOrEmpty();
         (await svc.CancelInviteAsync(w.UserInviteB)).Success.Should().BeFalse();
         (await svc.DismissPasswordResetAsync(w.ResetRequestB)).Success.Should().BeFalse();
+        (await svc.SetAdminAsync(w.UserB, true)).Success.Should().BeFalse();
+        (await svc.SetAdminAsync(w.UserA, true)).Success.Should().BeFalse();
+        (await Read(w, ctx => ctx.Users.AnyAsync(u => (u.Id == w.UserA || u.Id == w.UserB) && u.IsAdmin))).Should().BeFalse();
         (await Read(w, ctx => ctx.UserInvites.AnyAsync(i => i.Id == w.UserInviteB))).Should().BeTrue();
         (await Read(w, ctx => ctx.PasswordResetRequests.AnyAsync(r => r.Id == w.ResetRequestB))).Should().BeTrue();
     }
@@ -892,6 +895,7 @@ public class CrossTenantMatrixTests
         (await AdminUserSvc(w, u).GetAllUsersAsync()).Data!.Should().HaveCount(4);
         (await AdminUserSvc(w, u).GetPendingInvitesAsync()).Data!.Select(i => i.Id).Should().Contain(w.UserInviteB);
         (await AdminUserSvc(w, u).GetPendingPasswordResetsAsync()).Data!.Select(r => r.Id).Should().Contain(w.ResetRequestB);
+        (await AdminUserSvc(w, u).SetAdminAsync(w.UserB, true)).Success.Should().BeTrue();
         (await AdminAuditSvc(w, u).GetAllAuditLogsAsync()).Data!.Select(a => a.Id).Should().Contain(w.AuditB);
         (await AuthSvc(w, u).GetPendingInvitesAsync()).Data!.Select(i => i.Id).Should().Contain(w.UserInviteB);
         (await AuthSvc(w, u).CreateInviteAsync("fresh@x.test")).Success.Should().BeTrue();

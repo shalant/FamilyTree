@@ -22,8 +22,24 @@ public class AuthService(
     // lists span every family.
     private const string SuperUserOnly = "Only the site owner can manage user accounts.";
 
-    public string GetRegistrationMode() =>
-        config["Auth:RegistrationMode"] ?? "Open";
+    private static readonly string[] RegistrationModes = ["Open", "InviteOnly", "Closed"];
+
+    // Fails closed (S9, docs/security.md, 2026-10-25): a missing, misspelled or mis-cased
+    // value used to mean Open, so one typo in App Service config let anyone sign up. Case
+    // and spaces are forgiven; anything unrecognised means InviteOnly. Always returns one of
+    // the three canonical names, so callers can compare with ==.
+    public string GetRegistrationMode()
+    {
+        var configured = config["Auth:RegistrationMode"]?.Trim();
+        var mode = RegistrationModes.FirstOrDefault(m =>
+            string.Equals(m, configured, StringComparison.OrdinalIgnoreCase));
+        if (mode != null) return mode;
+
+        logger.LogWarning(
+            "Auth:RegistrationMode is {Configured}; expected Open, InviteOnly or Closed. Using InviteOnly.",
+            configured == null ? "not set" : $"\"{configured}\"");
+        return "InviteOnly";
+    }
 
     public async Task<ServiceResponse<Guid>> RegisterAsync(
         string firstName, string lastName, string email, string password,

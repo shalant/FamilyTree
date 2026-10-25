@@ -282,13 +282,19 @@ bUnit diffs a virtual DOM — it cannot see real CSS layout facts (touch target 
 ## Auth & Security
 
 ### Identity Stack
-ASP.NET Core Identity (`AppUser : IdentityUser<Guid>`) with cookie auth (`IdentityConstants.ApplicationScheme`). `AppUserClaimsPrincipalFactory` injects `DisplayName`, `PersonId`, and role claims into the cookie.
+ASP.NET Core Identity (`AppUser : IdentityUser<Guid>`) with cookie auth (`IdentityConstants.ApplicationScheme`). `AppUserClaimsPrincipalFactory` injects `DisplayName`, `PersonId`, and role claims into the cookie. **`AppUser.IsAdmin` is the only source of the Admin role** (2026-10-25): the Users tab changes it through `AdminUserService.SetAdminAsync`. Don't add Identity role memberships; nothing creates the roles (migration `FoldAdminRoleIntoIsAdmin` moved the old ones onto `IsAdmin`).
+
+**Sessions are re-checked (S7, 2026-10-25).** The cookie runs `SecurityStampValidator` and `SecurityStampRevalidatingAuthStateProvider` re-checks open Blazor circuits, every `Auth:SessionCheckInterval` (default 5 minutes; the E2E fixture sets zero, so every E2E test checks on every request). A stale security stamp signs the session out; a current one refreshes the claims. Anything that should end a user's sessions (password reset, Admin change) must rotate the stamp. The two-factor cookie schemes are registered though unused: without them a rejected cookie threw a 500 instead of signing out.
 
 ### Registration Modes
 Controlled by `Auth:RegistrationMode` in config:
 - `Open` — anyone can register (used in `appsettings.Development.json`)
 - `InviteOnly` — requires a valid `UserInvite` token in the registration URL (production default)
 - `Closed` — registration disabled entirely
+
+Case and spaces are ignored; a missing or unrecognised value means `InviteOnly` (fails closed since 2026-10-25, logged as a warning). `GetRegistrationMode()` always returns one of the three canonical names.
+
+Sign-in follows the cookie challenge's `/?ReturnUrl=` (email/password and Google) for local paths only, via `LoginRedirect` (2026-10-25); otherwise it lands on the user's focus person.
 
 ### Invite Flow
 `IAuthService.CreateInviteAsync(email)` (SuperUser-only since 2026-10-10) stores a `UserInvite` and returns its `Id`; Admin › Users builds `/register?invite=<id>` from it (the stored `Token` column is unused). Token TTL is `Auth:InviteTtlDays` (default 7). The super-user has no family claim, so their invites target the oldest family (auto-created if none exists). A story-invite response uses the separate, ungated `CreateInviteForStoryResponseAsync(email, familyId)`, targeting the story subject's family. `RegisterAsync` honours a valid invite's family in every registration mode.

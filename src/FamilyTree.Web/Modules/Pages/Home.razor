@@ -53,7 +53,7 @@
            sees LoginOverlay underneath the spinner instead of nothing. *@
         @if (_showIntro && _authStateResolved)
         {
-            <LoginOverlay OnGuest="HideIntro" ErrorMessage="@LoginError" PrefillEmail="@Email" />
+            <LoginOverlay OnGuest="HideIntro" ErrorMessage="@LoginError" PrefillEmail="@Email" ReturnUrl="@ReturnUrl" />
         }
     </NotAuthorized>
 </AuthorizeView>
@@ -184,6 +184,9 @@ else
     [SupplyParameterFromQuery] public Guid? View  { get; set; }
     [SupplyParameterFromQuery] public string? LoginError { get; set; }
     [SupplyParameterFromQuery] public string? Email { get; set; }
+    // Set by the cookie challenge (/?ReturnUrl=/admin) and kept through a failed attempt;
+    // the sign-in endpoints decide whether it's safe to follow (LoginRedirect).
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
 
     private List<PersonDto> _people = [];
     private List<CoupleDto> _couples = [];
