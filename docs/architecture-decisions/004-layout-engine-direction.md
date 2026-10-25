@@ -382,6 +382,36 @@ for lying along a line and drew every recorded pair (Louis to Tilly and Louis to
 its own bracket. Doug accepted the crossings: lines through people and lines on top of each
 other state relationships that aren't there, crossings only make a tree busier.
 
+## Lines through names (2026-10-25)
+
+On the live tree (Doug's screenshot, prototype) lines ran through people's names: a couple
+line runs along the bottom of the lower partner's circle, so when partners were born a few
+years apart it cut through the higher partner's name (Joseph, Louis, Marc, Stephanie,
+Lauren), and a single parent's stem started at their circle, through their own name (David,
+Gimpel). The scores counted lines through circles, not names, so the ratchet missed it.
+
+Added a score, lines through names (`LayoutQualityMetrics.LabelBox`), and changed the
+prototype's drawing only (`BuildConnectors(clearLabels: true)`; the archived engine draws as
+before): a higher partner whose name the line would cut gets it at the bottom of their own
+circle, stepping down 50 to the side of the name (`CoupleArc.StepX`), and a single parent's
+stem starts 38 below their circle. A line that passes below the name is left as it was.
+
+| | Before | After |
+|---|---|---|
+| Live: lines through names | 10 | 0 |
+| Generated: lines through names | 2072 | 233 |
+| Generated: crossings | 697 | 659 |
+| Generated: lines on top of another family's | 628 | 683 |
+| Live: crossings, lines on top of each other | 1, 0 | 1, 0 |
+
+The merged lines are mostly a person with two marriages on the same side on a crowded
+generated row: both lines leave them along the same short stub. Rejected on the generated
+families: every couple line at circle height, rim to rim (crowded rows ran it through the
+circles between partners: crossings 895, merged 931); the step at the midpoint (partners far
+apart often have someone there: merged 876); and, for a line passing below the name, rising
+to just under it rather than stopping short (merged 864). Still open: that line stops short
+of the higher partner when their years are far apart.
+
 ## Consequences
 
 - The scores give a baseline to beat. Since 2026-10-23 they are also a ratchet for the

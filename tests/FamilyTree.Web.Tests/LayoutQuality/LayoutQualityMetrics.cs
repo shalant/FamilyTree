@@ -50,6 +50,14 @@ public static class LayoutQualityMetrics
                 if (DistToSegment(n.X, n.Y, s) < r - 2) throughNodes.Add($"{s.Kind} through {n.Person.FirstName}");
             }
 
+        // A line through someone's name or birth year under their circle (found 2026-10-25 on
+        // the live tree: a couple line drawn at the lower partner's height ran through the
+        // higher partner's name, and a single parent's stem through their own).
+        var throughLabels = new List<string>();
+        foreach (var s in segments)
+            foreach (var n in layout.Nodes)
+                if (CrossesRect(s, LabelBox(n))) throughLabels.Add($"{s.Kind} through {n.Person.FirstName}'s name");
+
         // Lines from two families drawn on top of each other read as one family, which states a
         // relationship that isn't there: on the live tree (found 2026-10-23) Ray's line from
         // Louis + Lillian ran along Morry and Isador's line from their mother, so the three looked
@@ -119,7 +127,37 @@ public static class LayoutQualityMetrics
             overlaps,
             segments.Sum(s => Dist(s.X1, s.Y1, s.X2, s.Y2)),
             offCenter,
-            merged);
+            merged,
+            throughLabels);
+    }
+
+    // Where PersonNode draws the name (11px, top at rim + 5) and birth year (10px, rim + 20),
+    // centred under the circle and cut off at 88 wide. Text width is estimated per character.
+    public static (double Left, double Top, double Right, double Bottom) LabelBox(FamilyTreeLayoutEngine.LayoutNode n)
+    {
+        const double labelWidth = 88, nameCharWidth = 6.2, yearWidth = 24;
+        var width = Math.Min(labelWidth, Math.Max(n.Person.FirstName.Length * nameCharWidth, n.Person.BirthDate.HasValue ? yearWidth : 0));
+        var top = n.Y + n.Size / 2.0 + 5;
+        var bottom = top + (n.Person.BirthDate.HasValue ? 28 : 14);
+        return (n.X - width / 2, top, n.X + width / 2, bottom);
+    }
+
+    // Whether a segment passes through the inside of a box (Liang-Barsky clipping); a line that
+    // only grazes an edge doesn't count.
+    private static bool CrossesRect(Segment s, (double Left, double Top, double Right, double Bottom) box)
+    {
+        const double inset = 1;
+        var (l, t, r, b) = (box.Left + inset, box.Top + inset, box.Right - inset, box.Bottom - inset);
+        var (dx, dy) = (s.X2 - s.X1, s.Y2 - s.Y1);
+        double t0 = 0, t1 = 1;
+        foreach (var (pk, qk) in new[] { (-dx, s.X1 - l), (dx, r - s.X1), (-dy, s.Y1 - t), (dy, b - s.Y1) })
+        {
+            if (Math.Abs(pk) < 1e-9) { if (qk < 0) return false; continue; }
+            var u = qk / pk;
+            if (pk < 0) t0 = Math.Max(t0, u); else t1 = Math.Min(t1, u);
+            if (t0 > t1) return false;
+        }
+        return t1 - t0 > 1e-6;
     }
 
     public sealed record Segment(int Owner, double X1, double Y1, double X2, double Y2, string Kind = "line");
@@ -131,7 +169,8 @@ public static class LayoutQualityMetrics
         var owner = 0;
         foreach (var f in layout.Connectors)
         {
-            if (f.Couple is { } c) list.Add(new(owner, c.PartnerAX, c.PartnerAY, c.PartnerBX, c.PartnerBY, "couple line"));
+            if (f.Couple is { } c)
+                foreach (var (x1, y1, x2, y2) in c.Segments) list.Add(new(owner, x1, y1, x2, y2, "couple line"));
             if (f.Stem.TopY < f.Stem.BotY) list.Add(new(owner, f.Stem.X, f.Stem.TopY, f.Stem.X, f.Stem.BotY, "stem"));
             if (f.Span is { } s) list.Add(new(owner, s.LeftX, s.Y, s.RightX, s.Y, "sibling span"));
             foreach (var d in f.Drops) list.Add(new(owner, d.CenterX, f.Stem.BotY, d.CenterX, d.BotY, "child drop"));
@@ -201,8 +240,11 @@ public sealed record LayoutQualityReport(
     int NodeOverlaps,
     double ConnectorLength,
     IReadOnlyList<FamilyOffset> FamilyOffsets,  // every set of children sharing parents, most off-centre first
-    IReadOnlyList<string> MergedLineDetails)    // "Ray's line on Morry, Isador's line", in segment order
+    IReadOnlyList<string> MergedLineDetails,    // "Ray's line on Morry, Isador's line", in segment order
+    IReadOnlyList<string> LinesThroughLabelDetails)  // "couple line through Joseph's name", in segment order
 {
+    public int LinesThroughLabels => LinesThroughLabelDetails.Count;
+
     // Pieces of two different families' lines drawn on top of each other.
     public int MergedLines => MergedLineDetails.Count;
 
@@ -223,6 +265,9 @@ public sealed record LayoutQualityReport(
             sb.AppendLine($"  {g.A} + {g.B}: {g.Distance:0}{(g.IsFormer ? " (former)" : "")}");
         sb.AppendLine($"crossings: {Crossings}, lines through nodes: {LinesThroughNodes}, node overlaps: {NodeOverlaps}");
         foreach (var t in LinesThroughNodeDetails.Take(5))
+            sb.AppendLine($"  {t}");
+        sb.AppendLine($"lines through names: {LinesThroughLabels}");
+        foreach (var t in LinesThroughLabelDetails.Take(5))
             sb.AppendLine($"  {t}");
         sb.AppendLine($"lines on top of another family's: {MergedLines}");
         foreach (var m in MergedLineDetails.Take(5))

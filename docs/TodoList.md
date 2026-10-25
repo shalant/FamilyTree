@@ -187,6 +187,19 @@ stopping placement patches and replacing the placement algorithm, measured first
       crossings 0 → 1 (the Louis jump, unavoidable while both sets are drawn), live
       connector length 5434 → 5446. Tests:
       `TimelineLayoutEngineTests.SiblingSets_AroundAManWithTwoWives_EachGetOneClearBar`.
+- [x] **Keep lines out of people's names** (2026-10-25, `fix/lines-through-names`,
+      prototype only). Seen on the live tree through the picker: couple lines ran through
+      the name of a partner born a few years earlier (Joseph, Louis, Marc, Stephanie,
+      Lauren), and David's stem to Esther through his own name. New score "lines through
+      names" (live 10 -> 0, generated 2072 -> 233); the higher partner's line now starts at
+      their own circle and steps down beside their name, and a single parent's stem starts
+      below it. Generated crossings 697 -> 659, merged lines 628 -> 683 (loosened by hand,
+      for Doug to accept: a person with two marriages on the same side shares a short stub).
+      ADR 004, "Lines through names". Test:
+      `TimelineLayoutEngineTests.PartnersBornAFewYearsApart_AndASingleParent_NoLineThroughAName`.
+- [ ] **A couple line stops short of a partner born much earlier** (found 2026-10-25). When
+      the line passes below the higher partner's name it ends there, short of them. Rising
+      to just under the name was tried and raised generated merged lines to 864.
 - [ ] **Fewer crossings from sibling bars** (found 2026-10-24). Routes are scored against
       the lines drawn so far, set by set, narrowest first, and only bars above the row are
       tried (below the row was tried: crossings 696, and it sits among couple lines and

@@ -3,13 +3,14 @@
     "familiesWithLooseCouple": 107,
     "partnerGapWorst": 1600,
     "partnerGapMean": 220,
-    "crossings": 697,
-    "linesThroughNodes": 405,
+    "crossings": 659,
+    "linesThroughNodes": 403,
     "nodeOverlaps": 0,
     "familyOffCentreMean": 205,
     "widthMean": 1197,
-    "connectorLengthMean": 2752,
-    "mergedLines": 628
+    "connectorLengthMean": 2653,
+    "mergedLines": 683,
+    "linesThroughNames": 233
   },
   "fixture two-bridges (2026-10-16 screenshot)": {
     "partnerGapMax": 200,
@@ -18,8 +19,9 @@
     "nodeOverlaps": 0,
     "familyOffCentreMax": 102,
     "width": 1060,
-    "connectorLength": 2897,
-    "mergedLines": 0
+    "connectorLength": 2912,
+    "mergedLines": 0,
+    "linesThroughNames": 0
   },
   "fixture live": {
     "partnerGapMax": 200,
@@ -28,8 +30,9 @@
     "nodeOverlaps": 0,
     "familyOffCentreMax": 92,
     "width": 1240,
-    "connectorLength": 5446,
-    "mergedLines": 0
+    "connectorLength": 5409,
+    "mergedLines": 0,
+    "linesThroughNames": 0
   },
   "fixture local-dev": {
     "partnerGapMax": 200,
@@ -38,7 +41,8 @@
     "nodeOverlaps": 0,
     "familyOffCentreMax": 220,
     "width": 2770,
-    "connectorLength": 4955,
-    "mergedLines": 0
+    "connectorLength": 5008,
+    "mergedLines": 0,
+    "linesThroughNames": 0
   }
 }
