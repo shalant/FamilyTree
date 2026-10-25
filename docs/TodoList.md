@@ -2,6 +2,61 @@
 
 ---
 
+## Outreach readiness (planned 2026-10-24)
+
+Two goals: (1) ready to start inviting family; (2) robust enough that a casual user's
+first doubtful entry gets a reasonable outcome, not invented data or a silent failure.
+Work A in order before the first invite; B and C can follow.
+
+**A. Before the first invite**
+- [x] **A1: stop inventing data** (2026-10-24, `fix/a1-no-invented-end-dates`). Marking a
+      marriage as ended gave it an `EndDate` of the earlier partner's death date, else
+      *today*, because `EndDate != null` was the only way to say "ended" and the form has no
+      date field. That's how Lillian and Louis came to have ended on 2026-09-18. Added
+      `Relationship.IsEnded`, so a marriage can be ended with no known date. An `EndDate`
+      still counts as ended, so existing rows and test fixtures read the same. The
+      death-date default is kept; the today fallback is gone, from the person form and from
+      `ClaudeImportService` too. Migration `ClearInventedMarriageEndDates` sets `IsEnded`
+      on every dated marriage, then recomputes each `EndDate` under the new rule (no screen
+      ever let anyone type one, so every stored date was a default): Lillian and Louis
+      become 1922-12-04 if her death date is on file. Down puts a placeholder date back on
+      undated ended marriages so they don't revert to active. Checked on a scratch SQL Server
+      database (dated by death, by entry day, undated active; then Down). GEDCOM export writes
+      `DIV Y` for an ended marriage with or without a date. Tests:
+      `PersonServiceTests.UpdateAsync_MovingActiveSpouseToFormer_LeavesEndDateUnknownWhenNeitherPartnerHasDied`
+      (regression, fails against the old fallback),
+      `CreateAsync_PersonWhoseOnlyMarriageEndedWithNoDate_CanStillMarryAgain` (fails if
+      the active-marriage checks ignore `IsEnded`),
+      `UpdateAsync_MovingFormerSpouseBackToActive_ClearsTheEndedFlag`. Still open: whether a
+      divorced couple where one partner later died should get that death date (the default
+      can't tell divorce from widowhood; only a date field in the form can).
+- [ ] **A2: silent failures.** From "Non-security bugs" under Pre-invite hardening:
+      PersonAdd's post-create `UpdateAsync` fails silently for Members but toasts success;
+      `RelationshipService.UpdateAsync` always fails on an active spouse.
+- [ ] **A3: entry guardrails.** Hard errors for the impossible, "are you sure?" warnings
+      for the implausible: a parent under 12, a mother over 55, a child born over a year
+      after the father's death, age over 110 with no death date. Same rules as "Detect
+      likely data-entry slips", applied in the form.
+- [ ] **A4: invite-path security.** `ReturnUrl` ignored on `/auth/do-login`;
+      `Auth:RegistrationMode` fails open (S9); S7 session revocation; S8 blob privacy;
+      check Google sign-in works on prod.
+- [ ] **A5: Louis's sister drawn on top of Louis** in the archived engine the family sees.
+      Doug to decide: fix it in the frozen engine, or switch the family to the prototype
+      once it's ready.
+- [ ] **A6: walk the invitee journey on prod**, invite email to first tree view, on a phone
+      as well as desktop.
+
+**B. Battle-testing**
+- [ ] **B7: write-path fuzz harness.** Random casual-user edit sequences through the real
+      services: no crash, nothing invented, impossible input rejected with a message, the
+      layout still valid afterwards.
+- [ ] **B8: "Data check" admin list.** See "Detect likely data-entry slips".
+
+**C. Polish:** the tree loading state, the broken photo tile, and deploying at quiet hours
+(about 2.5 minutes of 500s per deploy). Each has its own entry below.
+
+---
+
 ## Layout engine direction (ADR 004, 2026-10-17)
 
 Context: after R0-R13 every fuzz invariant passes, but the live tree still looks loose
@@ -139,12 +194,15 @@ stopping placement patches and replacing the placement algorithm, measured first
       all sets' heights together, should give back some of the 12 crossings.
 - [ ] **Data check for Doug:** Lillian and Louis's marriage has an end date of 2026-09-18,
       which looks like the day it was entered. It's the only reason it's drawn as ended.
-      Doug confirmed it's a slip (2026-10-24); see "Detect likely data-entry slips".
+      Doug confirmed it's a slip (2026-10-24). The app made it up, not a typo: fixed by
+      Outreach readiness A1, whose migration sets it to Lillian's death date (1922-12-04) on the
+      next deploy. Tick this once that's checked on the live tree.
 - [ ] **Detect likely data-entry slips** (asked 2026-10-24, not started). A "Data check"
       list beside `DataIntegrityService`'s existing checks, each finding shown as "probably
       wrong, please check" with a "this is correct" dismiss, never fixed automatically.
-      Candidate rules: a date equal to the day the record was entered (`EndDate` =
-      `CreatedAt` ±1 day: the Lillian and Louis case); an event at an impossible age for
+      Candidate rules: a date equal to the day the record was entered (the Lillian and
+      Louis case turned out to be the app's doing and was fixed by A1, but a date typed in
+      a future end-date field could still slip this way); an event at an impossible age for
       someone with no death date (over 110); death before birth, a birth in the future, a
       marriage ending before it started or after a partner died; a child born when a
       parent was under 12, a mother over 55, or a father dead over a year; a surname one or

@@ -65,7 +65,7 @@ public class GedcomExportService : IGedcomExportService
             if (!coupleFam.ContainsKey(key))
             {
                 var fam = new FamRecord($"@F{fc++}@", r.PersonAId, r.PersonBId,
-                                        r.StartDate, r.EndDate);
+                                        r.StartDate, r.EndDate, r.IsEnded || r.EndDate.HasValue);
                 coupleFam[key] = fam;
                 famList.Add(fam);
             }
@@ -91,7 +91,7 @@ public class GedcomExportService : IGedcomExportService
             {
                 if (!soloFam.TryGetValue(parentId, out target!))
                 {
-                    target = new FamRecord($"@F{fc++}@", parentId, null, null, null);
+                    target = new FamRecord($"@F{fc++}@", parentId, null, null, null, false);
                     soloFam[parentId] = target;
                     famList.Add(target);
                 }
@@ -213,10 +213,11 @@ public class GedcomExportService : IGedcomExportService
                     sb.AppendLine($"2 DATE {GedDate(fam.MarriageDate.Value)}");
             }
 
-            if (fam.DivorceDate is not null)
+            if (fam.Ended)
             {
                 sb.AppendLine("1 DIV Y");
-                sb.AppendLine($"2 DATE {GedDate(fam.DivorceDate.Value)}");
+                if (fam.DivorceDate is not null)
+                    sb.AppendLine($"2 DATE {GedDate(fam.DivorceDate.Value)}");
             }
 
             foreach (var cid in fam.Children)
@@ -280,13 +281,14 @@ public class GedcomExportService : IGedcomExportService
 
     private sealed class FamRecord(
         string id, Guid personAId, Guid? personBId,
-        DateOnly? marriageDate, DateOnly? divorceDate)
+        DateOnly? marriageDate, DateOnly? divorceDate, bool ended)
     {
         public string    Id           { get; } = id;
         public Guid      PersonAId    { get; } = personAId;
         public Guid?     PersonBId    { get; } = personBId;
         public DateOnly? MarriageDate { get; } = marriageDate;
         public DateOnly? DivorceDate  { get; } = divorceDate;
+        public bool      Ended        { get; } = ended;
         public HashSet<Guid> Children { get; } = [];
     }
 }

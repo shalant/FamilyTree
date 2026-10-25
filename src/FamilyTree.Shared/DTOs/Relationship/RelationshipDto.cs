@@ -11,6 +11,7 @@ public class RelationshipDto
     public RelationshipType Type { get; set; }
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
+    public bool IsEnded { get; set; }
     public string? Notes { get; set; }
     public DateTime? CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

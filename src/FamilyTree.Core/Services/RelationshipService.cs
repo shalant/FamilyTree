@@ -142,6 +142,8 @@ public class RelationshipService(
                 PersonBId = b,
                 Type = request.Type,
                 StartDate = request.StartDate,
+                EndDate = request.EndDate,
+                IsEnded = request.IsEnded || request.EndDate.HasValue,
                 Notes = request.Notes?.Trim(),
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = userId,
@@ -221,6 +223,7 @@ public class RelationshipService(
             rel.Type = request.Type;
             rel.StartDate = request.StartDate;
             rel.EndDate = request.EndDate;
+            rel.IsEnded = request.IsEnded || request.EndDate.HasValue;
             rel.Notes = request.Notes?.Trim();
             rel.UpdatedAt = DateTime.UtcNow;
             rel.UpdatedBy = userId;
@@ -378,14 +381,14 @@ public class RelationshipService(
             var aHasSpouse = await ctx.Relationships.AnyAsync(
                 r => (r.PersonAId == aId || r.PersonBId == aId) &&
                      r.Type == RelationshipType.Spouse &&
-                     r.EndDate == null, ct);
+                     !r.IsEnded && r.EndDate == null, ct);
             if (aHasSpouse)
                 return $"{personA?.FirstName ?? "This person"} is already in an active marriage.";
 
             var bHasSpouse = await ctx.Relationships.AnyAsync(
                 r => (r.PersonAId == bId || r.PersonBId == bId) &&
                      r.Type == RelationshipType.Spouse &&
-                     r.EndDate == null, ct);
+                     !r.IsEnded && r.EndDate == null, ct);
             if (bHasSpouse)
                 return $"{personB?.FirstName ?? "This person"} is already in an active marriage.";
         }

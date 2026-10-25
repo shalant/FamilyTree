@@ -375,8 +375,12 @@ public class PersonServiceTests
     }
 
     [Fact]
-    public async Task UpdateAsync_MovingActiveSpouseToFormer_FallsBackToTodayWhenNeitherPartnerHasDied()
+    [Trait("Category", "Regression")]
+    public async Task UpdateAsync_MovingActiveSpouseToFormer_LeavesEndDateUnknownWhenNeitherPartnerHasDied()
     {
+        // Found live (2026-10-24): Lillian and Louis's marriage was on file as ended
+        // 2026-09-18, a date nobody typed. With no death to go on, the app used to fill
+        // in today. Now the marriage is marked ended and the date is left unknown.
         var (service, factory, _) = CreateSut();
         var alice = await service.CreateAsync(new PersonUpsertDto { FirstName = "Alice", LastName = "One" });
         var bob = await service.CreateAsync(new PersonUpsertDto { FirstName = "Bob", LastName = "Two" });
@@ -393,10 +397,60 @@ public class PersonServiceTests
             FormerSpouseIds = [bob.Data!.Id],
         });
 
+        await using (var ctx = factory.CreateDbContext())
+        {
+            var rel = ctx.Relationships.Single(r => r.Type == FamilyTree.Shared.Enums.RelationshipType.Spouse);
+            rel.IsEnded.Should().BeTrue();
+            rel.EndDate.Should().BeNull("nobody said when the marriage ended, so no date should be made up");
+        }
+
+        var reloaded = await service.GetByIdAsync(alice.Data!.Id);
+        reloaded.Data!.FormerSpouseIds.Should().Equal(bob.Data!.Id);
+        reloaded.Data.SpouseIds.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_MovingFormerSpouseBackToActive_ClearsTheEndedFlag()
+    {
+        var (service, factory, _) = CreateSut();
+        var alice = await service.CreateAsync(new PersonUpsertDto { FirstName = "Alice", LastName = "One" });
+        var bob = await service.CreateAsync(new PersonUpsertDto { FirstName = "Bob", LastName = "Two" });
+
+        await service.UpdateAsync(alice.Data!.Id, new PersonUpsertDto
+        {
+            FirstName = "Alice", LastName = "One",
+            FormerSpouseIds = [bob.Data!.Id],
+        });
+        await service.UpdateAsync(alice.Data!.Id, new PersonUpsertDto
+        {
+            FirstName = "Alice", LastName = "One",
+            SpouseIds = [bob.Data!.Id],
+        });
+
         await using var ctx = factory.CreateDbContext();
         var rel = ctx.Relationships.Single(r => r.Type == FamilyTree.Shared.Enums.RelationshipType.Spouse);
-        rel.EndDate.Should().Be(DateOnly.FromDateTime(DateTime.Today),
-            "with no recorded death for either partner (e.g. a divorce), today's date is still the only default available");
+        rel.IsEnded.Should().BeFalse();
+        rel.EndDate.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CreateAsync_PersonWhoseOnlyMarriageEndedWithNoDate_CanStillMarryAgain()
+    {
+        // An ended marriage with no EndDate must not count as active when checking for
+        // a second active marriage.
+        var (service, _, _) = CreateSut();
+        var bob = await service.CreateAsync(new PersonUpsertDto { FirstName = "Bob", LastName = "Two" });
+        await service.CreateAsync(new PersonUpsertDto
+        {
+            FirstName = "Alice", LastName = "One", FormerSpouseIds = [bob.Data!.Id],
+        });
+
+        var carol = await service.CreateAsync(new PersonUpsertDto
+        {
+            FirstName = "Carol", LastName = "Three", SpouseIds = [bob.Data!.Id],
+        });
+
+        carol.Success.Should().BeTrue(carol.Message);
     }
 
     [Fact]
