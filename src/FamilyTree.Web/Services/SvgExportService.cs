@@ -8,7 +8,7 @@ namespace FamilyTree.Web.Services;
 public enum SvgStyle      { Classic, Minimal, Dark }
 public enum SvgColorTheme { Forest, Ocean, Sepia, Mono }
 
-public class SvgExportService(FamilyTreeLayoutEngine layoutEngine)
+public class SvgExportService(IFamilyTreeLayoutEngine layoutEngine)
 {
     // ── Public entry point ────────────────────────────────────────────────────
 

@@ -7,6 +7,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace FamilyTree.Web.Services;
 
 /// <summary>
+/// ARCHIVED 2026-10-17 (ADR 004). Still the default engine in production, but frozen: no
+/// new placement rules. Fix it only if production breaks; new layout work goes into
+/// <see cref="TimelineLayoutEngine"/>. Its connector builder (<see cref="BuildConnectors"/>)
+/// and output records are shared with that engine and stay supported.
+///
 /// Computes complete 2D layout for a family tree visualization.
 ///
 /// HIGH‑LEVEL MODEL
@@ -23,7 +28,7 @@ namespace FamilyTree.Web.Services;
 ///   • Easy to extend with new relationship types
 ///   • Easy to reason about when debugging
 /// </summary>
-public class FamilyTreeLayoutEngine
+public class FamilyTreeLayoutEngine : IFamilyTreeLayoutEngine
 {
     private readonly ILogger<FamilyTreeLayoutEngine> _logger;
 
@@ -2031,7 +2036,7 @@ public class FamilyTreeLayoutEngine
     /// The logic is structured to avoid duplication between coupled and
     /// single‑parent families while keeping the visual grammar consistent.
     /// </summary>
-    private List<FamilyUnit> BuildConnectors(
+    internal static List<FamilyUnit> BuildConnectors(
         List<PersonDto> people,
         List<CoupleDto> couples,
         Dictionary<Guid, LayoutNode> nodeMap)
@@ -2103,7 +2108,7 @@ public class FamilyTreeLayoutEngine
     ///   • One child   → horizontal line + vertical stem + T‑bar + drop
     ///   • Many        → horizontal line + vertical stem + T‑bar + drops
     /// </summary>
-    private IEnumerable<FamilyUnit> BuildCoupleFamilyUnits(
+    private static IEnumerable<FamilyUnit> BuildCoupleFamilyUnits(
         LayoutNode partnerA,
         LayoutNode partnerB,
         List<LayoutNode> children,
@@ -2160,7 +2165,7 @@ public class FamilyTreeLayoutEngine
     ///   • Optional horizontal span across children
     ///   • Drops from span (or stem) to each child
     /// </summary>
-    private IEnumerable<FamilyUnit> BuildSingleParentFamilyUnits(
+    private static IEnumerable<FamilyUnit> BuildSingleParentFamilyUnits(
         LayoutNode parent,
         List<LayoutNode> children)
     {
@@ -2192,7 +2197,7 @@ public class FamilyTreeLayoutEngine
     /// include parentCenterX. This guarantees the vertical stem connects to the span
     /// without artificially widening it beyond the actual children positions.
     /// </summary>
-    private SiblingSpan? BuildSiblingSpanIncludingParentCenter(
+    private static SiblingSpan? BuildSiblingSpanIncludingParentCenter(
         double parentCenterX,
         List<LayoutNode> children,
         double spanY)

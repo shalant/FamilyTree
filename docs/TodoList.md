@@ -2,6 +2,84 @@
 
 ---
 
+## Layout engine direction (ADR 004, 2026-10-17)
+
+Context: after R0-R13 every fuzz invariant passes, but the live tree still looks loose
+(2026-10-16 screenshot: Ellen + Marc ~830 screen px apart while other couples sit at the
+normal spacing). [ADR 004](architecture-decisions/004-layout-engine-direction.md) proposes
+stopping placement patches and replacing the placement algorithm, measured first.
+
+- [x] **Step 1a: quality scores, fixtures and a gallery** (2026-10-17,
+      `feat/layout-quality-metrics`). Added `LayoutQualityMetrics` (partner gap, crossings,
+      lines through nodes, overlaps, connector length, family off-centre), `LayoutFixture`
+      (JSON Person + Relationship rows through `PersonMapper`), the checked-in
+      `two-bridges.json` reconstruction, `scripts/export-layout-fixture.sql`, and the local
+      gallery (`FAMILYTREE_LAYOUT_GALLERY=1`). Baseline and how-to:
+      `docs/Testing/layout-quality-gallery.md`. First finding: on `master`, `two-bridges`
+      has Ellen + Marc at 200 but Ray 1000 off-centre from Louis + Lillian; before PR #63
+      it was Ellen + Marc at 360.
+- [x] **Step 1b: export the live tree** (2026-10-18). Doug exported it through the portal
+      Query editor into `Fixtures/private/live.json` (gitignored; 30 people, 8 couples).
+      With Doug's own person as the anchor (what the site passes when he's signed in), the
+      archived engine on `master` reproduces the 2026-10-18 live screenshot exactly: Ellen +
+      Marc 680 apart, Fannie and Max between them. PR #63 is deployed (8b18c70, 2026-10-17
+      03:17 UTC) and doesn't close the gap for this anchor. A first pass without the anchor
+      wrongly blamed pre-#63 code; `LayoutFixture` now takes an optional `anchor`. Scores,
+      archived vs prototype: couples over 200 1 (680) vs 0, width 1900 vs 1400, worst family
+      off-centre 287 vs 300, node overlaps 1 vs 0, crossings 1 vs 1, lines through nodes 1
+      vs 6. Details: `docs/Testing/layout-quality-gallery.md`, "The live tree".
+- [ ] **Collapse ancestors' siblings** (decided 2026-10-18, not started). Siblings of the
+      focus person's ancestors (Fannie and Max beside Rose) collapse by default into a "+2"
+      marker beside the ancestor that opens on click, the way most genealogy apps handle
+      the conflict described in ADR 004, "Collapsing ancestors' siblings". Open questions:
+      whose ancestors (the focus person's or the signed-in user's), whether expanded
+      branches are remembered (per viewer, localStorage), and how the layout engine takes
+      a collapsed person (left out of the input, plus a marker node).
+- [ ] **Archived engine draws Louis's sister on top of Louis** (found 2026-10-18 in the live
+      export and visible on the live site; on `master` and on pre-#63 code, with or without
+      an anchor): a sibling-only person with no parents on the tree lands 10 units from Louis
+      on the same row. ADR 004 freezes the archived engine
+      except for production breakage; decide whether this counts, or whether switching to
+      `TimelineLayoutEngine` (no overlap on the live tree) is the fix.
+- [x] **Step 2: decide birth-year timeline vs generation rows** (2026-10-17). Doug keeps the
+      timeline; option 1 (exact birth-year Y, generation layers only for ordering, X solved
+      with separation only where blocks overlap in height). See ADR 004, "Step 2 decision".
+- [x] **Archive the current engine** (2026-10-17). `FamilyTreeLayoutEngine` frozen behind
+      `IFamilyTreeLayoutEngine`, still the default; `Layout:Engine=Timeline` switches.
+- [ ] **Step 3: prototype** — first version done 2026-10-17 (`TimelineLayoutEngine`,
+      `TimelineLayoutEngineTests`). MSAGL wasn't evaluated: option 1 needs every person at
+      a fixed Y (their birth year), which a stock layered layout doesn't assume, so a small
+      hand-written solver came first. Revisit MSAGL (or VPSC) if the solver becomes the
+      bottleneck. On 500 generated families: 0 overlaps
+      (archived 15), 107 families with a loose couple (164), 14% narrower, 12% less
+      connector, but 13% more crossings. On `two-bridges`: 1620 → 1022 wide, every couple
+      at 200, worst off-centre 1000 → 127. Next, in order: crossings (dummy nodes for long
+      edges, transpose pass), speed (~500 ms at 500 people), 3+ partner blocks, connectors
+      as obstacles, the anchor. Then Doug tries it on the live tree (Step 1b first).
+  Second round 2026-10-18 (Doug: "go ahead with step 2" of the plan to try it live): uses
+      the anchor; orphan siblings share their sibling's layer and stay beside them (on the
+      quieter end when the sibling stands between two partners); dateless years held between
+      parents and children, partners sharing one; a family's line down to its children is
+      kept clear of other families; a child pulls their own parents' end of a block; a loose
+      extra partner stays on the right end. Live tree: 1240 wide (archived 1900), every
+      couple at 200, 0 crossings, 4 lines through people (all dashed sibling links), worst
+      off-centre 274. 500 generated families: crossings 894 → 683, lines through people
+      672 → 582, still 0 overlaps, 107 loose couples. Still open: 3+ partner blocks (worst
+      partner gap 1600), speed not re-measured, Kat past her uncle Sam (ordering ignores
+      free space), dashed sibling links crossing a block.
+- [x] **Step 4: run both engines side by side** (2026-10-18). Both engines sit behind
+      `IFamilyTreeLayoutEngine` (`Layout:Engine`), and `TimelineEngineSuiteTests` reruns
+      every fuzz invariant and transition pair against the prototype through
+      `LayoutEngineOverride`: all pass, including the no-overlap invariant on the full
+      domain that the archived engine still skips, except three listed with reasons
+      (`Invariant4` full domain; Kat past Sam, both GUID orders) and one test judged not
+      applicable (the prototype turns Bill + Gish so newly linked brothers sit together).
+- [ ] **Try the prototype live**: PR and deploy (production stays on `Legacy`), then set
+      `Layout__Engine=Timeline` on the App Service; delete the setting to switch back.
+      Doug's call, after looking at the gallery.
+
+---
+
 ## Photo gallery: broken images (found 2026-10-24)
 
 - [ ] **The person photo gallery shows a broken photo as a blank tile with the browser's

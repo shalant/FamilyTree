@@ -1133,7 +1133,7 @@ public class FamilyTreeLayoutTransitionTests
             var people = People();
             if (reverseNameTies)
                 people = [.. people.GroupBy(p => (p.LastName, p.FirstName)).SelectMany(g => g.Reverse())];
-            return new FamilyTreeLayoutEngine().ComputeLayout(people, CoupleHelper.Derive(people), focus);
+            return LayoutEngineOverride.Create().ComputeLayout(people, CoupleHelper.Derive(people), focus);
         }
 
         public string Name(Guid id) => _people.FirstOrDefault(p => p.Id == id)?.FirstName ?? id.ToString()[..8];

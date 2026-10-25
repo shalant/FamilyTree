@@ -17,7 +17,7 @@ public class PersonDetailDrawerTests : ComponentTestBase
     public PersonDetailDrawerTests()
     {
         Services.AddSingleton<ToastService>();
-        Services.AddSingleton<FamilyTreeLayoutEngine>();
+        Services.AddSingleton<IFamilyTreeLayoutEngine, FamilyTreeLayoutEngine>();
         Services.AddSingleton<IMediumService>(new FakeMediumService());
         Services.AddSingleton<IStoryService>(new FakeStoryService());
     }
