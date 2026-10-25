@@ -722,6 +722,34 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
             Keep();
         }
 
+        // A couple with an orphan sibling glued to it decides which side the sibling takes, and
+        // nothing above turns it against Orient: a partner's lone parent always counts as the
+        // middle of their row, so Rebecca faced inward and her sister landed between two
+        // families, the sister's sons past Ray with her line drawn along his (found live
+        // 2026-10-24). Try each such couple the other way round, re-sort the rows by their
+        // parents, and keep it if that crosses less. Only these blocks: counting crossings is
+        // quadratic in the number of lines.
+        void Restore()
+        {
+            for (var b = 0; b < blocks.Count; b++) blocks[b].Members = [.. best.Members[b]];
+            rows = best.Rows.ToDictionary(kv => kv.Key, kv => kv.Value.ToList());
+            Reindex();
+        }
+        var turnable = Enumerable.Range(0, blocks.Count)
+            .Where(b => blocks[b].Members.Count >= 2 && followers[b].Count > 0).ToList();
+        foreach (var b in turnable.Where(_ => best.Score > 0))
+        {
+            Restore();
+            blocks[b].Members.Reverse();
+            GlueAll();
+            foreach (var l in layers.Skip(1))
+            {
+                rows[l] = Glue([.. rows[l].OrderBy(x => Bary(x, up: true)).ThenBy(x => rowIndex[x])]);
+                Reindex();
+            }
+            Keep();
+        }
+
         for (var b = 0; b < blocks.Count; b++) blocks[b].Members = best.Members[b];
         rows = best.Rows;
 

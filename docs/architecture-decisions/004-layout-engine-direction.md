@@ -288,6 +288,29 @@ tree that states wrong relationships is worse than a loose one. This is now the 
 close, ahead of the list above. The bracket-shaped sibling links (tried the same day; fewer
 lines through people, 582 to 309) also raised this score by 28%, so they weren't merged.
 
+**Fixed on the live tree (2026-10-24).** The cause was the side the orphan sibling took.
+"Unknown Polish Victim" Eisenberg has no parents on the tree and is glued beside her sister
+Rebecca, on Rebecca's end of the Joseph + Rebecca block. `Orient` turned that block so
+Rebecca faced her own parent, Gimpel, who is alone in his row and so always counts as the
+middle of it. That put Rebecca, and her sister, on the inner side towards Louis + Lillian,
+and the sister's sons ended up past Ray. Nothing in the sweeps turns a block against
+`Orient`, so the order with no crossings (sister, Rebecca, Joseph, her sons at the edge) was
+never tried. `OrderLayers` now tries each block with a glued orphan sibling the other way
+round, re-sorts the rows by their parents, and keeps it if the order crosses less.
+
+| | Before | After |
+|---|---|---|
+| Live tree: lines on top of another family's | 1 | 0 |
+| Live tree: worst family off-centre | 274 | 92 |
+| 500 generated: lines on top of another family's | 646 | 641 |
+| 500 generated: crossings | 683 | 685 |
+| 500 generated: connector length (mean) | 2780 | 2784 |
+
+The turn is judged by crossings in row order, not in the drawn layout, so it helps 7 of the
+500 generated families and hurts 4 (one from 10 to 19 crossings). Doug accepted the trade
+because it removes a relationship the tree stated wrongly; the two ratchet limits were raised
+by hand. Judging each turn after `SolveX` is the follow-up (`docs/TodoList.md`).
+
 ## Collapsing ancestors' siblings (decided 2026-10-18)
 
 The live tree showed a conflict no placement can remove. Ray + Rose's daughter Ellen married
