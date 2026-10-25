@@ -340,7 +340,7 @@ public class PersonService(
             person.DeathPlace = string.IsNullOrWhiteSpace(dto.DeathPlace) ? null : dto.DeathPlace.Trim();
             person.Gender = dto.Gender;
             person.BiographyNotes = dto.BiographyNotes?.Trim();
-            person.ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim();
+            person.ProfilePhotoUrl = await StoredPhotoUrlAsync(ctx, person, dto.ProfilePhotoUrl, ct);
             person.Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
             person.UpdatedAt = DateTime.UtcNow;
             person.UpdatedBy = userId;
@@ -369,6 +369,27 @@ public class PersonService(
     // photo. Until 2026-10-25 it did that through UpdateAsync, which Members can't call,
     // so a Member's new person silently kept no photo while the page said "added".
     // The photo must already be one of that person's own media, so no URL is taken.
+    // Read DTOs carry /media/{blob} (MediaPaths, S8), so the form sends that back. Store the
+    // blob URL it stands for, from this person's own media or their current photo, so the
+    // database keeps one form. Anything else is stored as given.
+    private static async Task<string?> StoredPhotoUrlAsync(
+        AppDbContext ctx, Person person, string? submitted, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(submitted)) return null;
+        submitted = submitted.Trim();
+        if (!submitted.StartsWith(MediaPaths.Prefix, StringComparison.Ordinal)) return submitted;
+
+        var name = MediaPaths.BlobName(submitted);
+        if (name == null) return submitted;
+        if (MediaPaths.BlobName(person.ProfilePhotoUrl) == name) return person.ProfilePhotoUrl;
+
+        var suffix = "/" + name;
+        return await ctx.Media
+            .Where(m => m.PersonId == person.Id && m.Url.EndsWith(suffix))
+            .Select(m => m.Url)
+            .FirstOrDefaultAsync(ct) ?? submitted;
+    }
+
     public async Task<ServiceResponse> SetProfilePhotoAsync(
         Guid personId, Guid mediumId, CancellationToken ct = default)
     {

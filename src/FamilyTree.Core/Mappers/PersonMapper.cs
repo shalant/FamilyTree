@@ -2,6 +2,8 @@
 using FamilyTree.Shared.DTOs.Person;
 using FamilyTree.Shared.Enums;
 
+using FamilyTree.Core.Services;
+
 namespace FamilyTree.Core.Mappers;
 
 public static class PersonMapper
@@ -96,7 +98,8 @@ public static class PersonMapper
             DeathPlace = person.DeathPlace,
 
             BiographyNotes = person.BiographyNotes,
-            ProfilePhotoUrl = person.ProfilePhotoUrl,
+            // Served through the app, never the blob URL (S8): MediaPaths.
+            ProfilePhotoUrl = MediaPaths.ToAppPath(person.ProfilePhotoUrl),
             Email = person.Email,
 
             Gender = person.Gender,

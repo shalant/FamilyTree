@@ -322,6 +322,7 @@ On startup, if `SuperUser:Email` config is set, that `AppUser` is promoted to `I
 - **User secrets**: All credentials (DB connection string, SuperUser email, Google OAuth, Azure Storage) are stored via `dotnet user-secrets` for local dev. See Build commands above.
 - **Dev seeding**: `DataSeeder.Seed()` runs on startup in development — creates a "My Family" row and a sample five-generation tree
 - **Blob storage**: `BlobStorageService` / `IBlobStorageService` abstracted; falls back to `UseDevelopmentStorage=true` (Azurite) if `AzureStorage:ConnectionString` is not set
+- **Media are served by the app, never from blob URLs (S8, 2026-10-25).** The database stores blob URLs; read DTOs carry `/media/{blob}` (`MediaPaths.ToAppPath`), served by `MediaAccessService` only to the person's own family, and `/media/invite/{token}` for a story invite's subject. Any new DTO or email that exposes a photo must go through `MediaPaths` (or the invite route), or it breaks once the container is private. Only JPEG/PNG/WebP/GIF render inline.
 - **Azure App Service config keys**: Use double-underscore for nested keys — e.g. `ConnectionStrings__DefaultConnection`, `Google__ClientId`
 - **`Ops:AlertEmail`** (optional): recipient for the migration-failure notification email; falls back to `SuperUser:Email` if unset. A failed send never masks the original migration exception — see CI/CD above.
 
