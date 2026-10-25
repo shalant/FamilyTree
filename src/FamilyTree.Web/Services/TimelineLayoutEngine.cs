@@ -122,7 +122,7 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
         for (var i = 0; i < g.N; i++)
             nodeMap[g.People[i].Id] = new LayoutNode(g.People[i], (int)Math.Round(x[i]), y[i], depth[i], i == focus, size[i]);
 
-        var connectors = BuildConnectors(people, g.Couples, nodeMap);
+        var connectors = BuildConnectors(people, g.Couples, nodeMap, clearLabels: true);
         var drawn = connectors.SelectMany(LinesOf).ToList();
         var siblingLinks = RouteSiblingLinks(g, nodeMap, drawn);
 
@@ -238,7 +238,8 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
 
     private static IEnumerable<Line> LinesOf(FamilyUnit f)
     {
-        if (f.Couple is { } c) yield return (c.PartnerAX, c.PartnerAY, c.PartnerBX, c.PartnerBY);
+        if (f.Couple is { } c)
+            foreach (var piece in c.Segments) yield return piece;
         if (f.Stem.TopY < f.Stem.BotY) yield return (f.Stem.X, f.Stem.TopY, f.Stem.X, f.Stem.BotY);
         if (f.Span is { } s) yield return (s.LeftX, s.Y, s.RightX, s.Y);
         foreach (var d in f.Drops) yield return (d.CenterX, f.Stem.BotY, d.CenterX, d.BotY);

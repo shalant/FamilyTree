@@ -61,6 +61,28 @@ public class LayoutQualityMetricsTests
     }
 
     [Fact]
+    public void LineThroughAName_Counts_AndOneBelowTheBirthYear_DoesNot()
+    {
+        // Joseph's circle spans 70..130; his name and year sit from 135 to 163.
+        var joseph = Node(new PersonDto { Id = Guid.NewGuid(), FirstName = "Joseph", LastName = "Test", BirthDate = new DateOnly(1895, 1, 1) }, 150, 100);
+        var throughName = new SiblingLink(0, 145, 300, 145);
+        var belowYear = new SiblingLink(0, 170, 300, 170);
+
+        Score(Layout([joseph], [], [throughName])).LinesThroughLabels.Should().Be(1);
+        Score(Layout([joseph], [], [belowYear])).LinesThroughLabels.Should().Be(0);
+    }
+
+    [Fact]
+    public void StemStartingAtTheParentsRim_RunsThroughTheirOwnName()
+    {
+        // David, found 2026-10-25: a single parent's stem started at the bottom of his circle.
+        var david = Node(P("David"), 150, 100);
+
+        Score(Layout([david], [Stem(150, 130, 300)])).LinesThroughLabels.Should().Be(1);
+        Score(Layout([david], [Stem(150, 160, 300)])).LinesThroughLabels.Should().Be(0);
+    }
+
+    [Fact]
     public void PartnerGap_IsTheHorizontalDistance_AndWideCouplesAreLoose()
     {
         var (a, b, c, d) = (P("Ellen"), P("Marc"), P("Rose"), P("Ray"));

@@ -127,6 +127,32 @@ public class TimelineLayoutEngineTests
     }
 
     [Fact]
+    [Trait("Category", "Regression")]
+    public void PartnersBornAFewYearsApart_AndASingleParent_NoLineThroughAName()
+    {
+        // Found 2026-10-25 on the live tree: the couple line ran along the bottom of the lower
+        // partner's circle, through the name of a partner born a few years earlier (Joseph,
+        // Louis, Marc, Stephanie), and David's stem down to Esther started at his circle,
+        // through his own name.
+        var t = new Family();
+        var rebecca = t.Add("Rebecca", 1897);
+        var joseph = t.Add("Joseph", 1895);
+        var max = t.Add("Max", 1924);
+        var david = t.Add("David", 1891);
+        var esther = t.Add("Esther", 1925);
+        t.Marry(rebecca, joseph).Parent(rebecca, max).Parent(joseph, max).Parent(david, esther);
+
+        var (layout, people, couples) = t.Fixture(max).Layout(new TimelineLayoutEngine());
+        var report = LayoutQualityMetrics.Compute(layout, people, couples);
+
+        report.LinesThroughLabelDetails.Should().BeEmpty();
+        var couple = layout.Connectors.Single(f => f.Couple != null).Couple!;
+        couple.Segments.Should().HaveCount(3, "the line steps down beside Joseph's name");
+        report.Crossings.Should().Be(0);
+        report.MergedLines.Should().Be(0);
+    }
+
+    [Fact]
     public void DatedPeople_SitExactlyAtTheirBirthYear()
     {
         var t = new Family();

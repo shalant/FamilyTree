@@ -2036,10 +2036,17 @@ public class FamilyTreeLayoutEngine : IFamilyTreeLayoutEngine
     /// The logic is structured to avoid duplication between coupled and
     /// single‑parent families while keeping the visual grammar consistent.
     /// </summary>
+    /// <param name="clearLabels">TimelineLayoutEngine's drawing (2026-10-25): lines keep out of
+    /// people's names. A couple line runs along the bottom of the lower partner's circle; if
+    /// that would cut through the higher partner's name, it starts at the bottom of their
+    /// circle instead and steps down just past the edge of their name. A single parent's stem
+    /// starts below their name. This engine leaves it off, so it draws as it always has (live tree,
+    /// 2026-10-25: through Joseph's, Louis's, Marc's and Stephanie's names, and David's).</param>
     internal static List<FamilyUnit> BuildConnectors(
         List<PersonDto> people,
         List<CoupleDto> couples,
-        Dictionary<Guid, LayoutNode> nodeMap)
+        Dictionary<Guid, LayoutNode> nodeMap,
+        bool clearLabels = false)
     {
         var families = new List<FamilyUnit>();
         var routedChildren = new HashSet<Guid>();
@@ -2059,7 +2066,7 @@ public class FamilyTreeLayoutEngine : IFamilyTreeLayoutEngine
             foreach (var c in children)
                 routedChildren.Add(c.Person.Id);
 
-            var coupleUnits = BuildCoupleFamilyUnits(a, b, children, couple.IsFormer);
+            var coupleUnits = BuildCoupleFamilyUnits(a, b, children, couple.IsFormer, clearLabels);
             families.AddRange(coupleUnits);
         }
 
@@ -2093,7 +2100,7 @@ public class FamilyTreeLayoutEngine : IFamilyTreeLayoutEngine
 
             if (!children.Any()) continue;
 
-            var singleUnits = BuildSingleParentFamilyUnits(parent, children);
+            var singleUnits = BuildSingleParentFamilyUnits(parent, children, clearLabels);
             families.AddRange(singleUnits);
         }
 
@@ -2112,7 +2119,8 @@ public class FamilyTreeLayoutEngine : IFamilyTreeLayoutEngine
         LayoutNode partnerA,
         LayoutNode partnerB,
         List<LayoutNode> children,
-        bool isFormer = false)
+        bool isFormer = false,
+        bool clearLabels = false)
     {
         var families = new List<FamilyUnit>();
 
@@ -2130,6 +2138,25 @@ public class FamilyTreeLayoutEngine : IFamilyTreeLayoutEngine
             midX,
             lineY,  // HeartY at the connector level
             isFormer);
+
+        if (clearLabels)
+        {
+            // PersonNode's name and year sit from 5 to 33 below the circle, at most 88 wide. A
+            // line further down than that passes under the name and is left as it was (it stops
+            // short of the partner, as before). Tried and rejected on the 500 generated families
+            // (2026-10-25; merged lines were 628, crossings 697): every couple line at circle
+            // height (crowded rows ran it through the circles between partners: 931, 895), the
+            // step at the midpoint (partners far apart often have someone there: 876), and a
+            // rise up to just under the name when the line passes below it (864).
+            (double Y, double? StepX) End(LayoutNode p, LayoutNode other)
+            {
+                var bottom = p.Y + p.Size / 2.0;
+                if (lineY <= bottom + 5 || lineY >= bottom + LabelClearance) return (lineY, null);
+                return (bottom, p.X + Math.Sign(other.X - p.X) * NameStepX);
+            }
+            var (a, b) = (End(partnerA, partnerB), End(partnerB, partnerA));
+            arc = new CoupleArc(partnerA.X, a.Y, partnerB.X, b.Y, lineY, midX, lineY, isFormer, a.StepX ?? b.StepX);
+        }
 
         if (!children.Any())
         {
@@ -2167,14 +2194,17 @@ public class FamilyTreeLayoutEngine : IFamilyTreeLayoutEngine
     /// </summary>
     private static IEnumerable<FamilyUnit> BuildSingleParentFamilyUnits(
         LayoutNode parent,
-        List<LayoutNode> children)
+        List<LayoutNode> children,
+        bool clearLabels = false)
     {
         var families = new List<FamilyUnit>();
 
         var parentBottomY = parent.Y + parent.Size / 2.0;
         var spanY = children.Min(c => c.Y - c.Size / 2.0) - 18;
 
-        var stem = new StemLine(parent.X, parentBottomY, spanY);
+        // PersonNode draws the name and birth year from 5 to 33 below the circle.
+        var stemTopY = clearLabels ? Math.Min(parentBottomY + LabelClearance, spanY) : parentBottomY;
+        var stem = new StemLine(parent.X, stemTopY, spanY);
 
         // Always include a T‑bar so drops connect cleanly even for single children.
         var span = BuildSiblingSpanIncludingParentCenter(
@@ -2214,6 +2244,9 @@ public class FamilyTreeLayoutEngine : IFamilyTreeLayoutEngine
         return new SiblingSpan(spanLeft, spanRight, spanY);
     }
 
+    private const double LabelClearance = 38;
+    private const double NameStepX = 50;  // half PersonNode's 88-wide label, plus a little
+
     // ─────────────────────────────────────────────────────────────────────────
     // RECORDS (data structures for layout output)
     // ─────────────────────────────────────────────────────────────────────────
@@ -2248,7 +2281,30 @@ public class FamilyTreeLayoutEngine : IFamilyTreeLayoutEngine
         double PeakY,
         double MidX,
         double HeartY,
-        bool IsFormer = false);
+        bool IsFormer = false,
+        double? StepX = null)
+    {
+        /// <summary>The line's pieces as drawn: one straight segment when the partners' ends
+        /// are level, otherwise across to the step (<see cref="StepX"/>, else
+        /// <see cref="MidX"/>), down or up it, and across again.</summary>
+        public IReadOnlyList<(double X1, double Y1, double X2, double Y2)> Segments
+        {
+            get
+            {
+                if (Math.Abs(PartnerAY - PartnerBY) < 0.5) return [(PartnerAX, PartnerAY, PartnerBX, PartnerBY)];
+                var x = StepX ?? MidX;
+                (double, double, double, double)[] pieces = [(PartnerAX, PartnerAY, x, PartnerAY), (x, PartnerAY, x, PartnerBY), (x, PartnerBY, PartnerBX, PartnerBY)];
+                return [.. pieces.Where(s => Math.Abs(s.Item1 - s.Item3) + Math.Abs(s.Item2 - s.Item4) > 0.5)];
+            }
+        }
+
+        /// <summary>SVG path data for <see cref="Segments"/>, drawn as one line.</summary>
+        public string PathData =>
+            $"M {F(PartnerAX)} {F(PartnerAY)} " +
+            string.Join(" ", Segments.Select(s => $"L {F(s.X2)} {F(s.Y2)}"));
+
+        private static string F(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    }
 
     /// <summary>
     /// A vertical line from a couple/parent down toward children.

@@ -80,12 +80,11 @@ public class SvgExportService(IFamilyTreeLayoutEngine layoutEngine)
         {
             if (family.Couple is { } arc)
             {
-                var ay    = arc.PartnerAY + titleH;
-                var by    = arc.PartnerBY + titleH;
                 var hy    = arc.HeartY    + titleH;
                 var color = arc.IsFormer  ? palette.DeadTop : palette.Couple;
                 var dash  = arc.IsFormer  ? """ stroke-dasharray="6 4" """ : " ";
-                sb.AppendLine($"""<line x1="{F(arc.PartnerAX)}" y1="{F(ay)}" x2="{F(arc.PartnerBX)}" y2="{F(by)}" stroke="{color}" stroke-width="1.5"{dash}/>""");
+                foreach (var (x1, y1, x2, y2) in arc.Segments)
+                    sb.AppendLine($"""<line x1="{F(x1)}" y1="{F(y1 + titleH)}" x2="{F(x2)}" y2="{F(y2 + titleH)}" stroke="{color}" stroke-width="1.5"{dash}/>""");
                 // Same marks as the canvas: a heart for a marriage, a broken heart for an ended one.
                 sb.AppendLine(arc.IsFormer
                     ? $"""<text x="{F(arc.MidX)}" y="{F(hy - 3)}" text-anchor="middle" font-size="9">&#x1F494;</text>"""

@@ -13,6 +13,7 @@ All in layout units (canvas pixels at zoom 1). Nothing fails on them yet; they'r
 | Partner gap | Horizontal distance between the two partners of every drawn couple. Over 200 (the engine's `SpouseSpacingX`) counts as a loose couple. |
 | Crossings | Connector lines from two different families that cross. Lines that only touch or meet at an end don't count. |
 | Lines through nodes | A connector passing through a person it doesn't start or end at. |
+| Lines through names (added 2026-10-25) | A connector passing through a person's name or birth year under their circle (`LayoutQualityMetrics.LabelBox`: PersonNode's label, width estimated per character). Found live: couple lines through a partner's name, a single parent's stem through their own. |
 | Node overlaps | Two people's circles overlapping. |
 | Lines on top of another family's (added 2026-10-23) | Pieces of two different families' lines running together (same direction, within 3 units). They read as one family, so the drawing states a relationship that isn't there: on the live tree Ray's line from Louis + Lillian ran along Morry and Isador's, so they looked like brothers. Two sibling links that share a person may merge (everyone on them is a sibling). |
 | Connector length | Total length of all connector lines. Lower means more compact. |

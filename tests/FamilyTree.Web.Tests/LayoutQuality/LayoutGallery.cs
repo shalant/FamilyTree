@@ -74,7 +74,7 @@ public static class LayoutGallery
         {
             if (f.Couple is { } c)
             {
-                Line(c.PartnerAX, c.PartnerAY, c.PartnerBX, c.PartnerBY, c.IsFormer ? "#8a9a8f" : "#b0915a", c.IsFormer);
+                foreach (var (x1, y1, x2, y2) in c.Segments) Line(x1, y1, x2, y2, c.IsFormer ? "#8a9a8f" : "#b0915a", c.IsFormer);
                 var gap = Math.Abs(c.PartnerBX - c.PartnerAX);
                 if (gap > LayoutQualityMetrics.SpouseSpacingX)
                     sb.Append($"<text x=\"{F(c.MidX)}\" y=\"{F((c.PartnerAY + c.PartnerBY) / 2 - 6)}\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#c0392b\">{F(gap)}</text>");
