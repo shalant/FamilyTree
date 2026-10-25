@@ -96,4 +96,59 @@ public class MediumServiceTests
         Assert.True(result.Success);
         Assert.Equal(garbage, blob.LastUploadedBytes);
     }
+
+    private static byte[] MakeImage(string format)
+    {
+        using var image = new Image<Rgba32>(10, 10, Color.CornflowerBlue.ToPixel<Rgba32>());
+        using var ms = new MemoryStream();
+        switch (format)
+        {
+            case "tiff": image.SaveAsTiff(ms); break;
+            case "bmp": image.SaveAsBmp(ms); break;
+            case "png": image.SaveAsPng(ms); break;
+            case "webp": image.SaveAsWebp(ms); break;
+            case "gif": image.SaveAsGif(ms); break;
+            default: throw new ArgumentException(format);
+        }
+        return ms.ToArray();
+    }
+
+    // The MIME allow-list trusts the browser's label, so a TIFF sent as image/jpeg used to be
+    // decoded by ImageSharp's TIFF decoder (open advisories in 3.1.x, docs/security.md A03).
+    [Theory]
+    [InlineData("tiff")]
+    [InlineData("bmp")]
+    public async Task CreateAsync_DisallowedFormatLabelledAsJpeg_IsRejectedAndNotUploaded(string format)
+    {
+        var (service, blob, personId) = await CreateSutAsync();
+
+        var dto = new MediumUpsertDto
+        {
+            PersonId = personId, FileName = "photo.jpg", MimeType = "image/jpeg", Type = "photo",
+        };
+        var result = await service.CreateAsync(dto, new MemoryStream(MakeImage(format)));
+
+        Assert.False(result.Success);
+        Assert.Contains("JPEG, PNG, WebP or GIF", result.Message);
+        Assert.Null(blob.LastUploadedBytes);
+    }
+
+    [Theory]
+    [InlineData("png", "image/png")]
+    [InlineData("webp", "image/webp")]
+    [InlineData("gif", "image/gif")]
+    public async Task CreateAsync_AllowedFormat_Uploads(string format, string mimeType)
+    {
+        var (service, blob, personId) = await CreateSutAsync();
+        var bytes = MakeImage(format);
+
+        var dto = new MediumUpsertDto
+        {
+            PersonId = personId, FileName = $"photo.{format}", MimeType = mimeType, Type = "photo",
+        };
+        var result = await service.CreateAsync(dto, new MemoryStream(bytes));
+
+        Assert.True(result.Success);
+        Assert.Equal(bytes, blob.LastUploadedBytes);
+    }
 }
