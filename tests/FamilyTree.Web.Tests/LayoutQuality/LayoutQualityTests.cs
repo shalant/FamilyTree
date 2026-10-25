@@ -190,6 +190,26 @@ public class LayoutFixtureTests(ITestOutputHelper output)
         }
     }
 
+    // Every fixture under every engine, one table per fixture (B7 step 0, 2026-10-25): the
+    // neutral test families exist to compare engines on families that weren't the ones each
+    // engine was tuned on. Scores, doesn't judge; results are in docs/Testing/layout-quality-gallery.md.
+    [Fact]
+    public void EveryFixture_ScoredByEveryEngine()
+    {
+        foreach (var fixture in LayoutFixture.LoadAll())
+        {
+            output.WriteLine($"== {fixture.Name} ({fixture.People.Count} people)");
+            output.WriteLine($"{"engine",-32}{"loose",6}{"gapMax",7}{"cross",6}{"thruNode",9}{"thruName",9}{"overlap",8}{"merged",7}{"offCtr",7}{"width",7}{"length",8}");
+            foreach (var (name, make) in LayoutGalleryTests.Engines)
+            {
+                var (layout, people, couples) = fixture.Layout(make());
+                layout.Nodes.Should().HaveCount(people.Count, $"{name} must place everyone in {fixture.Name}");
+                var r = LayoutQualityMetrics.Compute(layout, people, couples);
+                output.WriteLine($"{name,-32}{r.LooseCouples.Count(),6}{r.MaxPartnerGap,7:0}{r.Crossings,6}{r.LinesThroughNodes,9}{r.LinesThroughLabels,9}{r.NodeOverlaps,8}{r.MergedLines,7}{r.MaxFamilyOffCenter,7:0}{r.Width,7:0}{r.ConnectorLength,8:0}");
+            }
+        }
+    }
+
     // The common-practice baseline (LayeredBaselineEngine) only means something if it lays
     // out the same families: everyone placed, nobody twice, partners SpouseSpacingX apart.
     [Theory]
@@ -223,7 +243,7 @@ public class LayoutGalleryTests(ITestOutputHelper output)
 {
     private const int WorstPerScore = 4;
 
-    private static readonly (string Name, Func<IFamilyTreeLayoutEngine> Make)[] Engines =
+    internal static readonly (string Name, Func<IFamilyTreeLayoutEngine> Make)[] Engines =
         [("archived", () => new FamilyTreeLayoutEngine()), ("timeline prototype", () => new TimelineLayoutEngine()),
          ("layered baseline, generations", () => new LayeredBaselineEngine(birthYearY: false)),
          ("layered baseline, birth years", () => new LayeredBaselineEngine(birthYearY: true))];

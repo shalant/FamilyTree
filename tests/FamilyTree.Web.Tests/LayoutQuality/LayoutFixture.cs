@@ -30,7 +30,9 @@ public sealed record LayoutFixture(
     List<LayoutFixture.FixtureRelationship> Relationships)
 {
     public sealed record FixturePerson(Guid Id, string FirstName, string LastName, DateOnly? BirthDate);
-    public sealed record FixtureRelationship(Guid PersonAId, Guid PersonBId, RelationshipType Type, DateOnly? EndDate);
+    // IsEnded (added 2026-10-25, B7 step 0): a marriage ended with no known date, as A1 stores it.
+    // Optional, so exports from before it existed still load.
+    public sealed record FixtureRelationship(Guid PersonAId, Guid PersonBId, RelationshipType Type, DateOnly? EndDate, bool IsEnded = false);
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -68,7 +70,7 @@ public sealed record LayoutFixture(
     {
         var rels = Relationships.Select(r => new Relationship
         {
-            Id = Guid.NewGuid(), PersonAId = r.PersonAId, PersonBId = r.PersonBId, Type = r.Type, EndDate = r.EndDate,
+            Id = Guid.NewGuid(), PersonAId = r.PersonAId, PersonBId = r.PersonBId, Type = r.Type, EndDate = r.EndDate, IsEnded = r.IsEnded,
         }).ToList();
         return People
             .Select(p => PersonMapper.MapPersonToDto(new Person
