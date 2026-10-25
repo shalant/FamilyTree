@@ -96,9 +96,21 @@ stopping placement patches and replacing the placement algorithm, measured first
       person excluded) and its ratchet limits: prototype 646 over 500 generated families and
       1 on the live tree; archived engine 0 on the live tree. See ADR 004, "Lines on top of
       each other".
-- [ ] **Get the prototype's merged lines to 0 on the live tree** — first gap, ahead of the
-      rest; blocks switching everyone to the prototype (Doug can already try it on live
-      data through the super-user layout picker, 2026-10-24).
+- [x] **Get the prototype's merged lines to 0 on the live tree** (fixed 2026-10-24,
+      `fix/timeline-orphan-sibling-side`). Rebecca's orphan sister was glued to Rebecca's
+      inner side, so the sister's sons landed past Ray and her line ran along his. The
+      prototype now tries turning each couple that has an orphan sibling glued to it and
+      keeps the turn if the order crosses less. Live: merged lines 1 → 0, worst off-centre
+      274 → 92. 500 generated families: merged lines 646 → 641, but crossings 683 → 685 and
+      connector length 2780 → 2784; Doug accepted that trade and both ratchet limits were
+      raised by hand. Regression test:
+      `TimelineLayoutEngineTests.OrphanSiblingsChildren_DoNotShareALineWithTheNextFamily`.
+- [ ] **Judge the orphan-sibling turn by the drawn layout** (found 2026-10-24). The turn is
+      judged by straight parent-child lines in row order, not by the finished drawing, so
+      it makes 4 of the 500 generated families worse (seed 20261010 case 379: 10 → 19
+      crossings; case 7: 4 → 7) while 7 improve. Scoring each candidate after `SolveX`
+      (crossings and merged lines from the real connectors) would drop the bad turns; it
+      costs a position solve per candidate.
 - [ ] **Bracket-shaped sibling links: rework or drop** (tried 2026-10-23, not merged; patch
       in the gitignored `artifacts/sibling-bracket-2026-10-23.patch` on Doug's machine,
       `git apply` to bring it back). Lines through people 582 → 309, but crossings 683 → 753 and

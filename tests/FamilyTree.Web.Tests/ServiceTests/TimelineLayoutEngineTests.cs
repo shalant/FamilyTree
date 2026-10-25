@@ -207,6 +207,52 @@ public class TimelineLayoutEngineTests
             after[id].X.Should().Be(before[id].X, "Bill's marriage must not move Ray's family");
     }
 
+    // Found live 2026-10-24 (the shape of Doug's tree, renamed): Aunt is an orphan sibling of
+    // Mother, who is married to Father, and Aunt's own sons are cousins of Daughter. Daughter
+    // married Groom, whose parents are another couple in the same row. The prototype glued
+    // Aunt to Mother's inner side (Mother faced her lone parent, whose position always counts
+    // as the middle), so Aunt's sons landed past Groom and her line ran along the line down
+    // to Groom: Groom looked like the cousins' brother. Aunt goes on the outer side instead,
+    // her sons at the edge of the row, and no line lies on another family's.
+    [Fact]
+    [Trait("Category", "Regression")]
+    public void OrphanSiblingsChildren_DoNotShareALineWithTheNextFamily()
+    {
+        var t = new Family();
+        var grandpa = t.Add("Grandpa");
+        var father = t.Add("Father", 1895);
+        var mother = t.Add("Mother");
+        var aunt = t.Add("Aunt");
+        var uncle = t.Add("Cousin1");
+        var cousin = t.Add("Cousin2");
+        var son = t.Add("Son", 1924);
+        var daughter = t.Add("Daughter", 1923);
+        var inLawA = t.Add("InLawA", 1903);
+        var inLawB = t.Add("InLawB");
+        var groom = t.Add("Groom", 1922);
+        var child = t.Add("Child", 1950);
+        var secondWife = t.Add("SecondWife", 1902);
+        var halfBrother = t.Add("HalfBrother");
+        t.Parent(grandpa, mother)
+            .Marry(father, mother).Parent(father, son, daughter).Parent(mother, son, daughter)
+            .Sibling(aunt, mother).Parent(aunt, uncle, cousin).Sibling(uncle, cousin)
+            .Marry(inLawA, inLawB, ended: new DateOnly(1930, 1, 1)).Parent(inLawA, groom).Parent(inLawB, groom)
+            .Marry(secondWife, inLawB).Parent(secondWife, halfBrother).Parent(inLawB, halfBrother)
+            .Sibling(secondWife, inLawA).Sibling(groom, halfBrother)
+            .Marry(daughter, groom).Parent(daughter, child).Parent(groom, child);
+
+        var fixture = t.Fixture(child, anchor: child);
+        var (layout, people, couples) = fixture.Layout(new TimelineLayoutEngine());
+        var report = LayoutQualityMetrics.Compute(layout, people, couples);
+        var x = layout.Nodes.ToDictionary(n => n.Person.Id, n => n.X);
+
+        report.MergedLines.Should().Be(0, "the cousins' line must not run along the line down to Groom");
+        report.Crossings.Should().Be(0);
+        Math.Abs(x[aunt] - x[mother]).Should().Be(NodeSpacingX, "Aunt still sits beside her sister");
+        Math.Sign(x[uncle] - x[groom]).Should().Be(Math.Sign(x[aunt] - x[inLawA]),
+            "the cousins are on Aunt's side of Groom, as she is of Groom's parents");
+    }
+
     // Two dateless partners share a row even when their evidence differs, and an inferred
     // year never comes within 20 years of a parent or child, following a chain of dateless
     // relatives to the nearest recorded year (R3's shape in the archived engine).
