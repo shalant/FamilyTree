@@ -14,17 +14,22 @@ public sealed record LayoutEngineOption(string Key, string Name, IFamilyTreeLayo
 /// a viewer with more than one option available can switch for themselves. Since 2026-10-24
 /// the Timeline prototype is available to the super-user only, so Doug can try it on live data
 /// while the family keeps the archived engine (ADR 004). Opening an engine to everyone is a
-/// matter of clearing its <c>SuperUserOnly</c> flag.
+/// matter of clearing its <c>SuperUserOnly</c> flag. Since 2026-10-25 there are three: the
+/// archived engine, the best Timeline version so far (a frozen copy) and the newest Timeline
+/// code, so a new version can be compared with both on live data
+/// (docs/Testing/layout-versions.md).
 /// </summary>
 public sealed class LayoutEngineSelector
 {
     public const string LegacyKey = "Legacy";
     public const string TimelineKey = "Timeline";
+    public const string BestKey = "TimelineBest";
 
     private readonly ICurrentUserService _currentUser;
 
     public LayoutEngineSelector(
         FamilyTreeLayoutEngine legacy,
+        BestTimelineLayoutEngine best,
         TimelineLayoutEngine timeline,
         IConfiguration configuration,
         ICurrentUserService currentUser)
@@ -33,7 +38,8 @@ public sealed class LayoutEngineSelector
         All =
         [
             new(LegacyKey, "Current layout", legacy, SuperUserOnly: false),
-            new(TimelineKey, "Timeline prototype", timeline, SuperUserOnly: true),
+            new(BestKey, $"Best so far ({BestTimelineLayoutEngine.Version})", best, SuperUserOnly: true),
+            new(TimelineKey, $"Newest (since {TimelineLayoutEngine.Version})", timeline, SuperUserOnly: true),
         ];
         Default = Find(configuration["Layout:Engine"]) ?? All[0];
         Current = Default;

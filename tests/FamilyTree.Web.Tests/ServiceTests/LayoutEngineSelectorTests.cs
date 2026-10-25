@@ -6,7 +6,8 @@ using Xunit;
 namespace FamilyTree.Web.Tests.ServiceTests;
 
 // LayoutEngineSelector (2026-10-24): the super-user can switch to the Timeline prototype on
-// live data; everyone else stays on the site default. The rule that matters most is that a
+// live data; everyone else stays on the site default. Since 2026-10-25 the super-user has
+// three: archived, the best Timeline version so far, and the newest Timeline code. The rule that matters most is that a
 // family member can never select the prototype, even when their browser holds the
 // super-user's saved choice (the localStorage key is per browser, not per account).
 public class LayoutEngineSelectorTests
@@ -17,7 +18,7 @@ public class LayoutEngineSelectorTests
             .AddInMemoryCollection(siteDefault is null ? [] : [new("Layout:Engine", siteDefault)])
             .Build();
         return new LayoutEngineSelector(
-            new FamilyTreeLayoutEngine(), new TimelineLayoutEngine(), config,
+            new FamilyTreeLayoutEngine(), new BestTimelineLayoutEngine(), new TimelineLayoutEngine(), config,
             new FakeCurrentUserService { IsSuperUser = superUser });
     }
 
@@ -30,6 +31,7 @@ public class LayoutEngineSelectorTests
 
         selector.Available.Select(o => o.Key).Should().Equal(LayoutEngineSelector.LegacyKey);
         selector.TrySelect("Timeline").Should().BeFalse();
+        selector.TrySelect(LayoutEngineSelector.BestKey).Should().BeFalse();
 
         selector.Current.Key.Should().Be(LayoutEngineSelector.LegacyKey);
         selector.Current.Engine.Should().BeOfType<FamilyTreeLayoutEngine>();
@@ -45,14 +47,17 @@ public class LayoutEngineSelectorTests
 
         selector.Current.Key.Should().Be(LayoutEngineSelector.LegacyKey);
         selector.Available.Select(o => o.Key).Should()
-            .Equal(LayoutEngineSelector.LegacyKey, LayoutEngineSelector.TimelineKey);
+            .Equal(LayoutEngineSelector.LegacyKey, LayoutEngineSelector.BestKey, LayoutEngineSelector.TimelineKey);
 
         selector.TrySelect("timeline").Should().BeTrue(); // case-insensitive, like Layout:Engine
         selector.Current.Engine.Should().BeOfType<TimelineLayoutEngine>();
 
+        selector.TrySelect(LayoutEngineSelector.BestKey).Should().BeTrue();
+        selector.Current.Engine.Should().BeOfType<BestTimelineLayoutEngine>();
+
         selector.TrySelect("Legacy").Should().BeTrue();
         selector.Current.Engine.Should().BeOfType<FamilyTreeLayoutEngine>();
-        changed.Should().Be(2);
+        changed.Should().Be(3);
     }
 
     [Fact]

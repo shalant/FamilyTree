@@ -36,6 +36,11 @@ namespace FamilyTree.Web.Services;
 /// </summary>
 public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
 {
+    // The last version cut from this code (docs/Testing/layout-versions.md). Anything changed
+    // since is unreleased; the picker shows this engine as "Newest". Set by
+    // scripts/cut-layout-version.ps1, never by hand.
+    public const string Version = "v1";
+
     // Same values as FamilyTreeLayoutEngine, so the two can be compared like for like.
     private const int NodeSpacingX = 120;
     private const int SpouseSpacingX = 200;

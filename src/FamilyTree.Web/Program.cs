@@ -167,10 +167,12 @@ builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<TreeContextService>();
 builder.Services.AddScoped<FamilyTreeLayoutEngine>();
 builder.Services.AddScoped<TimelineLayoutEngine>();
+builder.Services.AddScoped<BestTimelineLayoutEngine>();
 // Which layout engine draws the tree (ADR 004): Layout:Engine sets the site default, "Legacy"
-// (the archived FamilyTreeLayoutEngine, used when unset) or "Timeline" (the prototype); set it
+// (the archived FamilyTreeLayoutEngine, used when unset), "TimelineBest" (the best prototype
+// version so far, frozen) or "Timeline" (the newest prototype code); set it
 // in user secrets or as Layout__Engine on the App Service. LayoutEngineSelector lets a viewer
-// switch for themselves among the engines open to them (the prototype: super-user only).
+// switch for themselves among the engines open to them (the prototype versions: super-user only).
 builder.Services.AddScoped<LayoutEngineSelector>();
 builder.Services.AddScoped<IFamilyTreeLayoutEngine, SelectedLayoutEngine>();
 builder.Services.AddScoped<SvgExportService>();

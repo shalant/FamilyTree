@@ -101,6 +101,14 @@ Work A in order before the first invite; B and C can follow.
       families". Not done: the one-way import into the local database for viewing in the
       app (the gallery is enough to score). Next: Doug decides whether to freeze
       `TimelineLayoutEngine` (and A5), then A4.
+- [x] **Layout engine versions** (2026-10-25, `feat/layout-engine-versions`). Doug wants to
+      keep earlier prototype versions, since a later one can be worse in ways the scores
+      miss. Added `TimelineLayoutEngine.Version`, a frozen `BestTimelineLayoutEngine` copy,
+      `scripts/cut-layout-version.ps1` (sets the version; `-Best` replaces the frozen copy),
+      `LayoutVersionHistoryTests` (prints a version's history row) and
+      `docs/Testing/layout-versions.md` (workflow and history; v1 recorded). The super-user's
+      picker now offers archived, "Best so far (v1)" and "Newest (since v1)"; the family is
+      unaffected. After merge: tag the merge commit `layout-v1`.
 - [ ] **B7: write-path fuzz harness.** Random casual-user edit sequences through the real
       services: no crash, nothing invented, impossible input rejected with a message, the
       layout still valid afterwards.

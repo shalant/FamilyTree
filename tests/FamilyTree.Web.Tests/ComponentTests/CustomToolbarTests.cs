@@ -75,7 +75,7 @@ public class CustomToolbarTests : ComponentTestBase
         selector.TrySelect(LayoutEngineSelector.TimelineKey);
         cut.Render();
 
-        cut.Find(".ft-layout-engine-label").TextContent.Trim().Should().Be("Timeline prototype");
+        cut.Find(".ft-layout-engine-label").TextContent.Trim().Should().Be($"Newest (since {TimelineLayoutEngine.Version})");
     }
 
     [Fact]
