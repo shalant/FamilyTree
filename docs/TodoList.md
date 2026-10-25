@@ -86,6 +86,22 @@ stopping placement patches and replacing the placement algorithm, measured first
 
 ---
 
+## Tree loading state (found 2026-10-24)
+
+- [ ] **The tree's loading state is a lone spinner on a blank white page.** Seen live
+      2026-10-24 (Doug's screenshot): the AppBar, then an empty white viewport with a small
+      green `MudProgressCircular` in the middle, before the green tree canvas paints. It
+      comes from `Home.razor` (`_loading || !_ready`, and the auth-resolving branch above
+      it), after the `#ft-splash` spinner in `App.razor` has already gone, so there are
+      two spinners in a row. Room to improve: paint the canvas background (the green
+      surface) straight away so it doesn't flash white to green, show something shaped
+      like the tree (a faint skeleton of nodes) or a short message rather than a bare
+      spinner, and make the two loading phases look like one. Check what actually takes
+      the time first (circuit connect, people query, focus from `localStorage`/DB) before
+      designing around it.
+
+---
+
 ## Photo gallery: broken images (found 2026-10-24)
 
 - [ ] **The person photo gallery shows a broken photo as a blank tile with the browser's
