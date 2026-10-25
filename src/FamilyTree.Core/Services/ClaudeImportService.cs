@@ -158,7 +158,7 @@ public class ClaudeImportService(
                 PersonBId = pB,
                 Type      = type.Value,
                 StartDate = ParseDate(rel.MarriageDate),
-                EndDate   = rel.IsFormer ? DateOnly.FromDateTime(DateTime.UtcNow) : null,
+                IsEnded   = rel.IsFormer,
                 CreatedAt = DateTime.UtcNow,
             });
             relCreated++;

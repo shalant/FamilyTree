@@ -15,6 +15,10 @@ public partial class Relationship
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
 
+    // A marriage can have ended without anyone knowing when. A set EndDate also
+    // counts as ended, so rows written before this flag existed still read right.
+    public bool IsEnded { get; set; }
+
     public DateTime? CreatedAt { get; set; }
     public Guid? CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }

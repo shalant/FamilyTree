@@ -26,6 +26,7 @@ public static class RelationshipMapper
             Type = r.Type,
             StartDate = r.StartDate,
             EndDate = r.EndDate,
+            IsEnded = r.IsEnded || r.EndDate.HasValue,
             Notes = r.Notes ?? string.Empty,
             CreatedAt = r.CreatedAt,
             UpdatedAt = r.UpdatedAt

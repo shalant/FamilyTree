@@ -17,6 +17,9 @@ public class RelationshipUpsertDto
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
 
+    // Ended with no known date. A set EndDate implies ended anyway.
+    public bool IsEnded { get; set; }
+
     [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters.")]
     public string? Notes { get; set; }
 }

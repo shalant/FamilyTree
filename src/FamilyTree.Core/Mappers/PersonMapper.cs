@@ -31,20 +31,20 @@ public static class PersonMapper
             .ToList();
 
         // ─────────────────────────────────────────────────────────────
-        // SPOUSES — active (EndDate = null) and former (EndDate set)
+        // SPOUSES — active, and former (IsEnded or an EndDate set)
         // ─────────────────────────────────────────────────────────────
         var spouseRels = rels
             .Where(r => r.Type == RelationshipType.Spouse &&
                        (r.PersonAId == person.Id || r.PersonBId == person.Id));
 
         var spouseIds = spouseRels
-            .Where(r => r.EndDate == null)
+            .Where(r => !r.IsEnded && r.EndDate == null)
             .Select(r => r.PersonAId == person.Id ? r.PersonBId : r.PersonAId)
             .Distinct()
             .ToList();
 
         var formerSpouseIds = spouseRels
-            .Where(r => r.EndDate != null)
+            .Where(r => r.IsEnded || r.EndDate != null)
             .Select(r => r.PersonAId == person.Id ? r.PersonBId : r.PersonAId)
             .Distinct()
             .ToList();

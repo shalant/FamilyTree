@@ -594,7 +594,7 @@ public class PersonService(
             }
         }
 
-        // Former spouses (Spouse rel with EndDate set)
+        // Former spouses (Spouse rel with IsEnded set)
         foreach (var formerSpouseId in dto.FormerSpouseIds)
         {
             if (dto.SpouseIds.Contains(formerSpouseId)) continue;
@@ -610,6 +610,7 @@ public class PersonService(
                 {
                     PersonAId = a, PersonBId = b,
                     Type = RelationshipType.Spouse,
+                    IsEnded = true,
                     EndDate = await ComputeFormerSpouseEndDateAsync(ctx, dto, formerSpouseId, ct),
                     CreatedAt = now,
                     CreatedBy = createdBy,
@@ -747,12 +748,12 @@ public class PersonService(
         foreach (var partnerId in existingByPartner.Keys.Except(allDesiredPartnerIds).ToList())
             ctx.Relationships.Remove(existingByPartner[partnerId]);
 
-        // Upsert active spouses (EndDate = null)
+        // Upsert active spouses (not ended, no EndDate)
         foreach (var spouseId in dto.SpouseIds)
         {
             if (existingByPartner.TryGetValue(spouseId, out var rel))
             {
-                if (rel.EndDate != null) { rel.EndDate = null; rel.UpdatedAt = now; }
+                if (rel.IsEnded || rel.EndDate != null) { rel.IsEnded = false; rel.EndDate = null; rel.UpdatedAt = now; }
             }
             else
             {
@@ -766,14 +767,15 @@ public class PersonService(
             }
         }
 
-        // Upsert former spouses (EndDate set)
+        // Upsert former spouses (IsEnded set)
         foreach (var formerSpouseId in dto.FormerSpouseIds)
         {
             if (dto.SpouseIds.Contains(formerSpouseId)) continue;
             if (existingByPartner.TryGetValue(formerSpouseId, out var rel))
             {
-                if (rel.EndDate == null)
+                if (!rel.IsEnded && rel.EndDate == null)
                 {
+                    rel.IsEnded = true;
                     rel.EndDate = await ComputeFormerSpouseEndDateAsync(ctx, dto, formerSpouseId, ct);
                     rel.UpdatedAt = now;
                 }
@@ -785,6 +787,7 @@ public class PersonService(
                 {
                     PersonAId = ordered[0], PersonBId = ordered[1],
                     Type = RelationshipType.Spouse,
+                    IsEnded = true,
                     EndDate = await ComputeFormerSpouseEndDateAsync(ctx, dto, formerSpouseId, ct),
                     CreatedAt = now, CreatedBy = createdBy,
                 });
@@ -792,15 +795,13 @@ public class PersonService(
         }
     }
 
-    // A former-spouse relationship's EndDate previously always defaulted to today,
-    // even when one (or both) partners have a recorded DeathDate that's clearly the
-    // real reason the marriage ended — e.g. a spouse who died in/shortly after
-    // childbirth decades ago, recorded as "ended 2026" the moment someone else got
-    // around to entering the data. Prefers the earlier of the two death dates when
-    // both are known (the marriage ended when the first partner died); falls back to
-    // today only when neither has a recorded death (the divorce case, where there's
-    // no better default available without a dedicated date-entry UI).
-    private static async Task<DateOnly> ComputeFormerSpouseEndDateAsync(
+    // The form has no end-date field, so an ended marriage's EndDate is only ever a
+    // default. Prefers the earlier of the two partners' death dates (the marriage
+    // ended when the first partner died; Lillian died in 1922, so "ended 2026" was
+    // wrong). With no recorded death it stays null: IsEnded says the marriage ended
+    // and nobody has said when. Until 2026-10-24 this fell back to today, which made
+    // up a date for every divorce (repaired by migration ClearInventedMarriageEndDates).
+    private static async Task<DateOnly?> ComputeFormerSpouseEndDateAsync(
         AppDbContext ctx, PersonUpsertDto dto, Guid partnerId, CancellationToken ct)
     {
         var partnerDeathDate = await ctx.People.AsNoTracking()
@@ -812,7 +813,7 @@ public class PersonService(
         if (partnerDeathDate.HasValue && (!earliest.HasValue || partnerDeathDate.Value < earliest.Value))
             earliest = partnerDeathDate;
 
-        return earliest ?? DateOnly.FromDateTime(DateTime.Today);
+        return earliest;
     }
 
     private static string? ValidatePersonDates(PersonUpsertDto dto)
@@ -967,7 +968,7 @@ public class PersonService(
                      r.Type == RelationshipType.Spouse &&
                      r.PersonAId != personId &&
                      r.PersonBId != personId &&
-                     r.EndDate == null, ct);
+                     !r.IsEnded && r.EndDate == null, ct);
 
             if (hasOtherActiveMarriage)
                 return $"{spouse.FirstName} {spouse.LastName} is already in an active marriage.";
