@@ -1,0 +1,44 @@
+{
+  "generated (seed 20261010, 500 families)": {
+    "familiesWithLooseCouple": 107,
+    "partnerGapWorst": 1600,
+    "partnerGapMean": 220,
+    "crossings": 683,
+    "linesThroughNodes": 582,
+    "nodeOverlaps": 0,
+    "familyOffCentreMean": 207,
+    "widthMean": 1197,
+    "connectorLengthMean": 2780,
+    "mergedLines": 646
+  },
+  "fixture two-bridges (2026-10-16 screenshot)": {
+    "partnerGapMax": 200,
+    "crossings": 0,
+    "linesThroughNodes": 0,
+    "nodeOverlaps": 0,
+    "familyOffCentreMax": 102,
+    "width": 1060,
+    "connectorLength": 2897,
+    "mergedLines": 0
+  },
+  "fixture live": {
+    "partnerGapMax": 200,
+    "crossings": 0,
+    "linesThroughNodes": 4,
+    "nodeOverlaps": 0,
+    "familyOffCentreMax": 274,
+    "width": 1240,
+    "connectorLength": 5911,
+    "mergedLines": 1
+  },
+  "fixture local-dev": {
+    "partnerGapMax": 200,
+    "crossings": 0,
+    "linesThroughNodes": 0,
+    "nodeOverlaps": 0,
+    "familyOffCentreMax": 220,
+    "width": 2770,
+    "connectorLength": 4955,
+    "mergedLines": 0
+  }
+}
