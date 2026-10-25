@@ -205,6 +205,10 @@ Viewer      Unauthenticated public access to public families; read-only, visibil
 ### A03 · Software Supply Chain — PARTIAL
 - `Azure.Storage.Blobs 12.29.0-beta.1` is a pre-release package used in production (`FamilyTree.Core.csproj`). Upgrade to a stable release.
 - No committed NuGet lock file — enables dependency-confusion attacks. Add `RestorePackagesWithLockFile = true` to project files.
+- **Vulnerable packages (checked 2026-10-23, `dotnet list package --vulnerable --include-transitive`):**
+  - Fixed: `System.Security.Cryptography.Pkcs` 9.0.4 (high, GHSA-846f-f764-76mx; moderate, GHSA-2fmv-rv2c-59x7), pulled in by `Microsoft.Data.SqlClient` 6.1.1. Pinned to 10.0.13 in `FamilyTree.Core.csproj`.
+  - **Open:** `SixLabors.ImageSharp` 3.1.12 (bumped from 3.1.11) still has five advisories (three high); only 4.1.2+ fixes them. ImageSharp 4 fails the build without a Six Labors license key (`SixLaborsLicenseKey` or a `sixlabors.lic` file), even under the free Apache tier, so upgrading needs Doug to get a key from sixlabors.com. Reachable: `MediumService.ResizeIfOversizedAsync` decodes uploaded images (signed-in family members only). Until 2026-10-24 it decoded whatever format ImageSharp detected, TIFF included, because the MIME allow-list trusts the browser's label. **Narrowed 2026-10-24:** `CreateAsync` now checks the file's actual bytes and rejects any recognised format other than JPEG, PNG, WebP or GIF, and the resize step decodes only those four (`MediumServiceTests.CreateAsync_DisallowedFormatLabelledAsJpeg_IsRejectedAndNotUploaded`). That closes the TIFF encoder/decoder bugs. Still reachable: the ICC-profile allocation bug, since JPEG and PNG can carry ICC profiles; only the 4.x upgrade fixes it. The HistogramEqualization one doesn't apply (never called).
+  - Open, tests only: `AngleSharp` 1.1.2 (moderate, via bUnit) in `FamilyTree.Web.Tests`; never deployed.
 
 ### A04 · Cryptographic Failures — PARTIAL
 - Password policy is weakened: `RequireDigit = false`, `RequireNonAlphanumeric = false`, `RequireUppercase = false` (`Program.cs` ~L74). "aaaaaaaaaa" is a valid password.
