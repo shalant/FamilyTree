@@ -312,6 +312,22 @@ into a small "+2" marker beside the ancestor that opens on click. Until that's b
 prototype uses option 2. The cost is losing the at-a-glance whole-family view the site
 draws today. Not started; see `docs/TodoList.md`, "Layout engine direction".
 
+## Trying the prototype on live data (2026-10-24)
+
+The live tree finds problems generated families don't, but switching `Layout__Engine` would
+show the prototype, with its known open bugs, to the whole family. So the engine is now
+picked per viewer: `LayoutEngineSelector` (scoped) holds a list of named engines, each
+marked `SuperUserOnly` or not, and `SelectedLayoutEngine` hands the canvas and SVG export
+whichever one the viewer selected. Everyone starts on the site default; the super-user gets
+a picker in the toolbar and sees the engine's name there while off the default, so a
+screenshot says which engine drew it. The intended loop: fix on a branch, check the live
+fixture in the gallery, merge and deploy (invisible to the family), then look on the live
+site and bring findings back as fixtures or tests.
+
+Built to grow into a choice for every viewer: clearing an engine's `SuperUserOnly` shows the
+picker to everyone. Not done yet: a mobile picker (the toolbar is a mini pill there), and
+remembering the choice per account rather than per browser.
+
 ## Consequences
 
 - The scores give a baseline to beat. Since 2026-10-23 they are also a ratchet for the

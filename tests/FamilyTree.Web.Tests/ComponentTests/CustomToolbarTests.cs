@@ -52,6 +52,32 @@ public class CustomToolbarTests : ComponentTestBase
         cut.Markup.Should().Contain("ft-toolbar-full");
     }
 
+    // Layout engine picker (2026-10-24): shown only to a viewer with more than one engine
+    // open to them, which today means the super-user.
+    [Fact]
+    public void FamilyMember_SeesNoLayoutEnginePicker()
+    {
+        var cut = RenderComponent<CustomToolbar>(p => p.Add(x => x.ForceCollapsed, false));
+
+        cut.FindAll(".ft-layout-engine-menu").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SuperUser_SeesLayoutEnginePicker_AndTheLabelOnlyOffTheDefault()
+    {
+        CurrentUser.IsSuperUser = true;
+        var selector = Services.GetRequiredService<LayoutEngineSelector>();
+        var cut = RenderComponent<CustomToolbar>(p => p.Add(x => x.ForceCollapsed, false));
+
+        cut.FindAll(".ft-layout-engine-menu").Should().ContainSingle();
+        cut.FindAll(".ft-layout-engine-label").Should().BeEmpty();
+
+        selector.TrySelect(LayoutEngineSelector.TimelineKey);
+        cut.Render();
+
+        cut.Find(".ft-layout-engine-label").TextContent.Trim().Should().Be("Timeline prototype");
+    }
+
     [Fact]
     public void NotForceCollapsed_CollapseThenExpand_TogglesLocalStateOnly()
     {
