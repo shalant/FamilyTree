@@ -21,6 +21,15 @@ public sealed class TestDataSeeder(string connectionString)
             .UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure())
             .Options);
 
+    // What a password reset or a role change does to every other session (S7).
+    public async Task RotateSecurityStampAsync(string email)
+    {
+        await using var db = NewContext();
+        var user = await db.Users.SingleAsync(u => u.NormalizedEmail == email.ToUpperInvariant());
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        await db.SaveChangesAsync();
+    }
+
     public async Task<Guid> CreateFamilyAsync(string name = "Test Family")
     {
         await using var db = NewContext();

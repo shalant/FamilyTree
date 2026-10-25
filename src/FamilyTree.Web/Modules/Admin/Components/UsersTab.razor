@@ -241,7 +241,6 @@ else
     private List<AdminUserDto> _users = [];
     private List<PersonDto> _people = [];
     private Dictionary<Guid, Guid?> _personLinks = new();
-    private Dictionary<Guid, List<string>> _userRoles = new();
     private List<AdminInviteDto> _pendingInvitesList = [];
     private List<AdminPasswordResetDto> _pendingResets = [];
 
@@ -293,34 +292,19 @@ else
     {
         var user = _users.FirstOrDefault(u => u.Id == userId);
         if (user?.IsSuperUser == true) return "SuperUser";
-        var roles = _userRoles.GetValueOrDefault(userId) ?? [];
-        return roles.Contains("Admin") ? "Admin" : "Member";
+        return user?.IsAdmin == true ? "Admin" : "Member";
     }
 
     private async Task SetRoleAsync(AdminUserDto user, string newRole)
     {
         if (user.IsSuperUser) return;
 
-        var appUser = await UserManager.FindByIdAsync(user.Id.ToString());
-        if (appUser == null)
+        var isAdmin = newRole == "Admin";
+        var ok = await TryAsync(() => AdminUserService.SetAdminAsync(user.Id, isAdmin), "Updating role");
+        if (ok)
         {
-            ToastService.Error("User not found.");
-            return;
-        }
-
-        var current = await UserManager.GetRolesAsync(appUser);
-        if (current.Count > 0)
-            await UserManager.RemoveFromRolesAsync(appUser, current);
-
-        var result = await UserManager.AddToRoleAsync(appUser, newRole);
-        if (result.Succeeded)
-        {
-            _userRoles[user.Id] = [newRole];
-            ToastService.Success($"Role set to {newRole}.");
-        }
-        else
-        {
-            ToastService.Error("Failed to update role.");
+            user.IsAdmin = isAdmin;
+            ToastService.Success($"Role set to {newRole}. Their open sessions will sign out within 5 minutes.");
         }
     }
 

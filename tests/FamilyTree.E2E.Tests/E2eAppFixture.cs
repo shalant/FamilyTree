@@ -153,6 +153,8 @@ public sealed class E2eAppFixture : IAsyncLifetime
         psi.Environment["Google__ClientId"] = "";
         psi.Environment["Google__ClientSecret"] = "";
         psi.Environment["AzureStorage__ConnectionString"] = ""; // forces the UseDevelopmentStorage=true fallback
+        psi.Environment["Auth__SessionCheckInterval"] = "00:00:00"; // check the security stamp on every
+                                                                     // request, so every test exercises it
         psi.Environment["DevAuth__Enabled"] = "false";           // see class remarks: DevAuth replaces the
                                                                   // entire cookie/Identity pipeline, which
                                                                   // would break real registration/login —

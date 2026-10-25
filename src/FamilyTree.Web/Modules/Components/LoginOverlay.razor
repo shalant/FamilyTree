@@ -70,6 +70,10 @@
             <AntiforgeryToken />
             <input type="hidden" name="email"    value="@_email" />
             <input type="hidden" name="password" value="@_password" />
+            @if (!string.IsNullOrEmpty(ReturnUrl))
+            {
+                <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+            }
 
             <div class="ft-field-label">Email</div>
             <MudTextField @bind-Value="_email"
@@ -116,6 +120,7 @@
     [Parameter] public EventCallback OnGuest { get; set; }
     [Parameter] public string? ErrorMessage { get; set; }
     [Parameter] public string? PrefillEmail { get; set; }
+    [Parameter] public string? ReturnUrl { get; set; }
 
     private string _email    = "";
     private string _password = "";
@@ -127,7 +132,9 @@
     }
 
     private void SignInWithGoogle() =>
-        Nav.NavigateTo("/auth/google", forceLoad: true);
+        Nav.NavigateTo(string.IsNullOrEmpty(ReturnUrl)
+            ? "/auth/google"
+            : $"/auth/google?returnUrl={Uri.EscapeDataString(ReturnUrl)}", forceLoad: true);
 
     private async Task BrowsePublic() => await OnGuest.InvokeAsync();
 }

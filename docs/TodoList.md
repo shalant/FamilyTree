@@ -76,12 +76,49 @@ Work A in order before the first invite; B and C can follow.
       `UpdateAsync_MothersDeathMovedBeforeHerChildsBirth_IsRefused` is tagged
       Regression), `PersonFormPlausibilityTests`. Next: B8's "Data check" list can run the
       same rules over the whole tree to find what was saved before this.
-- [ ] **A4: invite-path security.** `ReturnUrl` ignored on `/auth/do-login`;
-      `Auth:RegistrationMode` fails open (S9); S7 session revocation; S8 blob privacy;
-      check Google sign-in works on prod.
-- [ ] **A5: Louis's sister drawn on top of Louis** in the archived engine the family sees.
-      Doug to decide: fix it in the frozen engine, or switch the family to the prototype
-      once it's ready.
+- [ ] **A4: invite-path security.** Split in two; the first half is done.
+  - [x] **Sessions, sign-in redirect, registration mode** (2026-10-25,
+        `feat/a4-invite-path-security`). (1) **S7:** the 14-day cookie was never checked
+        against the user's security stamp, so a password reset or a demotion left every
+        other session signed in with its old claims. The cookie now runs
+        `SecurityStampValidator` and the new `SecurityStampRevalidatingAuthStateProvider`
+        re-checks open Blazor circuits, both every 5 minutes (`Auth:SessionCheckInterval`,
+        a TimeSpan); a stale stamp signs out, a current one refreshes the claims (so a new
+        Admin gets the role within 5 minutes). Turning it on exposed a latent crash: on
+        rejection Identity also signs out of the two-factor cookie schemes, which weren't
+        registered, so a revoked user got a 500 page; both are now registered (unused, no
+        2FA). (2) **Two Admin sources:** the Users tab wrote Identity roles that nothing
+        ever created (so changing a role there could only fail) and never read them back
+        (everyone showed as Member), while the claims came from `AppUser.IsAdmin`, which no
+        screen showed. `IsAdmin` is now the only source: the tab reads it and changes it
+        through `AdminUserService.SetAdminAsync` (SuperUser-only, rotates the stamp so the
+        user's sessions end), and migration `FoldAdminRoleIntoIsAdmin` moves any Identity
+        Admin membership onto `IsAdmin`. (3) **ReturnUrl:** sign-in now follows the
+        challenge's `?ReturnUrl=` (email/password and Google), local paths only
+        (`LoginRedirect`: no `//`, `/\`, other hosts, control characters or `/auth/`), and
+        a failed attempt keeps it for the next try. (4) **RegistrationMode** fails closed:
+        missing or unrecognised means InviteOnly with a logged warning, and case and spaces
+        are forgiven. Tests: `LoginRedirectTests`, `LoginOverlayReturnUrlTests`,
+        `AdminUserServiceTests`, `SecurityStampRevalidationTests`, two
+        `AuthServiceTreeLinkingTests` theories, `CrossTenantMatrixTests` rows for
+        `SetAdminAsync`, and two E2E tests: `ReturnUrlIsolatedTests` (Regression; fails
+        with do-login ignoring the field) and `SessionRevocationIsolatedTests` (fails
+        with the stamp check off). The E2E fixture sets the interval to zero, so every E2E
+        test now runs the stamp check on every request. Not covered: the circuit sign-out
+        in a real browser (unit-tested only); services read claims from the circuit's
+        `HttpContext`, so a revoked circuit stops showing protected pages but isn't torn
+        down. Side finding: the AppBar's search box renders signed out too, so it can't
+        prove a session is signed in; `CsrfLogoutIsolatedTests` relies on it and may pass
+        for the wrong reason.
+  - [ ] **S8 blob privacy** (its own PR next): serve media through an authenticated,
+        family-scoped endpoint instead of raw blob URLs (about 20 places, plus the story
+        invite email's photo), then make the container private (Doug, in Azure).
+  - [ ] **Google sign-in on prod** (Doug, with a real Google account): see "Google
+        sign-in" below.
+- [x] **A5: Louis's sister drawn on top of Louis** in the archived engine the family sees.
+      Decided 2026-10-25: no change for now. The family stays on the archived engine;
+      Doug switches them later by setting `Layout__Engine=TimelineBest` on the App
+      Service (the prototype doesn't have this overlap).
 - [ ] **A6: walk the invitee journey on prod**, invite email to first tree view, on a phone
       as well as desktop.
 
@@ -465,11 +502,12 @@ PR #43).
       showing. Regression test: `ToastServiceTests` (verified failing without the dedup). The
       `Home.razor` race itself has no automated test; `Home` is too heavy to render in bUnit.
 
-**Open (found 2026-10-11, smoke test): signed-out visits to protected pages land on `/?ReturnUrl=...` and the path is dropped after login**
-- [ ] Cookie auth challenges redirect to `/?ReturnUrl=%2Fadmin` (the checklist's "redirect to
+**Fixed 2026-10-25 (A4): signed-out visits to protected pages land on `/?ReturnUrl=...` and the path is dropped after login**
+- [x] Cookie auth challenges redirect to `/?ReturnUrl=%2Fadmin` (the checklist's "redirect to
       login" outcome, so not a security issue). Nothing in the app reads `ReturnUrl`, so after
       signing in the user lands on the tree instead of the page they asked for. Decide whether
-      to honour it (local paths only, to avoid an open redirect) or leave it.
+      to honour it (local paths only, to avoid an open redirect) or leave it. Honoured,
+      local paths only, since 2026-10-25 (A4, `LoginRedirect`).
 
 **Bug: page flashes and loads twice on arborkin.com (reported 2026-10-10)**
 - [x] **Turn off prerendering for the interactive render mode (done 2026-10-11).**
@@ -538,7 +576,7 @@ PR #43).
       holds the Admin role in production (S2 is exploitable by any Admin).
 - [ ] **Check how many `Family` rows production has.** S3/S4/S5 only leaked with two or
       more; not checked in the review (no production access).
-- [ ] **S7: sessions survive revocation.** Add security-stamp validation to the
+- [x] **S7: sessions survive revocation.** Fixed 2026-10-25 (A4, see Outreach readiness). Add security-stamp validation to the
       application cookie (`OnValidatePrincipal`) so demoting an Admin or resetting a
       password ends existing sessions; Blazor circuits also need a revalidating
       `AuthenticationStateProvider`. Remove or surface the second Admin source,
@@ -554,11 +592,11 @@ PR #43).
       (`UserMessageService.GetAllAsync`, every family's feature requests/contact messages)
       and the Admin Dashboard stats (`DashboardService`, global counts) are visible to
       every family Admin. Decide: SuperUser-only, or scope by family.
-- [ ] **S9 lows:** `Auth:RegistrationMode` fails open when missing or mis-cased;
-      story-invite `IsUsed` check-then-set race (double submit makes two stories);
+- [ ] **S9 lows:** ~~`Auth:RegistrationMode` fails open when missing or mis-cased~~
+      (fixed 2026-10-25, A4); story-invite `IsUsed` check-then-set race (double submit makes two stories);
       CR/LF in names/places injects GEDCOM records; null MIME type skips the upload
-      allow-list (and the size error says 50 MB for an 8 MB limit); `/auth/do-login`
-      ignores `?ReturnUrl=`, so deep links land on the tree after sign-in.
+      allow-list (and the size error says 50 MB for an 8 MB limit); ~~`/auth/do-login`
+      ignores `?ReturnUrl=`~~ (fixed 2026-10-25, A4).
 - [x] **Package advisories, first pass** (fixed 2026-10-24, `fix/image-format-allowlist`):
       Core's ImageSharp reference was affected, not just the test project's. Bumped
       `SixLabors.ImageSharp` 3.1.11 -> 3.1.12 (still vulnerable) and pinned

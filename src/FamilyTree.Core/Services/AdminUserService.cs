@@ -36,6 +36,7 @@ public class AdminUserService(
                 Email = u.Email ?? "",
                 DisplayName = u.DisplayName ?? "",
                 IsSuperUser = u.IsSuperUser,
+                IsAdmin = u.IsAdmin,
                 PersonId = u.PersonId,
                 CreatedAt = u.CreatedAt,
                 LastLoginAt = u.LastLoginAt,
@@ -163,6 +164,42 @@ public class AdminUserService(
         {
             logger.LogError(ex, "Error canceling invite {InviteId}", inviteId);
             return ServiceResponse.Fail("Failed to cancel invite.");
+        }
+    }
+
+    // AppUser.IsAdmin is the only source of the Admin role (S7, docs/security.md,
+    // 2026-10-25): the Users tab used to write Identity roles, which nothing created or
+    // read back, while the claims came from IsAdmin, which no screen showed. Changing it
+    // rotates the security stamp, so the user's other sessions end at their next check
+    // (cookie and Blazor circuit, every 5 minutes; Program.cs) instead of keeping the old
+    // role for up to 14 days.
+    public async Task<ServiceResponse> SetAdminAsync(Guid userId, bool isAdmin, CancellationToken ct = default)
+    {
+        if (!currentUser.IsSuperUser) return ServiceResponse.Fail(Denied);
+
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+            var user = await ctx.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+            if (user is null)
+                return ServiceResponse.Fail("User not found.");
+            if (user.IsSuperUser)
+                return ServiceResponse.Fail("The site owner's role can't be changed.");
+            if (user.IsAdmin == isAdmin)
+                return ServiceResponse.Ok();
+
+            user.IsAdmin = isAdmin;
+            user.SecurityStamp = Guid.NewGuid().ToString("N");
+            user.ConcurrencyStamp = Guid.NewGuid().ToString();
+            await ctx.SaveChangesAsync(ct);
+
+            logger.LogInformation("User {UserId} Admin set to {IsAdmin}", userId, isAdmin);
+            return ServiceResponse.Ok();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error setting Admin for user {UserId}", userId);
+            return ServiceResponse.Fail("Failed to update role.");
         }
     }
 

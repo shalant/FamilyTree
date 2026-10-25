@@ -10,6 +10,7 @@ public class AdminUserDto
     public required string Email { get; set; }
     public required string DisplayName { get; set; }
     public bool IsSuperUser { get; set; }
+    public bool IsAdmin { get; set; }
     public Guid? PersonId { get; set; }
     public DateTime? CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
@@ -38,4 +39,5 @@ public interface IAdminUserService
     Task<ServiceResponse<List<PersonDto>>> GetPeopleAsync(CancellationToken ct = default);
     Task<ServiceResponse> CancelInviteAsync(Guid inviteId, CancellationToken ct = default);
     Task<ServiceResponse> DismissPasswordResetAsync(Guid resetId, CancellationToken ct = default);
+    Task<ServiceResponse> SetAdminAsync(Guid userId, bool isAdmin, CancellationToken ct = default);
 }

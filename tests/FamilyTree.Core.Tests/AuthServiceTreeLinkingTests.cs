@@ -19,7 +19,7 @@ namespace FamilyTree.Core.Tests;
 public class AuthServiceTreeLinkingTests
 {
     private static (AuthService service, TestDbContextFactory factory, UserManager<AppUser> userManager) CreateSut(
-        string registrationMode = "Open")
+        string? registrationMode = "Open")
     {
         var factory = new TestDbContextFactory();
         var userManager = TestUserManagerFactory.Create(factory);
@@ -82,6 +82,34 @@ public class AuthServiceTreeLinkingTests
         var result = await service.RegisterAsync("Alice", "Smith", "alice@example.com", ValidPassword);
 
         result.Success.Should().BeFalse();
+    }
+
+    // S9 (docs/security.md): a missing or mistyped mode used to mean Open.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("Invite-Only")]
+    [InlineData("closd")]
+    public async Task RegisterAsync_UnrecognisedMode_FailsClosedToInviteOnly(string? configured)
+    {
+        var (service, _, _) = CreateSut(registrationMode: configured);
+
+        service.GetRegistrationMode().Should().Be("InviteOnly");
+        var result = await service.RegisterAsync("New", "User", "new@example.com", ValidPassword);
+
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("invitation is required");
+    }
+
+    [Theory]
+    [InlineData("open", "Open")]
+    [InlineData(" INVITEONLY ", "InviteOnly")]
+    [InlineData("closed", "Closed")]
+    public void GetRegistrationMode_ForgivesCaseAndSpaces(string configured, string expected)
+    {
+        var (service, _, _) = CreateSut(registrationMode: configured);
+
+        service.GetRegistrationMode().Should().Be(expected);
     }
 
     [Fact]
