@@ -56,6 +56,69 @@ public class TimelineLayoutEngineTests
     private static Dictionary<Guid, FamilyTreeLayoutEngine.LayoutNode> Lay(LayoutFixture f) =>
         f.Layout(new TimelineLayoutEngine()).Layout.Nodes.ToDictionary(n => n.Person.Id);
 
+    // Found on the live tree (2026-10-18): Libby and Lillian are sisters with no parents on the
+    // tree, both married to Louis, who sits between them, so a straight dashed link from one
+    // to the other ran through him. The link is now a bracket over the people (2026-10-23).
+    [Fact]
+    [Trait("Category", "Regression")]
+    public void SiblingLink_BetweenTwoWivesOfOneHusband_DoesNotRunThroughHim()
+    {
+        var t = new Family();
+        var louis = t.Add("Louis", 1888);
+        var libby = t.Add("Libby", 1890);
+        var lillian = t.Add("Lillian", 1893);
+        t.Marry(louis, libby).Marry(louis, lillian).Sibling(libby, lillian);
+
+        var layout = t.Fixture().Layout(new TimelineLayoutEngine()).Layout;
+        var him = layout.Nodes.Single(n => n.Person.Id == louis);
+        var link = layout.SiblingLinks.Should().ContainSingle().Subject;
+
+        foreach (var (x1, y1, x2, y2) in link.Segments)
+        {
+            var (dx, dy) = (x2 - x1, y2 - y1);
+            var t0 = Math.Clamp(((him.X - x1) * dx + (him.Y - y1) * dy) / (dx * dx + dy * dy), 0, 1);
+            var dist = Math.Sqrt(Math.Pow(x1 + t0 * dx - him.X, 2) + Math.Pow(y1 + t0 * dy - him.Y, 2));
+            dist.Should().BeGreaterThanOrEqualTo(him.Size / 2.0, "the sisters' link must go around their husband, not through him");
+        }
+    }
+
+    // Found live 2026-10-24: around Louis, his two wives Lillian and Libby are sisters and his
+    // own siblings Tilly and David sit past Libby. Straight links ran Lillian to Libby through
+    // Louis and Louis to David through Libby and Tilly, on top of Louis to Tilly. Now each set
+    // of siblings hangs from one bar of its own, and no sibling line goes through anyone or
+    // lies along another line. Each set's bar is its own height.
+    [Fact]
+    [Trait("Category", "Regression")]
+    public void SiblingSets_AroundAManWithTwoWives_EachGetOneClearBar()
+    {
+        var t = new Family();
+        var louis = t.Add("Louis", 1888);
+        var lillian = t.Add("Lillian", 1893);
+        var libby = t.Add("Libby", 1890);
+        var tilly = t.Add("Tilly", 1889);
+        var david = t.Add("David", 1891);
+        var ray = t.Add("Ray", 1922);
+        var william = t.Add("William", 1930);
+        t.Marry(louis, lillian, ended: new DateOnly(1925, 1, 1)).Marry(louis, libby)
+            .Sibling(lillian, libby).Sibling(tilly, louis).Sibling(david, louis)
+            .Parent(louis, ray, william).Parent(lillian, ray).Parent(libby, william);
+
+        var (layout, people, couples) = t.Fixture(ray).Layout(new TimelineLayoutEngine());
+        var report = LayoutQualityMetrics.Compute(layout, people, couples);
+
+        report.LinesThroughNodeDetails.Should().NotContain(d => d.StartsWith("sibling link"));
+        report.MergedLines.Should().Be(0);
+        var x = layout.Nodes.ToDictionary(n => n.Person.Id, n => (double)n.X);
+        bool Touches(FamilyTreeLayoutEngine.SiblingLink l, Guid id) => l.AX == x[id] || l.BX == x[id];
+        var louisSet = layout.SiblingLinks.Where(l => Touches(l, louis) || Touches(l, tilly) || Touches(l, david)).ToList();
+        var sisters = layout.SiblingLinks.Where(l => Touches(l, lillian) && Touches(l, libby)).ToList();
+        louisSet.Should().HaveCount(2, "Louis, Tilly and David are drawn as one chain");
+        louisSet.Select(l => l.BarY).Distinct().Should().ContainSingle("one bar for the whole set");
+        sisters.Should().ContainSingle();
+        if (sisters[0].BarY is { } sistersBar && louisSet[0].BarY is { } louisBar)
+            sistersBar.Should().NotBe(louisBar, "two sets never share a bar");
+    }
+
     [Fact]
     public void DatedPeople_SitExactlyAtTheirBirthYear()
     {

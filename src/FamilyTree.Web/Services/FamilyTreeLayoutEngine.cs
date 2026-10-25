@@ -2269,8 +2269,17 @@ public class FamilyTreeLayoutEngine : IFamilyTreeLayoutEngine
     /// A direct line between two siblings who have no shared parent on the tree
     /// (e.g. a newly-added sibling like "Bill" linked only to "Ray") — there is no
     /// parent/couple group to hang a normal stem+span+drop connector off of.
+    /// With <paramref name="BarY"/> set (TimelineLayoutEngine, 2026-10-23) it's drawn as a
+    /// bracket: up from each sibling to a bar at that height, then across, like a family's
+    /// sibling span. Null (this engine) draws the original straight line.
     /// </summary>
-    public record SiblingLink(double AX, double AY, double BX, double BY);
+    public record SiblingLink(double AX, double AY, double BX, double BY, double? BarY = null)
+    {
+        /// <summary>The line's pieces as drawn: one straight segment, or the bracket's three.</summary>
+        public IReadOnlyList<(double X1, double Y1, double X2, double Y2)> Segments => BarY is { } bar
+            ? [(AX, AY, AX, bar), (AX, bar, BX, bar), (BX, bar, BX, BY)]
+            : [(AX, AY, BX, BY)];
+    }
 
     /// <summary>
     /// A subtle vertical boundary marking the gap between two genuinely disconnected

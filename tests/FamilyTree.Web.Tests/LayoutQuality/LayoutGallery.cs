@@ -83,7 +83,8 @@ public static class LayoutGallery
             if (f.Span is { } s) Line(s.LeftX, s.Y, s.RightX, s.Y, "#b0915a", false);
             foreach (var d in f.Drops) Line(d.CenterX, f.Stem.BotY, d.CenterX, d.BotY, "#b0915a", false);
         }
-        foreach (var l in layout.SiblingLinks) Line(l.AX, l.AY, l.BX, l.BY, "#8a9a8f", true);
+        foreach (var l in layout.SiblingLinks)
+            foreach (var (x1, y1, x2, y2) in l.Segments) Line(x1, y1, x2, y2, "#8a9a8f", true);
 
         var overlapping = new HashSet<Guid>();
         for (var i = 0; i < layout.Nodes.Count; i++)

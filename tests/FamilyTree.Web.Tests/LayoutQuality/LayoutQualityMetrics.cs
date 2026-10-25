@@ -134,7 +134,11 @@ public static class LayoutQualityMetrics
             foreach (var d in f.Drops) list.Add(new(owner, d.CenterX, f.Stem.BotY, d.CenterX, d.BotY, "child drop"));
             owner++;
         }
-        foreach (var l in layout.SiblingLinks) list.Add(new(owner++, l.AX, l.AY, l.BX, l.BY, "sibling link"));
+        foreach (var l in layout.SiblingLinks)
+        {
+            foreach (var (x1, y1, x2, y2) in l.Segments) list.Add(new(owner, x1, y1, x2, y2, "sibling link"));
+            owner++;
+        }
         return list.Where(s => Dist(s.X1, s.Y1, s.X2, s.Y2) > 0.5).ToList();
     }
 
