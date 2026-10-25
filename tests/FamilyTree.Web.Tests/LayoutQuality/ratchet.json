@@ -44,5 +44,71 @@
     "connectorLength": 5008,
     "mergedLines": 0,
     "linesThroughNames": 0
+  },
+  "fixture deep-ancestor-line": {
+    "partnerGapMax": 200,
+    "crossings": 0,
+    "linesThroughNodes": 0,
+    "linesThroughNames": 0,
+    "nodeOverlaps": 0,
+    "mergedLines": 0,
+    "familyOffCentreMax": 63,
+    "width": 592,
+    "connectorLength": 4810
+  },
+  "fixture extreme": {
+    "partnerGapMax": 800,
+    "crossings": 3,
+    "linesThroughNodes": 3,
+    "linesThroughNames": 4,
+    "nodeOverlaps": 0,
+    "mergedLines": 8,
+    "familyOffCentreMax": 2479,
+    "width": 4660,
+    "connectorLength": 16149
+  },
+  "fixture realistic-descendants": {
+    "partnerGapMax": 200,
+    "crossings": 4,
+    "linesThroughNodes": 1,
+    "linesThroughNames": 0,
+    "nodeOverlaps": 0,
+    "mergedLines": 0,
+    "familyOffCentreMax": 493,
+    "width": 4280,
+    "connectorLength": 12870
+  },
+  "fixture realistic-ego-centred": {
+    "partnerGapMax": 200,
+    "crossings": 0,
+    "linesThroughNodes": 2,
+    "linesThroughNames": 0,
+    "nodeOverlaps": 0,
+    "mergedLines": 0,
+    "familyOffCentreMax": 158,
+    "width": 1617,
+    "connectorLength": 6277
+  },
+  "fixture realistic-two-families": {
+    "partnerGapMax": 200,
+    "crossings": 6,
+    "linesThroughNodes": 1,
+    "linesThroughNames": 0,
+    "nodeOverlaps": 0,
+    "mergedLines": 0,
+    "familyOffCentreMax": 360,
+    "width": 2160,
+    "connectorLength": 7808
+  },
+  "fixture vanilla-four-generations": {
+    "partnerGapMax": 200,
+    "crossings": 0,
+    "linesThroughNodes": 0,
+    "linesThroughNames": 0,
+    "nodeOverlaps": 0,
+    "mergedLines": 0,
+    "familyOffCentreMax": 160,
+    "width": 2465,
+    "connectorLength": 7905
   }
 }

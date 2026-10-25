@@ -169,3 +169,68 @@ side; without it this tree laid out mirrored and looked fine.
   Libby↔Lillian link crosses their husband Louis).
 - `two-bridges.json` has no anchor, so its archived-engine numbers above aren't what Doug
   sees either.
+
+## Neutral test families (B7 step 0, 2026-10-25)
+
+Until now every fixture was Doug's own family, the one both engines were tuned on. Six
+made-up families (names invented; the repo is public) now sit in `Fixtures/` beside
+`two-bridges.json`. Each file's `note` says what it covers:
+
+| Fixture | People | What it is |
+|---|---|---|
+| `vanilla-four-generations` | 42 | Every date known, both parents, one marriage each, two founding couples whose children marry. The easy case. |
+| `realistic-descendants` | 44 | The descendants of one couple as a family historian enters them: old generations dateless, about a fifth of marriages ended, some second marriages with children, a few children with one parent recorded. |
+| `realistic-ego-centred` | 33 | How a new user builds a tree: themself, parents (divorced, father remarried with a child), both sets of grandparents, aunts, uncles and cousins, some aunts entered as siblings with no parents, a great-grandparent line on one side only. |
+| `realistic-two-families` | 33 | Two families entered separately and joined by a marriage, a second marriage between them a generation later, a widow who remarries, a child with only a mother. |
+| `extreme` | 44 | Fourteen siblings, a man married five times (children by three wives), first cousins who marry, two sets of twins, an adopted child whose birth mother is also on the tree (three parents), a half-sibling by the founder's first wife, dateless people. |
+| `deep-ancestor-line` | 30 | One surname line back ten generations, dateless before 1790. |
+
+The script that wrote them was a one-off and isn't checked in; edit the JSON directly. The
+fixture format gained an optional `isEnded` (an ended marriage with no date, as A1 stores
+it). Scores for every fixture under every engine:
+
+```
+dotnet test tests/FamilyTree.Web.Tests --filter "FullyQualifiedName~EveryFixture_ScoredByEveryEngine" --logger "console;verbosity=detailed"
+```
+
+### Results, `master` at 70e2476
+
+Scores per family: archived / prototype / layered baseline in generations / layered
+baseline with birth years. The last one is the like-for-like yardstick for the prototype,
+which keeps the birth-year axis.
+
+| Fixture | Crossings | Lines through names | Overlaps | Couples over 200 (worst gap) | Family off-centre, worst | Width |
+|---|---|---|---|---|---|---|
+| vanilla | 4 / **0** / 0 / 0 | 14 / **0** / 0 / 12 | **5** / 0 / 0 / 0 | 0 / 0 / 0 / 0 | 213 / 160 / 156 / 156 | 1880 / 2465 / 2221 / 2221 |
+| descendants | 4 / **4** / 0 / 2 | 18 / 0 / 4 / 18 | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 | 700 / **493** / 1137 / 1137 | 4800 / 4280 / 4248 / 4248 |
+| ego-centred | 2 / **0** / 7 / 1 | 7 / 0 / 4 / 6 | 1 / 0 / 0 / 0 | 0 / 0 / 0 / 0 | 900 / **158** / 232 / 232 | 1760 / 1617 / 2145 / 2145 |
+| two-families | 1 / **6** / 0 / 7 | 6 / 0 / 1 / 7 | 0 / 0 / 0 / 0 | 2 (440) / 0 / 0 / 0 | 327 / **360** / 232 / 232 | 2000 / 2160 / 1987 / 1987 |
+| extreme | 9 / **3** / 0 / 5 | 19 / 4 / 11 / 13 | 0 / 0 / 0 / 1 | 4 (600) / 4 (**800**) / 4 (600) / 4 (600) | 4180 / **2479** / 2887 / 2887 | 4540 / 4660 / 3653 / 3653 |
+| deep line | 0 / **0** / 0 / 0 | 7 / 0 / 0 / 7 | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 | 190 / **63** / 151 / 151 | 1040 / 592 / 602 / 602 |
+
+Prototype lines through nodes: 0 to 2 per family, 3 on `extreme`. Lines on top of another
+family's: none, except 8 on `extreme`.
+
+- **The prototype holds up on families it wasn't tuned on.** No overlaps, no lines through
+  names except in `extreme`, every couple at 200 except where one person has five
+  partners, and the most centred families on four of six (within 4 of the best on `vanilla`). Against the birth-year baseline it
+  has fewer or equal crossings on five of six.
+- **The archived engine overlaps people on the easy family** (5 overlaps on
+  `vanilla-four-generations`), relevant to A5.
+- **Where the prototype is weak** (from the gallery drawings):
+  - *Many partners.* Amos's five wives are strung out to his left at 200, 400, 600 and 800,
+    their dashed lines stacked across each other; his first wife's children sit on his
+    right under his current wife's line, so they read as hers.
+  - *Three parents.* The adopted child's adoptive parents are drawn 400 apart with his birth
+    mother between them, so the couple line runs through her.
+  - *A child by a founder's earlier marriage* (Boaz) lands at the far end of the row; his
+    line spans all fourteen half-siblings.
+  - *Two families joined twice* (`realistic-two-families`, 6 crossings): the bridge couple's
+    children and their cousins share one band with a third family's line, and one child
+    sits left of his parents' family. The generation-row baseline has 0 here, the
+    birth-year one 7, so most of the cost is the birth-year axis, not the prototype.
+  - *Children of a second marriage* in `realistic-descendants` spread under the
+    neighbouring family, where the 4 crossings come from.
+
+`extreme` has all four engines over 200 on four couples: a person can have at most two
+partners beside them, so that score can't reach zero there.

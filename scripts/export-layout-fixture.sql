@@ -3,7 +3,7 @@
 -- Exports one family as a layout fixture (ADR 004, step 1): the people and relationships the
 -- tree is drawn from, in the JSON shape tests/FamilyTree.Web.Tests/LayoutQuality/LayoutFixture.cs
 -- loads. Only what the layout engine reads is exported: ids, first and last names, birth
--- dates, and relationship type and end date. No places, notes, photos or emails.
+-- dates, and relationship type, end date and whether it ended (IsEnded). No places, notes, photos or emails.
 --
 -- The output still holds real names and birth dates, and the repo is public, so save it ONLY
 -- under tests/FamilyTree.Web.Tests/LayoutQuality/Fixtures/private/ (gitignored). Full steps
@@ -33,7 +33,7 @@ DECLARE @json nvarchar(max) = (
             ORDER BY p.LastName, p.FirstName, p.Id
             FOR JSON PATH, INCLUDE_NULL_VALUES), '[]')) AS people,
         JSON_QUERY(ISNULL((
-            SELECT r.PersonAId AS personAId, r.PersonBId AS personBId, r.Type AS type, r.EndDate AS endDate
+            SELECT r.PersonAId AS personAId, r.PersonBId AS personBId, r.Type AS type, r.EndDate AS endDate, r.IsEnded AS isEnded
             FROM dbo.Relationships AS r
             JOIN dbo.People AS a ON a.Id = r.PersonAId AND a.FamilyId = @FamilyId AND a.DeletedAt IS NULL
             JOIN dbo.People AS b ON b.Id = r.PersonBId AND b.FamilyId = @FamilyId AND b.DeletedAt IS NULL

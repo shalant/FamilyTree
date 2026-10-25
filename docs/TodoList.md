@@ -86,6 +86,21 @@ Work A in order before the first invite; B and C can follow.
       as well as desktop.
 
 **B. Battle-testing**
+- [x] **B7 step 0: neutral test families** (2026-10-25, `feat/b7-neutral-test-families`).
+      Every fixture so far was Doug's own family, which both engines had been tuned on.
+      Added six made-up families (the repo is public) in `LayoutQuality/Fixtures`:
+      `vanilla-four-generations`, `realistic-descendants`, `realistic-ego-centred`,
+      `realistic-two-families`, `extreme` and `deep-ancestor-line`, 30-44 people each.
+      They were written by a one-off script (not checked in); the JSON is the source, edit
+      it by hand. Each has a `note` saying what it covers. The fixture format gained an
+      optional `isEnded` (and `scripts/export-layout-fixture.sql` exports it), because since
+      A1 an undated ended marriage has no `EndDate`. Added
+      `LayoutFixtureTests.EveryFixture_ScoredByEveryEngine`, which prints every fixture's
+      scores under all four engines, and recorded ratchet limits for the six. Results and
+      what the drawings showed: `docs/Testing/layout-quality-gallery.md`, "Neutral test
+      families". Not done: the one-way import into the local database for viewing in the
+      app (the gallery is enough to score). Next: Doug decides whether to freeze
+      `TimelineLayoutEngine` (and A5), then A4.
 - [ ] **B7: write-path fuzz harness.** Random casual-user edit sequences through the real
       services: no crash, nothing invented, impossible input rejected with a message, the
       layout still valid afterwards.

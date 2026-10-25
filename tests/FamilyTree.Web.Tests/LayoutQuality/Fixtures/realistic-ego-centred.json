@@ -1,0 +1,565 @@
+{
+  "name": "realistic-ego-centred",
+  "note": "Made-up family, generated (seed 2202) the way a new user builds a tree: themself, parents, grandparents on both sides, aunts, uncles and cousins, then children. Dates thin out further from the user; some aunts and uncles are entered as siblings with no parents recorded; one parent remarried; a great-grandparent line is known on one side only.",
+  "focus": "b7030003-0000-4000-8000-000000000000",
+  "anchor": "b7030003-0000-4000-8000-000000000000",
+  "people": [
+    {
+      "id": "b7030001-0000-4000-8000-000000000000",
+      "firstName": "Lionel",
+      "lastName": "Ashby",
+      "birthDate": "1948-06-01"
+    },
+    {
+      "id": "b7030002-0000-4000-8000-000000000000",
+      "firstName": "Ida",
+      "lastName": "Ashby",
+      "birthDate": null
+    },
+    {
+      "id": "b7030003-0000-4000-8000-000000000000",
+      "firstName": "Miriam",
+      "lastName": "Ashby",
+      "birthDate": "1978-06-01"
+    },
+    {
+      "id": "b7030004-0000-4000-8000-000000000000",
+      "firstName": "Russell",
+      "lastName": "Ashby",
+      "birthDate": "1981-06-01"
+    },
+    {
+      "id": "b7030005-0000-4000-8000-000000000000",
+      "firstName": "Olive",
+      "lastName": "Ashby",
+      "birthDate": "1954-06-01"
+    },
+    {
+      "id": "b7030006-0000-4000-8000-000000000000",
+      "firstName": "Craig",
+      "lastName": "Ashby",
+      "birthDate": "1990-06-01"
+    },
+    {
+      "id": "b7030007-0000-4000-8000-000000000000",
+      "firstName": "Kenneth",
+      "lastName": "Galloway",
+      "birthDate": "1977-06-01"
+    },
+    {
+      "id": "b7030008-0000-4000-8000-000000000000",
+      "firstName": "Shirley",
+      "lastName": "Galloway",
+      "birthDate": "2006-06-01"
+    },
+    {
+      "id": "b7030009-0000-4000-8000-000000000000",
+      "firstName": "Diane",
+      "lastName": "Galloway",
+      "birthDate": "2009-06-01"
+    },
+    {
+      "id": "b703000a-0000-4000-8000-000000000000",
+      "firstName": "Thelma",
+      "lastName": "Ashby",
+      "birthDate": "1982-06-01"
+    },
+    {
+      "id": "b703000b-0000-4000-8000-000000000000",
+      "firstName": "Joel",
+      "lastName": "Ashby",
+      "birthDate": "2010-06-01"
+    },
+    {
+      "id": "b703000c-0000-4000-8000-000000000000",
+      "firstName": "Eugene",
+      "lastName": "Ashby",
+      "birthDate": "1920-06-01"
+    },
+    {
+      "id": "b703000d-0000-4000-8000-000000000000",
+      "firstName": "Nora",
+      "lastName": "Ashby",
+      "birthDate": "1922-06-01"
+    },
+    {
+      "id": "b703000e-0000-4000-8000-000000000000",
+      "firstName": "Wesley",
+      "lastName": "Ashby",
+      "birthDate": "1951-06-01"
+    },
+    {
+      "id": "b703000f-0000-4000-8000-000000000000",
+      "firstName": "Opal",
+      "lastName": "Ashby",
+      "birthDate": "1956-06-01"
+    },
+    {
+      "id": "b7030010-0000-4000-8000-000000000000",
+      "firstName": "Ivan",
+      "lastName": "Delacroix",
+      "birthDate": "1923-06-01"
+    },
+    {
+      "id": "b7030011-0000-4000-8000-000000000000",
+      "firstName": "Della",
+      "lastName": "Delacroix",
+      "birthDate": "1925-06-01"
+    },
+    {
+      "id": "b7030012-0000-4000-8000-000000000000",
+      "firstName": "Nathan",
+      "lastName": "Delacroix",
+      "birthDate": null
+    },
+    {
+      "id": "b7030013-0000-4000-8000-000000000000",
+      "firstName": "Greta",
+      "lastName": "Hartigan",
+      "birthDate": null
+    },
+    {
+      "id": "b7030014-0000-4000-8000-000000000000",
+      "firstName": "Celia",
+      "lastName": "Delacroix",
+      "birthDate": null
+    },
+    {
+      "id": "b7030015-0000-4000-8000-000000000000",
+      "firstName": "Miles",
+      "lastName": "Delacroix",
+      "birthDate": null
+    },
+    {
+      "id": "b7030016-0000-4000-8000-000000000000",
+      "firstName": "Simon",
+      "lastName": "Delacroix",
+      "birthDate": "1948-06-01"
+    },
+    {
+      "id": "b7030017-0000-4000-8000-000000000000",
+      "firstName": "Nora",
+      "lastName": "Selwyn",
+      "birthDate": "1948-06-01"
+    },
+    {
+      "id": "b7030018-0000-4000-8000-000000000000",
+      "firstName": "Keith",
+      "lastName": "Delacroix",
+      "birthDate": "1974-06-01"
+    },
+    {
+      "id": "b7030019-0000-4000-8000-000000000000",
+      "firstName": "Iris",
+      "lastName": "Delacroix",
+      "birthDate": null
+    },
+    {
+      "id": "b703001a-0000-4000-8000-000000000000",
+      "firstName": "Elaine",
+      "lastName": "Delacroix",
+      "birthDate": "1945-06-01"
+    },
+    {
+      "id": "b703001b-0000-4000-8000-000000000000",
+      "firstName": "Vernon",
+      "lastName": "Merriweather",
+      "birthDate": "1945-06-01"
+    },
+    {
+      "id": "b703001c-0000-4000-8000-000000000000",
+      "firstName": "Kenneth",
+      "lastName": "Merriweather",
+      "birthDate": "1971-06-01"
+    },
+    {
+      "id": "b703001d-0000-4000-8000-000000000000",
+      "firstName": "Roland",
+      "lastName": "Merriweather",
+      "birthDate": "1973-06-01"
+    },
+    {
+      "id": "b703001e-0000-4000-8000-000000000000",
+      "firstName": "Dale",
+      "lastName": "Ashby",
+      "birthDate": null
+    },
+    {
+      "id": "b703001f-0000-4000-8000-000000000000",
+      "firstName": "Diane",
+      "lastName": "Ashby",
+      "birthDate": null
+    },
+    {
+      "id": "b7030020-0000-4000-8000-000000000000",
+      "firstName": "Theo",
+      "lastName": "Ashby",
+      "birthDate": null
+    },
+    {
+      "id": "b7030021-0000-4000-8000-000000000000",
+      "firstName": "Nora",
+      "lastName": "Ormsby",
+      "birthDate": null
+    }
+  ],
+  "relationships": [
+    {
+      "personAId": "b7030001-0000-4000-8000-000000000000",
+      "personBId": "b7030002-0000-4000-8000-000000000000",
+      "type": "Spouse",
+      "endDate": null,
+      "isEnded": true
+    },
+    {
+      "personAId": "b7030001-0000-4000-8000-000000000000",
+      "personBId": "b7030003-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030002-0000-4000-8000-000000000000",
+      "personBId": "b7030003-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030001-0000-4000-8000-000000000000",
+      "personBId": "b7030004-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030002-0000-4000-8000-000000000000",
+      "personBId": "b7030004-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030001-0000-4000-8000-000000000000",
+      "personBId": "b7030005-0000-4000-8000-000000000000",
+      "type": "Spouse",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030001-0000-4000-8000-000000000000",
+      "personBId": "b7030006-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030005-0000-4000-8000-000000000000",
+      "personBId": "b7030006-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030003-0000-4000-8000-000000000000",
+      "personBId": "b7030007-0000-4000-8000-000000000000",
+      "type": "Spouse",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030003-0000-4000-8000-000000000000",
+      "personBId": "b7030008-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030007-0000-4000-8000-000000000000",
+      "personBId": "b7030008-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030003-0000-4000-8000-000000000000",
+      "personBId": "b7030009-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030007-0000-4000-8000-000000000000",
+      "personBId": "b7030009-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030004-0000-4000-8000-000000000000",
+      "personBId": "b703000a-0000-4000-8000-000000000000",
+      "type": "Spouse",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030004-0000-4000-8000-000000000000",
+      "personBId": "b703000b-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703000a-0000-4000-8000-000000000000",
+      "personBId": "b703000b-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703000c-0000-4000-8000-000000000000",
+      "personBId": "b703000d-0000-4000-8000-000000000000",
+      "type": "Spouse",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703000c-0000-4000-8000-000000000000",
+      "personBId": "b7030001-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703000d-0000-4000-8000-000000000000",
+      "personBId": "b7030001-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703000c-0000-4000-8000-000000000000",
+      "personBId": "b703000e-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703000d-0000-4000-8000-000000000000",
+      "personBId": "b703000e-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030001-0000-4000-8000-000000000000",
+      "personBId": "b703000f-0000-4000-8000-000000000000",
+      "type": "Sibling",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030010-0000-4000-8000-000000000000",
+      "personBId": "b7030011-0000-4000-8000-000000000000",
+      "type": "Spouse",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030010-0000-4000-8000-000000000000",
+      "personBId": "b7030002-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030011-0000-4000-8000-000000000000",
+      "personBId": "b7030002-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030010-0000-4000-8000-000000000000",
+      "personBId": "b7030012-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030011-0000-4000-8000-000000000000",
+      "personBId": "b7030012-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030012-0000-4000-8000-000000000000",
+      "personBId": "b7030013-0000-4000-8000-000000000000",
+      "type": "Spouse",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030012-0000-4000-8000-000000000000",
+      "personBId": "b7030014-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030013-0000-4000-8000-000000000000",
+      "personBId": "b7030014-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030012-0000-4000-8000-000000000000",
+      "personBId": "b7030015-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030013-0000-4000-8000-000000000000",
+      "personBId": "b7030015-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030010-0000-4000-8000-000000000000",
+      "personBId": "b7030016-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030011-0000-4000-8000-000000000000",
+      "personBId": "b7030016-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030016-0000-4000-8000-000000000000",
+      "personBId": "b7030017-0000-4000-8000-000000000000",
+      "type": "Spouse",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030016-0000-4000-8000-000000000000",
+      "personBId": "b7030018-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030017-0000-4000-8000-000000000000",
+      "personBId": "b7030018-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030016-0000-4000-8000-000000000000",
+      "personBId": "b7030019-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030017-0000-4000-8000-000000000000",
+      "personBId": "b7030019-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030002-0000-4000-8000-000000000000",
+      "personBId": "b703001a-0000-4000-8000-000000000000",
+      "type": "Sibling",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703001a-0000-4000-8000-000000000000",
+      "personBId": "b703001b-0000-4000-8000-000000000000",
+      "type": "Spouse",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703001a-0000-4000-8000-000000000000",
+      "personBId": "b703001c-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703001b-0000-4000-8000-000000000000",
+      "personBId": "b703001c-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703001a-0000-4000-8000-000000000000",
+      "personBId": "b703001d-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703001b-0000-4000-8000-000000000000",
+      "personBId": "b703001d-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703001e-0000-4000-8000-000000000000",
+      "personBId": "b703001f-0000-4000-8000-000000000000",
+      "type": "Spouse",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703001e-0000-4000-8000-000000000000",
+      "personBId": "b703000c-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703001f-0000-4000-8000-000000000000",
+      "personBId": "b703000c-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703001e-0000-4000-8000-000000000000",
+      "personBId": "b7030020-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b703001f-0000-4000-8000-000000000000",
+      "personBId": "b7030020-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    },
+    {
+      "personAId": "b7030021-0000-4000-8000-000000000000",
+      "personBId": "b7030011-0000-4000-8000-000000000000",
+      "type": "Parent",
+      "endDate": null,
+      "isEnded": false
+    }
+  ]
+}
