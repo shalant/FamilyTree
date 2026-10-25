@@ -36,6 +36,9 @@ public static class LayoutQualityMetrics
             for (var j = i + 1; j < segments.Count; j++)
                 if (segments[i].Owner != segments[j].Owner && ProperlyCross(segments[i], segments[j]))
                     crossings++;
+        // A sibling bar's gap (a line jump) is where another line crosses it: the gap only stops
+        // it looking like a junction, so it still counts as a crossing.
+        crossings += layout.SiblingLinks.Sum(l => l.Gaps?.Count ?? 0);
 
         // A line through a node it doesn't start or end at. Touching the rim doesn't count.
         var throughNodes = new List<string>();

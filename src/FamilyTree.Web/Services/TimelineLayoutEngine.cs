@@ -201,7 +201,22 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
             links.AddRange(best);
             drawn.AddRange(best.SelectMany(l => l.Segments));
         }
-        return links;
+
+        // A line crossing a bar would read as hanging from it, so the bar gets a gap there
+        // (after every set is routed, so later sets' lines count too). Only lines passing right
+        // through: a sibling's own line ends at the bar, and a crossing within a gap of the
+        // bar's end isn't given one.
+        var upright = drawn.Where(d => Math.Abs(d.X1 - d.X2) < 0.5).ToList();
+        return [.. links.Select(l =>
+        {
+            if (l.BarY is not { } bar) return l;
+            var (left, right) = (Math.Min(l.AX, l.BX), Math.Max(l.AX, l.BX));
+            var gaps = upright
+                .Where(v => v.X1 > left + SiblingLink.JumpGap && v.X1 < right - SiblingLink.JumpGap
+                         && Math.Min(v.Y1, v.Y2) < bar - 0.5 && Math.Max(v.Y1, v.Y2) > bar + 0.5)
+                .Select(v => v.X1).Distinct().Order().ToList();
+            return gaps.Count > 0 ? l with { Gaps = gaps } : l;
+        })];
     }
 
     // Two level (or two upright) lines closer than SiblingLineClearance and sharing more than

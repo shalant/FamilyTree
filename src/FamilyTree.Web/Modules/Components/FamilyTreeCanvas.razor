@@ -117,12 +117,11 @@
                 @foreach (var link in _layout.SiblingLinks)
                 {
                     @* With BarY (TimelineLayoutEngine) the link is a bracket over the two
-                       siblings: up to the bar, across, down. Without it, a straight line. *@
+                       siblings: up to the bar, across (broken where another line crosses it),
+                       down. Without it, a straight line. *@
                     <g class="ft-line-sibling">
                         <title>Siblings</title>
-                        <path d="@(link.BarY is { } bar
-                                     ? $"M {F(link.AX)} {F(link.AY)} L {F(link.AX)} {F(bar)} L {F(link.BX)} {F(bar)} L {F(link.BX)} {F(link.BY)}"
-                                     : $"M {F(link.AX)} {F(link.AY)} L {F(link.BX)} {F(link.BY)}")"
+                        <path d="@string.Join(" ", link.Segments.Select(s => $"M {F(s.X1)} {F(s.Y1)} L {F(s.X2)} {F(s.Y2)}"))"
                               fill="none"
                               stroke="var(--ft-gray-300)"
                               stroke-width="1.6"

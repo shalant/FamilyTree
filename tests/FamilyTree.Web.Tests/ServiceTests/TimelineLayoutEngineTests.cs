@@ -117,6 +117,13 @@ public class TimelineLayoutEngineTests
         sisters.Should().ContainSingle();
         if (sisters[0].BarY is { } sistersBar && louisSet[0].BarY is { } louisBar)
             sistersBar.Should().NotBe(louisBar, "two sets never share a bar");
+
+        // Louis sits between the sisters, so his line up to his own siblings' bar passes their
+        // bar (or Libby's line passes his). The crossed bar breaks there, so Louis doesn't
+        // read as the sisters' brother, and the score still counts it as a crossing.
+        var gaps = layout.SiblingLinks.SelectMany(l => l.Gaps ?? []).ToList();
+        gaps.Should().ContainSingle().Which.Should().BeOneOf(x[louis], x[libby]);
+        report.Crossings.Should().Be(1, "a line jump is still a crossing");
     }
 
     [Fact]
