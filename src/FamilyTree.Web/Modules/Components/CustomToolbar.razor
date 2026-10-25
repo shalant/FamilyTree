@@ -1,6 +1,7 @@
 @using FamilyTree.Web.Services
 @inject NavigationManager Nav
 @inject TreeContextService TreeContext
+@inject LayoutEngineSelector LayoutSelector
 
 @if (_collapsed && ForceCollapsed)
 {
@@ -85,6 +86,38 @@ else
         <MudTooltip Text="Export family data" Placement="Placement.Top">
             <MudIconButton Icon="@Icons.Material.Outlined.FileDownload" Size="Size.Small" OnClick="OnExport" />
         </MudTooltip>
+
+        @* Layout engine picker: only for a viewer with more than one engine open to them
+           (today the super-user, who can try the Timeline prototype; LayoutEngineSelector).
+           Off the default, the engine's name shows so a screenshot says which one drew it. *@
+        @if (LayoutSelector.Available.Count > 1)
+        {
+            <MudDivider Vertical="true" FlexItem="true" Style="height:28px; margin:0 4px;" />
+
+            <MudMenu Icon="@Icons.Material.Outlined.AccountTree"
+                     Size="Size.Small"
+                     Dense="true"
+                     Class="ft-layout-engine-menu"
+                     AriaLabel="@($"Layout: {LayoutSelector.Current.Name}")"
+                     AnchorOrigin="Origin.TopLeft"
+                     TransformOrigin="Origin.BottomLeft">
+                @foreach (var option in LayoutSelector.Available)
+                {
+                    <MudMenuItem Class="ft-layout-engine-option"
+                                 Icon="@(option == LayoutSelector.Current ? Icons.Material.Filled.Check : null)"
+                                 OnClick="@(() => LayoutSelector.TrySelect(option.Key))">
+                        @option.Name
+                    </MudMenuItem>
+                }
+            </MudMenu>
+            @if (LayoutSelector.Current != LayoutSelector.Default)
+            {
+                <span class="ft-layout-engine-label"
+                      style="font-size:12px; color:var(--ft-green-700); white-space:nowrap; margin-right:4px;">
+                    @LayoutSelector.Current.Name
+                </span>
+            }
+        }
 
         <MudDivider Vertical="true" FlexItem="true" Style="height:28px; margin:0 4px;" />
 

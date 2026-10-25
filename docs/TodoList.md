@@ -74,9 +74,15 @@ stopping placement patches and replacing the placement algorithm, measured first
       domain that the archived engine still skips, except three listed with reasons
       (`Invariant4` full domain; Kat past Sam, both GUID orders) and one test judged not
       applicable (the prototype turns Bill + Gish so newly linked brothers sit together).
-- [ ] **Try the prototype live**: PR and deploy (production stays on `Legacy`), then set
-      `Layout__Engine=Timeline` on the App Service; delete the setting to switch back.
-      Doug's call, after looking at the gallery.
+- [ ] **Try the prototype live**: since 2026-10-24 (`feat/layout-engine-picker`) this no
+      longer means switching the whole site. The super-user picks "Timeline prototype"
+      from the layout menu in the floating toolbar; everyone else stays on `Legacy`
+      (`LayoutEngineSelector`, ADR 004, "Trying the prototype on live data"). Merge #65
+      and the picker, deploy, then try it. Setting `Layout__Engine=Timeline` still
+      switches everyone, for when the prototype is ready.
+- [ ] **Layout picker follow-ups** (2026-10-24): a picker on mobile (the toolbar is a mini
+      pill there); remembering the choice per account instead of per browser; opening
+      engines to every viewer once there's more than one worth choosing.
 
 ---
 

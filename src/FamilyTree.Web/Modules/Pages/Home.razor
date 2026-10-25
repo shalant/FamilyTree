@@ -24,6 +24,7 @@
 @inject IJSRuntime JS
 @inject AuthenticationStateProvider AuthStateProvider
 @inject TreeContextService TreeContext
+@inject LayoutEngineSelector LayoutSelector
 @inject UserManager<AppUser> UserManager
 
 <PageTitle>ArborKin</PageTitle>
@@ -410,6 +411,16 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // Restore this browser's layout-engine choice. TrySelect refuses an engine this viewer
+        // may not pick, so a family member on a browser the super-user also uses stays on the
+        // default even though the key is shared.
+        if (firstRender)
+        {
+            LayoutSelector.Changed += OnLayoutEngineChanged;
+            try { LayoutSelector.TrySelect(await JS.InvokeAsync<string?>("localStorage.getItem", LayoutEngineStorageKey)); }
+            catch { }
+        }
+
         if (firstRender && !_linkingModalChecked && _currentUserId.HasValue && _people.Any())
         {
             _linkingModalChecked = true;
@@ -502,6 +513,7 @@ else
     public async ValueTask DisposeAsync()
     {
         TreeContext.OnCenterTreeRequested -= OnCenterTreeFromAppBar;
+        LayoutSelector.Changed -= OnLayoutEngineChanged;
         TreeContext.OnZoomInRequested -= OnZoomInFromPanel;
         TreeContext.OnZoomOutRequested -= OnZoomOutFromPanel;
         TreeContext.OnResetViewRequested -= OnResetViewFromPanel;
@@ -525,6 +537,17 @@ else
         TreeContext.SetContext(person, _people.Count, _couples.Count);
         await PersistFocusAsync(person.Id);
     }
+
+    private const string LayoutEngineStorageKey = "ft-layout-engine";
+
+    // Redraws the tree with the newly selected engine (the canvas recomputes its layout on
+    // every parameter set) and remembers the choice for this browser.
+    private void OnLayoutEngineChanged() => _ = InvokeAsync(async () =>
+    {
+        StateHasChanged();
+        try { await JS.InvokeVoidAsync("localStorage.setItem", LayoutEngineStorageKey, LayoutSelector.Current.Key); }
+        catch { }
+    });
 
     // Saves focus to DB (if authenticated) and localStorage.
     private async Task PersistFocusAsync(Guid? personId)
