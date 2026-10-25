@@ -105,9 +105,10 @@ public class SvgExportService(IFamilyTreeLayoutEngine layoutEngine)
         }
 
         // Sibling links with no shared parent on the tree, dotted as on the canvas (the export
-        // left them out until 2026-10-24).
+        // left them out until 2026-10-24): a straight line, or the prototype's bracket.
         foreach (var link in layout.SiblingLinks)
-            sb.AppendLine($"""<line x1="{F(link.AX)}" y1="{F(link.AY + titleH)}" x2="{F(link.BX)}" y2="{F(link.BY + titleH)}" stroke="{palette.DeadTop}" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="0.1 4"/>""");
+            foreach (var (x1, y1, x2, y2) in link.Segments)
+                sb.AppendLine($"""<line x1="{F(x1)}" y1="{F(y1 + titleH)}" x2="{F(x2)}" y2="{F(y2 + titleH)}" stroke="{palette.DeadTop}" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="0.1 4"/>""");
 
         // ── Person nodes ──────────────────────────────────────────────────
         foreach (var node in layout.Nodes)

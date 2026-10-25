@@ -418,7 +418,7 @@ public class FamilyTreeLayoutFuzzTests
             if (u.Span is { } s) values.AddRange([s.LeftX, s.RightX, s.Y]);
             values.AddRange(u.Drops.SelectMany(d => new[] { d.CenterX, d.BotY }));
         }
-        values.AddRange(layout.SiblingLinks.SelectMany(l => new[] { l.AX, l.AY, l.BX, l.BY }));
+        values.AddRange(layout.SiblingLinks.SelectMany(l => new[] { l.AX, l.AY, l.BX, l.BY, l.BarY ?? 0 }));
         values.AddRange(layout.ComponentDividers.SelectMany(d => new[] { d.X, d.TopY, d.BotY }));
         Fail(values.Any(v => !double.IsFinite(v)) ? ["layout contains NaN or infinite coordinates"] : []);
     }

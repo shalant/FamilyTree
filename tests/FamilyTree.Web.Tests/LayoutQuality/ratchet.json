@@ -3,13 +3,13 @@
     "familiesWithLooseCouple": 107,
     "partnerGapWorst": 1600,
     "partnerGapMean": 220,
-    "crossings": 685,
-    "linesThroughNodes": 579,
+    "crossings": 697,
+    "linesThroughNodes": 405,
     "nodeOverlaps": 0,
     "familyOffCentreMean": 205,
     "widthMean": 1197,
-    "connectorLengthMean": 2784,
-    "mergedLines": 641
+    "connectorLengthMean": 2752,
+    "mergedLines": 628
   },
   "fixture two-bridges (2026-10-16 screenshot)": {
     "partnerGapMax": 200,
@@ -23,12 +23,12 @@
   },
   "fixture live": {
     "partnerGapMax": 200,
-    "crossings": 0,
-    "linesThroughNodes": 4,
+    "crossings": 1,
+    "linesThroughNodes": 0,
     "nodeOverlaps": 0,
     "familyOffCentreMax": 92,
     "width": 1240,
-    "connectorLength": 5434,
+    "connectorLength": 5446,
     "mergedLines": 0
   },
   "fixture local-dev": {

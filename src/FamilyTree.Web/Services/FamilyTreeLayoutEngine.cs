@@ -2269,8 +2269,37 @@ public class FamilyTreeLayoutEngine : IFamilyTreeLayoutEngine
     /// A direct line between two siblings who have no shared parent on the tree
     /// (e.g. a newly-added sibling like "Bill" linked only to "Ray") — there is no
     /// parent/couple group to hang a normal stem+span+drop connector off of.
+    /// With <paramref name="BarY"/> set (TimelineLayoutEngine, 2026-10-23) it's drawn as a
+    /// bracket: up from each sibling to a bar at that height, then across, like a family's
+    /// sibling span. Null (this engine) draws the original straight line.
     /// </summary>
-    public record SiblingLink(double AX, double AY, double BX, double BY);
+    /// <paramref name="Gaps"/> (2026-10-24) are X positions where another line crosses the bar:
+    /// the bar is drawn with a <see cref="JumpGap"/>-wide break there, so a line passing up
+    /// through it (Louis's, through his wives' sister bar) doesn't read as hanging from it.
+    public record SiblingLink(double AX, double AY, double BX, double BY, double? BarY = null, IReadOnlyList<double>? Gaps = null)
+    {
+        public const double JumpGap = 10;
+
+        /// <summary>The line's pieces as drawn: one straight segment, or the bracket's three, its bar broken at each gap.</summary>
+        public IReadOnlyList<(double X1, double Y1, double X2, double Y2)> Segments
+        {
+            get
+            {
+                if (BarY is not { } bar) return [(AX, AY, BX, BY)];
+                var (left, right) = (Math.Min(AX, BX), Math.Max(AX, BX));
+                var pieces = new List<(double, double, double, double)> { (AX, AY, AX, bar) };
+                var from = left;
+                foreach (var g in (Gaps ?? []).Order())
+                {
+                    pieces.Add((from, bar, g - JumpGap / 2, bar));
+                    from = g + JumpGap / 2;
+                }
+                pieces.Add((from, bar, right, bar));
+                pieces.Add((BX, bar, BX, BY));
+                return pieces;
+            }
+        }
+    }
 
     /// <summary>
     /// A subtle vertical boundary marking the gap between two genuinely disconnected

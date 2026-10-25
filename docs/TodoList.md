@@ -118,18 +118,39 @@ stopping placement patches and replacing the placement algorithm, measured first
       sibling line, so Ray and William didn't read as half-brothers. An ended marriage now
       has long dashes and a 💔; a sibling link is light grey dots. The SVG export matches
       and now draws sibling links at all. Test: `RelationshipLineStyleTests`.
-- [ ] **Route sibling links around people** (next, prototype only). The links still run
-      straight through anyone between the two siblings (Lillian to Libby through Louis;
-      Louis to David through Libby and Tilly, on top of the Louis to Tilly link). Plan: a
-      low bracket over the two people, stacked at different heights where links share a
-      stretch, judged by the merged-lines score first (what sank the attempt below).
+- [x] **Route sibling links around people** (2026-10-24, `feat/route-sibling-links`, PR #73,
+      prototype only). Straight links ran through anyone between two siblings (Lillian to
+      Libby through Louis; Louis to David through Libby and Tilly, on top of Louis to
+      Tilly). Each set of siblings now hangs from one dotted bar, drawn as a chain left to
+      right, routed first so it lies along no other line within 10, then through the fewest
+      people, crossings, length; a bar breaks (a line jump) where another line crosses it,
+      so Louis's line through his wives' sister bar doesn't read as him hanging from it.
+      This reworks the 2026-10-23 bracket attempt (merged lines 646 → 827), which lacked
+      the along-first rule and drew each recorded pair separately. Live: lines through
+      people 4 → 0. Generated: lines through people 579 → 405, merged lines 641 → 628,
+      connector length 2784 → 2752. Doug accepted: generated crossings 685 → 697, live
+      crossings 0 → 1 (the Louis jump, unavoidable while both sets are drawn), live
+      connector length 5434 → 5446. Tests:
+      `TimelineLayoutEngineTests.SiblingSets_AroundAManWithTwoWives_EachGetOneClearBar`.
+- [ ] **Fewer crossings from sibling bars** (found 2026-10-24). Routes are scored against
+      the lines drawn so far, set by set, narrowest first, and only bars above the row are
+      tried (below the row was tried: crossings 696, and it sits among couple lines and
+      stems). Ordering siblings next to each other where the layout allows, or choosing
+      all sets' heights together, should give back some of the 12 crossings.
 - [ ] **Data check for Doug:** Lillian and Louis's marriage has an end date of 2026-09-18,
       which looks like the day it was entered. It's the only reason it's drawn as ended.
-- [ ] **Bracket-shaped sibling links: rework or drop** (tried 2026-10-23, not merged; patch
-      in the gitignored `artifacts/sibling-bracket-2026-10-23.patch` on Doug's machine,
-      `git apply` to bring it back). Lines through people 582 → 309, but crossings 683 → 753 and
-      merged lines 646 → 827. Retry only with "lying on another line" as the first thing a
-      route avoids.
+      Doug confirmed it's a slip (2026-10-24); see "Detect likely data-entry slips".
+- [ ] **Detect likely data-entry slips** (asked 2026-10-24, not started). A "Data check"
+      list beside `DataIntegrityService`'s existing checks, each finding shown as "probably
+      wrong, please check" with a "this is correct" dismiss, never fixed automatically.
+      Candidate rules: a date equal to the day the record was entered (`EndDate` =
+      `CreatedAt` ±1 day: the Lillian and Louis case); an event at an impossible age for
+      someone with no death date (over 110); death before birth, a birth in the future, a
+      marriage ending before it started or after a partner died; a child born when a
+      parent was under 12, a mother over 55, or a father dead over a year; a surname one or
+      two letters off a close relative's ("Schumevith" vs "Schmulevith"); possible
+      duplicates (`PersonNameDuplicateMatcher`: William vs "Bill"). Later: the same rules
+      as warnings in the Add/Edit Person form.
 - [ ] **Try the prototype live**: since 2026-10-24 (`feat/layout-engine-picker`) this no
       longer means switching the whole site. The super-user picks "Timeline prototype"
       from the layout menu in the floating toolbar; everyone else stays on `Legacy`

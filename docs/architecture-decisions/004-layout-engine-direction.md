@@ -351,6 +351,37 @@ Built to grow into a choice for every viewer: clearing an engine's `SuperUserOnl
 picker to everyone. Not done yet: a mobile picker (the toolbar is a mini pill there), and
 remembering the choice per account rather than per browser.
 
+## Sibling links as bars (2026-10-24)
+
+On the live tree, through the picker, Doug found the old relatives around Louis unreadable:
+his ended marriage to Lillian, Lillian and Libby's sister link and his own links to Tilly
+and David were all grey dashed lines, the straight sibling links ran through people, and
+Ray and William didn't read as half-brothers. Two changes:
+
+1. **Line styles (both engines, every viewer, PR #72).** An ended marriage has long dashes
+   and a 💔; a sibling link is light grey dots. Ray then visibly hangs from a marriage.
+2. **Routing (prototype, PR #73).** Each set of siblings with no shared parent hangs from
+   one bar over them, drawn as a chain left to right. A set's route is chosen first so no
+   piece lies along another line within 10 (the merged-lines score uses 3, which left two
+   bars 7 apart, still a double line), then by people passed through, crossings and length;
+   a straight line stays when nothing is in its way (Rebecca and her sister). Where another
+   line crosses a bar, the bar breaks (a line jump): Louis sits between the two sisters and
+   his own siblings are beyond Libby, so one crossing is unavoidable, and without the break
+   Louis read as hanging from the sisters' bar. The score still counts a jump as a crossing.
+
+| | Before | After |
+|---|---|---|
+| Live: lines through people | 4 | 0 |
+| Generated: lines through people | 579 | 405 |
+| Generated: lines on top of another family's | 641 | 628 |
+| Generated: crossings | 685 | 697 |
+| Live: crossings | 0 | 1 (the Louis jump) |
+
+The first bracket attempt (2026-10-23) raised merged lines to 827 because it never checked
+for lying along a line and drew every recorded pair (Louis to Tilly and Louis to David) as
+its own bracket. Doug accepted the crossings: lines through people and lines on top of each
+other state relationships that aren't there, crossings only make a tree busier.
+
 ## Consequences
 
 - The scores give a baseline to beat. Since 2026-10-23 they are also a ratchet for the

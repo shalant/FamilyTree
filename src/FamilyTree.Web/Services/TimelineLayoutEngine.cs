@@ -1,6 +1,7 @@
 using FamilyTree.Shared.DTOs;
 using FamilyTree.Shared.DTOs.Person;
 using static FamilyTree.Web.Services.FamilyTreeLayoutEngine;
+using Line = (double X1, double Y1, double X2, double Y2);
 
 namespace FamilyTree.Web.Services;
 
@@ -121,13 +122,9 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
         for (var i = 0; i < g.N; i++)
             nodeMap[g.People[i].Id] = new LayoutNode(g.People[i], (int)Math.Round(x[i]), y[i], depth[i], i == focus, size[i]);
 
-        var siblingLinks = new List<SiblingLink>();
-        for (var i = 0; i < g.N; i++)
-            foreach (var s in g.Siblings[i].Where(s => s > i && !g.Parents[i].Intersect(g.Parents[s]).Any()))
-            {
-                var (a, b) = (nodeMap[g.People[i].Id], nodeMap[g.People[s].Id]);
-                siblingLinks.Add(new SiblingLink(a.X, a.Y, b.X, b.Y));
-            }
+        var connectors = BuildConnectors(people, g.Couples, nodeMap);
+        var drawn = connectors.SelectMany(LinesOf).ToList();
+        var siblingLinks = RouteSiblingLinks(g, nodeMap, drawn);
 
         var bandHeight = Math.Max((int)(PxPerYear * 10), 80);
         var bands = new List<GenerationBand>();
@@ -137,12 +134,133 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
         return new FamilyTreeLayout(
             [.. nodeMap.Values],
             bands,
-            BuildConnectors(people, g.Couples, nodeMap),
+            connectors,
             siblingLinks,
             dividers,
             (int)Math.Ceiling(previousEnd ?? 0) + PaddingX,
             canvasHeight,
             focus >= 0 ? depth[focus] : 0);
+    }
+
+    // Sibling links (siblings with no shared parent on the tree) treat people and the lines
+    // already drawn as obstacles. Straight lines ran through whoever sat in between (Lillian
+    // to her sister Libby through their husband Louis; Louis to David through Libby and
+    // Tilly, on top of Louis to Tilly), and on the live tree four such lines around Louis
+    // couldn't be told apart (2026-10-24). So the links of one set of siblings (Louis, Tilly,
+    // David) share one route: all straight, or all brackets to one bar over them, the shape a
+    // family's children hang from. Each set picks the route that lies along no other line
+    // first (what sank the first bracket attempt on 2026-10-23: merged lines 646 to 827), then
+    // the one through the fewest other people, then the fewest crossings, then the shortest,
+    // so siblings with nothing between them keep a straight line. Narrowest sets first, so a
+    // wider bar goes over the narrower ones.
+    private const int SiblingBarGap = 18;  // the connector builder's span sits this far above a child
+    private const int SiblingBarStep = 12; // further bars, each clear of the last (MergeDistance 3)
+    private const int SiblingBarTries = 8;
+
+    private static List<SiblingLink> RouteSiblingLinks(Graph g, Dictionary<Guid, LayoutNode> nodeMap, List<Line> drawn)
+    {
+        var pairs = Enumerable.Range(0, g.N)
+            .SelectMany(i => g.Siblings[i].Where(s => s > i && !g.Parents[i].Intersect(g.Parents[s]).Any()).Select(s => (i, s)))
+            .ToList();
+
+        // Sets of siblings joined by these links.
+        var root = Enumerable.Range(0, g.N).ToArray();
+        int Find(int v) => root[v] == v ? v : root[v] = Find(root[v]);
+        foreach (var (i, s) in pairs) root[Find(i)] = Find(s);
+        LayoutNode Node(int i) => nodeMap[g.People[i].Id];
+        var sets = pairs.GroupBy(p => Find(p.i))
+            .Select(gr => gr.ToList())
+            .OrderBy(set => set.SelectMany(p => new[] { Node(p.i).X, Node(p.s).X }).Max()
+                          - set.SelectMany(p => new[] { Node(p.i).X, Node(p.s).X }).Min())
+            .ToList();
+
+        var links = new List<SiblingLink>();
+        foreach (var set in sets)
+        {
+            var members = set.SelectMany(p => new[] { p.i, p.s }).Distinct().Select(Node).ToList();
+            var memberIds = members.Select(m => m.Person.Id).ToHashSet();
+            var others = nodeMap.Values.Where(n => !memberIds.Contains(n.Person.Id)).ToList();
+            var top = members.Min(m => m.Y - m.Size / 2.0) - SiblingBarGap;
+            var routes = new List<double?> { null }
+                .Concat(Enumerable.Range(0, SiblingBarTries).Select(k => (double?)(top - k * SiblingBarStep)));
+            // Drawn as a chain left to right (Louis to Tilly, Tilly to David), not the recorded
+            // pairs (Louis to Tilly, Louis to David): one bar with one line to each sibling,
+            // instead of two lines up from Louis on top of each other.
+            var chain = members.OrderBy(m => m.X).ThenBy(m => m.Person.Id).ToList();
+            var best = routes
+                .Select(bar => chain.Zip(chain.Skip(1), (a, b) => new SiblingLink(a.X, a.Y, b.X, b.Y, bar)).ToList())
+                .MinBy(route =>
+                {
+                    var segs = route.SelectMany(l => l.Segments).ToList();
+                    var along = segs.Sum(s => drawn.Count(d => Along(s, d)));
+                    var hits = segs.Sum(s => others.Count(n => DistanceToSegment(n.X, n.Y, s) < n.Size / 2.0));
+                    var crossings = segs.Sum(s => drawn.Count(d => Cross(s, d)));
+                    var length = segs.Sum(s => Math.Abs(s.X2 - s.X1) + Math.Abs(s.Y2 - s.Y1));
+                    return (along, hits, crossings, length);
+                })!;
+            links.AddRange(best);
+            drawn.AddRange(best.SelectMany(l => l.Segments));
+        }
+
+        // A line crossing a bar would read as hanging from it, so the bar gets a gap there
+        // (after every set is routed, so later sets' lines count too). Only lines passing right
+        // through: a sibling's own line ends at the bar, and a crossing within a gap of the
+        // bar's end isn't given one.
+        var upright = drawn.Where(d => Math.Abs(d.X1 - d.X2) < 0.5).ToList();
+        return [.. links.Select(l =>
+        {
+            if (l.BarY is not { } bar) return l;
+            var (left, right) = (Math.Min(l.AX, l.BX), Math.Max(l.AX, l.BX));
+            var gaps = upright
+                .Where(v => v.X1 > left + SiblingLink.JumpGap && v.X1 < right - SiblingLink.JumpGap
+                         && Math.Min(v.Y1, v.Y2) < bar - 0.5 && Math.Max(v.Y1, v.Y2) > bar + 0.5)
+                .Select(v => v.X1).Distinct().Order().ToList();
+            return gaps.Count > 0 ? l with { Gaps = gaps } : l;
+        })];
+    }
+
+    // Two level (or two upright) lines closer than SiblingLineClearance and sharing more than
+    // 2 of their length. LayoutQualityMetrics counts lines within 3 as merged; a router held
+    // to that put the sisters' bar 7 from Louis's siblings' bar on the live tree, which still
+    // read as a double line (2026-10-24), so the router keeps further apart than the score.
+    private const double SiblingLineClearance = 10;
+
+    private static bool Along(Line a, Line b)
+    {
+        static bool Flat(Line s) => Math.Abs(s.Y1 - s.Y2) < 0.5;
+        static bool Upright(Line s) => Math.Abs(s.X1 - s.X2) < 0.5;
+        static double Shared(double a1, double a2, double b1, double b2) =>
+            Math.Min(Math.Max(a1, a2), Math.Max(b1, b2)) - Math.Max(Math.Min(a1, a2), Math.Min(b1, b2));
+        if (Flat(a) && Flat(b) && Math.Abs(a.Y1 - b.Y1) < SiblingLineClearance) return Shared(a.X1, a.X2, b.X1, b.X2) > 2;
+        if (Upright(a) && Upright(b) && Math.Abs(a.X1 - b.X1) < SiblingLineClearance) return Shared(a.Y1, a.Y2, b.Y1, b.Y2) > 2;
+        return false;
+    }
+
+    private static IEnumerable<Line> LinesOf(FamilyUnit f)
+    {
+        if (f.Couple is { } c) yield return (c.PartnerAX, c.PartnerAY, c.PartnerBX, c.PartnerBY);
+        if (f.Stem.TopY < f.Stem.BotY) yield return (f.Stem.X, f.Stem.TopY, f.Stem.X, f.Stem.BotY);
+        if (f.Span is { } s) yield return (s.LeftX, s.Y, s.RightX, s.Y);
+        foreach (var d in f.Drops) yield return (d.CenterX, f.Stem.BotY, d.CenterX, d.BotY);
+    }
+
+    // Strict crossing: each line's ends lie on opposite sides of the other. Lines that only
+    // touch or meet at an end (a sibling's link and their own couple line) don't count.
+    private static bool Cross(Line a, Line b)
+    {
+        static double Side(Line l, double x, double y) => (l.X2 - l.X1) * (y - l.Y1) - (l.Y2 - l.Y1) * (x - l.X1);
+        const double eps = 1e-6;
+        static bool Apart(double p, double q) => (p > eps && q < -eps) || (p < -eps && q > eps);
+        return Apart(Side(a, b.X1, b.Y1), Side(a, b.X2, b.Y2)) && Apart(Side(b, a.X1, a.Y1), Side(b, a.X2, a.Y2));
+    }
+
+    private static double DistanceToSegment(double px, double py, Line s)
+    {
+        var (dx, dy) = (s.X2 - s.X1, s.Y2 - s.Y1);
+        var len = dx * dx + dy * dy;
+        var t = len == 0 ? 0 : Math.Clamp(((px - s.X1) * dx + (py - s.Y1) * dy) / len, 0, 1);
+        var (cx, cy) = (s.X1 + t * dx - px, s.Y1 + t * dy - py);
+        return Math.Sqrt(cx * cx + cy * cy);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
