@@ -3,6 +3,7 @@ using FamilyTree.Core.Services;
 using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Medium;
 using FamilyTree.Shared.DTOs.Person;
+using FamilyTree.Shared.DTOs.Relationship;
 using FamilyTree.Web.Modules.Pages;
 using FamilyTree.Web.Services;
 using FluentAssertions;
@@ -35,6 +36,7 @@ public class ParentLoopRejectionUiTests : ComponentTestBase
         }, LoopMessage);
         Services.AddSingleton<IPersonService>(_people);
         Services.AddSingleton<IMediumService>(new NoPhotosMediumService());
+        Services.AddSingleton<IRelationshipService>(new UnusedRelationshipService());
         RenderComponent<MudPopoverProvider>();
     }
 
@@ -93,11 +95,29 @@ class RejectingPersonService(PersonDto person, string failureMessage) : IPersonS
 
     public Task<ServiceResponse<List<PersonDto>>> GetAllForUserAsync(Guid userId, CancellationToken ct = default)
         => throw new NotImplementedException();
+    public Task<ServiceResponse> SetProfilePhotoAsync(Guid personId, Guid mediumId, CancellationToken ct = default)
+        => throw new NotImplementedException();
     public Task<ServiceResponse> DeleteAsync(Guid id, CancellationToken ct = default)
         => throw new NotImplementedException();
     public Task<ServiceResponse> RestoreAsync(Guid id, CancellationToken ct = default)
         => throw new NotImplementedException();
     public Task<ServiceResponse<List<PersonDto>>> GetDeletedAsync(CancellationToken ct = default)
+        => throw new NotImplementedException();
+}
+
+// PersonAdd links extra siblings through this after a successful add; a rejected add
+// never gets that far.
+class UnusedRelationshipService : IRelationshipService
+{
+    public Task<ServiceResponse<List<RelationshipDto>>> GetAllAsync(CancellationToken ct = default)
+        => throw new NotImplementedException();
+    public Task<ServiceResponse<List<RelationshipDto>>> GetForPersonAsync(Guid personId, CancellationToken ct = default)
+        => throw new NotImplementedException();
+    public Task<ServiceResponse<RelationshipDto>> CreateAsync(RelationshipUpsertDto dto, CancellationToken ct = default)
+        => throw new NotImplementedException();
+    public Task<ServiceResponse<RelationshipDto>> UpdateAsync(Guid id, RelationshipUpsertDto request, CancellationToken ct = default)
+        => throw new NotImplementedException();
+    public Task<ServiceResponse> DeleteAsync(Guid id, CancellationToken ct = default)
         => throw new NotImplementedException();
 }
 

@@ -295,6 +295,17 @@ public class CrossTenantMatrixTests
     }
 
     [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    public async Task Person_SetProfilePhotoAsync_FamilyBPerson_FailsAndLeavesItUnchanged(Caller c)
+    {
+        var w = await SeedAsync();
+        var r = await PersonSvc(w, w.As(c)).SetProfilePhotoAsync(w.B1, w.MediumB);
+        r.Success.Should().BeFalse();
+        r.Message.Should().NotContainAny(BNames);
+        var b1 = await Read(w, ctx => ctx.People.SingleAsync(p => p.Id == w.B1));
+        b1.ProfilePhotoUrl.Should().BeNull();
+    }
+
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Person_CreateAsync_WithFamilyBRelative_FailsAndLinksNothing(Caller c)
     {
         var w = await SeedAsync();
@@ -868,6 +879,7 @@ public class CrossTenantMatrixTests
         (await StorySvc(w, u).UpdateAsync(w.StoryBUnlinked, new StoryUpsertDto { Title = "edited", Body = "edited" })).Success.Should().BeTrue();
         (await PersonSvc(w, u).UpdateAsync(w.B2, Dto("Bruno", "Brennan-Edited"))).Success.Should().BeTrue();
         (await PersonSvc(w, u).RestoreAsync(w.BDeleted)).Success.Should().BeTrue();
+        (await PersonSvc(w, u).SetProfilePhotoAsync(w.B1, w.MediumB)).Success.Should().BeTrue();
         (await MediumSvc(w, u).DeleteAsync(w.MediumB)).Success.Should().BeTrue();
         (await PersonSvc(w, u).DeleteAsync(w.B2)).Success.Should().BeTrue();
     }

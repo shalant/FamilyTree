@@ -208,7 +208,7 @@ public class RelationshipService(
                 : (request.PersonBId, request.PersonAId);
 
             // Validate updated relationship
-            var ruleError = await ValidateNewRelationshipAsync(ctx, request, ct);
+            var ruleError = await ValidateNewRelationshipAsync(ctx, request, ct, excludeRelationshipId: rel.Id);
             if (ruleError != null)
                 return ServiceResponse<RelationshipDto>.Fail(ruleError);
 
@@ -330,8 +330,12 @@ public class RelationshipService(
         return null;
     }
 
+    // excludeRelationshipId: the row being updated, which must not count as the "other"
+    // marriage. Until 2026-10-25 UpdateAsync passed nothing, so an active spouse row always
+    // found itself and every edit to it failed with "already in an active marriage".
     private async Task<string?> ValidateNewRelationshipAsync(
-        AppDbContext ctx, RelationshipUpsertDto request, CancellationToken ct)
+        AppDbContext ctx, RelationshipUpsertDto request, CancellationToken ct,
+        Guid? excludeRelationshipId = null)
     {
         if (request.PersonAId == request.PersonBId)
             return "A person cannot be related to themselves.";
@@ -368,7 +372,9 @@ public class RelationshipService(
             }
         }
 
-        if (request.Type == RelationshipType.Spouse)
+        // Only an active marriage conflicts with another active one; recording a past
+        // marriage (ended, or with an end date) is fine whatever else the person has.
+        if (request.Type == RelationshipType.Spouse && !request.IsEnded && request.EndDate == null)
         {
             var aId = request.PersonAId;
             var bId = request.PersonBId;
@@ -379,14 +385,16 @@ public class RelationshipService(
                 .FirstOrDefaultAsync(p => p.Id == bId, ct);
 
             var aHasSpouse = await ctx.Relationships.AnyAsync(
-                r => (r.PersonAId == aId || r.PersonBId == aId) &&
+                r => r.Id != excludeRelationshipId &&
+                     (r.PersonAId == aId || r.PersonBId == aId) &&
                      r.Type == RelationshipType.Spouse &&
                      !r.IsEnded && r.EndDate == null, ct);
             if (aHasSpouse)
                 return $"{personA?.FirstName ?? "This person"} is already in an active marriage.";
 
             var bHasSpouse = await ctx.Relationships.AnyAsync(
-                r => (r.PersonAId == bId || r.PersonBId == bId) &&
+                r => r.Id != excludeRelationshipId &&
+                     (r.PersonAId == bId || r.PersonBId == bId) &&
                      r.Type == RelationshipType.Spouse &&
                      !r.IsEnded && r.EndDate == null, ct);
             if (bHasSpouse)

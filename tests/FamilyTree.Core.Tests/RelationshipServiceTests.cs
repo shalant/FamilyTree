@@ -88,6 +88,71 @@ public class RelationshipServiceTests
         await using var ctx = factory.CreateDbContext();
         ctx.Relationships.Should().BeEmpty();
     }
+    // Outreach readiness A2, 2026-10-25: the active-marriage check counted the row being
+    // updated as the "other" marriage, so any edit to an active spouse row failed.
+    [Fact]
+    [Trait("Category", "Regression")]
+    public async Task UpdateAsync_ActiveSpouse_DoesNotCountItselfAsTheOtherMarriage()
+    {
+        var (service, factory, _) = CreateSut();
+        var created = await service.CreateAsync(new RelationshipUpsertDto
+        {
+            PersonAId = LowerGuid, PersonBId = HigherGuid, Type = RelationshipType.Spouse,
+        });
+        created.Success.Should().BeTrue();
+
+        var result = await service.UpdateAsync(created.Data!.Id, new RelationshipUpsertDto
+        {
+            PersonAId = LowerGuid, PersonBId = HigherGuid, Type = RelationshipType.Spouse,
+            Notes = "Married in Brooklyn",
+        });
+
+        result.Success.Should().BeTrue(result.Message);
+        await using var ctx = factory.CreateDbContext();
+        ctx.Relationships.Single().Notes.Should().Be("Married in Brooklyn");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ReopeningAnEndedMarriage_StillFailsWhenAPartnerHasRemarried()
+    {
+        var (service, _, _) = CreateSut();
+        var third = Guid.Parse("00000000-0000-0000-0000-000000000003");
+        var first = await service.CreateAsync(new RelationshipUpsertDto
+        {
+            PersonAId = LowerGuid, PersonBId = HigherGuid, Type = RelationshipType.Spouse, IsEnded = true,
+        });
+        await service.CreateAsync(new RelationshipUpsertDto
+        {
+            PersonAId = HigherGuid, PersonBId = third, Type = RelationshipType.Spouse,
+        });
+
+        // Reopening the ended first marriage would give HigherGuid two active ones.
+        var result = await service.UpdateAsync(first.Data!.Id, new RelationshipUpsertDto
+        {
+            PersonAId = LowerGuid, PersonBId = HigherGuid, Type = RelationshipType.Spouse,
+        });
+
+        result.Success.Should().BeFalse();
+        result.Message.Should().Contain("already in an active marriage");
+    }
+
+    [Fact]
+    public async Task CreateAsync_EndedMarriage_IsAllowedBesideAnActiveOne()
+    {
+        var (service, _, _) = CreateSut();
+        var third = Guid.Parse("00000000-0000-0000-0000-000000000003");
+        await service.CreateAsync(new RelationshipUpsertDto
+        {
+            PersonAId = LowerGuid, PersonBId = HigherGuid, Type = RelationshipType.Spouse,
+        });
+
+        var result = await service.CreateAsync(new RelationshipUpsertDto
+        {
+            PersonAId = HigherGuid, PersonBId = third, Type = RelationshipType.Spouse, IsEnded = true,
+        });
+
+        result.Success.Should().BeTrue(result.Message);
+    }
 }
 
 // Regression tests for the family-scoping gap found 2026-07-04: RelationshipService

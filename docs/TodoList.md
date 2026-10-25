@@ -30,9 +30,30 @@ Work A in order before the first invite; B and C can follow.
       `UpdateAsync_MovingFormerSpouseBackToActive_ClearsTheEndedFlag`. Still open: whether a
       divorced couple where one partner later died should get that death date (the default
       can't tell divorce from widowhood; only a date field in the form can).
-- [ ] **A2: silent failures.** From "Non-security bugs" under Pre-invite hardening:
-      PersonAdd's post-create `UpdateAsync` fails silently for Members but toasts success;
-      `RelationshipService.UpdateAsync` always fails on an active spouse.
+- [x] **A2: silent failures** (2026-10-25, `fix/a2-silent-failures`). Two bugs from
+      "Non-security bugs" under Pre-invite hardening, plus two found beside them.
+      (1) After creating a person, PersonAdd set the profile photo and linked extra
+      siblings through `PersonService.UpdateAsync`, which Members can't call, ignored the
+      result and toasted success anyway, so a Member's new person silently lost both.
+      Added `PersonService.SetProfilePhotoAsync(personId, mediumId)`, open to admins and
+      to whoever created the person, taking one of that person's own media rather than a
+      URL; sibling links now go one by one through `RelationshipService.CreateAsync`,
+      which Members may already use. Each failure gets its own error toast (the add
+      itself still succeeded). `PersonForm.UploadPendingAsync` used to drop a rejected
+      photo without a word; it now returns a message per failed file. PersonEdit's
+      sibling-link step also toasted success without checking (admins only, so rarer);
+      it now shows the result. (2) `RelationshipService.UpdateAsync` counted the row
+      being updated as the "other" active marriage, so every edit to an active spouse
+      row failed; the check now skips that row, and only applies when the marriage being
+      saved is itself active (recording an ended marriage beside a current one was
+      refused too). Tests: `UpdateAsync_ActiveSpouse_DoesNotCountItselfAsTheOtherMarriage`
+      and `CreateAsync_EndedMarriage_IsAllowedBesideAnActiveOne` (both fail against the
+      old code), `UpdateAsync_ReopeningAnEndedMarriage_StillFailsWhenAPartnerHasRemarried`,
+      three `SetProfilePhotoAsync_*` tests (creator allowed; another Member refused;
+      another person's photo refused), and a `CrossTenantMatrixTests` row plus positive
+      control for the new method. Not covered: a bUnit test of PersonAdd's sibling
+      dialog as a Member (the page has no dialog-driving test yet); the service tests
+      pin the permission each step now relies on.
 - [ ] **A3: entry guardrails.** Hard errors for the impossible, "are you sure?" warnings
       for the implausible: a parent under 12, a mother over 55, a child born over a year
       after the father's death, age over 110 with no death date. Same rules as "Detect
@@ -512,11 +533,11 @@ PR #43).
       sixlabors.com). `AngleSharp` 1.1.2 (moderate, via bUnit) is tests only, never
       deployed. Details: `docs/security.md`, A03.
 - [ ] **Non-security bugs found by the same review (not fixed, not verified by test):**
-      PersonAdd's post-create `UpdateAsync` (photo back-fill, sibling linking) fails
-      silently for Members yet toasts success; `RelationshipService` canonical GUID
-      ordering inverts Parent/Adopted rows (latent, no UI caller);
-      `RelationshipService.UpdateAsync` always fails on an active spouse (counts itself
-      as the other marriage); `RestoreAsync` revives relationships to a still-deleted
+      ~~PersonAdd's post-create `UpdateAsync` (photo back-fill, sibling linking) fails
+      silently for Members yet toasts success~~ (fixed 2026-10-25, Outreach A2);
+      `RelationshipService` canonical GUID ordering inverts Parent/Adopted rows (latent,
+      no UI caller); ~~`RelationshipService.UpdateAsync` always fails on an active spouse
+      (counts itself as the other marriage)~~ (fixed 2026-10-25, Outreach A2); `RestoreAsync` revives relationships to a still-deleted
       partner; the unfiltered `(PersonAId, PersonBId, Type)` unique index blocks re-adding
       a soft-deleted pair; `PersonService.CreateAsync` isn't transactional;
       `GetAllAsync` loads every relationship in the database then filters in memory;

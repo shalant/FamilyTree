@@ -100,6 +100,8 @@ class FakePersonService : IPersonService
         => throw new NotImplementedException();
     public Task<ServiceResponse<PersonDto>> UpdateAsync(Guid id, PersonUpsertDto dto, CancellationToken ct = default)
         => throw new NotImplementedException();
+    public Task<ServiceResponse> SetProfilePhotoAsync(Guid personId, Guid mediumId, CancellationToken ct = default)
+        => throw new NotImplementedException();
     public Task<ServiceResponse> DeleteAsync(Guid id, CancellationToken ct = default)
         => throw new NotImplementedException();
     public Task<ServiceResponse> RestoreAsync(Guid id, CancellationToken ct = default)
