@@ -163,8 +163,8 @@ else
         if (dialogResult is { Canceled: false })
         {
             submittedDto.SiblingIds = [.. submittedDto.SiblingIds, .. suggestions.Select(p => p.Id)];
-            await PersonService.UpdateAsync(Id, submittedDto);
-            Toast.Success($"Linked as sibling to {suggestions.Count} more.");
+            var linkResult = await PersonService.UpdateAsync(Id, submittedDto);
+            Toast.ShowResult(linkResult, $"Linked as sibling to {suggestions.Count} more.");
         }
     }
 

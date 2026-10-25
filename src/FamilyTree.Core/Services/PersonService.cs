@@ -360,6 +360,51 @@ public class PersonService(
     }
 
     // ─────────────────────────────────────────────────────────────
+    //  SET PROFILE PHOTO
+    // ─────────────────────────────────────────────────────────────
+    // Narrower than UpdateAsync so the person's creator can do it too: PersonAdd uploads
+    // the form's queued photos after the person exists, then makes one of them the profile
+    // photo. Until 2026-10-25 it did that through UpdateAsync, which Members can't call,
+    // so a Member's new person silently kept no photo while the page said "added".
+    // The photo must already be one of that person's own media, so no URL is taken.
+    public async Task<ServiceResponse> SetProfilePhotoAsync(
+        Guid personId, Guid mediumId, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            var person = await ScopedPeople(ctx).FirstOrDefaultAsync(p => p.Id == personId, ct);
+            if (person is null)
+                return ServiceResponse.Fail($"Person {personId} not found.");
+
+            var userId = currentUser.UserId;
+            var isCreator = userId.HasValue && person.CreatedBy == userId;
+            if (!currentUser.IsSuperUser && !currentUser.IsAdmin && !isCreator)
+                return ServiceResponse.Fail("You do not have permission to update this person.");
+
+            var medium = await ctx.Media.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.Id == mediumId && m.PersonId == personId, ct);
+            if (medium is null)
+                return ServiceResponse.Fail("That photo isn't one of this person's photos.");
+
+            person.ProfilePhotoUrl = medium.Url;
+            person.UpdatedAt = DateTime.UtcNow;
+            person.UpdatedBy = userId;
+            await ctx.SaveChangesAsync(ct);
+
+            _ = auditLog.LogAsync("Update", "Person", personId, userId: userId);
+
+            return ServiceResponse.Ok();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error setting profile photo for person {Id}", personId);
+            return ServiceResponse.Fail("An error occurred setting this person's photo.");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
     //  DELETE (soft)
     // ─────────────────────────────────────────────────────────────
     public async Task<ServiceResponse> DeleteAsync(

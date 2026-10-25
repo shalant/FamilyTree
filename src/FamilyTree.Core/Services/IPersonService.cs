@@ -17,6 +17,11 @@ public interface IPersonService
     Task<ServiceResponse<PersonDto>> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<ServiceResponse<PersonDto>> CreateAsync(PersonUpsertDto dto, CancellationToken ct = default);
     Task<ServiceResponse<PersonDto>> UpdateAsync(Guid id, PersonUpsertDto dto, CancellationToken ct = default);
+    /// <summary>
+    /// Makes one of the person's own photos their profile photo. Allowed for admins and
+    /// for whoever created the person (PersonAdd's photo step, run as a Member too).
+    /// </summary>
+    Task<ServiceResponse> SetProfilePhotoAsync(Guid personId, Guid mediumId, CancellationToken ct = default);
     Task<ServiceResponse> DeleteAsync(Guid id, CancellationToken ct = default);
     Task<ServiceResponse> RestoreAsync(Guid id, CancellationToken ct = default);
     Task<ServiceResponse<List<PersonDto>>> GetDeletedAsync(CancellationToken ct = default);

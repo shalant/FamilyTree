@@ -3,12 +3,15 @@
 
 @using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Shared.DTOs.Relationship
+@using FamilyTree.Shared.Enums
 @using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Modules.Dialogs
 @using FamilyTree.Web.Services
 @using MudBlazor
 
 @inject IPersonService PersonService
+@inject IRelationshipService RelationshipService
 @inject NavigationManager Nav
 @inject ToastService Toast
 @inject IDialogService DialogService
@@ -93,19 +96,23 @@ else
             }
 
             var newPerson = result.Data!;
+            Toast.Success($"{newPerson.FullName} added.");
 
-            // Upload any photos queued in the form and back-fill ProfilePhotoUrl
+            // The person exists now, so a failure below is reported on its own rather than
+            // undoing the add. Until 2026-10-25 these steps ignored their results and a
+            // Member's photo and extra sibling links were silently lost (Outreach A2).
             if (_form?.HasPendingPhotos == true)
             {
-                var primaryUrl = await _form.UploadPendingAsync(newPerson.Id);
-                if (primaryUrl is not null)
+                var upload = await _form.UploadPendingAsync(newPerson.Id);
+                foreach (var failure in upload.Failures)
+                    Toast.Error($"Photo not saved. {failure}");
+                if (upload.PrimaryMediumId is { } mediumId)
                 {
-                    dto.ProfilePhotoUrl = primaryUrl;
-                    await PersonService.UpdateAsync(newPerson.Id, dto);
+                    var photo = await PersonService.SetProfilePhotoAsync(newPerson.Id, mediumId);
+                    if (!photo.Success)
+                        Toast.Error($"Photo saved, but not set as the profile photo. {photo.Message}");
                 }
             }
-
-            Toast.Success($"{newPerson.FullName} added.");
 
             // Offer to link missing sibling connections
             await OfferSiblingLinks(newPerson.Id, newPerson.FullName, dto);
@@ -161,9 +168,25 @@ else
         var result = await dialog.Result;
         if (result is { Canceled: false })
         {
-            submittedDto.SiblingIds = [.. submittedDto.SiblingIds, .. suggestions.Select(p => p.Id)];
-            await PersonService.UpdateAsync(newPersonId, submittedDto);
-            Toast.Success($"Linked as sibling to {suggestions.Count} more.");
+            // One link at a time through RelationshipService, which Members may use, rather
+            // than PersonService.UpdateAsync, which they may not.
+            var failed = new List<string>();
+            foreach (var sibling in suggestions)
+            {
+                var link = await RelationshipService.CreateAsync(new RelationshipUpsertDto
+                {
+                    PersonAId = newPersonId,
+                    PersonBId = sibling.Id,
+                    Type = RelationshipType.Sibling,
+                });
+                if (!link.Success) failed.Add($"{sibling.FullName} ({link.Message})");
+            }
+
+            var linked = suggestions.Count - failed.Count;
+            if (linked > 0)
+                Toast.Success($"Linked as sibling to {linked} more.");
+            if (failed.Count > 0)
+                Toast.Error($"Couldn't link as sibling to {string.Join(", ", failed)}.");
         }
     }
 }

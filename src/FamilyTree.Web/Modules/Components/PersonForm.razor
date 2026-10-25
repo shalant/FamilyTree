@@ -725,11 +725,15 @@
             _primaryPendingIndex = Math.Max(0, _pendingPreviews.Count - 1);
     }
 
-    // Called by PersonAdd after person creation to upload queued photos.
-    // Returns the URL of the primary photo, or null if none.
-    public async Task<string?> UploadPendingAsync(Guid personId)
+    // Called by PersonAdd after person creation to upload queued photos. Returns the
+    // primary photo's medium (null if none uploaded) and a message per failed upload,
+    // which used to be dropped, so a rejected file vanished without a word.
+    public record PendingUploadResult(Guid? PrimaryMediumId, List<string> Failures);
+
+    public async Task<PendingUploadResult> UploadPendingAsync(Guid personId)
     {
-        string? primaryUrl = null;
+        Guid? primaryId = null;
+        var failures = new List<string>();
         for (int i = 0; i < _pendingPreviews.Count; i++)
         {
             var p = _pendingPreviews[i];
@@ -742,10 +746,12 @@
             };
             using var stream = new MemoryStream(p.Data);
             var result = await MediumService.CreateAsync(dto, stream);
-            if (result.Success && (i == _primaryPendingIndex || primaryUrl is null))
-                primaryUrl = result.Data!.Url;
+            if (!result.Success)
+                failures.Add($"{p.FileName}: {result.Message}");
+            else if (i == _primaryPendingIndex || primaryId is null)
+                primaryId = result.Data!.Id;
         }
-        return primaryUrl;
+        return new PendingUploadResult(primaryId, failures);
     }
 
     // ── relationship search ────────────────────────────────────────

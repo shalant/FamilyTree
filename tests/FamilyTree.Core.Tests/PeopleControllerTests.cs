@@ -465,4 +465,67 @@ public class PersonServiceTests
 
         people.Should().BeEmpty();
     }
+    // ── SetProfilePhotoAsync (Outreach readiness A2, 2026-10-25) ──────────────────
+    // PersonAdd used to back-fill the photo with UpdateAsync, which a Member can't call,
+    // so a Member's new person kept no photo while the page toasted success.
+
+    private static async Task<Guid> AddPhotoAsync(TestDbContextFactory factory, Guid personId, string url)
+    {
+        await using var ctx = factory.CreateDbContext();
+        var medium = new Medium
+        {
+            Id = Guid.NewGuid(), PersonId = personId, Url = url, FileName = "p.jpg",
+            MimeType = "image/jpeg", Type = "photo", CreatedAt = DateTime.UtcNow,
+        };
+        ctx.Media.Add(medium);
+        await ctx.SaveChangesAsync();
+        return medium.Id;
+    }
+
+    [Fact]
+    [Trait("Category", "Regression")]
+    public async Task SetProfilePhotoAsync_MemberWhoCreatedThePerson_CanSetTheirPhoto()
+    {
+        var (service, factory, _) = CreateSut(userId: Guid.NewGuid(), isAdmin: false);
+        var created = await service.CreateAsync(new PersonUpsertDto { FirstName = "Bill", LastName = "Small" });
+        var mediumId = await AddPhotoAsync(factory, created.Data!.Id, "https://fake-blob/bill.jpg");
+
+        var result = await service.SetProfilePhotoAsync(created.Data.Id, mediumId);
+
+        result.Success.Should().BeTrue(result.Message);
+        await using var ctx = factory.CreateDbContext();
+        ctx.People.Single().ProfilePhotoUrl.Should().Be("https://fake-blob/bill.jpg");
+    }
+
+    [Fact]
+    public async Task SetProfilePhotoAsync_MemberWhoDidNotCreateThePerson_IsRefused()
+    {
+        var familyId = Guid.NewGuid();
+        var (creatorService, factory, _) = CreateSut(userId: Guid.NewGuid(), familyId: familyId, isAdmin: false);
+        var created = await creatorService.CreateAsync(new PersonUpsertDto { FirstName = "Bill", LastName = "Small" });
+        var mediumId = await AddPhotoAsync(factory, created.Data!.Id, "https://fake-blob/bill.jpg");
+
+        var otherMember = new FakeCurrentUserService { UserId = Guid.NewGuid(), FamilyId = familyId };
+        var service = new PersonService(factory, NullLogger<PersonService>.Instance, new FakeAuditLogService(), otherMember);
+        var result = await service.SetProfilePhotoAsync(created.Data.Id, mediumId);
+
+        result.Success.Should().BeFalse();
+        await using var ctx = factory.CreateDbContext();
+        ctx.People.Single().ProfilePhotoUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SetProfilePhotoAsync_PhotoOfSomeoneElse_IsRefused()
+    {
+        var (service, factory, _) = CreateSut(userId: Guid.NewGuid());
+        var bill = await service.CreateAsync(new PersonUpsertDto { FirstName = "Bill", LastName = "Small" });
+        var willa = await service.CreateAsync(new PersonUpsertDto { FirstName = "Willa", LastName = "Small" });
+        var willasPhoto = await AddPhotoAsync(factory, willa.Data!.Id, "https://fake-blob/willa.jpg");
+
+        var result = await service.SetProfilePhotoAsync(bill.Data!.Id, willasPhoto);
+
+        result.Success.Should().BeFalse();
+        await using var ctx = factory.CreateDbContext();
+        ctx.People.Single(p => p.Id == bill.Data.Id).ProfilePhotoUrl.Should().BeNull();
+    }
 }
