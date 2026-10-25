@@ -111,8 +111,14 @@ public class MobileControlPanelTests : ComponentTestBase
 
         cut.InvokeAsync(treeContext.CloseMobilePanel);
 
-        cut.WaitForAssertion(() => cut.Find(".ft-mobile-panel").ClassList.Should().Contain("ft-mobile-panel--closing"));
-        cut.Find(".ft-mobile-panel-backdrop").ClassList.Should().Contain("ft-mobile-panel-backdrop--closing");
+        // Both classes in one assertion: the closing state lasts only CloseAnimationMs, and
+        // checking the backdrop as a separate step failed on a slow CI runner (2026-10-24)
+        // because the panel had already unmounted between the two lines.
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find(".ft-mobile-panel").ClassList.Should().Contain("ft-mobile-panel--closing");
+            cut.Find(".ft-mobile-panel-backdrop").ClassList.Should().Contain("ft-mobile-panel-backdrop--closing");
+        });
         cut.WaitForAssertion(() => cut.Markup.Should().BeEmpty(), TimeSpan.FromSeconds(2));
     }
 
