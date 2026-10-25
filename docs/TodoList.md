@@ -54,10 +54,28 @@ Work A in order before the first invite; B and C can follow.
       control for the new method. Not covered: a bUnit test of PersonAdd's sibling
       dialog as a Member (the page has no dialog-driving test yet); the service tests
       pin the permission each step now relies on.
-- [ ] **A3: entry guardrails.** Hard errors for the impossible, "are you sure?" warnings
-      for the implausible: a parent under 12, a mother over 55, a child born over a year
-      after the father's death, age over 110 with no death date. Same rules as "Detect
-      likely data-entry slips", applied in the form.
+- [x] **A3: entry guardrails** (2026-10-25, `feat/a3-entry-guardrails`). Added
+      `PlausibilityRules` (Core), one set of rules for both the server and the form.
+      Errors (the server refuses): a parent born on or after the child; a child born after
+      their mother's death. Warnings (the form asks first; "Save anyway" saves): a parent
+      under 12 or over 80, a mother over 55, a child born more than a year after a
+      father's (or unknown-gender parent's) death, anyone over 110 with no death date or
+      who died over 110. Ages use whole dates, not just years. Until now the parent-age
+      and posthumous-birth limits were hard errors, duplicated in `PersonService` and
+      `RelationshipService` with year-only arithmetic, and `PersonService` checked only a
+      person's parents, never their children: a mother's death date could be moved to
+      before her child's birth, or a child older than the parent added from the parent's
+      form. Both now check both directions, but only the links a save adds (or every link
+      when the person's own dates or gender change), so someone whose saved data already
+      breaks a rule can still be edited; the form shows those as warnings. Adoptive links
+      aren't checked. **Loosened on purpose:** a parent under 12 or over 80 and a father
+      dying 9-12 months before the birth used to be refused and are now allowed after a
+      warning. Checked in the running app (local, dev auth): a 1900 birth date with no
+      death date shows the warning and "Save anyway". Tests: `PlausibilityRulesTests`,
+      `EntryGuardrailServiceTests` (all six fail against the old services;
+      `UpdateAsync_MothersDeathMovedBeforeHerChildsBirth_IsRefused` is tagged
+      Regression), `PersonFormPlausibilityTests`. Next: B8's "Data check" list can run the
+      same rules over the whole tree to find what was saved before this.
 - [ ] **A4: invite-path security.** `ReturnUrl` ignored on `/auth/do-login`;
       `Auth:RegistrationMode` fails open (S9); S7 session revocation; S8 blob privacy;
       check Google sign-in works on prod.

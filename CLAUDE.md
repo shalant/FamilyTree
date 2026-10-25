@@ -240,6 +240,7 @@ depth, which would remove the fragile birth-year inference machinery entirely.
 - `IDbContextFactory<AppDbContext>` is used for scoped, thread-safe contexts (not a singleton DbContext)
 - **Frontend components (Blazor pages, admin tabs) must NOT directly use `DbContext` or `IDbContextFactory`. All database queries must go through the service layer.** Create new service interfaces and implementations as needed to expose domain operations.
 - `PersonMapper` enriches `PersonDto` with derived relationship ID lists — not persisted
+- **Date plausibility lives in one place, `PlausibilityRules`** (Outreach A3, 2026-10-25): `Error` findings are refused by `PersonService`/`RelationshipService`, `Warning` findings are shown by `PersonForm`, which saves on a second press ("Save anyway"). Add a new date rule there, never inline in a service or page, so the server and the form can't disagree. The services judge only links a save adds (or all of a person's links when their own dates or gender change), so data saved before a rule existed stays editable.
 - `PersonService.SyncRelationshipsDiffAsync` handles create/update/delete of all relationship types including spouse ↔ former-spouse transitions
 
 ## Testing & Quality Strategy
