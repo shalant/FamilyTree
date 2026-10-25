@@ -229,13 +229,20 @@ PR #43).
       CR/LF in names/places injects GEDCOM records; null MIME type skips the upload
       allow-list (and the size error says 50 MB for an 8 MB limit); `/auth/do-login`
       ignores `?ReturnUrl=`, so deep links land on the tree after sign-in.
-- [ ] **Package advisories:** `dotnet build` warns NU1902/NU1903 for
-      `SixLabors.ImageSharp` 3.1.11 (high) and `AngleSharp` 1.1.2 (moderate) via
-      `FamilyTree.Web.Tests`; check whether Core's ImageSharp reference is affected too.
-      *2026-10-24:* Core is affected. Bumped to 3.1.12 (still vulnerable) and limited
-      server-side decoding to JPEG/PNG/WebP/GIF by actual file bytes, which closes the
-      TIFF advisories. The ICC-profile one stays open until ImageSharp 4.1.2+, which needs
-      a Six Labors license key (`docs/security.md`, A03).
+- [x] **Package advisories, first pass** (fixed 2026-10-24, `fix/image-format-allowlist`):
+      Core's ImageSharp reference was affected, not just the test project's. Bumped
+      `SixLabors.ImageSharp` 3.1.11 -> 3.1.12 (still vulnerable) and pinned
+      `System.Security.Cryptography.Pkcs` 10.0.13 (was 9.0.4 via `Microsoft.Data.SqlClient`,
+      two advisories). `MediumService` now rejects uploads whose actual bytes are a format
+      other than JPEG/PNG/WebP/GIF, whatever MIME type the browser sent, and only decodes
+      those four. Before, a TIFF labelled `image/jpeg` reached ImageSharp's vulnerable TIFF
+      decoder. Regression test:
+      `MediumServiceTests.CreateAsync_DisallowedFormatLabelledAsJpeg_IsRejectedAndNotUploaded`.
+- [ ] **Package advisories, still open:** ImageSharp's ICC-profile allocation advisory is
+      still reachable through ordinary JPEG/PNG uploads; only 4.1.2+ fixes it, and 4.x
+      fails the build without a Six Labors license key (Doug to get one from
+      sixlabors.com). `AngleSharp` 1.1.2 (moderate, via bUnit) is tests only, never
+      deployed. Details: `docs/security.md`, A03.
 - [ ] **Non-security bugs found by the same review (not fixed, not verified by test):**
       PersonAdd's post-create `UpdateAsync` (photo back-fill, sibling linking) fails
       silently for Members yet toasts success; `RelationshipService` canonical GUID
@@ -282,7 +289,8 @@ suggested order:
    the shape where two marriages cross between the same two sibling sets (partners 440px
    apart with the other couple between them; found 2026-10-15, no test yet).
 5. Housekeeping: bump `SixLabors.ImageSharp` 3.1.11 in the test project (NU1902/NU1903
-   advisory warnings on every build).
+   advisory warnings on every build). *2026-10-24:* bumped to 3.1.12; the warnings stay
+   until 4.x (see "Package advisories, still open" above).
 
 Added `tests/FamilyTree.Web.Tests/ServiceTests/FamilyTreeLayoutFuzzTests.cs` (Leg 1 of
 `docs/Testing/fuzz-and-adversarial-review-plan.md`, branch `testing/layout-fuzz-harness`):
