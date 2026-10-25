@@ -129,3 +129,6 @@ window.ftSvgToPng = async (svgContent, filename) => {
 window.ftHideSplash = () => {
     document.getElementById('ft-splash')?.remove();
 };
+
+// True on a touch screen (a phone or tablet), where the tree zooms by pinching, not scrolling.
+window.ftIsTouchScreen = () => window.matchMedia('(pointer: coarse)').matches;

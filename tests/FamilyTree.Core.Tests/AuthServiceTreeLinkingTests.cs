@@ -221,31 +221,96 @@ public class AuthServiceTreeLinkingTests
         exists.Data.Should().BeFalse();
     }
 
-    // ── EnsureUserFamilyAsync ────────────────────────────────────────────────
+    // ── RegisterExternalAsync (first Google sign-in) ─────────────────────────
+    // A6, 2026-10-25: in invite-only mode an invitee couldn't sign up with Google at all;
+    // the callback refused every new account.
 
-    [Fact]
-    public async Task EnsureUserFamilyAsync_NoExistingRow_CreatesOne()
+    private static async Task<UserInvite> SeedInviteAsync(
+        TestDbContextFactory factory, string email, DateTime? expiresAt = null)
     {
-        var (service, factory, userManager) = CreateSut();
-        var user = await CreateExistingUserAsync(userManager, "google@example.com");
-
-        await service.EnsureUserFamilyAsync(user.Id);
-
         await using var ctx = factory.CreateDbContext();
-        ctx.UserFamilies.Should().ContainSingle(uf => uf.UserId == user.Id);
+        var invite = new UserInvite
+        {
+            Id = Guid.NewGuid(), Email = email, FamilyId = TestFamilyId, RoleToGrant = "Member",
+            Token = "t", ExpiresAt = expiresAt ?? DateTime.UtcNow.AddDays(7), CreatedAt = DateTime.UtcNow,
+        };
+        ctx.UserInvites.Add(invite);
+        await ctx.SaveChangesAsync();
+        return invite;
     }
 
     [Fact]
-    public async Task EnsureUserFamilyAsync_AlreadyAssigned_DoesNotDuplicate()
+    public async Task RegisterExternalAsync_InviteOnly_InvitedVerifiedAddress_JoinsTheInvitesFamily()
     {
-        var (service, factory, userManager) = CreateSut();
-        var user = await CreateExistingUserAsync(userManager, "google2@example.com");
-        await service.EnsureUserFamilyAsync(user.Id);
+        var (service, factory, userManager) = CreateSut("InviteOnly");
+        var invite = await SeedInviteAsync(factory, "willa@example.com");
 
-        await service.EnsureUserFamilyAsync(user.Id);
+        var result = await service.RegisterExternalAsync("Willa@Example.com", "Willa", "Small", emailVerified: true);
 
+        result.Success.Should().BeTrue(result.Message);
+        (await userManager.FindByIdAsync(result.Data.ToString()))!.DisplayName.Should().Be("Willa Small");
         await using var ctx = factory.CreateDbContext();
-        ctx.UserFamilies.Count(uf => uf.UserId == user.Id).Should().Be(1);
+        ctx.UserFamilies.Should().ContainSingle(uf => uf.UserId == result.Data && uf.FamilyId == TestFamilyId);
+        (await ctx.UserInvites.FindAsync(invite.Id))!.AcceptedAt.Should().NotBeNull();
+    }
+
+    [Theory]
+    [InlineData("stranger@example.com", true, false)]   // no invite
+    [InlineData("willa@example.com", false, false)]     // Google hasn't verified the address
+    [InlineData("willa@example.com", true, true)]       // the invite has expired
+    public async Task RegisterExternalAsync_InviteOnly_WithoutAUsableInvite_CreatesNothing(
+        string email, bool verified, bool expired)
+    {
+        var (service, factory, userManager) = CreateSut("InviteOnly");
+        await SeedInviteAsync(factory, "willa@example.com", expired ? DateTime.UtcNow.AddDays(-1) : null);
+
+        var result = await service.RegisterExternalAsync(email, "Willa", "Small", verified);
+
+        result.Success.Should().BeFalse();
+        result.Message.Should().Be(AuthService.NoInviteForExternalSignIn);
+        (await userManager.FindByEmailAsync(email)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task RegisterExternalAsync_Open_NeedsNoInvite()
+    {
+        var (service, factory, _) = CreateSut("Open");
+
+        var result = await service.RegisterExternalAsync("anyone@example.com", "Any", "One", emailVerified: false);
+
+        result.Success.Should().BeTrue(result.Message);
+        await using var ctx = factory.CreateDbContext();
+        ctx.UserFamilies.Should().ContainSingle(uf => uf.UserId == result.Data);
+    }
+
+    [Fact]
+    public async Task RegisterExternalAsync_Closed_Refuses()
+    {
+        var (service, factory, _) = CreateSut("Closed");
+        await SeedInviteAsync(factory, "willa@example.com");
+
+        var result = await service.RegisterExternalAsync("willa@example.com", "Willa", "Small", emailVerified: true);
+
+        result.Message.Should().Be(AuthService.RegistrationClosed);
+    }
+
+    // ── CreateInviteForStoryResponseAsync ────────────────────────────────────
+
+    // A6, 2026-10-25: someone already sent a link from Admin > Users who then answered a
+    // story invite got a failure here, and the response page's "Create a free account"
+    // pointed at /register?invite= with no ID: a dead end in invite-only mode.
+    [Fact]
+    public async Task CreateInviteForStoryResponseAsync_OpenInviteExists_ReturnsIt()
+    {
+        var (service, factory, _) = CreateSut("InviteOnly");
+        var existing = await SeedInviteAsync(factory, "willa@example.com");
+
+        var result = await service.CreateInviteForStoryResponseAsync("Willa@example.com", TestFamilyId);
+
+        result.Success.Should().BeTrue();
+        result.Data.Should().Be(existing.Id);
+        await using var ctx = factory.CreateDbContext();
+        ctx.UserInvites.Should().ContainSingle();
     }
 
     // ── LinkUserToTreeAsync ──────────────────────────────────────────────────

@@ -13,12 +13,12 @@ public interface IAuthService
     Task<ServiceResponse<bool>> UserExistsAsync(string email);
 
     /// <summary>
-    /// Ensures a user has a UserFamily row, defaulting to the single family this
-    /// deployment currently has (creating it if missing) if they don't already have
-    /// one. No-op if the user is already assigned. Used for registration paths that
-    /// don't go through RegisterAsync (e.g. the Google OAuth new-account branch).
+    /// Creates the account for a first Google sign-in, in the family of the address's open
+    /// invite. Invite-only mode needs such an invite and a Google-verified address; it fails
+    /// with <see cref="AuthService.NoInviteForExternalSignIn"/> otherwise (A6, 2026-10-25:
+    /// invitees couldn't sign up with Google at all).
     /// </summary>
-    Task<ServiceResponse> EnsureUserFamilyAsync(Guid userId);
+    Task<ServiceResponse<Guid>> RegisterExternalAsync(string email, string firstName, string lastName, bool emailVerified);
 
     /// <summary>SuperUser-only admin invite (Admin › Users).</summary>
     Task<ServiceResponse<Guid>>                  CreateInviteAsync(string email);

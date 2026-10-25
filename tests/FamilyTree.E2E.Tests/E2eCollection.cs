@@ -23,3 +23,7 @@ public class E2eCollection : ICollectionFixture<E2eAppFixture>;
 // isolating it is the pragmatic fix pending deeper investigation.
 [CollectionDefinition("E2E-Isolated")]
 public class E2eIsolatedCollection : ICollectionFixture<E2eAppFixture>;
+
+// The production registration mode (InviteOnly); see InviteOnlyAppFixture.
+[CollectionDefinition("E2E-InviteOnly")]
+public class E2eInviteOnlyCollection : ICollectionFixture<InviteOnlyAppFixture>;
