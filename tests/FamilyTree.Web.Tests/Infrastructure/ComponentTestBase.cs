@@ -8,11 +8,19 @@ using MudBlazor.Services;
 
 public abstract class ComponentTestBase : TestContext
 {
+    // A signed-in family member by default; set IsSuperUser before rendering to test
+    // super-user-only UI (e.g. the layout engine picker).
+    protected FakeCurrentUserService CurrentUser { get; } = new();
+
     protected ComponentTestBase()
     {
         // App services
         Services.AddSingleton<ToastService>();
         Services.AddSingleton<IFamilyTreeLayoutEngine, FamilyTreeLayoutEngine>();
+        Services.AddSingleton<ICurrentUserService>(CurrentUser);
+        Services.AddSingleton(new LayoutEngineSelector(
+            new FamilyTreeLayoutEngine(), new TimelineLayoutEngine(),
+            new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), CurrentUser));
         Services.AddSingleton<TreeContextService>();
         Services.AddSingleton<ThemeService>();
 
