@@ -19,7 +19,7 @@ public abstract class ComponentTestBase : TestContext
         Services.AddSingleton<IFamilyTreeLayoutEngine, FamilyTreeLayoutEngine>();
         Services.AddSingleton<ICurrentUserService>(CurrentUser);
         Services.AddSingleton(new LayoutEngineSelector(
-            new FamilyTreeLayoutEngine(), new TimelineLayoutEngine(),
+            new FamilyTreeLayoutEngine(), new BestTimelineLayoutEngine(), new TimelineLayoutEngine(),
             new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), CurrentUser));
         Services.AddSingleton<TreeContextService>();
         Services.AddSingleton<ThemeService>();

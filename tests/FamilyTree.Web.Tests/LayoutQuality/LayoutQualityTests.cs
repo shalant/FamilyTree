@@ -244,7 +244,9 @@ public class LayoutGalleryTests(ITestOutputHelper output)
     private const int WorstPerScore = 4;
 
     internal static readonly (string Name, Func<IFamilyTreeLayoutEngine> Make)[] Engines =
-        [("archived", () => new FamilyTreeLayoutEngine()), ("timeline prototype", () => new TimelineLayoutEngine()),
+        [("archived", () => new FamilyTreeLayoutEngine()),
+         ($"timeline best so far ({BestTimelineLayoutEngine.Version})", () => new BestTimelineLayoutEngine()),
+         ($"timeline newest (since {TimelineLayoutEngine.Version})", () => new TimelineLayoutEngine()),
          ("layered baseline, generations", () => new LayeredBaselineEngine(birthYearY: false)),
          ("layered baseline, birth years", () => new LayeredBaselineEngine(birthYearY: true))];
 

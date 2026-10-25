@@ -76,7 +76,8 @@ $env:FAMILYTREE_RATCHET_UPDATE = "1"; dotnet test tests/FamilyTree.Web.Tests --f
 ```
 
 A round of layout work: pick one gap, change the prototype, run the ratchet and look at the
-gallery. If a score has to get worse for a better-looking result, edit `ratchet.json` by
+gallery. When a round is worth keeping, cut it as a version (`layout-versions.md`, added
+2026-10-25). If a score has to get worse for a better-looking result, edit `ratchet.json` by
 hand and give the reason in the commit message. Run the update with the live export present
 so its limits tighten too.
 

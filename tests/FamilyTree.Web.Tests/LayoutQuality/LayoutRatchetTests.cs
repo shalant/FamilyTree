@@ -27,7 +27,7 @@ public class LayoutRatchetTests(ITestOutputHelper output)
     private static string RatchetPath => Path.Combine(LayoutGalleryTests.RepoRoot(), "tests", "FamilyTree.Web.Tests", "LayoutQuality", "ratchet.json");
 
     // Compared after rounding to a whole layout unit, so an average can't fail on a fraction.
-    private static Dictionary<string, double> GeneratedScores(IReadOnlyList<LayoutQualityReport> r) => new()
+    internal static Dictionary<string, double> GeneratedScores(IReadOnlyList<LayoutQualityReport> r) => new()
     {
         ["familiesWithLooseCouple"] = r.Count(x => x.LooseCouples.Any()),
         ["partnerGapWorst"] = r.Max(x => x.MaxPartnerGap),
