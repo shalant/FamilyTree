@@ -111,6 +111,20 @@ stopping placement patches and replacing the placement algorithm, measured first
       crossings; case 7: 4 → 7) while 7 improve. Scoring each candidate after `SolveX`
       (crossings and merged lines from the real connectors) would drop the bad turns; it
       costs a position solve per candidate.
+- [x] **Tell ended marriages and sibling links apart** (2026-10-24,
+      `feat/distinct-relationship-lines`, both engines). On the live tree four grey dashed
+      lines around Louis looked alike: his ended marriage to Lillian, Lillian and Libby's
+      sister link, and his own links to Tilly and David. Ray hung from what read as a
+      sibling line, so Ray and William didn't read as half-brothers. An ended marriage now
+      has long dashes and a 💔; a sibling link is light grey dots. The SVG export matches
+      and now draws sibling links at all. Test: `RelationshipLineStyleTests`.
+- [ ] **Route sibling links around people** (next, prototype only). The links still run
+      straight through anyone between the two siblings (Lillian to Libby through Louis;
+      Louis to David through Libby and Tilly, on top of the Louis to Tilly link). Plan: a
+      low bracket over the two people, stacked at different heights where links share a
+      stretch, judged by the merged-lines score first (what sank the attempt below).
+- [ ] **Data check for Doug:** Lillian and Louis's marriage has an end date of 2026-09-18,
+      which looks like the day it was entered. It's the only reason it's drawn as ended.
 - [ ] **Bracket-shaped sibling links: rework or drop** (tried 2026-10-23, not merged; patch
       in the gitignored `artifacts/sibling-bracket-2026-10-23.patch` on Doug's machine,
       `git apply` to bring it back). Lines through people 582 → 309, but crossings 683 → 753 and
