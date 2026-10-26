@@ -212,6 +212,12 @@ public class PersonService(
             var loopError = await ValidateNoParentLoopAsync(ctx, Guid.Empty, $"{dto.FirstName} {dto.LastName}".Trim(), dto, ct);
             if (loopError != null) return ServiceResponse<PersonDto>.Fail(loopError);
 
+            var ancestorError = await ValidateAncestorDatesAsync(ctx, Guid.Empty, dto, datesChanged: true, ct);
+            if (ancestorError != null) return ServiceResponse<PersonDto>.Fail(ancestorError);
+
+            var roleError = await ValidateRelativeRolesAsync(ctx, Guid.Empty, dto, ct);
+            if (roleError != null) return ServiceResponse<PersonDto>.Fail(roleError);
+
             var spouseError = await ValidateSpouseRelationshipsAsync(ctx, Guid.Empty, dto, ct);
             if (spouseError != null) return ServiceResponse<PersonDto>.Fail(spouseError);
 
@@ -325,10 +331,17 @@ public class PersonService(
             var loopError = await ValidateNoParentLoopAsync(ctx, id, $"{person.FirstName} {person.LastName}".Trim(), dto, ct);
             if (loopError != null) return ServiceResponse<PersonDto>.Fail(loopError);
 
+            var ancestorError = await ValidateAncestorDatesAsync(ctx, id, dto, person.BirthDate != dto.BirthDate, ct);
+            if (ancestorError != null) return ServiceResponse<PersonDto>.Fail(ancestorError);
+
+            var roleError = await ValidateRelativeRolesAsync(ctx, id, dto, ct);
+            if (roleError != null) return ServiceResponse<PersonDto>.Fail(roleError);
+
             var spouseError = await ValidateSpouseRelationshipsAsync(ctx, id, dto, ct);
             if (spouseError != null) return ServiceResponse<PersonDto>.Fail(spouseError);
 
             var userId = currentUser.UserId;
+            var oldDeathDate = person.DeathDate;
 
             person.FirstName = dto.FirstName.Trim();
             person.LastName = dto.LastName.Trim();
@@ -346,6 +359,8 @@ public class PersonService(
             person.UpdatedBy = userId;
 
             await SyncRelationshipsDiffAsync(ctx, id, dto, userId, ct);
+            if (oldDeathDate != dto.DeathDate)
+                await RefreshEndedMarriageDatesAsync(ctx, id, oldDeathDate, dto.DeathDate, ct);
             await ctx.SaveChangesAsync(ct);
 
             _ = auditLog.LogAsync("Update", "Person", id, userId: userId);
@@ -515,16 +530,38 @@ public class PersonService(
                 .Where(r => (r.PersonAId == id || r.PersonBId == id) && r.DeletedAt == deletedAt)
                 .ToListAsync(ct);
 
+            // A link to someone who is still deleted stays deleted, and is handed over to that
+            // person: it comes back when they do. Until 2026-10-25 it came back now, a live
+            // link to a deleted person (found by the B7 write-path fuzz harness).
+            var otherIds = relationships.Select(r => r.PersonAId == id ? r.PersonBId : r.PersonAId).Distinct().ToList();
+            var stillDeleted = await ctx.People.IgnoreQueryFilters()
+                .Where(p => otherIds.Contains(p.Id) && p.Id != id && p.DeletedAt != null)
+                .ToDictionaryAsync(p => p.Id, p => p.DeletedAt!.Value, ct);
+            Guid OtherOf(Relationship r) => r.PersonAId == id ? r.PersonBId : r.PersonAId;
+            var reviving = relationships.Where(r => !stillDeleted.ContainsKey(OtherOf(r))).ToList();
+
             // Restoring brings Parent links back, and the tree may have changed since they
             // were removed (R0): refuse if that would put someone back among their own
             // ancestors, rather than reviving a loop.
-            var loopError = await ValidateRestoredParentLinksAsync(ctx, relationships, ct);
+            var loopError = await ValidateRestoredParentLinksAsync(ctx, reviving, ct);
             if (loopError != null) return ServiceResponse.Fail(loopError);
+
+            // The same holds for dates and marriages: a parent's dates may have been changed,
+            // or a spouse remarried, while this person was deleted.
+            var linkError = await ValidateRestoredLinksAsync(ctx, person, reviving, ct);
+            if (linkError != null) return ServiceResponse.Fail(linkError);
+
+            var ended = await EndClashingMarriagesAsync(ctx, person, reviving, ct);
 
             person.DeletedAt = null;
             person.DeletedBy = null;
             foreach (var rel in relationships)
             {
+                if (stillDeleted.TryGetValue(OtherOf(rel), out var theirs))
+                {
+                    rel.DeletedAt = theirs;
+                    continue;
+                }
                 rel.DeletedAt = null;
                 rel.DeletedBy = null;
             }
@@ -533,7 +570,9 @@ public class PersonService(
 
             _ = auditLog.LogAsync("Restore", "Person", id, userId: currentUser.UserId);
 
-            return ServiceResponse.Ok();
+            return ended.Count == 0
+                ? ServiceResponse.Ok()
+                : ServiceResponse.Ok($"{person.FirstName} {person.LastName} restored. " + string.Join(" ", ended));
         }
         catch (Exception ex)
         {
@@ -884,6 +923,38 @@ public class PersonService(
         return earliest;
     }
 
+    // An ended marriage's EndDate is only ever the default above: the earlier partner's death
+    // date. When this person's death date changes, a marriage that took its date from the
+    // old one follows the new one (or loses it, if the death date was cleared). Until
+    // 2026-10-25 it kept the old date, which then stood for nothing anyone had entered (found
+    // by the B7 write-path fuzz harness). A marriage with no EndDate keeps none: it ended
+    // before either death was known, so a later death doesn't say when.
+    private static async Task RefreshEndedMarriageDatesAsync(
+        AppDbContext ctx, Guid personId, DateOnly? oldDeath, DateOnly? newDeath, CancellationToken ct)
+    {
+        // Deleted ones too: a marriage put away with a deleted partner comes back when they
+        // are restored, and must come back with the right date.
+        var marriages = await ctx.Relationships.IgnoreQueryFilters()
+            .Where(r => r.Type == RelationshipType.Spouse && r.EndDate != null &&
+                        (r.PersonAId == personId || r.PersonBId == personId))
+            .ToListAsync(ct);
+        foreach (var rel in marriages)
+        {
+            var partnerId = rel.PersonAId == personId ? rel.PersonBId : rel.PersonAId;
+            var partnerDeath = await ctx.People.IgnoreQueryFilters().AsNoTracking()
+                .Where(p => p.Id == partnerId)
+                .Select(p => p.DeathDate)
+                .FirstOrDefaultAsync(ct);
+            if (rel.EndDate != Earlier(oldDeath, partnerDeath)) continue;
+            rel.EndDate = Earlier(newDeath, partnerDeath);
+            rel.IsEnded = true;
+            rel.UpdatedAt = DateTime.UtcNow;
+        }
+    }
+
+    private static DateOnly? Earlier(DateOnly? a, DateOnly? b) =>
+        a is null ? b : b is null ? a : a < b ? a : b;
+
     private static string? ValidatePersonDates(PersonUpsertDto dto)
     {
         var today = DateOnly.FromDateTime(DateTime.Today);
@@ -947,6 +1018,95 @@ public class PersonService(
                 .SelectMany(c => PlausibilityRules.CheckParentChild(subject, ToLifeDates(relatives[c]))));
 
         return findings.FirstOrDefault(f => f.Severity == PlausibilitySeverity.Error)?.Message;
+    }
+
+    // An ancestor two or more generations up born on or after the descendant
+    // (PlausibilityRules.CheckAncestor). Every such pair runs through this person: someone
+    // above them and someone below. Judges only the pairs this save makes, through a link it
+    // adds or through this person's own new birth date, for the same reason as above.
+    private static async Task<string?> ValidateAncestorDatesAsync(
+        AppDbContext ctx, Guid personId, PersonUpsertDto dto, bool datesChanged, CancellationToken ct)
+    {
+        var parentIds = dto.ParentIds.Distinct().ToList();
+        var childIds = dto.ChildIds.Distinct().ToList();
+        if (parentIds.Count == 0 && childIds.Count == 0) return null;
+
+        var edges = await ctx.Relationships.AsNoTracking()
+            .Where(r => r.Type == RelationshipType.Parent)
+            .Select(r => new { Parent = r.PersonAId, Child = r.PersonBId })
+            .ToListAsync(ct);
+        var addedParents = parentIds.Where(p => !edges.Any(e => e.Parent == p && e.Child == personId)).ToList();
+        var addedChildren = childIds.Where(c => !edges.Any(e => e.Parent == personId && e.Child == c)).ToList();
+        if (!datesChanged && addedParents.Count == 0 && addedChildren.Count == 0) return null;
+
+        var after = new ParentGraph(edges
+            .Where(e => e.Parent != personId && e.Child != personId)
+            .Select(e => (e.Parent, e.Child))
+            .Concat(parentIds.Select(p => (p, personId)))
+            .Concat(childIds.Select(c => (personId, c))));
+
+        // Generations up from this person through the given parents, and down through the
+        // given children (this person at 0).
+        Dictionary<Guid, int> Through(IEnumerable<Guid> next, Func<Guid, Dictionary<Guid, int>> walk)
+        {
+            var reach = new Dictionary<Guid, int> { [personId] = 0 };
+            foreach (var n in next)
+                foreach (var (id, d) in walk(n))
+                    if (!reach.TryGetValue(id, out var have) || d + 1 < have) reach[id] = d + 1;
+            return reach;
+        }
+        var up = Through(parentIds, after.AncestorGenerations);
+        var down = Through(childIds, after.DescendantGenerations);
+        var upNew = datesChanged ? up : Through(addedParents, after.AncestorGenerations);
+        var downNew = datesChanged ? down : Through(addedChildren, after.DescendantGenerations);
+
+        var pairs = upNew.SelectMany(a => down.Select(d => (A: a.Key, D: d.Key, G: a.Value + d.Value)))
+            .Concat(up.SelectMany(a => downNew.Select(d => (A: a.Key, D: d.Key, G: a.Value + d.Value))))
+            .Where(p => p.G >= 2 && p.A != p.D)
+            .Distinct()
+            .ToList();
+        if (pairs.Count == 0) return null;
+
+        var ids = pairs.SelectMany(p => new[] { p.A, p.D }).Where(id => id != personId).Distinct().ToList();
+        var people = await ctx.People.AsNoTracking().Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct);
+        var subject = new LifeDates($"{dto.FirstName} {dto.LastName}".Trim(), dto.BirthDate, dto.DeathDate, dto.Gender);
+        LifeDates? Of(Guid id) => id == personId ? subject : people.TryGetValue(id, out var p) ? ToLifeDates(p) : null;
+
+        return pairs
+            .OrderBy(p => p.G).ThenBy(p => p.A).ThenBy(p => p.D)
+            .Select(p => Of(p.A) is { } a && Of(p.D) is { } d ? PlausibilityRules.CheckAncestor(a, d, p.G) : null)
+            .FirstOrDefault(f => f != null)?.Message;
+    }
+
+    // Someone can't be both a person's parent (or child) and their spouse or sibling: a slip
+    // of the person picker, found by the B7 write-path fuzz harness (2026-10-25), and the
+    // layout engine then has to draw them on two rows at once. Judges only a clash this save
+    // makes.
+    private static async Task<string?> ValidateRelativeRolesAsync(
+        AppDbContext ctx, Guid personId, PersonUpsertDto dto, CancellationToken ct)
+    {
+        var lineal = dto.ParentIds.Concat(dto.ChildIds).ToHashSet();
+        var lateral = dto.SpouseIds.Concat(dto.FormerSpouseIds).Concat(dto.SiblingIds).ToHashSet();
+        var clashes = lineal.Intersect(lateral).ToList();
+        if (clashes.Count == 0) return null;
+
+        var existing = await ctx.Relationships.AsNoTracking()
+            .Where(r => r.PersonAId == personId || r.PersonBId == personId)
+            .Select(r => new { r.PersonAId, r.PersonBId, r.Type })
+            .ToListAsync(ct);
+        bool Had(Guid other, bool linealLink) => existing.Any(r =>
+            (r.PersonAId == other || r.PersonBId == other) &&
+            (r.Type == RelationshipType.Parent) == linealLink);
+
+        var clash = clashes.Cast<Guid?>().FirstOrDefault(q => !Had(q!.Value, true) || !Had(q.Value, false));
+        if (clash is not { } q) return null;
+
+        var name = await ctx.People.AsNoTracking().Where(p => p.Id == q)
+            .Select(p => p.FirstName + " " + p.LastName).FirstOrDefaultAsync(ct) ?? "That person";
+        var person = $"{dto.FirstName} {dto.LastName}".Trim();
+        var asLineal = dto.ParentIds.Contains(q) ? "parent" : "child";
+        var asLateral = dto.SiblingIds.Contains(q) ? "sibling" : "spouse";
+        return $"{name} can't be both {person}'s {asLineal} and {person}'s {asLateral}.";
     }
 
     internal static LifeDates ToLifeDates(Person p) =>
@@ -1032,10 +1192,119 @@ public class PersonService(
                "because the family tree has changed since they were deleted. Fix the conflicting parent link first.";
     }
 
+    // One current marriage at a time, the rule RelationshipService already kept. Only a
+    // marriage this save starts (or takes back from former) is judged, so someone saved
+    // with two current spouses before the rule can still be edited, and so can their
+    // spouses. Until 2026-10-25 (found by the B7 write-path fuzz harness) the person's own
+    // marriages were never counted, so adding a second spouse to a married person was
+    // saved; and every current spouse was re-judged on every save, so once someone had two,
+    // neither partner could be edited at all.
+    private static async Task<string?> ValidateRestoredLinksAsync(
+        AppDbContext ctx, Person person, List<Relationship> restoring, CancellationToken ct)
+    {
+        var name = $"{person.FirstName} {person.LastName}".Trim();
+        var parentLinks = restoring.Where(r => r.Type == RelationshipType.Parent).ToList();
+        if (parentLinks.Count > 0)
+        {
+            var edges = (await ctx.Relationships.AsNoTracking()
+                    .Where(r => r.Type == RelationshipType.Parent)
+                    .Select(r => new { r.PersonAId, r.PersonBId })
+                    .ToListAsync(ct))
+                .Select(r => (r.PersonAId, r.PersonBId))
+                .Concat(parentLinks.Select(r => (r.PersonAId, r.PersonBId)))
+                .ToList();
+            var graph = new ParentGraph(edges);
+            var ids = edges.SelectMany(e => new[] { e.Item1, e.Item2 }).Append(person.Id).Distinct().ToList();
+            var people = await ctx.People.AsNoTracking().Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id, ct);
+            people[person.Id] = person;
+
+            foreach (var link in parentLinks)
+            {
+                if (!people.TryGetValue(link.PersonAId, out var parent) || !people.TryGetValue(link.PersonBId, out var child)) continue;
+                var finding = PlausibilityRules.CheckParentChild(ToLifeDates(parent), ToLifeDates(child))
+                    .FirstOrDefault(f => f.Severity == PlausibilitySeverity.Error);
+                finding ??= graph.AncestorGenerations(link.PersonAId)
+                    .SelectMany(a => graph.DescendantGenerations(link.PersonBId)
+                        .Select(d => (A: a.Key, D: d.Key, G: a.Value + d.Value + 1)))
+                    .Where(p => p.G >= 2 && people.ContainsKey(p.A) && people.ContainsKey(p.D))
+                    .OrderBy(p => p.G)
+                    .Select(p => PlausibilityRules.CheckAncestor(ToLifeDates(people[p.A]), ToLifeDates(people[p.D]), p.G))
+                    .FirstOrDefault(f => f != null);
+                if (finding != null)
+                    return $"Restoring {name} would bring back a link that can't be right: {finding.Message} " +
+                           "Correct the dates first.";
+            }
+        }
+
+        return null;
+    }
+
+    // While someone was deleted their spouse may have remarried, or (when two partners are
+    // restored in turn) two of their own marriages may come back at once. Refusing the restore
+    // would leave the user stuck: the marriage that clashes can't be edited while its person
+    // is deleted. A later marriage says the earlier one ended, so a restored marriage comes
+    // back ended (date unknown, like any ended marriage) when a newer one is current, and a
+    // live marriage is never changed. Returns a sentence for each, for the restore's message.
+    // Found by the B7 write-path fuzz harness, 2026-10-25.
+    private static async Task<List<string>> EndClashingMarriagesAsync(
+        AppDbContext ctx, Person person, List<Relationship> restoring, CancellationToken ct)
+    {
+        static bool Active(Relationship r) => !r.IsEnded && r.EndDate == null;
+        static DateTime When(Relationship r) => r.CreatedAt ?? DateTime.MinValue;
+
+        var notes = new List<string>();
+        var marriages = restoring.Where(r => r.Type == RelationshipType.Spouse && Active(r))
+            .OrderByDescending(When).ThenBy(r => r.Id).ToList();
+        foreach (var marriage in marriages)
+        {
+            var spouseId = marriage.PersonAId == person.Id ? marriage.PersonBId : marriage.PersonAId;
+            var live = await ctx.Relationships.AsNoTracking()
+                .Where(r => r.Type == RelationshipType.Spouse && !r.IsEnded && r.EndDate == null && r.Id != marriage.Id &&
+                            (r.PersonAId == spouseId || r.PersonBId == spouseId))
+                .Select(r => r.PersonAId == spouseId ? r.PersonBId : r.PersonAId)
+                .FirstOrDefaultAsync(ct);
+            var newerRestored = marriages.Any(m => m != marriage && Active(m) && When(m) >= When(marriage) &&
+                                                   (When(m) > When(marriage) || m.Id.CompareTo(marriage.Id) < 0));
+            if (live == Guid.Empty && !newerRestored) continue;
+
+            marriage.IsEnded = true;
+            marriage.UpdatedAt = DateTime.UtcNow;
+            var names = await ctx.People.IgnoreQueryFilters().AsNoTracking()
+                .Where(p => p.Id == spouseId || p.Id == live)
+                .ToDictionaryAsync(p => p.Id, p => $"{p.FirstName} {p.LastName}", ct);
+            var spouse = names.GetValueOrDefault(spouseId, "their spouse");
+            notes.Add(live != Guid.Empty
+                ? $"Their marriage to {spouse} is shown as ended, since {spouse} is now married to {names.GetValueOrDefault(live, "someone else")}."
+                : $"Their marriage to {spouse} is shown as ended, since they married again later.");
+        }
+        return notes;
+    }
+
     private static async Task<string?> ValidateSpouseRelationshipsAsync(
         AppDbContext ctx, Guid personId, PersonUpsertDto dto, CancellationToken ct)
     {
-        foreach (var spouseId in dto.SpouseIds)
+        var spouseIds = dto.SpouseIds.Distinct().ToList();
+        if (spouseIds.Count == 0) return null;
+
+        var activeNow = await ctx.Relationships.AsNoTracking()
+            .Where(r => r.Type == RelationshipType.Spouse && !r.IsEnded && r.EndDate == null &&
+                        (r.PersonAId == personId || r.PersonBId == personId))
+            .Select(r => r.PersonAId == personId ? r.PersonBId : r.PersonAId)
+            .ToListAsync(ct);
+        var added = spouseIds.Where(s => !activeNow.Contains(s)).ToList();
+        if (added.Count == 0) return null;
+
+        if (spouseIds.Count > 1)
+        {
+            var names = await ctx.People.AsNoTracking()
+                .Where(p => spouseIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => $"{p.FirstName} {p.LastName}", ct);
+            var listed = spouseIds.Select(id => names.GetValueOrDefault(id, "someone")).ToList();
+            return $"{dto.FirstName} {dto.LastName}".Trim() + $" can't be married to {string.Join(" and ", listed)} at once. " +
+                   "If a marriage has ended, list them as a former spouse instead.";
+        }
+
+        foreach (var spouseId in added)
         {
             var spouse = await ctx.People
                 .AsNoTracking()

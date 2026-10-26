@@ -69,6 +69,20 @@ public class DeletedTabTests : ComponentTestBase
         _personService.RestoreCalls.Should().Equal(AliceId, BobId);
     }
 
+    // A restore that brings a marriage back as ended (its spouse has remarried) says so;
+    // the plain "restored" toast would hide it (B7, 2026-10-25).
+    [Fact]
+    public void RestoreWithAMessage_ShowsTheMessageInsteadOfThePlainToast()
+    {
+        _personService.RestoreMessage = "Alice Anders restored. Their marriage to Ed Ames is shown as ended, since Ed Ames is now married to Fay Ames.";
+        var cut = RenderComponent<DeletedTab>();
+
+        RestoreButtonAtRow(cut, 0).Click();
+
+        Services.GetRequiredService<FamilyTree.Web.Services.ToastService>().Toasts
+            .Should().ContainSingle().Which.Message.Should().Be(_personService.RestoreMessage);
+    }
+
     private static AngleSharp.Dom.IElement RestoreButtonAtRow(IRenderedComponent<DeletedTab> cut, int rowIndex)
     {
         var row = cut.FindAll("tbody tr")[rowIndex];
@@ -82,6 +96,7 @@ class FakePersonServiceForDeletedTab : IPersonService
 {
     public List<PersonDto> Deleted { get; set; } = [];
     public List<Guid> RestoreCalls { get; } = [];
+    public string? RestoreMessage { get; set; }
 
     public Task<ServiceResponse<List<PersonDto>>> GetDeletedAsync(CancellationToken ct = default)
         => Task.FromResult(ServiceResponse<List<PersonDto>>.Ok(Deleted));
@@ -89,7 +104,7 @@ class FakePersonServiceForDeletedTab : IPersonService
     public Task<ServiceResponse> RestoreAsync(Guid id, CancellationToken ct = default)
     {
         RestoreCalls.Add(id);
-        return Task.FromResult(ServiceResponse.Ok());
+        return Task.FromResult(RestoreMessage is null ? ServiceResponse.Ok() : ServiceResponse.Ok(RestoreMessage));
     }
 
     public Task<ServiceResponse<List<PersonDto>>> GetAllAsync(CancellationToken ct = default)

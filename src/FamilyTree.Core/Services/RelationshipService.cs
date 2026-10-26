@@ -340,6 +340,19 @@ public class RelationshipService(
         if (request.PersonAId == request.PersonBId)
             return "A person cannot be related to themselves.";
 
+        // A parent or child can't also be a spouse or sibling (PersonService's
+        // ValidateRelativeRolesAsync; B7, 2026-10-25).
+        var lineal = request.Type is RelationshipType.Parent or RelationshipType.Adopted;
+        var clash = await ctx.Relationships.AnyAsync(r =>
+            r.Id != excludeRelationshipId &&
+            ((r.PersonAId == request.PersonAId && r.PersonBId == request.PersonBId) ||
+             (r.PersonAId == request.PersonBId && r.PersonBId == request.PersonAId)) &&
+            (r.Type == RelationshipType.Parent || r.Type == RelationshipType.Adopted) != lineal, ct);
+        if (clash)
+            return lineal
+                ? "These two are already linked as spouses or siblings, so one can't be the other's parent."
+                : "One of these two is already the other's parent, so they can't also be spouses or siblings.";
+
         // Validate date range
         if (request.StartDate.HasValue && request.EndDate.HasValue &&
             request.StartDate.Value >= request.EndDate.Value)
