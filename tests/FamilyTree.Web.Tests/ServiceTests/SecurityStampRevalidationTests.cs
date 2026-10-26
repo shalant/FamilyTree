@@ -64,13 +64,30 @@ public class SecurityStampRevalidationTests
             manager, SignedInAs(user, "stamp-1"), Options)).Should().BeFalse();
     }
 
-    // Just enough of a user store for UserManager's find and stamp calls.
+    // A session for a bare Google identity (its user ID the Google subject, not an account
+    // ID) was possible until 2026-10-25 (AuthSetup.AddArborKinGoogle). The account lookup
+    // threw on it, so the circuit check broke instead of signing it out.
+    [Fact]
+    [Trait("Category", "Regression")]
+    public async Task GoogleIdentitySession_SignsOut()
+    {
+        var (manager, _, _) = Setup();
+        var google = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, "109876543210987654321"), new Claim(ClaimTypes.Name, "Doug Rosenberg")],
+            "Identity.Application"));
+
+        (await SecurityStampRevalidatingAuthStateProvider.StampStillMatchesAsync(
+            manager, google, Options)).Should().BeFalse();
+    }
+
+    // Just enough of a user store for UserManager's find and stamp calls. Parses the ID
+    // like the EF store does, which throws on one that isn't a GUID.
     private sealed class StampStore(AppUser? user) : IUserSecurityStampStore<AppUser>
     {
         public AppUser? User { get; set; } = user;
 
         public Task<AppUser?> FindByIdAsync(string userId, CancellationToken ct) =>
-            Task.FromResult(User?.Id.ToString() == userId ? User : null);
+            Task.FromResult(User?.Id == Guid.Parse(userId) ? User : null);
         public Task SetSecurityStampAsync(AppUser u, string stamp, CancellationToken ct) { u.SecurityStamp = stamp; return Task.CompletedTask; }
         public Task<string?> GetSecurityStampAsync(AppUser u, CancellationToken ct) => Task.FromResult(u.SecurityStamp);
         public Task<IdentityResult> UpdateAsync(AppUser u, CancellationToken ct) => Task.FromResult(IdentityResult.Success);

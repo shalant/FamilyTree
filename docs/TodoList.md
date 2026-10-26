@@ -154,6 +154,11 @@ Work A in order before the first invite; B and C can follow.
         that `/auth/google` now redirects to Google with `https://arborkin.com/signin-google`
         and Google shows its account picker (no redirect or client error). Left: Doug signs
         in with his own Google account, and a Google account with no invite is refused.
+        **First real sign-in, 2026-10-25, found a hole:** Google signed in to the app's own
+        cookie, so any Google account got a signed-in session with no account behind it
+        (Doug's phone: "Doug Rosenberg", Member, empty tree, `?loginError=google_error`).
+        Fixed in `fix/google-signin-scheme` (security.md, "Any Google account got a
+        signed-in session"); after deploying, Doug repeats both checks.
 - [x] **A5: Louis's sister drawn on top of Louis** in the archived engine the family sees.
       Decided 2026-10-25: no change for now. The family stays on the archived engine;
       Doug switches them later by setting `Layout__Engine=TimelineBest` on the App

@@ -42,6 +42,8 @@ public sealed class SecurityStampRevalidatingAuthStateProvider(
     internal static async Task<bool> StampStillMatchesAsync(
         UserManager<AppUser> userManager, ClaimsPrincipal principal, IdentityOptions options)
     {
+        // A Google-identity session (AuthSetup) has no account ID, and the lookup throws on it.
+        if (!AuthSetup.IsAccountPrincipal(principal)) return false;
         var user = await userManager.GetUserAsync(principal);
         if (user is null) return false;
         if (!userManager.SupportsUserSecurityStamp) return true;

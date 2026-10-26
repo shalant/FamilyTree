@@ -233,7 +233,7 @@ else
             // password reset or a role change (both rotate the security stamp) ends other
             // sessions, and changed claims (Admin, FamilyId) reach the cookie, instead of
             // the 14-day cookie carrying them unchecked.
-            options.Events.OnValidatePrincipal = SecurityStampValidator.ValidatePrincipalAsync;
+            options.Events.OnValidatePrincipal = AuthSetup.ValidateAppCookieAsync;
         })
         .AddCookie(IdentityConstants.ExternalScheme)
         // Never used (no 2FA), but SecurityStampValidator signs out of the remember-me
@@ -249,16 +249,7 @@ else
     var googleId     = builder.Configuration["Google:ClientId"];
     var googleSecret = builder.Configuration["Google:ClientSecret"];
     if (!string.IsNullOrWhiteSpace(googleId) && !string.IsNullOrWhiteSpace(googleSecret))
-    {
-        authBuilder.AddGoogle(options =>
-        {
-            options.ClientId     = googleId;
-            options.ClientSecret = googleSecret;
-            // Not mapped by default; an invite is claimed by address alone, so only a
-            // verified one may (AuthService.RegisterExternalAsync).
-            options.ClaimActions.MapJsonKey("email_verified", "email_verified");
-        });
-    }
+        authBuilder.AddArborKinGoogle(googleId, googleSecret);
 }
 
 // ── Pipeline ──────────────────────────────────────────────────
@@ -515,6 +506,7 @@ if (!devAuthEnabled)
 
     app.MapGet("/auth/google-callback", async (
         string? returnUrl,
+        HttpContext httpContext,
         Microsoft.AspNetCore.Identity.SignInManager<FamilyTree.Core.Models.AppUser> signInManager,
         Microsoft.AspNetCore.Identity.UserManager<FamilyTree.Core.Models.AppUser> userManager,
         IAuthService authService) =>
@@ -522,10 +514,14 @@ if (!devAuthEnabled)
         var info = await signInManager.GetExternalLoginInfoAsync();
         if (info == null)
             return Results.LocalRedirect(LoginRedirect.LoginError("google_error", returnUrl));
+        // Read once; the Google identity must not outlive this request in any cookie.
+        await httpContext.SignOutAsync(IdentityConstants.ExternalScheme);
 
         var email = info.Principal.FindFirstValue(ClaimTypes.Email);
         if (string.IsNullOrWhiteSpace(email))
             return Results.LocalRedirect(LoginRedirect.LoginError("google_error", returnUrl));
+        var verified = string.Equals(
+            info.Principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase);
 
         // Existing external login → sign straight in
         var signInResult = await signInManager.ExternalLoginSignInAsync(
@@ -536,11 +532,16 @@ if (!devAuthEnabled)
             return Results.LocalRedirect(LoginRedirect.AfterSignIn(returnUrl, u?.FocusPersonId ?? u?.PersonId));
         }
 
-        // Email account exists but Google not yet linked → link and sign in
+        // Email account exists but Google not yet linked → link and sign in, only for an
+        // address Google has verified: the address is all that ties the two together.
         var existing = await userManager.FindByEmailAsync(email);
         if (existing != null)
         {
-            await userManager.AddLoginAsync(existing, info);
+            if (!verified)
+                return Results.LocalRedirect(LoginRedirect.LoginError("google_error", returnUrl));
+            var linked = await userManager.AddLoginAsync(existing, info);
+            if (!linked.Succeeded)
+                return Results.LocalRedirect(LoginRedirect.LoginError("google_error", returnUrl));
             await signInManager.SignInAsync(existing, isPersistent: true);
             return Results.LocalRedirect(LoginRedirect.AfterSignIn(returnUrl, existing.FocusPersonId ?? existing.PersonId));
         }
@@ -551,8 +552,6 @@ if (!devAuthEnabled)
         var lastName  = info.Principal.FindFirstValue(ClaimTypes.Surname)   ?? "";
         if (string.IsNullOrWhiteSpace(firstName) && string.IsNullOrWhiteSpace(lastName))
             firstName = email.Split('@')[0];
-        var verified = string.Equals(
-            info.Principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase);
 
         var registered = await authService.RegisterExternalAsync(email, firstName, lastName, verified);
         if (!registered.Success)
@@ -569,7 +568,9 @@ if (!devAuthEnabled)
         var newUser = await userManager.FindByIdAsync(registered.Data.ToString());
         if (newUser == null)
             return Results.LocalRedirect(LoginRedirect.LoginError("google_error", returnUrl));
-        await userManager.AddLoginAsync(newUser, info);
+        var added = await userManager.AddLoginAsync(newUser, info);
+        if (!added.Succeeded)
+            return Results.LocalRedirect(LoginRedirect.LoginError("google_error", returnUrl));
         await signInManager.SignInAsync(newUser, isPersistent: true);
         return Results.LocalRedirect(LoginRedirect.AfterSignIn(returnUrl, null));
     });
