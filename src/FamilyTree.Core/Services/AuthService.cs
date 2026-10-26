@@ -246,6 +246,47 @@ public class AuthService(
         return await CreateInviteCoreAsync(email, familyId: null);
     }
 
+    public async Task<ServiceResponse> SendInviteEmailAsync(Guid inviteId, string baseUrl)
+    {
+        if (!currentUser.IsSuperUser) return ServiceResponse.Fail(SuperUserOnly);
+        if (string.IsNullOrWhiteSpace(baseUrl)) return ServiceResponse.Fail("Couldn't work out the site address for the link.");
+
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync();
+            var invite = await ctx.UserInvites.FirstOrDefaultAsync(i => i.Id == inviteId);
+            if (invite == null || invite.AcceptedAt != null || invite.CancelledAt != null
+                || invite.ExpiresAt <= DateTime.UtcNow)
+                return ServiceResponse.Fail("That invite is no longer open.");
+
+            var inviterId = currentUser.UserId;
+            var inviterName = inviterId == null ? null
+                : await ctx.Users.Where(u => u.Id == inviterId).Select(u => u.DisplayName).FirstOrDefaultAsync();
+            inviterName = string.IsNullOrWhiteSpace(inviterName) ? "A family member" : inviterName;
+
+            var daysLeft = Math.Max(1, (int)Math.Ceiling((invite.ExpiresAt - DateTime.UtcNow).TotalDays));
+            var link = $"{baseUrl.TrimEnd('/')}/register?invite={invite.Id}";
+            var html = UserInviteEmailBuilder.Build(inviterName, link, daysLeft);
+
+            try
+            {
+                await emailSender.SendAsync(invite.Email, $"{inviterName} has invited you to ArborKin", html);
+            }
+            catch (Exception sendEx)
+            {
+                logger.LogWarning(sendEx, "Failed to send admin invite email to {Email}", invite.Email);
+                return ServiceResponse.Fail("The email couldn't be sent. The invite is still valid: copy the link and send it yourself.");
+            }
+
+            return ServiceResponse.Ok();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "SendInviteEmailAsync failed for invite {InviteId}", inviteId);
+            return ServiceResponse.Fail("Failed to send the invite email.");
+        }
+    }
+
     // Not caller-gated: StoryInviteService.SubmitResponseAsync runs in the anonymous
     // /story/respond circuit and offers the responder an account. Only server-side code
     // reaches it with an email taken from an existing StoryInvite row.

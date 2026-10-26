@@ -24,6 +24,13 @@ public interface IAuthService
     Task<ServiceResponse<Guid>>                  CreateInviteAsync(string email);
 
     /// <summary>
+    /// SuperUser-only: emails an open admin invite's register link to the address it was
+    /// made for. Fails with a message the admin can act on (copy the link instead) when the
+    /// send fails; the invite itself stays valid either way.
+    /// </summary>
+    Task<ServiceResponse>                        SendInviteEmailAsync(Guid inviteId, string baseUrl);
+
+    /// <summary>
     /// Registration invite offered to someone who just answered a story invite. Not
     /// caller-gated (the respond page is anonymous); <paramref name="familyId"/> is the
     /// family the story is about, or null for the default family.
