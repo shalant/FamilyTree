@@ -478,21 +478,30 @@ stopping placement patches and replacing the placement algorithm, measured first
 
 ## Photo gallery: broken images (found 2026-10-24)
 
-- [ ] **The person photo gallery shows a broken photo as a blank tile with the browser's
+- [x] **The person photo gallery shows a broken photo as a blank tile with the browser's
       broken-image icon.** Seen live 2026-10-24 on Doug's own Photos tab
       (`PersonMedia.razor`): one of three photos rendered as an empty box in the top-left
       corner, still offering "Use as profile". It was there before that day's deploy (in a
       screenshot taken before the upload), so it isn't from the image-format change in #66.
-      `PersonNode` and `PersonDetailDrawer` already handle this (`@onerror` -> initials, or
-      a broken-image badge with "Photo couldn't be loaded", 2026-10-12); the gallery tiles
-      have no `@onerror` at all. Do: give gallery tiles the same treatment (a clear "Photo
-      couldn't be loaded" tile, with Delete available but not "Use as profile"), and find
-      out why that photo is broken: missing blob, an unconverted HEIC, or something else.
-- [ ] **Upload hint mentions HEIC, but the server doesn't accept it.** `PersonMedia.razor`
-      says "JPG, PNG, HEIC, WebP". HEIC only works when the browser converts it to JPEG
+      **Fixed 2026-10-25 (`fix/photo-gallery-broken-tile`):** a gallery photo whose `<img>`
+      fails to load (`@onerror`) now becomes a "Photo couldn't be loaded" tile with the
+      same `ft-photo-broken-tile` look as `PersonDetailDrawer`; its hover overlay keeps
+      Edit/Delete, and "Use as profile" is hidden. Regression test:
+      `PersonMediaTests.PhotoThatFailsToLoad_ShowsCouldntBeLoadedTile_AndNoUseAsProfile`
+      (fails against the old page, passes now).
+- [ ] **Find out why that one photo is broken (needs production data).** Not determined:
+      it needs a look at that `Media` row and its blob on prod. Check, in order: does the
+      blob exist (a missing one makes `/media/{blob}` 404); is `MimeType` an image type
+      (`MediaAccessService.ImageType` serves anything else as an attachment, which an
+      `<img>` won't render, e.g. a row saved as `image/heic` before the allow-list); does
+      the stored `Url` end in the blob's name. Open the broken photo's URL directly to see
+      the status code.
+- [x] **Upload hint mentions HEIC, but the server doesn't accept it.** `PersonMedia.razor`
+      said "JPG, PNG, HEIC, WebP". HEIC only works when the browser converts it to JPEG
       first; if that fails, the original's `image/heic` MIME type is rejected by
-      `MediumService`'s allow-list. Either drop HEIC from the hint or say what happens.
-      Related to the broken tile above if that photo turns out to be a HEIC.
+      `MediumService`'s allow-list (the user sees an "Failed to upload" toast).
+      **Fixed 2026-10-25:** the hint now reads "JPG, PNG, WebP · max 8 MB each. HEIC works
+      only if your browser can convert it" (`PersonMediaTests.UploadHint_DoesNotPromiseHeic`).
 
 ---
 
