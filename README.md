@@ -29,9 +29,9 @@ Designed as both a genuine family tool (actively used by 5+ family members) and 
 | Metric | Status |
 |--------|--------|
 | **Core Tests** | 287/287 ✅ |
-| **Web Tests** (components, layout, services) | 324/329 ✅ (5 skipped) |
+| **Web Tests** (components, layout, services) | 328/333 ✅ (5 skipped) |
 | **E2E Tests** (Playwright, real SQL Server) | 18/18 ✅ |
-| **Total** | 629 passing (as of 2026-10-25) |
+| **Total** | 633 passing (as of 2026-10-25) |
 | **Build (Debug + Release)** | ✅ |
 | **CI Pipeline** | ✅ [View Latest Run](https://github.com/shalant/FamilyTree/actions/workflows/ci.yml) |
 | **Branch Protection** | ✅ Master requires PR + passing CI |

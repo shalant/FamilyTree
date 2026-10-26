@@ -287,8 +287,24 @@ first Google sign-in gets an account only if the Google account's address has an
 unexpired `UserInvite`, and only if Google reports the address verified (`email_verified`,
 mapped in `Program.cs`); it joins that invite's family and accepts it
 (`AuthService.RegisterExternalAsync`). The address is the whole credential here, so an
-unverified one never claims an invite. Not changed: a Google sign-in whose address matches
-an existing password account links to it without checking `email_verified`.
+unverified one never claims an invite. Since 2026-10-25 (`fix/google-signin-scheme`), a
+Google sign-in whose address matches an existing account links to it only when the address
+is verified too.
+
+**Any Google account got a signed-in session (found live and fixed 2026-10-25).** Google
+was registered without a `SignInScheme`, so it signed in to the default scheme, which
+`AddAuthentication(IdentityConstants.ApplicationScheme)` makes the app's own cookie (full
+`AddIdentity` points it at the external cookie instead). From 2026-10-25, when Google
+credentials were first set on production, until the fix deployed, every Google sign-in left
+an `.ArborKin.Auth` cookie for the bare Google identity: invite or not, no account behind
+it, a Member with no family claim, so it saw an empty tree and every family-scoped service
+returned nothing. The callback then found no external sign-in and sent `google_error`, so no
+account was ever linked or created (production had no `AspNetUserLogins` rows). Found by
+Doug's phone showing "Doug Rosenberg" (his Google profile name, matching no account) on an
+empty tree. Fixed: Google signs in to the external cookie (`AuthSetup.AddArborKinGoogle`),
+the callback clears that cookie once read, and the app cookie is rejected on every request
+when its user ID isn't an account ID, which signs out the sessions made before the fix (the
+stamp check alone threw on them). `AuthSetupTests`, `SecurityStampRevalidationTests`.
 
 ---
 
