@@ -193,8 +193,18 @@ Work A in order before the first invite; B and C can follow.
         (touch input and phone browser quirks don't show in an emulator). **Done
         2026-10-25:** the invite reached Doug's `+a6` address with the photo, and the link
         worked on his real phone.
-- [ ] **Admin invites aren't emailed** (left over from A6): Admin › Users "Generate link"
-      still only gives a link to copy and send.
+- [x] **Admin invites aren't emailed** (left over from A6): Admin › Users "Generate link"
+      only gave a link to copy and send. **Fixed 2026-10-25 (`feat/email-admin-invites`):**
+      the button is now "Send invite". It creates the invite, then
+      `IAuthService.SendInviteEmailAsync` (super-user only, like the rest of invites)
+      emails the register link through `UserInviteEmailBuilder` (same look as
+      `StoryInviteEmailBuilder`). The link stays on screen with "Emailed to ..." or, if
+      the send fails, the reason and "send it yourself"; the invite is valid either way.
+      Also fixed the line above the link, which named a blank address (it read the
+      already-cleared field). Tests: `CrossTenantMatrixTests` (`Auth_SendInviteEmail_*`:
+      family Admin refused, super-user sends to the invited address with the link,
+      cancelled invite refused, failed send keeps the invite) and `UsersTabInviteTests`.
+      Not checked: a real SMTP send on prod; try it with a `+` address after deploy.
 
 **B. Battle-testing**
 - [x] **B7 step 0: neutral test families** (2026-10-25, `feat/b7-neutral-test-families`).

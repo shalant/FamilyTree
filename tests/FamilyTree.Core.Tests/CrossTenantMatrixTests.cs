@@ -194,8 +194,8 @@ public class CrossTenantMatrixTests
             ["Stories:InviteTtlDays"] = "30",
         }).Build();
 
-    private static AuthService AuthSvc(World w, ICurrentUserService u, string mode = "InviteOnly") =>
-        new(w.Users, Config(mode), w.Db, new FakeEmailSender(), NullLogger<AuthService>.Instance, u);
+    private static AuthService AuthSvc(World w, ICurrentUserService u, string mode = "InviteOnly", IEmailSender? email = null) =>
+        new(w.Users, Config(mode), w.Db, email ?? new FakeEmailSender(), NullLogger<AuthService>.Instance, u);
 
     private static StoryInviteService StoryInviteSvc(World w, ICurrentUserService u, IEmailSender? email = null) =>
         new(w.Db, NullLogger<StoryInviteService>.Instance, new FakeAuditLogService(), u,
@@ -840,6 +840,59 @@ public class CrossTenantMatrixTests
         (await Read(w, ctx => ctx.UserInvites.CountAsync())).Should().Be(1);
         (await Read(w, ctx => ctx.UserInvites.SingleAsync())).CancelledAt.Should().BeNull();
         (await Read(w, ctx => ctx.PasswordResetRequests.SingleAsync())).DismissedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Auth_SendInviteEmail_DeniesFamilyAdmin_AndSendsNothing()
+    {
+        var w = await SeedAsync();
+        var email = new RecordingEmailSender();
+        var r = await AuthSvc(w, w.As(Caller.AdminA), email: email).SendInviteEmailAsync(w.UserInviteB, "https://site.test");
+        r.Success.Should().BeFalse();
+        email.Sent.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Auth_SendInviteEmail_SuperUserEmailsTheInvitedAddressWithTheRegisterLink()
+    {
+        var w = await SeedAsync();
+        var email = new RecordingEmailSender();
+        var r = await AuthSvc(w, w.SuperUser, email: email).SendInviteEmailAsync(w.UserInviteB, "https://site.test/");
+        r.Success.Should().BeTrue();
+
+        var invite = await Read(w, ctx => ctx.UserInvites.SingleAsync(i => i.Id == w.UserInviteB));
+        var sent = email.Sent.Should().ContainSingle().Subject;
+        sent.To.Should().Be(invite.Email);
+        sent.Body.Should().Contain($"https://site.test/register?invite={w.UserInviteB}");
+    }
+
+    [Fact]
+    public async Task Auth_SendInviteEmail_RefusesACancelledInvite_AndSendsNothing()
+    {
+        var w = await SeedAsync();
+        var email = new RecordingEmailSender();
+        var svc = AuthSvc(w, w.SuperUser, email: email);
+        (await svc.CancelInviteAsync(w.UserInviteB)).Success.Should().BeTrue();
+
+        (await svc.SendInviteEmailAsync(w.UserInviteB, "https://site.test")).Success.Should().BeFalse();
+        email.Sent.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Auth_SendInviteEmail_WhenTheSendFails_SaysToCopyTheLink_AndKeepsTheInvite()
+    {
+        var w = await SeedAsync();
+        var r = await AuthSvc(w, w.SuperUser, email: new ThrowingEmailSender()).SendInviteEmailAsync(w.UserInviteB, "https://site.test");
+
+        r.Success.Should().BeFalse();
+        r.Message.Should().Contain("copy the link");
+        (await Read(w, ctx => ctx.UserInvites.SingleAsync(i => i.Id == w.UserInviteB))).CancelledAt.Should().BeNull();
+    }
+
+    private sealed class ThrowingEmailSender : IEmailSender
+    {
+        public Task SendAsync(string to, string subject, string htmlBody, CancellationToken ct = default)
+            => throw new InvalidOperationException("SMTP down");
     }
 
     // ── Anonymous caller (S1) ───────────────────────────────────────────────────

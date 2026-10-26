@@ -37,7 +37,7 @@
                        Style="flex-shrink:0;"
                        OnClick="CreateInviteAsync"
                        Disabled="@(_creatingInvite || !IsValidInviteEmail(_inviteEmail))">
-                Generate link
+                Send invite
             </MudButton>
         </div>
     </div>
@@ -54,8 +54,22 @@
         <div style="margin-top:12px; padding:12px; border-radius:8px;
             background:rgba(76,175,80,0.08); border:1px solid rgba(76,175,80,0.25);">
             <div style="font-size:11px; color:var(--ft-gray-400); margin-bottom:6px;">
-                Send this link to @_inviteEmail — expires in 7 days
+                @if (_inviteEmailed)
+                {
+                    <span>Emailed to @_invitedEmail. You can also send them this link yourself.</span>
+                }
+                else
+                {
+                    <span>Send this link to @_invitedEmail yourself.</span>
+                }
+                Expires in 7 days.
             </div>
+            @if (_inviteEmailError is not null)
+            {
+                <div style="font-size:13px; color:var(--mud-palette-error); margin-bottom:8px;">
+                    @_inviteEmailError
+                </div>
+            }
             <div style="display:flex; gap:8px; align-items:center;">
                 <code style="font-size:12px; color:var(--ft-green-800); word-break:break-all; flex:1;">
                     @_inviteLink
@@ -247,6 +261,11 @@ else
     private string _inviteEmail = "";
     private string? _inviteLink;
     private string? _inviteError;
+    // The address the current link was made for (_inviteEmail is cleared once it's created),
+    // whether the email went out, and why not if it didn't.
+    private string _invitedEmail = "";
+    private bool _inviteEmailed;
+    private string? _inviteEmailError;
     private bool _creatingInvite;
 
     private Guid? _editingUserId;
@@ -370,20 +389,33 @@ else
     {
         _inviteError = null;
         _inviteLink = null;
+        _inviteEmailError = null;
+        _inviteEmailed = false;
         _creatingInvite = true;
 
         var result = await AuthService.CreateInviteAsync(_inviteEmail.Trim());
-        _creatingInvite = false;
 
         if (!result.Success)
         {
+            _creatingInvite = false;
             _inviteError = result.Message;
             return;
         }
 
         var baseUri = NavigationManager.BaseUri.TrimEnd('/');
         _inviteLink = $"{baseUri}/register?invite={result.Data}";
+        _invitedEmail = _inviteEmail.Trim();
         _inviteEmail = "";
+
+        // The invite is valid whether or not the email goes out; the link stays on screen
+        // as the fallback.
+        var sent = await AuthService.SendInviteEmailAsync(result.Data, baseUri);
+        _creatingInvite = false;
+        _inviteEmailed = sent.Success;
+        if (sent.Success)
+            ToastService.Success($"Invite emailed to {_invitedEmail}.");
+        else
+            _inviteEmailError = sent.Message;
 
         await LoadPendingInvitesAsync();
     }

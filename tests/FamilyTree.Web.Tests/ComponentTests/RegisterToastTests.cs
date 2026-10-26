@@ -92,8 +92,21 @@ class FakeAuthService : IAuthService
         => throw new NotImplementedException();
     public Task<ServiceResponse<Guid>> RegisterExternalAsync(string email, string firstName, string lastName, bool emailVerified)
         => throw new NotImplementedException();
+    // Set by UsersTabInviteTests; unset, an unstubbed call still throws.
+    public Guid? CreatedInviteId { get; set; }
+    public ServiceResponse? SendInviteEmailResult { get; set; }
+    public List<(Guid InviteId, string BaseUrl)> EmailedInvites { get; } = [];
+
     public Task<ServiceResponse<Guid>> CreateInviteAsync(string email)
-        => throw new NotImplementedException();
+        => CreatedInviteId is { } id
+            ? Task.FromResult(ServiceResponse<Guid>.Ok(id))
+            : throw new NotImplementedException();
+    public Task<ServiceResponse> SendInviteEmailAsync(Guid inviteId, string baseUrl)
+    {
+        if (SendInviteEmailResult is null) throw new NotImplementedException();
+        EmailedInvites.Add((inviteId, baseUrl));
+        return Task.FromResult(SendInviteEmailResult);
+    }
     public Task<ServiceResponse<Guid>> CreateInviteForStoryResponseAsync(string email, Guid? familyId)
         => throw new NotImplementedException();
     public Task<ServiceResponse<List<UserInvite>>> GetPendingInvitesAsync()
