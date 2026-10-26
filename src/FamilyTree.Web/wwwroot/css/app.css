@@ -706,14 +706,77 @@ html body #blazor-error-ui .dismiss {
     height: 100dvh;
     overflow: hidden;
     touch-action: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+/* The tree's green surface: shared by the canvas, the tree page's loading state and the
+   pre-circuit splash on "/", so the three never flash white between each other. */
+.ft-viewport,
+.ft-loading-surface,
+#ft-splash.ft-splash--tree {
     background:
         radial-gradient(ellipse at 15% 28%, rgba(93, 202, 165, 0.18) 0%, transparent 48%),
         radial-gradient(ellipse at 85% 72%, rgba(29, 158, 117, 0.10) 0%, transparent 42%),
         radial-gradient(ellipse at 55% 5%,  rgba(159, 225, 203, 0.16) 0%, transparent 38%),
         linear-gradient(to bottom, var(--ft-green-50) 0%, var(--ft-green-200) 100%);
-    z-index: 1;
-    opacity: 0;
-    transition: opacity 0.25s ease;
+}
+
+/* ── Tree loading state ───────────────────────────────────────────────────── */
+.ft-loading-surface {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ft-loading-art {
+    width: min(340px, 78vw);
+}
+
+.ft-loading-art svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.ft-loading-lines path {
+    fill: none;
+    stroke: var(--ft-line-parent);
+    stroke-width: 2;
+    stroke-linecap: round;
+    opacity: 0.45;
+}
+
+.ft-loading-nodes circle {
+    fill: var(--ft-green-100);
+    stroke: var(--ft-green-300);
+    stroke-width: 2;
+    animation: ft-loading-breathe 2.4s ease-in-out infinite;
+}
+
+/* One slow pulse, a beat later per generation, so it reads as the tree filling downward. */
+.ft-loading-nodes .g2 { animation-delay: 0.25s; }
+.ft-loading-nodes .g3 { animation-delay: 0.5s; }
+
+@keyframes ft-loading-breathe {
+    0%, 100% { opacity: 0.45; }
+    50%      { opacity: 0.95; }
+}
+
+.ft-loading-text {
+    margin: 14px 0 0;
+    font: italic 500 17px/1.4 Georgia, serif;
+    color: var(--ft-green-800);
+    opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ft-loading-nodes circle { animation: none; opacity: 0.7; }
 }
 
 /*.ft-viewport {

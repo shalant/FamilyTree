@@ -58,18 +58,11 @@
     </NotAuthorized>
 </AuthorizeView>
 
-@if (!_authStateResolved)
+@if (!_authStateResolved || _loading || !_ready)
 {
-    @* Auth state still resolving — show spinner to prevent LoginOverlay flashing on logout *@
-    <div style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:10;">
-        <MudProgressCircular Indeterminate="true" Color="Color.Success" />
-    </div>
-}
-else if (_loading || !_ready)
-{
-    <div style="position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:10;">
-        <MudProgressCircular Indeterminate="true" Color="Color.Success" />
-    </div>
+    @* Auth state still resolving (prevents LoginOverlay flashing on logout), then people and
+       focus loading. The same surface as App.razor's pre-circuit splash, so it reads as one wait. *@
+    <TreeLoadingSurface />
 }
 else if (!_people.Any())
 {
@@ -278,7 +271,16 @@ else
                 // (OnAfterRenderAsync) re-prompts them to finish linking.
                 _ready = true;
             }
-            // else: _ready stays false — OnAfterRenderAsync reads DB/localStorage
+            else if (_currentUserId.HasValue)
+            {
+                // A signed-in user's focus lives in the DB, which needs no JS, so resolve it
+                // here rather than in OnAfterRenderAsync: that cost a whole extra render and
+                // round trip before the tree could paint.
+                _focusPerson = await ResolveFocusAsync();
+                TreeContext.SetContext(_focusPerson, _people.Count, _couples.Count);
+                _ready = true;
+            }
+            // else (guest): _ready stays false — OnAfterRenderAsync reads localStorage
         }
         else
         {

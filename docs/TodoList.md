@@ -482,7 +482,23 @@ stopping placement patches and replacing the placement algorithm, measured first
 
 ## Tree loading state (found 2026-10-24)
 
-- [ ] **The tree's loading state is a lone spinner on a blank white page.** Seen live
+- [x] **Done 2026-10-25.** Measured first (local, warm, signed in): the browser gets the
+      shell and starts the circuit in ~220ms; on the server auth state + user lookup take
+      ~18ms, the people query ~60ms, the focus lookup ~6ms. The cold first request after a
+      restart is much slower (people query ~650ms, EF warm-up), and Azure SQL serverless
+      will be slower still, so the wait that matters is the one on the blank page. The real
+      waste was structural: a signed-in user's focus (a DB read, no JS needed) was resolved
+      in `OnAfterRenderAsync`, costing an extra render pass and round trip before the tree
+      could paint. Fixed: `Home.razor` resolves it in `OnInitializedAsync` for signed-in
+      users (guests still read `localStorage` after render). Looks: new
+      `TreeLoadingSurface` (the canvas's green gradient, now shared by `.ft-viewport`, the
+      loading surface and `#ft-splash` on "/", plus a faint lopsided tree sketch and
+      "Opening your tree") replaces both spinners, shown identically by the pre-circuit
+      splash (`App.razor`, only on "/") and by `Home.razor`, so the two waits read as one.
+      `TreeLayout` gives `body` the green too, so the hand-off to the fading-in canvas
+      never flashes white. The Home focus change has no automated test (Home has no bUnit
+      harness); checked in the browser against the local DB. Original note below.
+- [x] ~~**The tree's loading state is a lone spinner on a blank white page.**~~ Seen live
       2026-10-24 (Doug's screenshot): the AppBar, then an empty white viewport with a small
       green `MudProgressCircular` in the middle, before the green tree canvas paints. It
       comes from `Home.razor` (`_loading || !_ready`, and the auth-resolving branch above

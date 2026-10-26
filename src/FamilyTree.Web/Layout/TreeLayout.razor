@@ -20,6 +20,12 @@
             height: 100dvh !important;
             max-height: 100dvh !important;
         }
+        /* The canvas fades in from opacity 0 once its JS is up, and the loading surface is
+           gone by then: this keeps the page the canvas's green (minus the soft glows) so
+           the hand-off never flashes white. */
+        body {
+            background: linear-gradient(to bottom, var(--ft-green-50) 0%, var(--ft-green-200) 100%) fixed;
+        }
     </style>
 </HeadContent>
 

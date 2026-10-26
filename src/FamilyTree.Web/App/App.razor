@@ -1,3 +1,4 @@
+@using FamilyTree.Web.Modules.Components
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,7 +15,16 @@
     <HeadOutlet @rendermode="@_interactiveNoPrerender" />
 </head>
 <body>
-    <div id="ft-splash" aria-hidden="true"><div class="ft-splash-spinner"></div></div>
+    @if (_isTreePage)
+    {
+        @* On "/" the splash is the tree's loading surface, the same one Home.razor shows while it
+           loads, so the wait before and after the circuit connects looks like one. *@
+        <div id="ft-splash" class="ft-splash--tree" aria-hidden="true"><TreeLoadingSurface /></div>
+    }
+    else
+    {
+        <div id="ft-splash" aria-hidden="true"><div class="ft-splash-spinner"></div></div>
+    }
     <Routes @rendermode="@_interactiveNoPrerender" />
     <div id="components-reconnect-modal">
         <div class="ft-reconnect-card">
@@ -71,6 +81,9 @@
     // query string forces a new URL — and a real fetch — the moment that specific file
     // changes on disk, without needing any build-time versioning infrastructure.
     [Inject] private IWebHostEnvironment Env { get; set; } = null!;
+    [Inject] private NavigationManager Nav { get; set; } = null!;
+
+    private bool _isTreePage => new Uri(Nav.Uri).AbsolutePath == "/";
 
     private string AssetVersion(string relativePath)
     {
