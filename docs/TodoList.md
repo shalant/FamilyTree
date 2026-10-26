@@ -266,6 +266,16 @@ Work A in order before the first invite; B and C can follow.
     and left fields out. All three now use `PersonMapper.ToUpsertDto` (`PersonMapperToUpsertTests`
     checks it copies every field; `PersonMediaTests` fails against the old page). Data
     already lost this way can't be recovered from the app.
+    Checked prod 2026-10-26: **nothing was lost.** A point-in-time copy from 2026-10-19
+    03:00 UTC, the oldest Azure kept, had the same 21 spouse/sibling rows (same creation
+    times) and the same 53 relationships and 31 people as prod, and no emails to lose.
+    Before that the backups are gone, so the audit log was used: only 7 people have ever
+    had photos. Douglas's and Walker's sibling and former-marriage links predate their later
+    updates and survive, and Elizabeth was never updated. Amelia, Elliot, Marc and Omar were
+    updated right after a photo upload, and Doug confirmed none of them ever had a former
+    marriage or a sibling link outside shared parents. The copy was deleted afterwards.
+    The audit log records "Update Person" with no before/after values, and the relationship
+    sync removes rows without auditing them, so a backup is the only record of a removed link.
   - Still open: the prototype draws an undated person above their dated parent in about 1
     session in 3,000 on families whose dates are consistent (ADR 004, "Known gaps", with
     replay seeds). Not covered: Members' permissions, photos, stories, the sign-up linking
