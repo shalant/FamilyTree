@@ -46,6 +46,41 @@ public class PersonMediaTests : ComponentTestBase
         sent.SpouseIds.Should().Equal(person.SpouseIds);
         sent.ChildIds.Should().Equal(person.ChildIds);
     }
+
+    // Found live 2026-10-24: a photo that failed to load showed as an empty box with the
+    // browser's broken-image icon, still offering "Use as profile".
+    [Fact]
+    [Trait("Category", "Regression")]
+    public void PhotoThatFailsToLoad_ShowsCouldntBeLoadedTile_AndNoUseAsProfile()
+    {
+        Services.AddSingleton<IPersonService>(new FakePersonServiceForMedia(
+            new PersonDto { Id = PersonId, FirstName = "Ada", LastName = "Arden" }));
+        Services.AddSingleton<IMediumService>(new FakeMediumServiceForMedia());
+        RenderComponent<MudPopoverProvider>();
+
+        var cut = RenderComponent<PersonMedia>(p => p.Add(x => x.Id, PersonId));
+        cut.FindAll("button").Should().Contain(b => b.TextContent.Contains("Use as profile"));
+
+        cut.Find("img").TriggerEvent("onerror", new Microsoft.AspNetCore.Components.Web.ErrorEventArgs());
+
+        cut.FindAll("img").Should().BeEmpty();
+        cut.Find(".ft-photo-broken-tile").TextContent.Should().Contain("Photo couldn't be loaded");
+        cut.FindAll("button").Should().NotContain(b => b.TextContent.Contains("Use as profile"));
+    }
+
+    [Fact]
+    public void UploadHint_DoesNotPromiseHeic()
+    {
+        Services.AddSingleton<IPersonService>(new FakePersonServiceForMedia(
+            new PersonDto { Id = PersonId, FirstName = "Ada", LastName = "Arden" }));
+        Services.AddSingleton<IMediumService>(new FakeMediumServiceForMedia());
+        RenderComponent<MudPopoverProvider>();
+
+        var cut = RenderComponent<PersonMedia>(p => p.Add(x => x.Id, PersonId));
+
+        cut.Markup.Should().NotContain("JPG, PNG, HEIC");
+        cut.Markup.Should().Contain("HEIC works only if your browser can convert it");
+    }
 }
 
 class FakePersonServiceForMedia(PersonDto person) : IPersonService
