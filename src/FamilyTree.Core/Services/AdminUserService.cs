@@ -60,7 +60,7 @@ public class AdminUserService(
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
             var invites = await ctx.UserInvites
                 .AsNoTracking()
-                .Where(i => i.ExpiresAt > DateTime.UtcNow)
+                .Where(i => i.ExpiresAt > DateTime.UtcNow && i.AcceptedAt == null && i.CancelledAt == null)
                 .OrderByDescending(i => i.CreatedAt)
                 .Select(i => new AdminInviteDto
                 {
@@ -88,7 +88,7 @@ public class AdminUserService(
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
             var resets = await ctx.PasswordResetRequests
                 .AsNoTracking()
-                .Where(r => r.ExpiresAt > DateTime.UtcNow && r.DismissedAt == null)
+                .Where(r => r.ExpiresAt > DateTime.UtcNow && r.CompletedAt == null && r.DismissedAt == null)
                 .OrderByDescending(r => r.CreatedAt)
                 .Select(r => new AdminPasswordResetDto
                 {
