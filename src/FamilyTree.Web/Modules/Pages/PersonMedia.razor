@@ -3,6 +3,7 @@
 
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Shared.DTOs.Medium
+@using FamilyTree.Core.Mappers
 @using FamilyTree.Core.Services
 @using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Modules.Dialogs
@@ -534,23 +535,8 @@ else
     private async Task SetProfilePhoto(PhotoItem photo)
     {
         if (_person is null) return;
-        var dto = new PersonUpsertDto
-        {
-            FirstName = _person.FirstName,
-            LastName = _person.LastName,
-            MiddleName = _person.MiddleName,
-            MaidenName = _person.MaidenName,
-            BirthDate = _person.BirthDate,
-            BirthPlace = _person.BirthPlace,
-            DeathDate = _person.DeathDate,
-            DeathPlace = _person.DeathPlace,
-            BiographyNotes = _person.BiographyNotes,
-            Gender = _person.Gender,
-            ProfilePhotoUrl = photo.Url,
-            ParentIds = _person.ParentIds ?? [],
-            SpouseIds = _person.SpouseIds ?? [],
-            ChildIds = _person.ChildIds ?? []
-        };
+        var dto = PersonMapper.ToUpsertDto(_person);
+        dto.ProfilePhotoUrl = photo.Url;
         var result = await PersonService.UpdateAsync(Id, dto);
         if (result.Success)
         {
@@ -582,23 +568,8 @@ else
             if (_profilePhotoUrl == photo.Url)
             {
                 // Clear the profile photo since it no longer exists
-                var dto = new PersonUpsertDto
-                {
-                    FirstName = _person!.FirstName,
-                    LastName = _person.LastName,
-                    MiddleName = _person.MiddleName,
-                    MaidenName = _person.MaidenName,
-                    BirthDate = _person.BirthDate,
-                    BirthPlace = _person.BirthPlace,
-                    DeathDate = _person.DeathDate,
-                    DeathPlace = _person.DeathPlace,
-                    BiographyNotes = _person.BiographyNotes,
-                    Gender = _person.Gender,
-                    ProfilePhotoUrl = null,
-                    ParentIds = _person.ParentIds ?? [],
-                    SpouseIds = _person.SpouseIds ?? [],
-                    ChildIds = _person.ChildIds ?? []
-                };
+                var dto = PersonMapper.ToUpsertDto(_person!);
+                dto.ProfilePhotoUrl = null;
                 var clearResult = await PersonService.UpdateAsync(Id, dto);
                 if (clearResult.Success)
                 {

@@ -8,6 +8,36 @@ namespace FamilyTree.Core.Mappers;
 
 public static class PersonMapper
 {
+    /// <summary>
+    /// The edit form's starting point: everything about the person as loaded, so a save
+    /// that changes one thing keeps the rest. UpdateAsync replaces every field and every
+    /// link with what it is sent, so a field left out here is wiped. Until 2026-10-25 each
+    /// page built this by hand: PersonEdit left out Email (saving any edit cleared it), and
+    /// PersonMedia's set-photo and delete-photo also left out FormerSpouseIds and SiblingIds,
+    /// so choosing a profile photo deleted the person's former marriages and sibling links.
+    /// PersonMapperTests checks every PersonUpsertDto property is copied.
+    /// </summary>
+    public static PersonUpsertDto ToUpsertDto(PersonDto person) => new()
+    {
+        FirstName = person.FirstName,
+        LastName = person.LastName,
+        MiddleName = person.MiddleName,
+        MaidenName = person.MaidenName,
+        BirthDate = person.BirthDate,
+        BirthPlace = person.BirthPlace,
+        DeathDate = person.DeathDate,
+        DeathPlace = person.DeathPlace,
+        BiographyNotes = person.BiographyNotes,
+        ProfilePhotoUrl = person.ProfilePhotoUrl,
+        Email = person.Email,
+        Gender = person.Gender,
+        ParentIds = [.. person.ParentIds ?? []],
+        SpouseIds = [.. person.SpouseIds ?? []],
+        FormerSpouseIds = [.. person.FormerSpouseIds ?? []],
+        ChildIds = [.. person.ChildIds ?? []],
+        SiblingIds = [.. person.SiblingIds ?? []],
+    };
+
     public static PersonDto MapPersonToDto(Person person, IEnumerable<Relationship> relationships)
     {
         var rels = relationships.ToList();

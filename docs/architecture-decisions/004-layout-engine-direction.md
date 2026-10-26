@@ -211,6 +211,17 @@ Known gaps, roughly in the order to tackle them:
   Release build) before the second round; not re-measured since.
 - **The X solver is coordinate descent**, which can stall when blocks press against each
   other. The VPSC algorithm (merging blocks that touch) is the standard fix if it shows up.
+- **An undated person drawn above their dated parent** in messy undated families built one
+  save at a time (found 2026-10-25 by the B7 write-path fuzz harness, about 1 session in
+  3,000, never on the pinned CI seed). In each case the family's dates can be satisfied
+  (parents 12+ years older, partners and linked siblings within 40 years, siblings in one
+  generation), so it's placement, not data: e.g. two undated cousins married to each
+  other, one drawn on a row above their own mother born 1981. Replay:
+  `FAMILYTREE_WRITE_FUZZ_SEED=4 FAMILYTREE_WRITE_FUZZ_ITER=3000` (also seeds 1, 2, 6) on
+  `WritePathFuzzTests.CasualUserSessions_...`, which shrinks and prints the session. The
+  archived engine also does this on structurally odd data (a parent of one child who is
+  the former spouse of that child's sibling), and is frozen, so the harness doesn't hold
+  it to child-below-parent.
 
 ## Step 5: the common-practice baseline (2026-10-23)
 

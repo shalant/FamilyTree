@@ -89,6 +89,21 @@ public static class PlausibilityRules
         }
     }
 
+    /// <summary>
+    /// An ancestor two or more generations up must be born before the descendant. Found by
+    /// the write-path fuzz harness (B7, 2026-10-25): with the person in between dateless,
+    /// <see cref="CheckParentChild"/> has nothing to compare on either link, so a grandparent
+    /// born in 1980 of a grandchild born in 1891 was saved, and the tree drew the dateless
+    /// parent above their own parent.
+    /// </summary>
+    public static PlausibilityFinding? CheckAncestor(LifeDates ancestor, LifeDates descendant, int generations)
+    {
+        if (ancestor.BirthDate is not { } a || descendant.BirthDate is not { } d || a < d) return null;
+        var kin = generations switch { 2 => "grandparent", 3 => "great-grandparent", _ => "ancestor" };
+        return Error($"{ancestor.Name} was born on {Format(a)}, not before {descendant.Name} ({Format(d)}), " +
+                     $"so can't be {descendant.Name}'s {kin}. Check the parents and children in between.");
+    }
+
     /// <summary>Whole years from <paramref name="birth"/> to <paramref name="on"/>.</summary>
     public static int AgeOn(DateOnly birth, DateOnly on)
     {

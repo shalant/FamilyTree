@@ -76,7 +76,7 @@ Work A in order before the first invite; B and C can follow.
       `UpdateAsync_MothersDeathMovedBeforeHerChildsBirth_IsRefused` is tagged
       Regression), `PersonFormPlausibilityTests`. Next: B8's "Data check" list can run the
       same rules over the whole tree to find what was saved before this.
-- [ ] **A4: invite-path security.** Split in two; the first half is done.
+- [x] **A4: invite-path security.** Done 2026-10-25, except one check Doug deferred (below).
   - [x] **Sessions, sign-in redirect, registration mode** (2026-10-25,
         `feat/a4-invite-path-security`). (1) **S7:** the 14-day cookie was never checked
         against the user's security stamp, so a password reset or a demotion left every
@@ -148,7 +148,7 @@ Work A in order before the first invite; B and C can follow.
         familytreemediadr --public-access off`. Check: a raw photo URL now fails (409/404)
         and the tree still shows photos. Story invite emails sent before the deploy carry
         raw URLs, so their photo stops showing; the link itself still works.
-  - [ ] **Google sign-in on prod** (Doug, with a real Google account): see "Google
+  - [x] **Google sign-in on prod** (Doug, with a real Google account): see "Google
         sign-in" below. Configured 2026-10-25: Doug created the OAuth client and set
         `Google__ClientId`/`Google__ClientSecret` on the App Service; checked from outside
         that `/auth/google` now redirects to Google with `https://arborkin.com/signin-google`
@@ -159,11 +159,16 @@ Work A in order before the first invite; B and C can follow.
         (Doug's phone: "Doug Rosenberg", Member, empty tree, `?loginError=google_error`).
         Fixed in `fix/google-signin-scheme` (security.md, "Any Google account got a
         signed-in session"); after deploying, Doug repeats both checks.
+        **Checked 2026-10-25** after #83 was deployed: Doug's Google sign-in lands in his
+        super-user account, and `AspNetUserLogins` has his Google row.
+    - [ ] Deferred by Doug: check on prod that a Google account with no invite is refused
+          (needs a second real Google account; covered by unit tests). Also untested on
+          prod: a real invitee signing up with their own Google account.
 - [x] **A5: Louis's sister drawn on top of Louis** in the archived engine the family sees.
       Decided 2026-10-25: no change for now. The family stays on the archived engine;
       Doug switches them later by setting `Layout__Engine=TimelineBest` on the App
       Service (the prototype doesn't have this overlap).
-- [ ] **A6: walk the invitee journey**, invite email to first tree view, on a phone as well
+- [x] **A6: walk the invitee journey**, invite email to first tree view, on a phone as well
       as desktop. **Done locally 2026-10-25** (`feat/a6-invitee-journey`): the walk is now
       `InviteeJourneyTests` (E2E, invite-only like production, desktop and a 390px touch
       phone; `FAMILYTREE_E2E_SCREENSHOTS=<dir>` saves every step). It found and fixed:
@@ -182,12 +187,14 @@ Work A in order before the first invite; B and C can follow.
         screens.
   - [x] A green focus box sat offset from the linking dialog's picker after a tap (the
         global keyboard ring on MudBlazor's inner input); fields show focus by their border.
-  - [ ] **Left for Doug on prod (about 10 minutes):** send one story invite to a Gmail "+"
+  - [x] **Left for Doug on prod (about 10 minutes):** send one story invite to a Gmail "+"
         address of his own and check the email arrives, its photo shows (the
         `/media/invite/` route) and the link opens; open an invite link on his real phone
-        (touch input and phone browser quirks don't show in an emulator).
-  - [ ] Not done: Admin › Users "Generate link" still only gives a link to copy and send;
-        it doesn't email the invite.
+        (touch input and phone browser quirks don't show in an emulator). **Done
+        2026-10-25:** the invite reached Doug's `+a6` address with the photo, and the link
+        worked on his real phone.
+- [ ] **Admin invites aren't emailed** (left over from A6): Admin › Users "Generate link"
+      still only gives a link to copy and send.
 
 **B. Battle-testing**
 - [x] **B7 step 0: neutral test families** (2026-10-25, `feat/b7-neutral-test-families`).
@@ -213,9 +220,57 @@ Work A in order before the first invite; B and C can follow.
       `docs/Testing/layout-versions.md` (workflow and history; v1 recorded). The super-user's
       picker now offers archived, "Best so far (v1)" and "Newest (since v1)"; the family is
       unaffected. After merge: tag the merge commit `layout-v1`.
-- [ ] **B7: write-path fuzz harness.** Random casual-user edit sequences through the real
-      services: no crash, nothing invented, impossible input rejected with a message, the
-      layout still valid afterwards.
+- [x] **B7: write-path fuzz harness** (2026-10-25, `feat/b7-write-path-fuzz`). Added
+      `FamilyTree.Web.Tests/WritePath`: `WritePathFuzzTests` plays 150 random casual-user
+      sessions (1-40 saves each, pinned seed) through the real `PersonService` and
+      `RelationshipService` on EF InMemory, as a family Admin doing what the screens do:
+      add a person (often name only; dates sometimes blank, a century off, in the future
+      or before birth), PersonEdit's full-form save (add or remove a relative, change
+      dates, end or take back a marriage, rename, gender), delete, restore, and the sibling
+      dialog. After every save it checks: no crash (the services log a caught exception and
+      say "An error occurred", so the log is watched); impossible input refused with a
+      message and the database untouched; sound input accepted and stored exactly as sent
+      (`Tree`, the harness's own idea of the family, compared to the database); and rules
+      that hold for any family (`CheckDatabase`). At the end both engines must draw everyone
+      once at a finite position, and the prototype each child below each parent wherever
+      the dates allow it (`PlausibleFamilies`, a Bellman-Ford check). A failure shrinks to a
+      short session and prints it. `Generator_ReachesEveryKindOfEditAndRefusal` keeps it
+      from passing vacuously; `Survey_GroupsEveryFailingSession` (opt-in) groups every
+      failure at once, which is how these were found: the first survey failed 209 of 1,500
+      sessions. Fixed, each with a test in `WritePathFindingsTests` that fails against the
+      old code:
+  - **Two current marriages:** adding a spouse checked only whether *the spouse* was
+    married, so a married person could be given a second current spouse. Now refused,
+    judged only on a marriage the save starts, so someone saved with two (Florence) and
+    their spouses can still be edited: until now every current spouse was re-judged on
+    every save, so neither of Florence's husbands could be edited at all.
+  - **A grandparent born after the grandchild**, through an undated person between them,
+    was saved (`PlausibilityRules` only compared directly linked people) and drawn with the
+    undated person above their own parent. New `PlausibilityRules.CheckAncestor` error, in
+    create, update and restore, judged only on the pairs a save makes.
+  - **Someone recorded as both a parent and a spouse or sibling** (a slip of the picker)
+    was saved. Now refused in `PersonService` and `RelationshipService`.
+  - **Stale marriage end dates:** an ended marriage's default end date (the earlier
+    partner's death date) stayed when that death date was changed or cleared, leaving a
+    date nobody entered. It now follows the death date (deleted marriages too); a marriage
+    ended with no date stays undated.
+  - **Restore** brought back links to people still deleted (the open "Non-security bugs"
+    item): they now stay deleted and come back with that person. It also brought back a
+    parent link made impossible while the child was deleted (refused now), and could give
+    someone two current marriages; a restored marriage now comes back ended (date unknown)
+    when a newer one is current, and the restore's message says so (`ServiceResponse.Ok(message)`,
+    shown by `DeletedTab`).
+  - Found reading the pages (the harness builds its own form): **PersonMedia's "Use as
+    profile" and delete-photo deleted the person's former marriages and sibling links**,
+    and PersonEdit and both cleared their email, because each page built the save by hand
+    and left fields out. All three now use `PersonMapper.ToUpsertDto` (`PersonMapperToUpsertTests`
+    checks it copies every field; `PersonMediaTests` fails against the old page). Data
+    already lost this way can't be recovered from the app.
+  - Still open: the prototype draws an undated person above their dated parent in about 1
+    session in 3,000 on families whose dates are consistent (ADR 004, "Known gaps", with
+    replay seeds). Not covered: Members' permissions, photos, stories, the sign-up linking
+    flow (`AuthService`), and SQL Server itself (the unique index is checked by the
+    harness, not enforced by InMemory).
 - [ ] **B8: "Data check" admin list.** See "Detect likely data-entry slips".
 
 **C. Polish:** the tree loading state, the broken photo tile, and deploying at quiet hours
@@ -387,7 +442,12 @@ stopping placement patches and replacing the placement algorithm, measured first
       parent was under 12, a mother over 55, or a father dead over a year; a surname one or
       two letters off a close relative's ("Schumevith" vs "Schmulevith"); possible
       duplicates (`PersonNameDuplicateMatcher`: William vs "Bill"). Later: the same rules
-      as warnings in the Add/Edit Person form.
+      as warnings in the Add/Edit Person form. From B7 (2026-10-25), allowed but drawn
+      badly because no row fits: a grandparent less than 24 years older than a grandchild
+      (12 per generation) with the parent between undated; linked siblings generations
+      apart (a sibling born 1896 of someone whose own child was born 2005); someone married
+      to a partner who died before they could have been born; someone who is both a
+      sibling and a niece or nephew of the same person.
 - [ ] **Try the prototype live**: since 2026-10-24 (`feat/layout-engine-picker`) this no
       longer means switching the whole site. The super-user picks "Timeline prototype"
       from the layout menu in the floating toolbar; everyone else stays on `Legacy`
@@ -683,8 +743,8 @@ PR #43).
       silently for Members yet toasts success~~ (fixed 2026-10-25, Outreach A2);
       `RelationshipService` canonical GUID ordering inverts Parent/Adopted rows (latent,
       no UI caller); ~~`RelationshipService.UpdateAsync` always fails on an active spouse
-      (counts itself as the other marriage)~~ (fixed 2026-10-25, Outreach A2); `RestoreAsync` revives relationships to a still-deleted
-      partner; the unfiltered `(PersonAId, PersonBId, Type)` unique index blocks re-adding
+      (counts itself as the other marriage)~~ (fixed 2026-10-25, Outreach A2); ~~`RestoreAsync` revives relationships to a still-deleted
+      partner~~ (fixed 2026-10-25, B7); the unfiltered `(PersonAId, PersonBId, Type)` unique index blocks re-adding
       a soft-deleted pair; `PersonService.CreateAsync` isn't transactional;
       `GetAllAsync` loads every relationship in the database then filters in memory;
       a story-invite respondent who already has an active `UserInvite` gets a broken

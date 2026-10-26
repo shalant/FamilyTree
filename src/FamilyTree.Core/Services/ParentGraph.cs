@@ -49,6 +49,29 @@ public sealed class ParentGraph
     /// <paramref name="id"/> itself only if it sits on a loop.</summary>
     public HashSet<Guid> Descendants(Guid id) => Reach(_childrenOf, id);
 
+    /// <summary>Like <see cref="Ancestors"/>, with each one's fewest generations up
+    /// (1 = parent), and <paramref name="id"/> itself at 0.</summary>
+    public Dictionary<Guid, int> AncestorGenerations(Guid id) => Distances(_parentsOf, id);
+
+    /// <summary>Like <see cref="Descendants"/>, with each one's fewest generations down
+    /// (1 = child), and <paramref name="id"/> itself at 0.</summary>
+    public Dictionary<Guid, int> DescendantGenerations(Guid id) => Distances(_childrenOf, id);
+
+    private static Dictionary<Guid, int> Distances(Dictionary<Guid, List<Guid>> map, Guid start)
+    {
+        var dist = new Dictionary<Guid, int> { [start] = 0 };
+        var queue = new Queue<Guid>();
+        queue.Enqueue(start);
+        while (queue.Count > 0)
+        {
+            var at = queue.Dequeue();
+            if (!map.TryGetValue(at, out var next)) continue;
+            foreach (var n in next)
+                if (dist.TryAdd(n, dist[at] + 1)) queue.Enqueue(n);
+        }
+        return dist;
+    }
+
     private static HashSet<Guid> Reach(Dictionary<Guid, List<Guid>> map, Guid start)
     {
         var seen = new HashSet<Guid>();

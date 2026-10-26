@@ -22,6 +22,10 @@ public class ServiceResponse
     public static ServiceResponse Ok() =>
         new() { Success = true };
 
+    // Succeeded, with something the user should know about how.
+    public static ServiceResponse Ok(string message) =>
+        new() { Success = true, Message = message };
+
     public static ServiceResponse Fail(string message) =>
         new() { Success = false, Message = message };
 }

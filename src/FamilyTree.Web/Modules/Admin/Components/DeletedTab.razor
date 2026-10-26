@@ -1,5 +1,6 @@
 @inherits BaseComponent
 
+@using FamilyTree.Shared
 @using FamilyTree.Shared.DTOs.Admin
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Web.Components
@@ -167,8 +168,9 @@ else
         row.IsRestoring = true;
         try
         {
+            ServiceResponse? result = null;
             var success = await TryAsync(
-                () => PersonService.RestoreAsync(row.Id),
+                async () => result = await PersonService.RestoreAsync(row.Id),
                 $"Restoring {row.FullName}");
 
             if (success)
@@ -183,7 +185,8 @@ else
                 // every other row's position stable for the rest of this viewing session;
                 // it only disappears from the list on the next full reload.
                 row.IsRestored = true;
-                ToastService.Success($"{row.FullName} restored.");
+                // A restore can end a marriage that clashes with a newer one, and says so.
+                ToastService.Success(string.IsNullOrEmpty(result?.Message) ? $"{row.FullName} restored." : result.Message);
             }
         }
         finally
