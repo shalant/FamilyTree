@@ -774,11 +774,16 @@ PR #43).
       no UI caller); ~~`RelationshipService.UpdateAsync` always fails on an active spouse
       (counts itself as the other marriage)~~ (fixed 2026-10-25, Outreach A2); ~~`RestoreAsync` revives relationships to a still-deleted
       partner~~ (fixed 2026-10-25, B7); the unfiltered `(PersonAId, PersonBId, Type)` unique index blocks re-adding
-      a soft-deleted pair; `PersonService.CreateAsync` isn't transactional;
-      `GetAllAsync` loads every relationship in the database then filters in memory;
+      a soft-deleted pair; ~~`PersonService.CreateAsync` isn't transactional~~ (fixed 2026-10-25,
+      `fix/small-backend-bugs`: person and links save in one transaction inside the retry
+      strategy; `PersonCreateTransactionTests` in the E2E project, because InMemory ignores
+      transactions);
+      ~~`GetAllAsync` loads every relationship in the database then filters in memory~~
+      (fixed 2026-10-25: filtered in SQL against the caller's visible people);
       a story-invite respondent who already has an active `UserInvite` gets a broken
-      `/register?invite=` link (`Fail` never sets `Data`); `AdminUserService`'s pending
-      invites/resets include accepted, cancelled and completed rows.
+      `/register?invite=` link (`Fail` never sets `Data`); ~~`AdminUserService`'s pending
+      invites/resets include accepted, cancelled and completed rows~~ (fixed 2026-10-25,
+      `AdminUserServiceTests`).
 
 ---
 

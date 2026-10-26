@@ -70,23 +70,22 @@ public class PersonService(
             // legacy FamilyId == null records. A regular user with no FamilyId claim —
             // e.g. a broken/missing UserFamily assignment — must see NOTHING rather than
             // being accidentally treated the same as a super-user.
-            var people = await ctx.People
+            var scoped = ctx.People
+                .Where(p => isSuperUser || (familyId.HasValue && p.FamilyId == familyId));
+
+            var people = await scoped
                 .AsNoTracking()
-                .Where(p => isSuperUser || (familyId.HasValue && p.FamilyId == familyId))
                 .OrderBy(p => p.LastName)
                 .ThenBy(p => p.FirstName)
                 .ToListAsync(ct);
 
-            var peopleIds = people.Select(p => p.Id).ToHashSet();
-
+            // Only relationships whose both ends are people this caller can see (the People
+            // query filter already drops soft-deleted ones), filtered in the database. It
+            // used to load every relationship of every family and filter in memory.
             var relationships = await ctx.Relationships
                 .AsNoTracking()
+                .Where(r => scoped.Any(p => p.Id == r.PersonAId) && scoped.Any(p => p.Id == r.PersonBId))
                 .ToListAsync(ct);
-
-            // Exclude relationships where either party is soft-deleted or outside this family
-            relationships = relationships
-                .Where(r => peopleIds.Contains(r.PersonAId) && peopleIds.Contains(r.PersonBId))
-                .ToList();
 
             var dtos = people
                 .Select(p => PersonMapper.MapPersonToDto(p, relationships))
@@ -225,31 +224,47 @@ public class PersonService(
             var userId = currentUser.UserId;
             var familyId = await ResolveFamilyIdForCreateAsync(ctx, ct);
 
-            var person = new Person
+            // The person's Id comes from the database (newsequentialid()), so the person has
+            // to be saved before its relationships can name it: two saves. One transaction
+            // makes them all-or-nothing, so a failed relationship save can't leave a person
+            // with none of the links they were created with. The execution strategy
+            // (EnableRetryOnFailure) re-runs the whole delegate on a transient fault, so
+            // each attempt starts from a clean change tracker.
+            Person person = null!;
+            var strategy = ctx.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
             {
-                FirstName = dto.FirstName.Trim(),
-                LastName = dto.LastName.Trim(),
-                MiddleName = string.IsNullOrWhiteSpace(dto.MiddleName) ? null : dto.MiddleName.Trim(),
-                MaidenName = string.IsNullOrWhiteSpace(dto.MaidenName) ? null : dto.MaidenName.Trim(),
-                BirthDate = dto.BirthDate,
-                BirthPlace = string.IsNullOrWhiteSpace(dto.BirthPlace) ? null : dto.BirthPlace.Trim(),
-                DeathDate = dto.DeathDate,
-                DeathPlace = string.IsNullOrWhiteSpace(dto.DeathPlace) ? null : dto.DeathPlace.Trim(),
-                Gender = dto.Gender,
-                BiographyNotes = dto.BiographyNotes?.Trim(),
-                ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim(),
-                Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim(),
-                FamilyId = familyId,
-                CreatedAt = now,
-                CreatedBy = userId,
-                UpdatedAt = now,
-            };
+                ctx.ChangeTracker.Clear();
+                await using var tx = await ctx.Database.BeginTransactionAsync(ct);
 
-            ctx.People.Add(person);
-            await ctx.SaveChangesAsync(ct);
+                person = new Person
+                {
+                    FirstName = dto.FirstName.Trim(),
+                    LastName = dto.LastName.Trim(),
+                    MiddleName = string.IsNullOrWhiteSpace(dto.MiddleName) ? null : dto.MiddleName.Trim(),
+                    MaidenName = string.IsNullOrWhiteSpace(dto.MaidenName) ? null : dto.MaidenName.Trim(),
+                    BirthDate = dto.BirthDate,
+                    BirthPlace = string.IsNullOrWhiteSpace(dto.BirthPlace) ? null : dto.BirthPlace.Trim(),
+                    DeathDate = dto.DeathDate,
+                    DeathPlace = string.IsNullOrWhiteSpace(dto.DeathPlace) ? null : dto.DeathPlace.Trim(),
+                    Gender = dto.Gender,
+                    BiographyNotes = dto.BiographyNotes?.Trim(),
+                    ProfilePhotoUrl = string.IsNullOrWhiteSpace(dto.ProfilePhotoUrl) ? null : dto.ProfilePhotoUrl.Trim(),
+                    Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim(),
+                    FamilyId = familyId,
+                    CreatedAt = now,
+                    CreatedBy = userId,
+                    UpdatedAt = now,
+                };
 
-            await SyncRelationshipsAsync(ctx, person.Id, dto, userId, ct);
-            await ctx.SaveChangesAsync(ct);
+                ctx.People.Add(person);
+                await ctx.SaveChangesAsync(ct);
+
+                await SyncRelationshipsAsync(ctx, person.Id, dto, userId, ct);
+                await ctx.SaveChangesAsync(ct);
+
+                await tx.CommitAsync(ct);
+            });
 
             _ = auditLog.LogAsync("Create", "Person", person.Id, userId: userId);
 
