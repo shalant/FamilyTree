@@ -33,6 +33,23 @@ public static class PlausibilityRules
     public const int MaxMotherAge = 55;
     public const int MaxParentAge = 80;
     public const int MaxLifespan = 110;
+    public const int MinMarriageAge = 12;
+    public const int MaxSiblingGap = 50;
+    public static readonly DateOnly EarliestBirth = new(1800, 1, 1);
+
+    /// <summary>
+    /// A person's own dates, refused by <see cref="PersonService"/> on every save. Moved here
+    /// from PersonService (B8, 2026-10-27) so the Data check can find rows that slipped past
+    /// it (an older import path, a direct database edit).
+    /// </summary>
+    public static IEnumerable<PlausibilityFinding> CheckRecordedDates(DateOnly? birth, DateOnly? death, DateOnly today)
+    {
+        if (birth > today) yield return Error("Birth date cannot be in the future.");
+        if (birth < EarliestBirth) yield return Error("Birth date cannot be before 1800.");
+        if (death > today) yield return Error("Death date cannot be in the future.");
+        if (birth.HasValue && death.HasValue && birth.Value >= death.Value)
+            yield return Error("Birth date must be before death date.");
+    }
 
     public static IEnumerable<PlausibilityFinding> CheckPerson(LifeDates person, DateOnly today)
     {
@@ -102,6 +119,68 @@ public static class PlausibilityRules
         var kin = generations switch { 2 => "grandparent", 3 => "great-grandparent", _ => "ancestor" };
         return Error($"{ancestor.Name} was born on {Format(a)}, not before {descendant.Name} ({Format(d)}), " +
                      $"so can't be {descendant.Name}'s {kin}. Check the parents and children in between.");
+    }
+
+    /// <summary>
+    /// An ancestor two or more generations up with nobody dated in between must be at least
+    /// <see cref="MinParentAge"/> years older per generation. Allowed (B7, 2026-10-25) but
+    /// drawn badly, because no row fits the undated people in between. Warnings only.
+    /// </summary>
+    public static PlausibilityFinding? CheckAncestorGap(LifeDates ancestor, LifeDates descendant, int generations)
+    {
+        if (ancestor.BirthDate is not { } a || descendant.BirthDate is not { } d || a >= d) return null;
+        var gap = AgeOn(a, d);
+        if (gap >= MinParentAge * generations) return null;
+        var kin = generations switch { 2 => "grandparent", 3 => "great-grandparent", _ => "ancestor" };
+        return Warn($"{ancestor.Name} would have been {gap} when {descendant.Name} was born, but is recorded as " +
+                    $"{descendant.Name}'s {kin}. Check the parents and children in between.");
+    }
+
+    /// <summary>
+    /// A marriage's dates against its partners' lives (B8, 2026-10-27). Warnings only for now:
+    /// the Data check reports them; the write path and the form don't use them yet.
+    /// </summary>
+    public static IEnumerable<PlausibilityFinding> CheckMarriage(
+        LifeDates a, LifeDates b, DateOnly? start, DateOnly? end)
+    {
+        // Someone married to a partner who died before they were born (B7).
+        foreach (var (p, q) in new[] { (a, b), (b, a) })
+            if (p.DeathDate is { } died && q.BirthDate is { } born && died < born)
+                yield return Warn($"{p.Name} died on {Format(died)}, before {q.Name} was born ({Format(born)}), " +
+                                  $"but they're recorded as married.");
+
+        if (start is { } s && end is { } e && e < s)
+            yield return Warn($"The marriage of {a.Name} and {b.Name} ends ({Format(e)}) before it starts ({Format(s)}).");
+
+        foreach (var p in new[] { a, b })
+        {
+            if (start is { } st && p.BirthDate is { } born)
+            {
+                if (st < born)
+                    yield return Warn($"The marriage of {a.Name} and {b.Name} starts ({Format(st)}) before " +
+                                      $"{p.Name} was born ({Format(born)}).");
+                else if (AgeOn(born, st) < MinMarriageAge)
+                    yield return Warn($"{p.Name} would have been {AgeOn(born, st)} when they married.");
+            }
+            if (start is { } st2 && p.DeathDate is { } died && st2 > died)
+                yield return Warn($"The marriage of {a.Name} and {b.Name} starts ({Format(st2)}) after " +
+                                  $"{p.Name} died ({Format(died)}).");
+            if (end is { } en && p.DeathDate is { } died2 && en > died2)
+                yield return Warn($"The marriage of {a.Name} and {b.Name} ends ({Format(en)}) after " +
+                                  $"{p.Name} died ({Format(died2)}).");
+        }
+    }
+
+    /// <summary>Recorded siblings born generations apart (B7: a sibling born 1896 of someone
+    /// whose own child was born 2005). Allowed but drawn badly.</summary>
+    public static PlausibilityFinding? CheckSiblings(LifeDates a, LifeDates b)
+    {
+        if (a.BirthDate is not { } x || b.BirthDate is not { } y) return null;
+        var (older, younger, ob, yb) = x <= y ? (a, b, x, y) : (b, a, y, x);
+        var gap = AgeOn(ob, yb);
+        return gap > MaxSiblingGap
+            ? Warn($"{older.Name} and {younger.Name} are recorded as siblings but were born {gap} years apart.")
+            : null;
     }
 
     /// <summary>Whole years from <paramref name="birth"/> to <paramref name="on"/>.</summary>

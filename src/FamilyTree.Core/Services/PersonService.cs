@@ -970,21 +970,9 @@ public class PersonService(
     private static DateOnly? Earlier(DateOnly? a, DateOnly? b) =>
         a is null ? b : b is null ? a : a < b ? a : b;
 
-    private static string? ValidatePersonDates(PersonUpsertDto dto)
-    {
-        var today = DateOnly.FromDateTime(DateTime.Today);
-        var yearBound = new DateOnly(1800, 1, 1);
-
-        if (dto.BirthDate.HasValue && dto.BirthDate.Value > today)
-            return "Birth date cannot be in the future.";
-        if (dto.BirthDate.HasValue && dto.BirthDate.Value < yearBound)
-            return "Birth date cannot be before 1800.";
-        if (dto.DeathDate.HasValue && dto.DeathDate.Value > today)
-            return "Death date cannot be in the future.";
-        if (dto.BirthDate.HasValue && dto.DeathDate.HasValue && dto.BirthDate.Value >= dto.DeathDate.Value)
-            return "Birth date must be before death date.";
-        return null;
-    }
+    private static string? ValidatePersonDates(PersonUpsertDto dto) =>
+        PlausibilityRules.CheckRecordedDates(dto.BirthDate, dto.DeathDate, DateOnly.FromDateTime(DateTime.Today))
+            .FirstOrDefault()?.Message;
 
     private static string? ValidatePersonNames(PersonUpsertDto dto)
     {

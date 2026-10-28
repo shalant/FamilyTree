@@ -163,6 +163,7 @@ builder.Services.AddScoped<IAdminActivityService, AdminActivityService>();
 builder.Services.AddScoped<IAdminAuditService, AdminAuditService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
 builder.Services.AddScoped<IDataIntegrityService, DataIntegrityService>();
+builder.Services.AddScoped<IDataCheckService, DataCheckService>();
 builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ToastService>();

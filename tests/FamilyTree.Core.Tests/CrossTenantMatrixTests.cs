@@ -459,6 +459,48 @@ public class CrossTenantMatrixTests
         (await MediaSvc(w, w.SuperUser).OpenAsync("b1.jpg")).Success.Should().BeTrue();
     }
 
+    // ── DataCheckService (B8) ───────────────────────────────────────────────────
+
+    private static DataCheckService DataCheckSvc(World w, ICurrentUserService u) =>
+        new(w.Db, u, NullLogger<DataCheckService>.Instance);
+
+    // The seed has no slips, so give family B one (and the cross-family Sibling row is
+    // there to tempt a rule into pairing A2 with B2).
+    private static async Task<Guid> AddFamilyBSlipAsync(World w)
+    {
+        await using var ctx = w.Db.CreateDbContext();
+        var p = new Person
+        {
+            Id = Guid.NewGuid(), FirstName = "Bad", LastName = "Brennan", FamilyId = w.FamilyB,
+            BirthDate = new DateOnly(1990, 1, 1), DeathDate = new DateOnly(1980, 1, 1), CreatedAt = DateTime.UtcNow,
+        };
+        ctx.People.Add(p);
+        await ctx.SaveChangesAsync();
+        return p.Id;
+    }
+
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    public async Task DataCheck_GetFindingsAsync_ShowsNothingOfFamilyB(Caller c)
+    {
+        var w = await SeedAsync();
+        var slip = await AddFamilyBSlipAsync(w);
+        var r = await DataCheckSvc(w, w.As(c)).GetFindingsAsync();
+        var findings = r.Data ?? [];
+        findings.SelectMany(f => f.People).Select(p => p.PersonId).Should().NotContain([w.B1, w.B2, slip]);
+        findings.Select(f => f.Message).Should().NotContain(m => BNames.Any(m.Contains));
+    }
+
+    [Fact]
+    public async Task DataCheck_GetFindingsAsync_PositiveControls()
+    {
+        var w = await SeedAsync();
+        var slip = await AddFamilyBSlipAsync(w);
+        (await DataCheckSvc(w, w.AdminBUser).GetFindingsAsync()).Data!
+            .SelectMany(f => f.People).Select(p => p.PersonId).Should().Contain(slip);
+        (await DataCheckSvc(w, w.SuperUser).GetFindingsAsync()).Data!
+            .SelectMany(f => f.People).Select(p => p.PersonId).Should().Contain(slip);
+    }
+
     // ── MediumService ───────────────────────────────────────────────────────────
 
     [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
