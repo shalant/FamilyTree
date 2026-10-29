@@ -37,6 +37,10 @@
             <DeletedTab />
         </MudTabPanel>
 
+        <MudTabPanel Text="Data check" Icon="@Icons.Material.Outlined.FactCheck">
+            <DataCheckTab />
+        </MudTabPanel>
+
         @* SuperUser-only (finding S2, docs/security.md): Users exposes every family's
            accounts plus copyable password-reset links; audit log and activity have no
            family scope.

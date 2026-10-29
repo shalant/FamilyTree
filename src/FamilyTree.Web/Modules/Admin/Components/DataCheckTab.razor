@@ -1,0 +1,113 @@
+@inherits BaseComponent
+
+@using FamilyTree.Shared.DTOs.Admin
+@using FamilyTree.Web.Components
+@inject IDataCheckService DataCheckService
+
+@* B8 (2026-10-27): data that is probably a slip, for a person to look at. Nothing here
+   changes data; each person links to their edit page. *@
+
+<MudPaper Class="pa-3 mb-3" Style="background:var(--ft-surface-card);" Elevation="0">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+        <div>
+            <MudText Typo="Typo.subtitle2">Data check</MudText>
+            <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
+                Dates, names and links that are probably wrong. Nothing is changed for you: open a person to check and fix them.
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   StartIcon="@Icons.Material.Outlined.Refresh"
+                   Disabled="@_loading"
+                   OnClick="LoadAsync">
+            Check again
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_findings is null)
+{
+    @* TryAsync has already shown the error toast. *@
+}
+else if (_findings.Count == 0)
+{
+    <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true">
+        Nothing to check: no likely slips found.
+    </MudAlert>
+}
+else
+{
+    var multipleFamilies = _findings.Select(f => f.FamilyId).Distinct().Count() > 1;
+    @foreach (var family in _findings.GroupBy(f => f.FamilyName))
+    {
+        @if (multipleFamilies)
+        {
+            <MudText Typo="Typo.h6" Class="mt-4 mb-2">@family.Key</MudText>
+        }
+        @foreach (var group in family.GroupBy(f => f.Rule))
+        {
+            <MudPaper Class="pa-3 mb-3 ft-data-check-group" Style="background:var(--ft-surface-card);" Elevation="0">
+                <MudText Typo="Typo.subtitle2" Class="mb-1">@Title(group.Key) (@group.Count())</MudText>
+                @foreach (var finding in group)
+                {
+                    <div class="ft-data-check-finding" style="padding:8px 0; border-top:1px solid var(--ft-border, rgba(0,0,0,0.08));">
+                        <div style="display:flex; gap:8px; align-items:flex-start;">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                     Color="@(finding.IsImpossible ? Color.Error : Color.Warning)">
+                                @(finding.IsImpossible ? "Can't be right" : "Probably wrong")
+                            </MudChip>
+                            <MudText Typo="Typo.body2" Style="flex:1; min-width:0;">@finding.Message</MudText>
+                        </div>
+                        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:4px;">
+                            @foreach (var person in finding.People)
+                            {
+                                <MudLink Href="@($"/people/{person.PersonId}/edit")" Typo="Typo.caption">
+                                    Check @person.Name
+                                </MudLink>
+                            }
+                        </div>
+                    </div>
+                }
+            </MudPaper>
+        }
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private List<DataCheckFindingDto>? _findings;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _findings = await TryAsync(() => DataCheckService.GetFindingsAsync(), "Running the data check");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string Title(string rule) => rule switch
+    {
+        "Dates" => "A person's dates",
+        "ParentChild" => "Parents and children",
+        "Ancestor" => "Grandparents and further back",
+        "Marriage" => "Marriages",
+        "Siblings" => "Siblings",
+        "RoleClash" => "Related in two ways at once",
+        "EntryDay" => "Dates that match the day they were entered",
+        "Surname" => "Surnames a letter or two apart",
+        "Duplicate" => "Possible duplicates",
+        _ => rule,
+    };
+}

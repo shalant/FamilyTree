@@ -291,7 +291,8 @@ Work A in order before the first invite; B and C can follow.
     replay seeds). Not covered: Members' permissions, photos, stories, the sign-up linking
     flow (`AuthService`), and SQL Server itself (the unique index is checked by the
     harness, not enforced by InMemory).
-- [ ] **B8: "Data check" admin list.** See "Detect likely data-entry slips".
+- [ ] **B8: "Data check" admin list.** See "Detect likely data-entry slips". Part 1 (the
+      read-only list) done 2026-10-27, `feat/data-check`; part 2 (dismissals) open.
 
 **C. Polish:** the tree loading state, the broken photo tile, and deploying at quiet hours
 (about 2.5 minutes of 500s per deploy). Each has its own entry below.
@@ -451,7 +452,36 @@ stopping placement patches and replacing the placement algorithm, measured first
       Doug confirmed it's a slip (2026-10-24). The app made it up, not a typo: fixed by
       Outreach readiness A1, whose migration sets it to Lillian's death date (1922-12-04) on the
       next deploy. Tick this once that's checked on the live tree.
-- [ ] **Detect likely data-entry slips** (asked 2026-10-24, not started). A "Data check"
+- [x] **Detect likely data-entry slips, part 1: the list** (2026-10-27, `feat/data-check`).
+      Added an Admin › "Data check" tab (`DataCheckTab`, `DataCheckService`,
+      `DataCheckRules`). A family Admin sees their own family; the super-user sees every
+      family, each checked on its own so no rule pairs people across families. Read-only:
+      each finding links to the people's edit pages. Rules: a person's own dates (the save
+      checks, moved from `PersonService` into `PlausibilityRules.CheckRecordedDates`, plus
+      over-110 with no death); parent/child (`CheckParentChild`); an ancestor against each
+      dated descendant reached through undated people only (`CheckAncestor`, plus new
+      `CheckAncestorGap`: under 12 years per generation), so a problem with a dated person
+      between shows once, on the parent link; marriages (new `CheckMarriage`: ends before it
+      starts, starts before birth, under 12, starts or ends after a death, a partner who died
+      before the other was born); linked siblings over 50 years apart (`CheckSiblings`);
+      parent who is also spouse or sibling, and sibling who is also niece or nephew; a date
+      within a day of the record's `CreatedAt`; close relatives' surnames one or two letters
+      apart; possible duplicates (similar surname or maiden name, same first name or a
+      nickname via new `NameSimilarity.SameFirstName`, not linked, not siblings, born within
+      two years). The marriage rules are warnings only: the form and the server don't use
+      them yet. `PersonNameDuplicateMatcher`'s comment claimed it caught "Bill"/"William";
+      it doesn't (about 0.6 similar), and now says so. Tests: `DataCheckRulesTests` (a firing
+      and a quiet case per rule), `DataCheckServiceTests`, `CrossTenantMatrixTests` rows
+      (checked to fail with the family filter removed), `DataCheckTabTests`, and
+      `DataCheckFixtureTests`, which requires no findings on the checked-in layout fixtures
+      and on its first run caught "Johann"/"Johanna Weidmann" as a duplicate (a name and its
+      feminine form are now left out, as are records with different genders).
+      Next: run it on prod and look at what it finds before part 2.
+- [ ] **Detect likely data-entry slips, part 2: dismissals.** A "this is correct" button per
+      finding, stored in a new table (family, rule, people, a fingerprint of the values the
+      rule looked at, who, when), so a dismissed finding comes back if those values change.
+      Decide first, from the prod run: the fingerprint must not change on its own (the
+      over-110 message's age goes up every year). Original request (2026-10-24): a "Data check"
       list beside `DataIntegrityService`'s existing checks, each finding shown as "probably
       wrong, please check" with a "this is correct" dismiss, never fixed automatically.
       Candidate rules: a date equal to the day the record was entered (the Lillian and
