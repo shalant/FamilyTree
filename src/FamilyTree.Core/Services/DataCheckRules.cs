@@ -49,6 +49,10 @@ public static class DataCheckRules
     /// <summary>Two records born further apart than this are taken to be different people.</summary>
     private const int DuplicateBirthSlackDays = 2 * 365;
 
+    /// <summary>Surnames this long or longer may differ by two letters and still be flagged;
+    /// shorter ones only by one.</summary>
+    private const int SurnameTwoLetterMinLength = 8;
+
     public static List<DataCheckFinding> Find(
         IReadOnlyCollection<Person> people, IReadOnlyCollection<Relationship> relationships, DateOnly today)
     {
@@ -270,8 +274,10 @@ public static class DataCheckRules
             var x = t.People[a].LastName.Trim();
             var y = t.People[b].LastName.Trim();
             if (x.Length < 4 || y.Length < 4 || string.Equals(x, y, StringComparison.OrdinalIgnoreCase)) continue;
+            // Two letters only on longer names: on short ones ("Mell"/"Small") two letters is
+            // most of the name, so it's a different name, not a slip.
             var d = NameSimilarity.Distance(x, y);
-            if (d > 2) continue;
+            if (d > (Math.Min(x.Length, y.Length) >= SurnameTwoLetterMinLength ? 2 : 1)) continue;
             yield return new(DataCheckRule.Surname, false,
                 $"{t.Name(a)} and {t.Name(b)} are close relatives whose surnames differ by {(d == 1 ? "one letter" : "two letters")} " +
                 $"(\"{x}\" and \"{y}\"). Is one a typo?",
