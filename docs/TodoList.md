@@ -476,7 +476,11 @@ stopping placement patches and replacing the placement algorithm, measured first
       `DataCheckFixtureTests`, which requires no findings on the checked-in layout fixtures
       and on its first run caught "Johann"/"Johanna Weidmann" as a duplicate (a name and its
       feminine form are now left out, as are records with different genders).
-      Next: run it on prod and look at what it finds before part 2.
+      First prod run (2026-10-28) found 4 surname findings and nothing else: two
+      "Schumevith"/"Schmulevith" pairs (Fannie against Joseph and Rebecca, worth checking)
+      and two "Mell"/"Small" pairs, which are different names, not slips. Fixed the same day:
+      two letters apart now counts only when both surnames have 8 or more letters, one letter
+      below that (`ShortSurnamesTwoLettersApart_AreNotFlagged`, which failed before the fix).
 - [ ] **Detect likely data-entry slips, part 2: dismissals.** A "this is correct" button per
       finding, stored in a new table (family, rule, people, a fingerprint of the values the
       rule looked at, who, when), so a dismissed finding comes back if those values change.

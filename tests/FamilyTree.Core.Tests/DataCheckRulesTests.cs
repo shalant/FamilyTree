@@ -269,6 +269,23 @@ public class DataCheckRulesTests
         Run(DataCheckRule.Surname).Should().ContainSingle().Which.Message.Should().Contain("two letters");
     }
 
+    // Found on the live run, 2026-10-28: "Mell" and "Small" are two letters apart, which
+    // on names that short is most of the name, not a typo.
+    [Fact]
+    [Trait("Category", "Regression")]
+    public void ShortSurnamesTwoLettersApart_AreNotFlagged()
+    {
+        Parent(P("Lillian", "Mell", 1930), P("Ray", "Small", 1955));
+        Run(DataCheckRule.Surname).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ShortSurnamesOneLetterApart_AreFlagged()
+    {
+        Parent(P("Sam", "Small", 1900), P("Ida", "Smal", 1930));
+        Run(DataCheckRule.Surname).Should().ContainSingle().Which.Message.Should().Contain("one letter");
+    }
+
     [Fact]
     public void SpousesWithSimilarSurnames_AreNotFlagged()
     {
