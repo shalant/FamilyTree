@@ -511,6 +511,25 @@ stopping placement patches and replacing the placement algorithm, measured first
 - [ ] **Layout picker follow-ups** (2026-10-24): a picker on mobile (the toolbar is a mini
       pill there); remembering the choice per account instead of per browser; opening
       engines to every viewer once there's more than one worth choosing.
+- [ ] **Adding a childless person's first child reorders the prototype's tree** (found
+      2026-10-28 in a trial on a copy of the live export: adding William Small's daughter
+      moved 28 of 30 people and swapped 12 neighbours). Fixed in `AssignLayers` on branch
+      `fix/timeline-new-child-reorders-tree` (not yet committed, 2026-10-31): a branch
+      hanging from one family is placed below it like a childless person. Test
+      `ChildlessHalfBrotherGainsAChild_NobodyIsRearranged` fails on the old code, passes
+      with the fix. Full Web suite: 352 passed, 7 skipped, 1 failed, the ratchet (generated
+      lines through names 240 vs limit 233; crossings and four other scores improved).
+      **Resume here:** Doug to decide whether to accept the 233 to 240 loosening
+      (recommended: hand-edit `ratchet.json` with the reason in the commit message, then
+      `FAMILYTREE_RATCHET_UPDATE=1` with the live export present to tighten the rest), then
+      full `dotnet test FamilyTree.sln`, Release build, commit, PR. (CLAUDE.md's
+      transitions list and ADR 004 are already updated on the branch.) Details: ADR 004, "Adding a child reorders the tree".
+- [ ] **Adding a third son of Louis and Libby still reorders the prototype's tree** (found
+      2026-10-28, same trial; after the daughter, all 31 people move). The row-ordering
+      search finds an arrangement with fewer crossings (2 to 1) and takes it; the layout has
+      no memory of its last arrangement. Decide: prefer the previous order (stability-aware
+      ordering) or accept it. Not reproduced in a public-safe test yet; the small
+      transition-test family doesn't show it.
 
 ---
 

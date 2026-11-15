@@ -423,6 +423,42 @@ apart often have someone there: merged 876); and, for a line passing below the n
 to just under it rather than stopping short (merged 864). Still open: that line stops short
 of the higher partner when their years are far apart.
 
+## Adding a child reorders the tree (found 2026-10-28)
+
+Doug asked how adding William Small's daughter, and then a third son of Louis and Libby,
+would look. A trial on a copy of the live export (local only, `Fixtures/private/`) showed
+the prototype rearranging almost the whole tree: adding the daughter moved 28 of 30 people,
+swapped 12 neighbours on their rows, and put her 440 px from William (crossings 1 to 5).
+The archived engine moved nobody.
+
+Cause, in `AssignLayers`: only childless people were left out of the bottom-up pull that
+lowers parents to just above their children. William with a childless daughter wasn't
+childless any more, so his level stayed counted from the top, and Louis's family was pulled
+down only to his row instead of Ray's. Louis jumped a generation and every row reordered.
+
+Fix (branch `fix/timeline-new-child-reorders-tree`, uncommitted as of 2026-10-31): the
+exclusion now covers a branch that hangs from one family (`hanging`: every child hangs too,
+and the person has a single kept parent link), placed below its parents the way a childless
+person was (`PlaceHanging`). A branch with parents on both sides (Marc and Ellen) still
+takes its level from both; a first version without the single-parent condition broke
+`ParentlessInLaws_FloatDownToJustAboveTheirChild` and
+`OrphanSiblingsChildren_DoNotShareALineWithTheNextFamily`. Test:
+`FamilyTreeLayoutTransitionTests.ChildlessHalfBrotherGainsAChild_NobodyIsRearranged` (the
+live shape with made-up surnames; fails on the old code in both ID orders, passes under
+both engines). Live copy after the fix: no row swaps, width unchanged at 1240, crossings 1
+to 2, the daughter's father's line shifts about 107 px.
+
+Ratchet: generated lines through names 233 to 240 (worse); crossings 659 to 642, lines
+through nodes 403 to 400, merged lines 683 to 680, width and connector length slightly
+better. Awaiting Doug's decision to loosen that one limit by hand.
+
+Still open: adding the third son after the daughter still moves all 31 people. It isn't the
+orientation mirror (judging it by the anchor's two parents changed nothing and was
+reverted). The row-ordering search finds a different arrangement with fewer crossings (2 to
+1) and takes it. A layout recomputed from scratch on every edit can't prevent that on its
+own; the options are keeping the previous order as a preference (stability-aware ordering)
+or accepting it. `docs/TodoList.md`.
+
 ## Consequences
 
 - The scores give a baseline to beat. Since 2026-10-23 they are also a ratchet for the

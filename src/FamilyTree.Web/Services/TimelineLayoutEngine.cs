@@ -410,17 +410,29 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
                 level[o] = Math.Max(level[o], level[k] + 1);
         // Childless clusters don't hold their parents up: Bud's son Elliot has no children,
         // and counting him would pin Bud to the top row although his other son Marc is three
-        // generations down. They are placed afterwards, one layer below their parents.
-        bool Leaf(int k) => !outE[k].Any(o => Kept(k, o));
+        // generations down. Nor does a branch that hangs from this one family alone, with
+        // nothing further down holding it: William, with only a childless daughter, held
+        // Louis's family a layer higher than his half-brother Ray did, so adding her reordered
+        // the whole live tree (2026-10-28). A branch with parents on another side too (Marc +
+        // Ellen) does hold its parents: its layer comes from that side. Hanging clusters are
+        // placed afterwards, top down, one layer below their parents. Reverse topological
+        // order sees children first.
+        var hanging = new bool[c];
         for (var idx = order.Count - 1; idx >= 0; idx--)
         {
             var k = order[idx];
-            var kids = outE[k].Where(o => Kept(k, o) && !Leaf(o)).ToList();
+            var kids = outE[k].Where(o => Kept(k, o)).ToList();
+            hanging[k] = kids.All(o => hanging[o]) && (kids.Count == 0 || inE[k].Count(u => Kept(u, k)) == 1);
+        }
+        for (var idx = order.Count - 1; idx >= 0; idx--)
+        {
+            var k = order[idx];
+            var kids = outE[k].Where(o => Kept(k, o) && !hanging[o]).ToList();
             if (kids.Count > 0) level[k] = Math.Max(level[k], kids.Min(o => level[o]) - 1);
         }
-        void PlaceLeaves()
+        void PlaceHanging()
         {
-            foreach (var k in order.Where(Leaf))
+            foreach (var k in order.Where(k => hanging[k]))
             {
                 var parents = inE[k].Where(u => Kept(u, k)).ToList();
                 if (parents.Count > 0) level[k] = parents.Max(u => level[u]) + 1;
@@ -429,7 +441,7 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
 
         // A family with no recorded parents but a Sibling link (an orphan sibling, like Bill
         // beside his brother Ray) takes their sibling's layer, as far as its own children
-        // allow, so ordering can put the two side by side. Childless children don't limit it
+        // allow, so ordering can put the two side by side. Hanging children don't limit it
         // (they're placed below their parents afterwards), so an orphan sibling with a
         // childless daughter still joins their sibling's layer.
         var siblingClusters = Enumerable.Range(0, c).Select(_ => new SortedSet<int>()).ToArray();
@@ -437,16 +449,16 @@ public class TimelineLayoutEngine : IFamilyTreeLayoutEngine
             foreach (var s in g.Siblings[i].Where(s => cl[s] != cl[i])) siblingClusters[cl[i]].Add(cl[s]);
         for (var round = 0; round < 2; round++)
         {
-            PlaceLeaves();
+            PlaceHanging();
             foreach (var k in order.Where(k => siblingClusters[k].Count > 0 && !inE[k].Any(u => Kept(u, k))))
             {
                 var target = siblingClusters[k].Max(s => level[s]);
-                var kids = outE[k].Where(o => Kept(k, o) && !Leaf(o)).ToList();
+                var kids = outE[k].Where(o => Kept(k, o) && !hanging[o]).ToList();
                 if (kids.Count > 0) target = Math.Min(target, kids.Min(o => level[o]) - 1);
                 level[k] = target;
             }
         }
-        PlaceLeaves();
+        PlaceHanging();
 
         return [.. Enumerable.Range(0, g.N).Select(i => level[cl[i]])];
     }
