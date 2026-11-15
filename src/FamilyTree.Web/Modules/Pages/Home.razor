@@ -137,6 +137,16 @@ else
 
     <FamilyFactsBanner People="_people" />
 
+    @* First-visit hint. Stays until the first touch on the tree or "Got it": a toast timed out
+       after five seconds, which a new relative looking at the screen for the first time missed. *@
+    @if (_treeHint is not null)
+    {
+        <div class="ft-tree-hint" role="status">
+            <span>@_treeHint</span>
+            <button type="button" class="ft-tree-hint-btn" @onclick="DismissTreeHintAsync">Got it</button>
+        </div>
+    }
+
     <div id="ft-toolbar" style="@_toolbarStyle">
         <CustomToolbar OnZoomIn="@(async () => { if (_canvas != null) await _canvas.ZoomIn(); })"
                        OnZoomOut="@(async () => { if (_canvas != null) await _canvas.ZoomOut(); })"
@@ -199,6 +209,7 @@ else
     private (double Left, double Top)? _heroPos;
     private bool _isNarrowViewport;
     private bool _treeHintChecked = false;
+    private string? _treeHint;
     private bool _linkingModalChecked = false;
 
     // Mobile/tablet always anchors bottom-left, ignoring any saved drag position from
@@ -482,14 +493,29 @@ else
                 if (seen != "1")
                 {
                     var touch = await JS.InvokeAsync<bool>("ftIsTouchScreen");
-                    Toast.Info(touch
-                        ? "Tip: Drag to explore the tree. Pinch to zoom."
-                        : "Tip: Drag to explore the tree. Scroll to zoom.");
-                    await JS.InvokeVoidAsync("localStorage.setItem", "ft-treehint", "1");
+                    _treeHint = touch
+                        ? "Drag to explore the tree. Pinch to zoom."
+                        : "Drag to explore the tree. Scroll to zoom.";
+                    StateHasChanged();
+                    // Seen means used or dismissed, not merely shown, so a reload before the
+                    // first touch shows it again.
+                    await JS.InvokeVoidAsync("ftWatchFirstTreeGesture", _dotNetRef);
                 }
             }
             catch { }
         }
+    }
+
+    [JSInvokable]
+    public Task OnTreeGesture() => DismissTreeHintAsync();
+
+    private async Task DismissTreeHintAsync()
+    {
+        if (_treeHint is null) return;
+        _treeHint = null;
+        StateHasChanged();
+        try { await JS.InvokeVoidAsync("localStorage.setItem", "ft-treehint", "1"); }
+        catch { }
     }
 
     [JSInvokable]

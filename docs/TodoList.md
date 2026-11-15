@@ -22,11 +22,14 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       `TreeStats.ComputeGenerations` takes the longest parent chain; regression
       `TreeStatsTests.MarriedInParentWithNoAncestors_DoesNotShortenTheLongLine` failed (3, not 4) before the fix.
 - [x] Invitee journey on a 390px phone (2026-11-15, `docs/uxui/` addendum): findings P1-P6.
-- [ ] P1/P2/P3: toast over the Create account button, two stacked toasts over the link dialog, one-time
-      touch hint (and its flaky E2E assertion). Phone tree view still unseen; Add/Edit person, Admin tabs.
+- [x] P1/P2/P3 (2026-11-15, `fix/phone-toasts`): removed the carried-over and "Account created" toasts, moved
+      the register welcome inline, made the tree hint a persistent pill with "Got it". The flaky phone E2E
+      case was a screenshot-mode artifact (hint said "Scroll"), not a race.
+- [ ] P7/P8 from the first phone tree screenshot (default zoom too tight; line through a name). Edit person
+      with data, photo upload and four Admin tabs (Audit log, Activity, Deleted, Messages) still unreviewed.
 - [x] First UX/UI score (2026-11-15): good cop 70/100 provisional, with fixed weights and a score log in
-      `docs/uxui/`. Re-score the whole app after each merge; the unviewed rows (dark theme, login card, Edit
-      person, photo upload, real phone) stay provisional until seen. New findings A1-A4, F1, then D1, D2, L1 from
+      `docs/uxui/`. Re-score the whole app after each merge; the unviewed rows (Edit person with data, photo
+      upload, four Admin tabs, a real phone) stay provisional until seen. New findings A1-A4, F1, then D1, D2, L1 from
       the dark-mode and signed-out login pass (dark facts banner at about 1.5:1; wordmark invisible on the dark login card).
 - [ ] Medium/low items still open: Stories empty-state double button and glass card, inline-style
       drift between pages, login card exits and "Create an account" copy.

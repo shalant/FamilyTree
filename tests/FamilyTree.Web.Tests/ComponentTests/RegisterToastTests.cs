@@ -44,30 +44,34 @@ public class RegisterToastTests : ComponentTestBase
         Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
             .NavigateTo($"/register?invite={InviteId}");
 
+    // 2026-11-15: the welcome message moved from a toast to the invite box on the page. On a phone
+    // the fixed-bottom toast sat on top of the Create account button (the one action here), and
+    // it stacked with the toast the story page carried over. A toast must not come back for it.
     [Fact]
     [Trait("Category", "Regression")]
-    public void WelcomeToast_Shown_WhenInviteHasPendingStory()
+    public void WelcomeNote_Shown_InsideThePage_WhenInviteHasPendingStory()
     {
         RegisterFakes(new StoryDto { Id = Guid.NewGuid(), UnlinkedPersonName = "Bill Small" });
         NavigateWithInvite();
 
         var cut = RenderComponent<Register>();
 
-        var toastService = Services.GetRequiredService<ToastService>();
-        toastService.Toasts.Should().ContainSingle(t => t.Message.Contains("memory has been saved"));
+        cut.Markup.Should().Contain("Your memory has been saved");
+        Services.GetRequiredService<ToastService>().Toasts.Should().BeEmpty();
     }
 
     [Fact]
     [Trait("Category", "Regression")]
-    public void WelcomeToast_NotShown_WhenInviteHasNoPendingStory()
+    public void WelcomeNote_NotShown_WhenInviteHasNoPendingStory()
     {
         RegisterFakes(pendingStory: null);
         NavigateWithInvite();
 
         var cut = RenderComponent<Register>();
 
-        var toastService = Services.GetRequiredService<ToastService>();
-        toastService.Toasts.Should().NotContain(t => t.Message.Contains("memory has been saved"));
+        cut.Markup.Should().NotContain("memory has been saved");
+        cut.Markup.Should().Contain("You've been invited");
+        Services.GetRequiredService<ToastService>().Toasts.Should().BeEmpty();
     }
 }
 
