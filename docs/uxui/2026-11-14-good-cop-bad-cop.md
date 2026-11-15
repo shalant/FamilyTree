@@ -51,7 +51,7 @@ Severity: **High** (misleads or blocks a new user), **Medium** (rough edge a rel
 
 6. **Dashboard: three disabled "Coming soon" rows.** Excel, CSV and PDF export sit dimmed beside the one that works. Half the export card is things you can't do. **Fix:** show only what works; mention the roadmap in the FAQ if at all.
 
-7. **Dashboard "Generations 3" looks wrong for a tree that visibly spans four or five.** `ComputeGenerations` does a breadth-first walk with a `visited` set, so a person reached first by a shallower path keeps the shallower depth; with marriages joining families it undercounts. Not confirmed against the data. **Fix:** compute longest path (depth = max over parents + 1), then check against the live tree.
+7. **Dashboard "Generations 3" looks wrong for a tree that visibly spans four or five.** `ComputeGenerations` does a breadth-first walk with a `visited` set, so a person reached first by a shallower path keeps the shallower depth; with marriages joining families it undercounts. **Confirmed and fixed 2026-11-14** (`TreeStats.ComputeGenerations` now takes the longest parent chain; a test reproduced the undercount first).
 
 8. **Stories empty state has two identical "Add story" buttons** (header and card) and uses a different card style from the rest of the page (a translucent blurred card, `rgba(245,245,245,0.4)` with `backdrop-filter`) — one of the glassmorphism tells in the baseline. It also uses a hard-coded hex white on a button. **Fix:** one button; use the standard card tokens.
 
@@ -72,7 +72,7 @@ Severity: **High** (misleads or blocks a new user), **Medium** (rough edge a rel
 1. Rewrite the FAQ (1) and remove the guest link (2). Both are small, both are the first thing a new relative reads.
 2. Hide or finish Settings (3); trim the Dashboard export card (6).
 3. Move the delete control off People rows (4); raise body type size (5).
-4. Verify the Generations count (7).
+4. ~~Verify the Generations count (7).~~ Done 2026-11-14.
 5. Then do the pass I couldn't do here: the invitee journey on a real phone, Add/Edit person, and the Admin tabs.
 
-Findings 1, 3 and 6 are plainly checkable in the code; 4, 5, 8 and 9 are visible in the screenshots taken; 7 is a hypothesis.
+Findings 1, 3 and 6 are plainly checkable in the code; 4, 5, 8 and 9 are visible in the screenshots taken; 7 was a hypothesis, since confirmed.
