@@ -10,7 +10,6 @@
 
 @inject IPersonService PersonService
 @inject NavigationManager Nav
-@inject IDialogService DialogService
 @inject ToastService Toast
 
 <PageTitle>People</PageTitle>
@@ -130,12 +129,6 @@
                                        Color="Color.Primary"
                                        OnClick="@(() => Nav.NavigateTo($"/people/{person.Id}/edit"))" />
                     </MudTooltip>
-                    <MudTooltip Text="Delete" Placement="Placement.Left">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                       Size="Size.Small"
-                                       Color="Color.Error"
-                                       OnClick="@((e) => PromptDeleteAsync(person, e))" />
-                    </MudTooltip>
                 </MudTd>
             </RowTemplate>
 
@@ -193,33 +186,4 @@
         _ => Icons.Material.Outlined.Transgender
     };
 
-    private async Task PromptDeleteAsync(PersonDto person, MouseEventArgs e)
-    {
-        var parameters = new DialogParameters<ConfirmDialog>
-        {
-            { x => x.Message, $"This will remove {person.FullName} from your family tree. This action cannot be undone." },
-            { x => x.ConfirmLabel, "Delete" }
-        };
-
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>(
-            $"Delete {person.FullName}?", parameters);
-
-        var result = await dialog.Result;
-        if (result is { Canceled: false })
-            await DeletePersonAsync(person);
-    }
-
-    private async Task DeletePersonAsync(PersonDto person)
-    {
-        var result = await PersonService.DeleteAsync(person.Id);
-        if (result.Success)
-        {
-            _people.Remove(person);
-            Toast.Success($"{person.FullName} has been deleted");
-        }
-        else
-        {
-            Toast.Error(result.Message);
-        }
-    }
 }

@@ -19,7 +19,7 @@
             Frequently asked questions
         </div>
         <div style="font-size:14px; color:var(--ft-gray-400); margin-bottom:20px;">
-            Questions about using FamilyTree, your data, and how we keep it safe.
+            Questions about using ArborKin, your data, and how we keep it safe.
         </div>
         <MudTextField @bind-Value="_search"
                       Placeholder="Search questions…"
@@ -99,36 +99,36 @@
     private readonly List<FaqSection> _sections =
     [
         new("Getting started", Icons.Material.Outlined.Rocket, [
-            new("What is FamilyTree?",
-                "FamilyTree is a private web app for building and browsing your family tree. You can add people, connect relationships, upload photos and documents, and visualize multiple generations in an interactive canvas."),
-            new("Do I need to create an account?",
-                "Authentication is coming soon. Right now the app is in early development — you can use it fully without logging in. When accounts launch, you'll be able to log in and keep your data private."),
+            new("What is ArborKin?",
+                "ArborKin is a private web app for building and browsing your family tree. You can add people, connect relationships, share stories, upload photos and documents, and see several generations on an interactive canvas."),
+            new("Do I need an account?",
+                "Yes. ArborKin is invite-only. Someone already on the tree sends you an invitation, and you create an account from the link in it. If your invite link has expired or was already used, ask whoever invited you for a new one."),
             new("Is this the same as Ancestry or MyHeritage?",
-                "No. Those are commercial platforms that own your data and require subscriptions. FamilyTree is independent, ad-free, and keeps your data private. We don't sell or share anything."),
+                "No. Those are commercial platforms that own your data and require subscriptions. ArborKin is independent, ad-free, and keeps your family's data private. We don't sell or share anything."),
             new("Can I import data from Ancestry or another app?",
-                "GEDCOM import is coming soon — GEDCOM is the standard export format supported by Ancestry, MyHeritage, FamilySearch, and most genealogy apps. PDF and AI-powered document import are also in development."),
+                "Not at the moment. Importing from GEDCOM files is switched off for now. To add people, use Add person, or ask the family admin."),
         ]),
 
         new("Privacy & security", Icons.Material.Outlined.Security, [
             new("Who can see my family tree?",
-                "Currently only you (the person using the browser session). Once authentication is live, your tree is private by default — only you and people you explicitly invite can view it."),
+                "Only people who have been invited to your family's tree and have signed in. Each family's tree is separate: someone in another family can't see yours. The family admin and the site owner can see everything in a tree."),
             new("Is my data encrypted?",
-                "Yes. Data is encrypted at rest using Azure SQL Transparent Data Encryption (TDE) and in transit using TLS 1.3. Profile photos and uploaded documents are stored in Azure Blob Storage with private access only."),
+                "Yes. Data is encrypted at rest by Azure SQL Transparent Data Encryption and in transit by HTTPS (TLS 1.2 or newer). Profile photos and uploaded documents are kept in private Azure Blob Storage and are only shown to signed-in members of the person's own family."),
             new("Do you share my data with third parties?",
                 "No. We do not sell, share, license, or analyze your family data for any commercial purpose. Your family history belongs to you."),
             new("Do you use tracking or analytics?",
-                "We do not use advertising trackers or behavioral analytics on your data. Basic server-side logging (error rates, uptime) is used for operations only — never tied to your identity or content."),
+                "There are no advertising trackers or analytics scripts on the site. The app keeps an audit log of changes made to the tree (who changed what, and when) that only the site owner can read, and server logs for error and uptime monitoring."),
             new("Where is my data stored?",
-                "Your data is stored on Microsoft Azure infrastructure in the United States (East US region). Backups are retained for 7 days."),
+                "Your data is stored on Microsoft Azure infrastructure. The database keeps backups for 7 days."),
             new("What happens if the site goes down?",
-                "Your data is backed up daily. You can export a complete copy at any time using the export feature (coming soon). We are not responsible for data loss in catastrophic failure scenarios, so we recommend downloading a local backup periodically."),
+                "The database is backed up automatically, and you can download a copy of your tree at any time from the Dashboard (GEDCOM export). This is a family project, not a commercial service, so there is no guarantee against data loss. We recommend downloading a copy now and then."),
         ]),
 
         new("Your data", Icons.Material.Outlined.Storage, [
             new("How do I delete my account?",
-                "Account deletion is coming when authentication launches. Once available, deleting your account will permanently remove all your people, relationships, photos, and documents within 30 days."),
+                "There is no self-service account deletion yet. Send a message to the admin from the Dashboard (Contact the admin) and they will take care of it."),
             new("Can I export my family tree?",
-                "Export to GEDCOM, Excel, CSV, and PDF is on the roadmap and will be available soon. You will always be able to get a full copy of your data."),
+                "Yes. The Dashboard has a GEDCOM (.ged) download, the standard format that other genealogy apps can read. Excel, CSV, and PDF exports are not available yet."),
             new("What file formats can I upload for photos?",
                 "JPEG, PNG, WebP, and GIF are supported, up to 50 MB per file."),
             new("Can I upload documents like birth certificates or old letters?",
@@ -138,14 +138,14 @@
         ]),
 
         new("Technical questions", Icons.Material.Outlined.Code, [
-            new("What technology powers FamilyTree?",
-                "FamilyTree is built on .NET 10 with Blazor Server (C#), MudBlazor for UI components, Entity Framework Core for data access, and SQL Server / Azure SQL for storage. The tree visualization is rendered entirely in C# with SVG — no JavaScript layout library."),
+            new("What technology powers ArborKin?",
+                "ArborKin is built on .NET 10 with Blazor Server (C#), MudBlazor for UI components, Entity Framework Core for data access, and SQL Server / Azure SQL for storage. The tree visualization is rendered entirely in C# with SVG — no JavaScript layout library."),
             new("Is this open source?",
-                "Not yet publicly, but it's planned. The project may be open-sourced once the codebase is in a stable enough state for external contributors."),
+                "The source code is public on GitHub (shalant/FamilyTree)."),
             new("Why does the tree take a moment to load?",
-                "FamilyTree uses Blazor Server, which runs logic on the server and streams UI updates over a WebSocket. The first load establishes that connection. Subsequent interactions are fast."),
+                "ArborKin uses Blazor Server, which runs logic on the server and streams UI updates over a WebSocket. The first load establishes that connection. Subsequent interactions are fast."),
             new("Does it work on mobile?",
-                "The data management pages (add/edit/list) work on mobile. The tree visualization canvas is optimized for desktop — a responsive mobile layout is on the roadmap."),
+                "Yes. The tree canvas works with touch (drag to pan, pinch to zoom), and the menus and forms are laid out for a phone screen."),
         ]),
     ];
 

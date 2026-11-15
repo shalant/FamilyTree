@@ -186,7 +186,6 @@
                     <div style="font-size:11px; color:var(--ft-text-muted); margin-top:2px;">@_userEmail</div>
                 </div>
                 <MudMenuItem Icon="@Icons.Material.Outlined.Dashboard"   OnClick='() => Nav.NavigateTo("/dashboard")'>Dashboard</MudMenuItem>
-                <MudMenuItem Icon="@Icons.Material.Outlined.Settings"    OnClick='() => Nav.NavigateTo("/settings")'>Settings</MudMenuItem>
                 @if (_authChipLabel is "Admin" or "Super-user")
                 {
                     <MudMenuItem Icon="@Icons.Material.Outlined.AdminPanelSettings" OnClick='() => Nav.NavigateTo("/admin")'>Admin</MudMenuItem>
@@ -261,10 +260,6 @@
                     <span>Admin</span>
                 </div>
             }
-            <div class="ft-drawer-item" @onclick="@(() => NavTo("/settings"))">
-                <MudIcon Icon="@Icons.Material.Outlined.Settings" Class="ft-drawer-icon" />
-                <span>Settings</span>
-            </div>
         </nav>
 
         <div class="ft-drawer-divider"></div>
