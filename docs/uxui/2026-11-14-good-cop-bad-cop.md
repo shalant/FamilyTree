@@ -37,6 +37,27 @@ Scored with the shared system in `career-development/docs/UX_UI_SCORING.md` (lin
 
 **Deliberate decisions.** None in this repo's docs bear on UX, so nothing is excluded from the bad cop.
 
+### Good cop re-score, 2026-11-15 (after the #96 and #98 deploy): **74 / 100, provisional**
+
+Same fixed weights as above. Build scored: live arborkin.com after the deploy that carried #92 to #98 (confirmed by fetching the live stylesheet: it holds the persistent-hint, dark-wordmark and dark-banner rules).
+
+| Area | Was | Now | Why it moved |
+|---|---|---|---|
+| Invite to first-tree flow | 14 | **17** | The toast over the Create account button, the stacked toasts and the one-time hint are gone (#96). Seen in the local E2E build at 390px with screenshots, **not walked on the live site** (that needs a real invite). |
+| Tree canvas readability | 15 | 15 | The dark facts banner is readable live (text now rgb(200, 235, 218)), but it still runs under the top connector ticks, and the phone default zoom (P7) and the line through a name (P8) are open. |
+| Identity and first impression | 11 | **12** | The dark wordmark is fixed (#98), seen live on the 404 card, which uses the same rule; the dark login card was seen in a local render, not live. |
+| Mobile | 10 | 10 | Unchanged. Emulation only; the persistent hint is seen at 390px locally. |
+| Empty, error and loading states | 7 | 7 | Unchanged. |
+| Forms (Add/Edit person) | 7 | 7 | Unchanged. |
+| Craft and consistency | 6 | 6 | Unchanged. |
+| **Total** | 70 | **74** | 17 + 15 + 12 + 10 + 7 + 7 + 6 |
+
+**Bad cop, open now:** 0 High, **6 Medium** (P7, #8 Stories empty-state styling, #9 inline-style drift, #10 blank space under short pages, A1 Admin width, A2 Admin Stories table), **13 Low** (unchanged). P1 to P3, D1 and D2 are fixed and deployed.
+
+**Still not viewed:** Edit person with data, photo upload, the Audit log, Activity, Deleted and Messages tabs, a real phone, and the invite flow on the live site. The rows that depend on them stay provisional, about 4 points either way.
+
+**Reviewer:** the same model that fixed these findings, so allow about 3 points either way. Of the +4, the invite-flow +3 rests on the least direct evidence (a local build, not the live site).
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
@@ -67,6 +88,8 @@ New from the Admin and Add person pass (2026-11-15):
 | 2026-11-15 | bad cop | same | 0 High, 9 Medium, 12 Low open (before the dark and login pass) | Severity list above; a number would claim more precision than a flow review has. |
 | 2026-11-15 | good cop | same, plus dark theme and the signed-out login (local build) | 70 (provisional) | Unchanged: the clean login card (+1 identity) offsets the dark-mode wordmark and banner (-1). Unviewed now: Edit person, photo upload, four Admin tabs, a real phone. |
 | 2026-11-15 | bad cop | same | 0 High, 11 Medium, 13 Low open | Adds D1 and D2 (Medium), L1 (Low). |
+| 2026-11-15 | good cop | live arborkin.com after the #96 and #98 deploy | 74 (provisional) | +3 invite flow (P1-P3 fixed, seen in a local E2E build, not walked live), +1 identity (dark wordmark fixed). |
+| 2026-11-15 | bad cop | same | 0 High, 6 Medium, 13 Low open | P1-P3, D1, D2 fixed and deployed. |
 
 ## Scope and method
 
@@ -179,4 +202,4 @@ Findings 1, 3 and 6 are plainly checkable in the code; 4, 5, 8 and 9 are visible
 ### Fixed 2026-11-15: D1 and D2 (`fix/dark-mode-banner-and-logo`)
 
 - Guarded by `DarkModeLegibilityTests` (E2E, real browser): the dark facts banner must reach 4.5:1 (it measured 1.8:1 before) and the dark login logo must be recoloured while the light one is not. Both tests failed on the old stylesheet and pass on the fix.
-- **Not re-scored.** The scoring rules say to re-score the whole app after a merge, not to add planned gains, so the good cop stays at 70 until this is deployed and viewed live.
+- Not re-scored at the time: the scoring rules say to re-score after a merge and deploy, not to add planned gains. Re-scored after the deploy: see "Good cop re-score" above (74).
