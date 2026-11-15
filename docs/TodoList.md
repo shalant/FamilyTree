@@ -26,7 +26,8 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       touch hint (and its flaky E2E assertion). Phone tree view still unseen; Add/Edit person, Admin tabs.
 - [x] First UX/UI score (2026-11-15): good cop 70/100 provisional, with fixed weights and a score log in
       `docs/uxui/`. Re-score the whole app after each merge; the unviewed rows (dark theme, login card, Edit
-      person, photo upload, real phone) stay provisional until seen. New findings A1-A4, F1.
+      person, photo upload, real phone) stay provisional until seen. New findings A1-A4, F1, then D1, D2, L1 from
+      the dark-mode and signed-out login pass (dark facts banner at about 1.5:1; wordmark invisible on the dark login card).
 - [ ] Medium/low items still open: Stories empty-state double button and glass card, inline-style
       drift between pages, login card exits and "Create an account" copy.
 

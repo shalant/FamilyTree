@@ -23,7 +23,7 @@ Scored with the shared system in `career-development/docs/UX_UI_SCORING.md` (lin
 |---|---|---|
 | Invite to first-tree flow | 14 / 20 | One clear action per screen, good expired-invite copy, the dialog fits a phone, the whole journey passes in E2E on desktop and phone. Costs: the toast over the Create account button, the stacked toasts and the one-time hint are fixed in #96 but not live. |
 | Tree canvas readability | 15 / 20 | A real birth-year timeline, photo nodes and distinct former marriages read well on desktop. Costs: known layout gaps (the third-son reorder, lines through names), and a phone first view that is zoomed too tight (P7, P8). |
-| Identity and first impression | 11 / 15 | One consistent hand: Georgia italic headings, green palette, logo, the family facts banner. Provisional: the signed-out login card was read in code, not seen live. |
+| Identity and first impression | 11 / 15 | One consistent hand: Georgia italic headings, green palette, logo, the family facts banner. The signed-out login card is clean in light mode (one action, calm). Costs: in dark mode the wordmark nearly disappears (D2) and the facts banner is unreadable (D1). |
 | Mobile | 10 / 15 | Touch gestures, drawers and stacked forms exist and the invite flow passes at 390px. Provisional: emulation only, no real phone, and the phone tree view was seen once on three people. |
 | Empty, error and loading states | 7 / 10 | Friendly error pages and one continuous loading surface. Costs: the Stories empty state (two identical buttons, glass card) was read in code, not seen. |
 | Forms (Add/Edit person) | 7 / 10 | The Add person form is clean, sectioned and plainly labelled, and warns instead of blocking on implausible dates. Costs: five relationship pickers before Notes, small labels (F1). Provisional: no photo upload or Edit with real data seen. |
@@ -31,7 +31,7 @@ Scored with the shared system in `career-development/docs/UX_UI_SCORING.md` (lin
 
 **Rows sum to 70** (14 + 15 + 11 + 10 + 7 + 7 + 6).
 
-**What was and wasn't viewed.** Live arborkin.com after the 2026-11-15 deploy (#92 to #95, not #96), desktop 1519px, light theme, signed in as the super-user: Dashboard, FAQ, People, Add person, Admin (Dashboard, Data check, Users, Stories). Phone: E2E emulation at 390px touch only, three screens plus the tree. **Not viewed:** dark theme, the signed-out login card, Edit person with data, photo upload, the Audit log, Activity, Deleted and Messages tabs, and anything on a real phone. The unviewed rows are provisional and could move about 4 points either way.
+**What was and wasn't viewed.** Live arborkin.com after the 2026-11-15 deploy (#92 to #95, not #96), desktop 1519px, light theme, signed in as the super-user: Dashboard, FAQ, People, Add person, Admin (Dashboard, Data check, Users, Stories). Phone: E2E emulation at 390px touch only, three screens plus the tree. **Second pass, same day:** dark theme on the live site (tree, People, Dashboard, Stories, Add person), and the signed-out login and forgot-password pages from a local build at 1280px and 390px, light and dark. **Still not viewed:** Edit person with data, photo upload, the Audit log, Activity, Deleted and Messages tabs, and anything on a real phone. The rows that depend on those are provisional and could move about 4 points either way.
 
 **Reviewer.** Claude (Sonnet 5.5) reviewed, and the same model fixed several of these findings, so allow about 3 points either way. Read the number as a consistency check, not a measurement.
 
@@ -42,8 +42,8 @@ Scored with the shared system in `career-development/docs/UX_UI_SCORING.md` (lin
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
 
 - **High:** none open. The three High findings (stale FAQ, dead guest link, dummy Settings) are live-fixed.
-- **Medium:** P1, P2, P3 (fixed in #96, not yet merged or deployed); P7 (phone default zoom); the Stories empty-state styling (#8); inline-style drift (#9); blank space under short pages (#10); A1 and A2 below.
-- **Low:** P4, P5, P6, P8, #11 to #15, A3, A4, F1 below.
+- **Medium:** P1, P2, P3 (fixed in #96, not yet merged or deployed); P7 (phone default zoom); the Stories empty-state styling (#8); inline-style drift (#9); blank space under short pages (#10); A1, A2, D1 and D2 below.
+- **Low:** P4, P5, P6, P8, #11 to #15, A3, A4, F1, L1 below.
 
 New from the Admin and Add person pass (2026-11-15):
 
@@ -52,6 +52,10 @@ New from the Admin and Add person pass (2026-11-15):
 - **A3 (Low):** Users shows "Last login" as a dash for everyone, which looks broken. Fill it or drop the column.
 - **A4 (Low, data hygiene):** the Stories list still holds leftover test stories.
 - **F1 (Low):** Add person asks for Identity, Photos, then five relationship pickers (Parents, Spouses/partners, Former partners, Siblings, Children) before Notes, with labels near 12px. A name-only add scrolls past all of it; consider folding relationships behind an "Add relationships" step.
+- **D1 (Medium):** in dark mode the facts banner at the top of the tree is unreadable. `[data-theme="dark"] .facts-banner-text` uses `var(--ft-green-200)`, which in the inverted dark palette is `#1e4d33`, a dark green, on a dark green banner: roughly 1.5:1 contrast (measured by hand from the token values, not with a tool). One-line fix: use `--ft-green-800`. It also runs under the tree's top connector ticks.
+- **D2 (Medium):** in dark mode the "ArborKin" wordmark on the login card is dark letters on a dark card, so only the leaves and roots show. The logo is a single PNG (`arborkin-logo__transparent.png`) with no dark variant. Needs a light-text version or a light plate behind it.
+- **L1 (Low):** a signed-out visitor sees a blurred ghost of the app bar (logo, a green avatar circle) behind the login card. That is the "am I already in?" false signal `AuthLayout` exists to prevent on the other auth pages.
+- **Dark mode otherwise holds together:** People, Dashboard, Stories and Add person are consistent and readable. The app bar is a mid-grey band lighter than the page, and the People search box is a filled light-grey field, both a little off, not broken. The theme toggle's first click on the tree page did not take once (unconfirmed, not reproduced).
 - **Keep:** the Data check tab explains itself ("Nothing is changed for you: open a person to check and fix them") and offers a Check link per person; the Dashboard is calmer now that only the working export shows.
 - **Verified live:** after the deploy the Dashboard "Generations" tile reads 6 (it read 3), and the FAQ is the rewritten one.
 
@@ -60,7 +64,9 @@ New from the Admin and Add person pass (2026-11-15):
 | Date | Lens | Build scored | Score | What changed or cost points |
 |---|---|---|---|---|
 | 2026-11-15 | good cop | live arborkin.com, deployed #92 to #95 (not #96) | 70 (provisional) | First score. Unviewed: dark theme, login card, Edit person, photo upload, real phone. Costs: P1 to P3 live until #96, P7, A1, A2, style drift. |
-| 2026-11-15 | bad cop | same | 0 High, 9 Medium, 12 Low open | Severity list above; a number would claim more precision than a flow review has. |
+| 2026-11-15 | bad cop | same | 0 High, 9 Medium, 12 Low open (before the dark and login pass) | Severity list above; a number would claim more precision than a flow review has. |
+| 2026-11-15 | good cop | same, plus dark theme and the signed-out login (local build) | 70 (provisional) | Unchanged: the clean login card (+1 identity) offsets the dark-mode wordmark and banner (-1). Unviewed now: Edit person, photo upload, four Admin tabs, a real phone. |
+| 2026-11-15 | bad cop | same | 0 High, 11 Medium, 13 Low open | Adds D1 and D2 (Medium), L1 (Low). |
 
 ## Scope and method
 
