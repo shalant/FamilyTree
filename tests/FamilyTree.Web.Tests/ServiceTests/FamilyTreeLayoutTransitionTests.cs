@@ -131,6 +131,58 @@ public class FamilyTreeLayoutTransitionTests
             AssertChildUnderParents(after, afterLayout, c);
     }
 
+    // A childless man gains a child, who is childless herself: the live tree's shape on
+    // 2026-10-28, when Doug planned to add William's daughter. Louis has a son Ray, whose
+    // wife Rose's parents and grandfather are on the tree, so Ray sits three generations
+    // down, and a son William by his second wife Libby. Ray's daughter Ellen married Marc,
+    // of another family; their son Dan is the anchor.
+    //
+    // Found with the live tree in TimelineLayoutEngine (the archived engine moved nobody):
+    // a child with no children of her own doesn't hold her father anywhere, so William
+    // floated up a generation, took Louis's family with him, and every row was ordered again
+    // (28 of 30 people moved; Rose's family swapped sides with Louis's). The prototype solves
+    // X for the whole tree at once, so people may shift; nobody may change row or swap sides
+    // with someone on their row. Adding a third son for Louis + Libby after her still
+    // reorders the live tree, but not this smaller family (docs/TodoList.md).
+    [Theory, InlineData(false), InlineData(true)]
+    public void ChildlessHalfBrotherGainsAChild_NobodyIsRearranged(bool reverseIds)
+    {
+        var t = new Tree(reverseIds);
+        var gimpel = t.Add("Gimpel", "Kuh");
+        var joseph = t.Add("Joseph", "Kuh", 1895);
+        var rebecca = t.Add("Rebecca", "Kuh");
+        var rose = t.Add("Rose", "Kuh", 1923);
+        var max = t.Add("Max", "Kuh", 1924);
+        var louis = t.Add("Louis", "Small");
+        var lillian = t.Add("Lillian", "Small", 1903);
+        var libby = t.Add("Libby", "Small", 1902);
+        var ray = t.Add("Ray", "Small", 1922);
+        var william = t.Add("William", "Small");
+        var ellen = t.Add("Ellen", "Small", 1950);
+        var bud = t.Add("Bud", "Lee");
+        var florence = t.Add("Florence", "Lee");
+        var marc = t.Add("Marc", "Lee", 1948);
+        var dan = t.Add("Dan", "Lee", 1978);
+        t.Parent(gimpel, rebecca).Marry(joseph, rebecca)
+         .Parent(joseph, rose).Parent(rebecca, rose).Parent(joseph, max).Parent(rebecca, max)
+         .Marry(louis, lillian, ended: new DateOnly(1925, 1, 1)).Marry(louis, libby)
+         .Parent(louis, ray).Parent(lillian, ray).Parent(louis, william).Parent(libby, william)
+         .Marry(ray, rose).Parent(ray, ellen).Parent(rose, ellen)
+         .Marry(bud, florence).Parent(bud, marc).Parent(florence, marc)
+         .Marry(marc, ellen).Parent(marc, dan).Parent(ellen, dan);
+
+        var before = t.Layout(dan, anchor: dan);
+        var withDaughter = t.Clone();
+        var daughter = withDaughter.Add("Willa", "Small");
+        withDaughter.Parent(william, daughter);
+        var daughterLayout = withDaughter.Layout(dan, anchor: dan);
+
+        AssertSound(t, before);
+        AssertSound(withDaughter, daughterLayout);
+        AssertSameRowOrder(before, daughterLayout, t.Ids, "William's daughter must not rearrange the tree");
+        AssertChildUnderParents(withDaughter, daughterLayout, daughter);
+    }
+
     // Two single parents marry (R2's first repro): Rose has Bud, Ellen has Ellen Jr, no
     // shared children. Each one's own single-parent group is their primary, so the
     // childless marriage is placed by the cross-root step, which used to keep the two
@@ -1040,6 +1092,26 @@ public class FamilyTreeLayoutTransitionTests
                 $"{a[id].Person.FirstName} moved differently from {a[ids[0]].Person.FirstName}: {because}");
     }
 
+    // The listed people may shift sideways, but each keeps their row (Y) and their side of
+    // everyone who shares that row with them (circles overlapping in height).
+    private static void AssertSameRowOrder(FamilyTreeLayout before, FamilyTreeLayout after, IReadOnlyList<Guid> ids, string because)
+    {
+        var (b, a) = (ById(before), ById(after));
+        var errors = new List<string>();
+        foreach (var id in ids)
+            if (a[id].Y != b[id].Y) errors.Add($"{b[id].Person.FirstName} moved from y={b[id].Y} to y={a[id].Y}");
+        for (var i = 0; i < ids.Count; i++)
+            for (var j = i + 1; j < ids.Count; j++)
+            {
+                var (p, q) = (ids[i], ids[j]);
+                if (Math.Abs(b[p].Y - b[q].Y) >= (b[p].Size + b[q].Size) / 2) continue;
+                if (Math.Sign(b[p].X - b[q].X) * Math.Sign(a[p].X - a[q].X) < 0)
+                    errors.Add($"{b[p].Person.FirstName} and {b[q].Person.FirstName} swapped sides");
+            }
+        if (errors.Count > 0) errors.Insert(0, because);
+        Fail(errors);
+    }
+
     private static void Fail(List<string> errors)
     {
         if (errors.Count > 0)
@@ -1128,12 +1200,12 @@ public class FamilyTreeLayoutTransitionTests
 
         // reverseNameTies reverses the order of rows tied on LastName and FirstName, the
         // part of the list order SQL Server doesn't guarantee.
-        public FamilyTreeLayout Layout(Guid focus, bool reverseNameTies = false)
+        public FamilyTreeLayout Layout(Guid focus, bool reverseNameTies = false, Guid? anchor = null)
         {
             var people = People();
             if (reverseNameTies)
                 people = [.. people.GroupBy(p => (p.LastName, p.FirstName)).SelectMany(g => g.Reverse())];
-            return LayoutEngineOverride.Create().ComputeLayout(people, CoupleHelper.Derive(people), focus);
+            return LayoutEngineOverride.Create().ComputeLayout(people, CoupleHelper.Derive(people), focus, anchor);
         }
 
         public string Name(Guid id) => _people.FirstOrDefault(p => p.Id == id)?.FirstName ?? id.ToString()[..8];

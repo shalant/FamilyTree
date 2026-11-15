@@ -3,14 +3,14 @@
     "familiesWithLooseCouple": 107,
     "partnerGapWorst": 1600,
     "partnerGapMean": 220,
-    "crossings": 659,
-    "linesThroughNodes": 403,
+    "crossings": 642,
+    "linesThroughNodes": 400,
     "nodeOverlaps": 0,
     "familyOffCentreMean": 205,
-    "widthMean": 1197,
-    "connectorLengthMean": 2653,
-    "mergedLines": 683,
-    "linesThroughNames": 233
+    "widthMean": 1196,
+    "connectorLengthMean": 2648,
+    "mergedLines": 680,
+    "linesThroughNames": 240
   },
   "fixture two-bridges (2026-10-16 screenshot)": {
     "partnerGapMax": 200,
