@@ -16,7 +16,11 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       one export that works.
 - [x] Removed the red delete icon from People rows. Deleting stays on the Edit page and the tree's
       detail drawer.
-- [ ] Verify the Dashboard "Generations" count (shows 3 for a tree that looks 4-5 deep).
+- [x] Dashboard "Generations" count (2026-11-14, `fix/dashboard-generations-count`): it showed 3 for a tree four
+      or five deep. A breadth-first walk from every parentless person reached a child through a
+      married-in parent (generation 1) first and counted the longer line down short. Now
+      `TreeStats.ComputeGenerations` takes the longest parent chain; regression
+      `TreeStatsTests.MarriedInParentWithNoAncestors_DoesNotShortenTheLongLine` failed (3, not 4) before the fix.
 - [ ] Phone and invitee-journey pass, Add/Edit person, Admin tabs.
 - [ ] Medium/low items still open: Stories empty-state double button and glass card, inline-style
       drift between pages, login card exits and "Create an account" copy.
