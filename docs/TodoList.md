@@ -22,8 +22,11 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       `TreeStats.ComputeGenerations` takes the longest parent chain; regression
       `TreeStatsTests.MarriedInParentWithNoAncestors_DoesNotShortenTheLongLine` failed (3, not 4) before the fix.
 - [x] Invitee journey on a 390px phone (2026-11-15, `docs/uxui/` addendum): findings P1-P6.
-- [ ] P1/P2/P3: toast over the Create account button, two stacked toasts over the link dialog, one-time
-      touch hint (and its flaky E2E assertion). Phone tree view still unseen; Add/Edit person, Admin tabs.
+- [x] P1/P2/P3 (2026-11-15, `fix/phone-toasts`): removed the carried-over and "Account created" toasts, moved
+      the register welcome inline, made the tree hint a persistent pill with "Got it". The flaky phone E2E
+      case was a screenshot-mode artifact (hint said "Scroll"), not a race.
+- [ ] P7/P8 from the first phone tree screenshot (default zoom too tight; line through a name). Add/Edit
+      person, photo upload, Admin tabs still unreviewed.
 - [ ] Medium/low items still open: Stories empty-state double button and glass card, inline-style
       drift between pages, login card exits and "Create an account" copy.
 

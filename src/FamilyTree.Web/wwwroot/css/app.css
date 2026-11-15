@@ -2346,3 +2346,46 @@ img.ft-photo { color: transparent; font-size: 0; }
     background: var(--ft-surface);
     color: var(--ft-gray-400);
 }
+
+/* ── First-visit tree hint ────────────────────────────────────────────────────
+   A persistent hint, not a toast: it stays until the first touch on the tree or "Got it". Sits
+   bottom-centre, above the toolbar pill on a phone, and below the toasts (z-index 9999). */
+.ft-tree-hint {
+    position: fixed;
+    left: 50%;
+    bottom: 5.5rem;
+    transform: translateX(-50%);
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    /* left:50% alone caps the width at the space to the right edge (half the screen), which wrapped
+       the hint onto four lines on a phone; max-content takes the text width, up to the screen. */
+    width: max-content;
+    max-width: calc(100vw - 2rem);
+    padding: 6px 6px 6px 16px;
+    background: var(--ft-surface-elevated);
+    color: var(--ft-text-primary);
+    border: 1px solid var(--ft-line-border);
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .1);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.ft-tree-hint-btn {
+    flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 14px;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    color: var(--ft-green-700);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ft-tree-hint-btn:hover { background: var(--ft-green-50); }
+.ft-tree-hint-btn:focus-visible { outline: 2px solid var(--ft-green-600); outline-offset: 1px; }

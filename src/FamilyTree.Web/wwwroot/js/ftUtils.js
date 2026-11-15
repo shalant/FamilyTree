@@ -132,3 +132,14 @@ window.ftHideSplash = () => {
 
 // True on a touch screen (a phone or tablet), where the tree zooms by pinching, not scrolling.
 window.ftIsTouchScreen = () => window.matchMedia('(pointer: coarse)').matches;
+
+// Calls Home's OnTreeGesture once, on the first touch or click that lands on the tree canvas, so the
+// first-visit hint can go away once the visitor has started using the tree.
+window.ftWatchFirstTreeGesture = (dotNetRef) => {
+    const onDown = (e) => {
+        if (!(e.target instanceof Element) || !e.target.closest('.ft-viewport')) return;
+        document.removeEventListener('pointerdown', onDown, true);
+        dotNetRef.invokeMethodAsync('OnTreeGesture').catch(() => {});
+    };
+    document.addEventListener('pointerdown', onDown, true);
+};
