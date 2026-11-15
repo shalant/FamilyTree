@@ -1240,8 +1240,10 @@ html body #blazor-error-ui .dismiss {
 [data-theme="dark"] .facts-banner {
     background: linear-gradient(to bottom, rgba(18, 40, 28, 0.72) 0%, rgba(18, 40, 28, 0.72) 60%, rgba(18, 40, 28, 0.15) 100%);
 }
+/* The dark palette is inverted: --ft-green-200 is a dark green, which was unreadable (about 1.5:1)
+   on this dark banner. -800 is the light end. */
 [data-theme="dark"] .facts-banner-text {
-    color: var(--ft-green-200);
+    color: var(--ft-green-800);
 }
 
 @keyframes ft-dash-spin {
@@ -1689,6 +1691,17 @@ html.ft-no-select * {
 [data-theme="dark"] .ft-appbar-logo img {
     filter: brightness(0) invert(1);
     opacity: 0.92;
+}
+
+/* The large logos on the dark cards (sign-in, register, reset, story response, error page, reconnect
+   card). A white silhouette is fine at app-bar size, but at this size it drops the brand green.
+   invert + hue-rotate lightens the near-black wordmark and puts the inverted green back near its
+   own hue, so the leaves and roots stay green. Compared against a white silhouette and a
+   saturated variant on 2026-11-15; this read best. */
+[data-theme="dark"] .auth-card img[src$="arborkin-logo__transparent.png"],
+[data-theme="dark"] .ft-error-card-logo img,
+[data-theme="dark"] .ft-reconnect-logo img {
+    filter: invert(1) hue-rotate(180deg);
 }
 
 /* ── AppBar search (desktop only) ────────────────────────────────────────── */

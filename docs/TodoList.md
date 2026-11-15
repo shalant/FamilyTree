@@ -31,6 +31,8 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       `docs/uxui/`. Re-score the whole app after each merge; the unviewed rows (Edit person with data, photo
       upload, four Admin tabs, a real phone) stay provisional until seen. New findings A1-A4, F1, then D1, D2, L1 from
       the dark-mode and signed-out login pass (dark facts banner at about 1.5:1; wordmark invisible on the dark login card).
+- [x] D1 and D2 (2026-11-15, `fix/dark-mode-banner-and-logo`): dark facts banner text now `--ft-green-800` (was 1.8:1),
+      large logos recoloured on the dark cards. `DarkModeLegibilityTests` fails on the old CSS. Re-score after deploy.
 - [ ] Medium/low items still open: Stories empty-state double button and glass card, inline-style
       drift between pages, login card exits and "Create an account" copy.
 
