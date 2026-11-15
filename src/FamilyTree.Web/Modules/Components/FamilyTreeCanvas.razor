@@ -177,10 +177,11 @@
         if (firstRender)
         {
             _jsModule = await JS.InvokeAsync<IJSObjectReference>(
-                "import", "/js/canvas-interaction.js?v=2");
+                "import", "/js/canvas-interaction.js?v=3");
 
-            var (fx, fy, genTopY, genBotY) = ComputeDefaultView();
-            await _jsModule.InvokeVoidAsync("init", "ft-viewport", "ft-transform", fx, fy, genTopY, genBotY);
+            var v = CanvasDefaultView.Compute(_layout);
+            await _jsModule.InvokeVoidAsync("init", "ft-viewport", "ft-transform",
+                v.FocusX, v.FocusY, v.TopY, v.BotY, v.LeftX, v.RightX);
             _prevFocusId = FocusId;
         }
         else if (FocusId != _prevFocusId && _jsModule != null)
@@ -190,34 +191,6 @@
                 await _jsModule.InvokeVoidAsync("centerOn", focusNode.X, focusNode.Y);
             _prevFocusId = FocusId;
         }
-    }
-
-    // Shared by the first-render init (fit ±1 generation around the focus person)
-    // and ResetView (which needs to recompute the same default zoom/pan, not just
-    // re-pan at whatever zoom the user is currently at).
-    private (double Fx, double Fy, double? GenTopY, double? GenBotY) ComputeDefaultView()
-    {
-        var focusNode = _layout.Nodes.FirstOrDefault(n => n.IsFocus);
-        var fx = focusNode?.X ?? _layout.CanvasWidth / 2.0;
-        var fy = focusNode?.Y ?? _layout.CanvasHeight / 2.0;
-
-        var fd = _layout.FocusDepth;
-        var parentNodes = _layout.Nodes.Where(n => n.Depth == fd + 1).ToList();
-        var childNodes  = _layout.Nodes.Where(n => n.Depth == fd - 1).ToList();
-
-        double? genTopY = null;
-        double? genBotY = null;
-        if (parentNodes.Count > 0)
-            genTopY = parentNodes.Min(n => (double)n.Y - n.Size / 2.0) - 30;
-        else if (focusNode != null)
-            genTopY = focusNode.Y - focusNode.Size / 2.0 - 30;
-
-        if (childNodes.Count > 0)
-            genBotY = childNodes.Max(n => (double)n.Y + n.Size / 2.0) + 30;
-        else if (focusNode != null)
-            genBotY = focusNode.Y + focusNode.Size / 2.0 + 30;
-
-        return (fx, fy, genTopY, genBotY);
     }
 
     public async Task ZoomIn()
@@ -244,8 +217,8 @@
     public async Task ResetView()
     {
         if (_jsModule == null) return;
-        var (fx, fy, genTopY, genBotY) = ComputeDefaultView();
-        await _jsModule.InvokeVoidAsync("resetView", fx, fy, genTopY, genBotY);
+        var v = CanvasDefaultView.Compute(_layout);
+        await _jsModule.InvokeVoidAsync("resetView", v.FocusX, v.FocusY, v.TopY, v.BotY, v.LeftX, v.RightX);
     }
 
     public async ValueTask DisposeAsync()

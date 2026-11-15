@@ -25,8 +25,11 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
 - [x] P1/P2/P3 (2026-11-15, `fix/phone-toasts`): removed the carried-over and "Account created" toasts, moved
       the register welcome inline, made the tree hint a persistent pill with "Got it". The flaky phone E2E
       case was a screenshot-mode artifact (hint said "Scroll"), not a race.
-- [ ] P7/P8 from the first phone tree screenshot (default zoom too tight; line through a name). Edit person
-      with data, photo upload and four Admin tabs (Audit log, Activity, Deleted, Messages) still unreviewed.
+- [x] P7 (2026-11-15, `fix/phone-initial-zoom`): the phone's default tree view fitted height only and sat under the
+      app bar; `CanvasDefaultView` + `canvas-interaction.js` now fit the immediate family across and below the bar.
+      Browser test failed before (parent at -71px), passes after. Re-score after deploy.
+- [ ] P8 (a connector runs through the parent's name label on the phone view). Edit person with data, photo
+      upload and four Admin tabs (Audit log, Activity, Deleted, Messages) still unreviewed.
 - [x] First UX/UI score (2026-11-15): good cop 70/100 provisional, with fixed weights and a score log in
       `docs/uxui/`. Re-score the whole app after each merge; the unviewed rows (Edit person with data, photo
       upload, four Admin tabs, a real phone) stay provisional until seen. New findings A1-A4, F1, then D1, D2, L1 from

@@ -143,6 +143,25 @@ public class InviteeJourneyTests(InviteOnlyAppFixture fixture) : E2eTestBase(fix
         await Expect(hint).ToBeVisibleAsync(new() { Timeout = 15_000 });
         await ShotAsync(page, device, "8-tree");
 
+        // P7 (docs/uxui/, 2026-11-15): on a phone the first view was zoomed in until the parent was cut
+        // off under the app bar. The focus person and their parent must be fully on screen, below the bar.
+        if (device == "phone")
+        {
+            var bar = await page.Locator("#ft-appbar").BoundingBoxAsync();
+            Assert.NotNull(bar);
+            foreach (var initials in new[] { "WG", "RG" })   // Willa (focus) and Rose (her parent)
+            {
+                var box = await page.Locator(".person-node").Filter(new() { HasText = initials }).First.BoundingBoxAsync();
+                Assert.NotNull(box);
+                Assert.True(box.X >= 0 && box.X + box.Width <= 390,
+                    $"{initials} node is cut off sideways: x {box.X:0}..{box.X + box.Width:0} on a 390px screen.");
+                Assert.True(box.Y >= bar.Y + bar.Height,
+                    $"{initials} node is under the app bar: top {box.Y:0}, app bar bottom {bar.Y + bar.Height:0}.");
+                Assert.True(box.Y + box.Height <= 844,
+                    $"{initials} node runs off the bottom: bottom {box.Y + box.Height:0} on an 844px screen.");
+            }
+        }
+
         // The hint is not a timed toast: it is still there after the old five-second toast would
         // have gone (a first-time visitor looking away missed it, and this assertion raced it),
         // and "Got it" dismisses it.
