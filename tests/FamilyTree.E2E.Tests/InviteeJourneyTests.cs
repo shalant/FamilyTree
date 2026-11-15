@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
 
@@ -132,9 +133,23 @@ public class InviteeJourneyTests(InviteOnlyAppFixture fixture) : E2eTestBase(fix
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         // The tip waits for the tree's first render; a cold app on its first test run took
         // longer than the default 5s once.
-        await Expect(page.GetByText(device == "phone" ? "Pinch to zoom" : "Scroll to zoom"))
-            .ToBeVisibleAsync(new() { Timeout = 15_000 });
+        // With FAMILYTREE_E2E_SCREENSHOTS set, the full-page captures on the emulated phone leave the
+        // page reporting a mouse (the hint then says "Scroll", seen 2026-11-15), so the wording is only
+        // checked per device when no screenshots are being taken.
+        var shooting = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("FAMILYTREE_E2E_SCREENSHOTS"));
+        var hint = shooting
+            ? page.GetByText(new Regex("(Pinch|Scroll) to zoom"))
+            : page.GetByText(device == "phone" ? "Pinch to zoom" : "Scroll to zoom");
+        await Expect(hint).ToBeVisibleAsync(new() { Timeout = 15_000 });
         await ShotAsync(page, device, "8-tree");
+
+        // The hint is not a timed toast: it is still there after the old five-second toast would
+        // have gone (a first-time visitor looking away missed it, and this assertion raced it),
+        // and "Got it" dismisses it.
+        await page.WaitForTimeoutAsync(6_000);
+        await Expect(hint).ToBeVisibleAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Got it" }).ClickAsync();
+        await Expect(hint).ToBeHiddenAsync();
 
         var children = await Fixture.Seeder.GetChildrenAsync(roseId);
         Assert.Contains(children, p => p.FirstName == "Willa");

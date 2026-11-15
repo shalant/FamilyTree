@@ -13,7 +13,6 @@
 @inject IDialogService DialogService
 @inject NavigationManager Nav
 @inject IJSRuntime JS
-@inject ToastService ToastService
 
 <PageTitle>Create account — Arborkin</PageTitle>
 
@@ -94,7 +93,14 @@
             @if (_invite != null)
             {
                 <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="mb-3" Dense="true">
-                    You've been invited — your email is pre-filled below.
+                    @if (_storySubjectName != null)
+                    {
+                        <span>Your memory has been saved — now create your free ArborKin account. Your email is pre-filled below.</span>
+                    }
+                    else
+                    {
+                        <span>You've been invited — your email is pre-filled below.</span>
+                    }
                 </MudAlert>
             }
 
@@ -273,7 +279,6 @@
     private bool _showConfirm;
     private bool _loading;
     private bool _registered;
-    private bool _welcomeToastShown;
     private Guid? _registeredUserId;
 
     private string? _error;
@@ -319,11 +324,6 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && _inviteId.HasValue && _invite != null && _storySubjectName != null && !_welcomeToastShown)
-        {
-            _welcomeToastShown = true;
-            ToastService.Success("Welcome! Your memory has been saved — now create your free ArborKin account.");
-        }
         if (firstRender && _inviteId.HasValue)
             await JS.InvokeVoidAsync("history.replaceState", null, "", "/register");
     }
@@ -373,7 +373,6 @@
         {
             _registeredUserId = result.Data;
             _registered = true;
-            ToastService.Success("Account created — let's link you to your tree!");
         }
     }
 
