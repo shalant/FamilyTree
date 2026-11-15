@@ -21,7 +21,9 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       married-in parent (generation 1) first and counted the longer line down short. Now
       `TreeStats.ComputeGenerations` takes the longest parent chain; regression
       `TreeStatsTests.MarriedInParentWithNoAncestors_DoesNotShortenTheLongLine` failed (3, not 4) before the fix.
-- [ ] Phone and invitee-journey pass, Add/Edit person, Admin tabs.
+- [x] Invitee journey on a 390px phone (2026-11-15, `docs/uxui/` addendum): findings P1-P6.
+- [ ] P1/P2/P3: toast over the Create account button, two stacked toasts over the link dialog, one-time
+      touch hint (and its flaky E2E assertion). Phone tree view still unseen; Add/Edit person, Admin tabs.
 - [ ] Medium/low items still open: Stories empty-state double button and glass card, inline-style
       drift between pages, login card exits and "Create an account" copy.
 

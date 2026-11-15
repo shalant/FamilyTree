@@ -76,3 +76,23 @@ Severity: **High** (misleads or blocks a new user), **Medium** (rough edge a rel
 5. Then do the pass I couldn't do here: the invitee journey on a real phone, Add/Edit person, and the Admin tabs.
 
 Findings 1, 3 and 6 are plainly checkable in the code; 4, 5, 8 and 9 are visible in the screenshots taken; 7 was a hypothesis, since confirmed.
+
+## Addendum 2026-11-15: invitee journey on a 390px touch phone
+
+**Method:** `InviteeJourneyTests` (story invite → thank-you → register → link to tree → first tree view), run locally against LocalDB with `FAMILYTREE_E2E_SCREENSHOTS` set, desktop and a 390px touch phone. The screenshots are not committed (repo is public; they stay local). All 20 E2E tests pass locally without screenshots. I looked at the phone screenshots for the thank-you page, register, the link-to-tree dialog and the expired-invite page. **I did not see the phone tree view**: see finding P3.
+
+**Good cop**
+- The thank-you page has one clear primary action ("Create a free account") and a quiet way out.
+- The expired-invite page says why, what to do if the account already exists, and who to ask. It has the right tone for a relative who clicked an old link.
+- The link-to-tree dialog fits the phone viewport (the test asserts it), and "Who do you know?" is a plain question, not a form.
+- The whole journey completes on a phone; the invited email is pre-filled.
+
+**Bad cop**
+- **P1 (Medium): a toast sits on the Create account button.** On the register screen the fixed-bottom toast ("Your memory of … has been saved!") covers the lower half of the one action the page exists for. It clears on its own, but a relative reading the form is looking at it right then. **Fix:** don't show the carried-over "saved" toast on the register page, or show it once on the thank-you page only.
+- **P2 (Medium): two stacked toasts over the link-to-tree dialog.** "Account created — let's link you to your tree!" and the earlier "memory saved" toast stack at the bottom and take about a fifth of the phone screen while the user is choosing who they are. The first repeats the dialog's own heading; the second is about the previous page. **Fix:** one toast at most, and none that repeats what is on screen.
+- **P3 (Medium): the only touch hint is a one-time toast, and the test that checks it is flaky.** "Tip: Drag to explore the tree. Pinch to zoom." appears once per browser (`ft-treehint` in localStorage) and then disappears. A first-time phone user who looks away misses it for good. The E2E assertion on it (`StoryInvite_ToFirstTreeView(phone)`) failed 2 of 2 runs with screenshots on and passed 2 of 2 without: it races the toast's disappearance. The CI run is not affected today, but it can flake. **Fix:** make the hint persist until the first drag or pinch (or until dismissed), which fixes both the experience and the race. Until then the phone tree screenshot can't be taken by that test.
+- **P4 (Low): thank-you subtitle looks low-contrast.** The grey-blue "Want to see the full family tree…" line on white looks below AA. Not measured; measure before changing.
+- **P5 (Low): the open dropdown covers "Skip for now / Continue"** in the link dialog while a list is open, as expected for a dropdown, but on a phone the buttons are out of reach until a choice is made.
+- **P6 (Low): the long pre-filled email is printed twice** (the Google hint and the field) and wraps awkwardly at 390px.
+
+**Still not covered:** the phone tree view, Add/Edit person, photo upload, and the Admin tabs.
