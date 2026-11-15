@@ -108,16 +108,10 @@
             New here? <a href="/register">Create an account</a>
         </div>
 
-        @* ── Browse public ─────────────────────────────────────────────────── *@
-        <div class="auth-browse">
-            <button @onclick="BrowsePublic">Browse public trees without signing in →</button>
-        </div>
-
     </div>
 </div>
 
 @code {
-    [Parameter] public EventCallback OnGuest { get; set; }
     [Parameter] public string? ErrorMessage { get; set; }
     [Parameter] public string? PrefillEmail { get; set; }
     [Parameter] public string? ReturnUrl { get; set; }
@@ -135,6 +129,4 @@
         Nav.NavigateTo(string.IsNullOrEmpty(ReturnUrl)
             ? "/auth/google"
             : $"/auth/google?returnUrl={Uri.EscapeDataString(ReturnUrl)}", forceLoad: true);
-
-    private async Task BrowsePublic() => await OnGuest.InvokeAsync();
 }

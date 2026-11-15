@@ -2,6 +2,27 @@
 
 ---
 
+## UX/UI review (2026-11-14)
+
+Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 2026-11-14
+(branch `docs/uxui-review`):
+- [x] Rewrote the FAQ against the invite-only, working-GEDCOM-export app (it said sign-in was
+      "coming soon"), and removed its claims that nobody had checked (TLS 1.3, East US,
+      "never tied to your identity"); see `docs/security.md` for the real ones.
+- [x] Removed the login card's "Browse public trees" link (no public trees; guests hit an
+      "Add first person" screen) and `Home`'s `_showIntro`/`OnGuest` plumbing.
+- [x] Removed the Settings page (three switches that changed nothing, two disabled GEDCOM
+      buttons) and its menu, drawer and Dashboard links; trimmed the Dashboard export card to the
+      one export that works.
+- [x] Removed the red delete icon from People rows. Deleting stays on the Edit page and the tree's
+      detail drawer.
+- [ ] Verify the Dashboard "Generations" count (shows 3 for a tree that looks 4-5 deep).
+- [ ] Phone and invitee-journey pass, Add/Edit person, Admin tabs.
+- [ ] Medium/low items still open: Stories empty-state double button and glass card, inline-style
+      drift between pages, login card exits and "Create an account" copy.
+
+---
+
 ## Outreach readiness (planned 2026-10-24)
 
 Two goals: (1) ready to start inviting family; (2) robust enough that a casual user's
