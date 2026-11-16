@@ -11,6 +11,10 @@
     .ft-admin-nav-row:hover { background: var(--ft-green-50) !important; }
     .ft-admin-tabs .mud-tabs-panel { width: 100%; }
     .mud-tabs-panel { min-width: 0; }
+    /* A wide table (Users, Stories) used to push the panel past the page's 1100px container, so
+       the right edge jumped from tab to tab (UX/UI review A1, 2026-11-15). The panel area keeps
+       its width and a wide table scrolls inside it. */
+    .ft-admin-tabs .mud-tabs-panels { min-width: 0; overflow-x: auto; }
 </style>
 
 <div style="padding:24px; max-width:1100px; margin:auto;">

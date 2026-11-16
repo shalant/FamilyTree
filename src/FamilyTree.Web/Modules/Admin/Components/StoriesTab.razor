@@ -52,7 +52,7 @@ else
                                            OnClick="@(() => MoveStoryAsync(context.Id, 1))" />
                         </div>
                     </MudTd>
-                    <MudTd Style="font-size:13px;">
+                    <MudTd Style="font-size:13px; white-space:nowrap;">
                         @(context.PersonId.HasValue
                             ? _people.FirstOrDefault(p => p.Id == context.PersonId)?.FullName ?? "—"
                             : context.UnlinkedPersonName)
@@ -62,7 +62,7 @@ else
                         white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                         @context.Body
                     </MudTd>
-                    <MudTd Style="font-size:12px; color:var(--ft-gray-400);">
+                    <MudTd Style="font-size:12px; color:var(--ft-gray-400); white-space:nowrap;">
                         @(context.AuthorDisplayName ?? context.AuthorName ?? "Unknown")
                     </MudTd>
                     <MudTd>
@@ -79,7 +79,7 @@ else
                             <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Published</MudChip>
                         }
                     </MudTd>
-                    <MudTd Style="font-size:11px; color:var(--ft-gray-300);">
+                    <MudTd Style="font-size:12px; color:var(--ft-gray-400); white-space:nowrap;">
                         @context.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")
                     </MudTd>
                     <MudTd>
@@ -105,12 +105,6 @@ else
                                 <MudIconButton Icon="@Icons.Material.Outlined.Edit"
                                                Size="Size.Small"
                                                OnClick="@(() => EditStoryAsync(context))" />
-                            </MudTooltip>
-                            <MudTooltip Text="Delete">
-                                <MudIconButton Icon="@Icons.Material.Outlined.DeleteOutline"
-                                               Color="Color.Error"
-                                               Size="Size.Small"
-                                               OnClick="@(() => DeleteStoryAsync(context.Id))" />
                             </MudTooltip>
                         </div>
                     </MudTd>
@@ -355,29 +349,12 @@ else
             story.Body = updated.Body;
             Toast.Success("Story updated");
         }
-    }
-
-    private async Task DeleteStoryAsync(Guid storyId)
-    {
-        var parameters = new DialogParameters<ConfirmDialog>
+        else if (result is { Canceled: false, Data: Guid deletedId })
         {
-            { d => d.Message, "Delete this story? This cannot be undone." }
-        };
-
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete story", parameters);
-        var result = await dialog.Result;
-        if (result is null || result.Canceled) return;
-
-        var deleteResult = await StoryService.DeleteAsync(storyId);
-        if (deleteResult.Success)
-        {
-            _allStories.RemoveAll(s => s.Id == storyId);
-            _unlinkedStories.RemoveAll(s => s.Id == storyId);
+            // The dialog already confirmed and deleted it; just drop the row.
+            _allStories.RemoveAll(s => s.Id == deletedId);
+            _unlinkedStories.RemoveAll(s => s.Id == deletedId);
             Toast.Success("Story deleted");
-        }
-        else
-        {
-            Toast.Error(deleteResult.Message);
         }
     }
 

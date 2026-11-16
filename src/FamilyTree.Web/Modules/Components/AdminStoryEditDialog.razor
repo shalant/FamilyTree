@@ -3,6 +3,7 @@
 @using MudBlazor
 
 @inject IStoryService StoryService
+@inject IDialogService DialogService
 
 <MudDialog>
     <DialogContent>
@@ -22,6 +23,11 @@
         }
     </DialogContent>
     <DialogActions>
+        @* Delete lives here, not on every table row: a loud red trash icon next to the approve
+           check invited a mis-tap (UX/UI review A2, 2026-11-15). *@
+        <MudButton OnClick="DeleteAsync" Variant="Variant.Text" Color="Color.Error"
+                   Disabled="_saving" Class="ft-story-delete">Delete story</MudButton>
+        <MudSpacer />
         <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
         <MudButton OnClick="Save"
                    Variant="Variant.Filled"
@@ -70,6 +76,31 @@
         }
 
         MudDialog.Close(DialogResult.Ok(result.Data));
+    }
+
+    // Closes with the story's id (a Guid), which tells the table to drop the row.
+    private async Task DeleteAsync()
+    {
+        _error = null;
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { d => d.Message, "Delete this story? This cannot be undone." }
+        };
+        var confirm = await DialogService.ShowAsync<ConfirmDialog>("Delete story", parameters);
+        var answer = await confirm.Result;
+        if (answer is null || answer.Canceled) return;
+
+        _saving = true;
+        var result = await StoryService.DeleteAsync(StoryId);
+        _saving = false;
+
+        if (!result.Success)
+        {
+            _error = result.Message;
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(StoryId));
     }
 
     private void Cancel() => MudDialog.Cancel();

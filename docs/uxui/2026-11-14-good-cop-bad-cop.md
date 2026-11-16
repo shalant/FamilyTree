@@ -247,3 +247,23 @@ Findings 1, 3 and 6 are plainly checkable in the code; 4, 5, 8 and 9 are visible
 - **Fix.** Doug set `Layout__Engine=TimelineBest` on the App Service (no code change, no deploy; delete the setting to roll back). On the 30-person live-data fixture: lines through names 10 to 0, loose couples 1 to 0, overlaps 1 to 0, width 1900 to 1240.
 - **Seen.** Doug looked at his own tree on desktop and on his phone after the switch and said it looks great. Reviewer: the same model that made the fixes; not viewed by me on the live site.
 - **Open.** The third-son reorder (a third child can reorder the live tree) and the 240 generated-family lines through names. Re-score after the nav drawer (#101) is deployed and viewed.
+
+### Addendum 2026-11-15: A1 and A2 fixed (`fix/admin-polish`)
+
+- **A1 (Medium).** Measured on the live Admin page at 1626px: the tab panel area was 852px on six tabs, 940px on Users and 976px on Stories, because a wide table pushed past the page's 1100px container. The panel area now keeps its width and a wide table scrolls inside it. Checked by injecting the rule into the live page: 852px on all eight tabs, Users and Stories scrolling at 940 and 976.
+- **A2 (Medium).** The Stories table lost the red trash icon on every row; Delete is in the Edit story dialog behind the existing confirmation. Dates, "About" and "Submitted by" stay on one line. The table itself now scrolls inside the panel when it is wider than it.
+- **Not re-scored** until deployed and viewed. Not viewed: the dialog's Delete button on the live site.
+
+### Seen 2026-11-15: the four Admin tabs not viewed before (Audit log, Activity, Deleted, Messages)
+
+Live arborkin.com, desktop 1626px, light theme, signed in as the super-user, read only (nothing clicked beyond switching tabs). Reviewer: the same model that made the fixes.
+
+- **A5 (Low):** Audit log and Activity show the User as a truncated raw id (`f9b335bf…`), not a name, so "who did this" needs a lookup. Show the display name (or email) with the id as a tooltip.
+- **A6 (Low):** the Audit log's Action and Entity filters are different widths and don't line up with the table below them.
+- **A7 (Low):** secondary text and dates in the Admin tables are 11px light grey (Deleted date, Messages date and sender, Activity user), the same readability problem the nav drawer had (P9).
+- **A8 (Low):** each table is only as wide as its content (Activity is narrow, Messages wide), so the panel looks ragged from tab to tab even with A1 fixed. Give the tables the full panel width.
+- **Fine:** Deleted reads clearly (name, deleted date, born year, one Restore button), and its Data integrity card explains itself.
+- **Worth a look by Doug:** Messages holds one real entry, a feature request ("make primary photo easy", category Tree visualization), with the sender shown as a dash. Find out whether it came from a family member and whether the sender is lost.
+- **Edit person with data (viewed, nothing saved):** a real person with a middle name, birth date and place, a profile photo and two parents. The form reads clearly: Identity, Photos, Relationships, then Notes, with the person's name in the heading. The parent chips show birth years and a clear remove control.
+- **E1 (Low):** the uploaded photo's remove control is a small unlabelled ✕ on the thumbnail's corner, always visible: the same destructive-control pattern as A2 and the People rows. Move it behind the photo's own menu or a labelled "Remove photo", with a confirmation.
+- **Effect on the score:** these screens are no longer unviewed, and they cost nothing in the numbers above (all Low). **Still not viewed:** the photo upload itself (a write to live data, so not exercised) and anything on a real phone beyond the tree and the nav drawer.
