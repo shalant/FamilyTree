@@ -583,7 +583,10 @@ stopping placement patches and replacing the placement algorithm, measured first
       search finds an arrangement with fewer crossings (2 to 1) and takes it; the layout has
       no memory of its last arrangement. Decide: prefer the previous order (stability-aware
       ordering) or accept it. Not reproduced in a public-safe test yet; the small
-      transition-test family doesn't show it.
+      transition-test family doesn't show it. 2026-11-15: it is the generations above the
+      anchor's parents turning, not a mirror, and a crossing threshold can't hold it (ADR 004);
+      only a remembered order would. Layout v2 cut the same day, so the family's `TimelineBest`
+      now has the #92 fix (William's daughter: 19 of 30 move, no row swaps; v1 moved 28 with 12 swaps).
 
 ---
 
