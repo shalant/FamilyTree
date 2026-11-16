@@ -18,14 +18,14 @@ let _lastY = 0;
 let _activePointers = new Map(); // pointerId -> {x, y}
 let _pinchStartDist = null;      // distance between the two active pointers, updated each move
 
-export function init(viewportId, transformId, focusX, focusY, genTopY, genBotY) {
+export function init(viewportId, transformId, focusX, focusY, genTopY, genBotY, genLeftX, genRightX) {
     dispose();
 
     _viewport = document.getElementById(viewportId);
     _transform = document.getElementById(transformId);
     if (!_viewport || !_transform) return;
 
-    _applyDefaultView(focusX, focusY, genTopY, genBotY);
+    _applyDefaultView(focusX, focusY, genTopY, genBotY, genLeftX, genRightX);
 
     _syncTimeline();
 
@@ -44,23 +44,50 @@ export function init(viewportId, transformId, focusX, focusY, genTopY, genBotY) 
 // Re-fits ±1 generation around the focus person, same as the initial load —
 // unlike centerOn(), this also resets zoom rather than just re-panning at
 // whatever zoom level the user is currently at.
-export function resetView(focusX, focusY, genTopY, genBotY) {
+export function resetView(focusX, focusY, genTopY, genBotY, genLeftX, genRightX) {
     if (!_viewport) return;
-    _applyDefaultView(focusX, focusY, genTopY, genBotY);
+    _applyDefaultView(focusX, focusY, genTopY, genBotY, genLeftX, genRightX);
 }
 
-function _applyDefaultView(focusX, focusY, genTopY, genBotY) {
+// Phones and tablets (the app's one mobile breakpoint): the fixed app bar covers the top of the
+// full-screen canvas, so the framed area starts below it.
+const MOBILE_MAX_WIDTH = 768;
+
+function _appBarBottom(viewportWidth) {
+    if (viewportWidth > MOBILE_MAX_WIDTH) return 0;
+    const bar = document.getElementById('ft-appbar');
+    return bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+}
+
+function _applyDefaultView(focusX, focusY, genTopY, genBotY, genLeftX, genRightX) {
     const rect = _viewport.getBoundingClientRect();
 
     if (genTopY != null && genBotY != null && genBotY > genTopY) {
-        // Fit ±1 generation in the viewport (parents row → children row).
+        // Fit ±1 generation in the viewport (parents row → children row), and, when the family's
+        // width is known, fit that across too: a tall narrow phone is limited by width, not height,
+        // and fitting only the height zoomed in until the parents were cut off.
         const genHeight = genBotY - genTopY;
         const padding = 80;
-        _zoom = Math.min(rect.height / (genHeight + padding * 2), 2.5);
-        _zoom = Math.max(_zoom, 0.3);
+        const topInset = _appBarBottom(rect.width);
+        const availH = Math.max(rect.height - topInset, 100);
+        const zoomH = availH / (genHeight + padding * 2);
+
+        let zoomW = Infinity;
+        if (genLeftX != null && genRightX != null && genRightX > genLeftX) {
+            const sidePad = 16;
+            zoomW = Math.max(rect.width - sidePad * 2, 100) / (genRightX - genLeftX);
+        }
+
+        const fit = Math.min(zoomH, 2.5);
+        const widthLimited = zoomW < fit;
+        _zoom = Math.max(Math.min(fit, zoomW), 0.3);
+
         const midY = (genTopY + genBotY) / 2;
-        _panX = rect.width  / 2 - focusX * _zoom;
-        _panY = rect.height / 2 - midY    * _zoom;
+        // Width-limited: centre the family, so all of it is on screen. Otherwise keep the focus
+        // person centred, as before.
+        const centreX = widthLimited ? (genLeftX + genRightX) / 2 : focusX;
+        _panX = rect.width / 2 - centreX * _zoom;
+        _panY = topInset + availH / 2 - midY * _zoom;
     } else {
         _zoom = 0.8;
         _panX = rect.width  / 2 - focusX * _zoom;

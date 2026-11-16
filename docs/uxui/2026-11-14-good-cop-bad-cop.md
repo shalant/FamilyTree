@@ -203,3 +203,10 @@ Findings 1, 3 and 6 are plainly checkable in the code; 4, 5, 8 and 9 are visible
 
 - Guarded by `DarkModeLegibilityTests` (E2E, real browser): the dark facts banner must reach 4.5:1 (it measured 1.8:1 before) and the dark login logo must be recoloured while the light one is not. Both tests failed on the old stylesheet and pass on the fix.
 - Not re-scored at the time: the scoring rules say to re-score after a merge and deploy, not to add planned gains. Re-scored after the deploy: see "Good cop re-score" above (74).
+
+### Fixed 2026-11-15: P7, the phone's default zoom (`fix/phone-initial-zoom`)
+
+- **Cause.** The first view fitted only the *height* of the family (one generation up to one down), capped at 2.5x, and centred it on the full-screen canvas, so on a tall narrow phone the zoom was set by height, the fixed app bar covered the top 57px, and in the invitee tree the parent's node started 71px above the visible area. The "row above" was also found by generation depth, and in that tree (no dates) the parent was not in it, so only the focus person was framed.
+- **Fix.** `CanvasDefaultView` now also frames the focus person's actual parents, partners and children (a union with the old rule, so views that worked are unchanged), passes their horizontal extent to `canvas-interaction.js`, which fits width as well as height, centres the family when width is the limit, and on phones and tablets (768px and under) frames the area below the app bar. The invitee tree now opens at about 1.7x with both people fully on screen (was 2.5x with the parent cut off).
+- **Guards.** `CanvasDefaultViewTests` (4 unit tests, one tagged Regression) and a phone assertion in `InviteeJourneyTests` that the focus person and parent are fully on screen and below the app bar. The browser test failed on the old code (parent's top at -71 against an app bar bottom of 57) and passes now. Note the E2E project runs the already-built web app: rebuild `FamilyTree.Web` between states when checking before and after.
+- **Not re-scored** until deployed and viewed live. P8 (the connector running through the parent's name label) is still open and is visible in the new screenshot.
