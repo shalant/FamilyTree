@@ -217,3 +217,10 @@ Findings 1, 3 and 6 are plainly checkable in the code; 4, 5, 8 and 9 are visible
 - **P9 (Low, found by Doug).** The mobile nav drawer used 14px item text, 18px icons, a 13px name and an 11px light-grey role label, on 44px rows that were mostly empty to the right. For an older relative that is hard to read. Fixed: 18px text, 24px icons, 56px rows, 17px name, 13px darker role label. The drawer's own close button stays (the existing close test and a clear tap target). Guard: `MobileDrawer_TextIsLargeEnoughToReadComfortably` failed at 14px before, passes after.
 - **Not re-scored** until deployed and viewed on the phone.
 - **Drawer 10% more translucent (Doug's call, 2026-11-15).** Background opacity 0.72 to 0.62 (light) and 0.66 to 0.56 (dark); the blur is unchanged. Check on the phone that the bigger text is still easy to read over a busy tree.
+
+### Addendum 2026-11-15: P8 fixed by making `TimelineBest` the family's layout
+
+- **Cause.** P8 was not a canvas bug: the archived engine, the site default, draws straight connectors through name labels; the Timeline engines route around them (ADR 004, "Lines through names").
+- **Fix.** Doug set `Layout__Engine=TimelineBest` on the App Service (no code change, no deploy; delete the setting to roll back). On the 30-person live-data fixture: lines through names 10 to 0, loose couples 1 to 0, overlaps 1 to 0, width 1900 to 1240.
+- **Seen.** Doug looked at his own tree on desktop and on his phone after the switch and said it looks great. Reviewer: the same model that made the fixes; not viewed by me on the live site.
+- **Open.** The third-son reorder (a third child can reorder the live tree) and the 240 generated-family lines through names. Re-score after the nav drawer (#101) is deployed and viewed.
