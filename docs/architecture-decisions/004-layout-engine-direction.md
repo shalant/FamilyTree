@@ -459,6 +459,16 @@ reverted). The row-ordering search finds a different arrangement with fewer cros
 own; the options are keeping the previous order as a preference (stability-aware ordering)
 or accepting it. `docs/TodoList.md`.
 
+Looked at again 2026-11-15: the anchor's parents (Ellen and Marc) and their two families stay
+where they were. What turns is the generations above them: Louis's three-person block
+flips (Libby and her sons to the left, Lillian towards Ray) and Isador and Morry move to the
+other edge. It is not the final mirror: the old "lean" sum and a rule judged by the anchor's
+two parents gave the same answer at every stage, so that change was tried and dropped. A
+threshold ("move away from the start only if it saves N crossings") doesn't work either: the
+depth-first start order has 21 to 28 crossings on the search's own count against about 8 for
+the result, so it isn't a stable order to hold on to. The options left are remembering each
+family's last order (stored, used as the starting order) or accepting the reorder.
+
 ## Consequences
 
 - The scores give a baseline to beat. Since 2026-10-23 they are also a ratchet for the
