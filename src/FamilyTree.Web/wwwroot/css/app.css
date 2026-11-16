@@ -1947,7 +1947,7 @@ html.ft-no-select * {
        above it is the fallback for those that don't. */
     max-height: calc(100vh - 76px);
     max-height: calc(100dvh - 76px);
-    background: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.62);
     backdrop-filter: blur(29px) saturate(190%);
     -webkit-backdrop-filter: blur(29px) saturate(190%);
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.5);
@@ -1979,7 +1979,7 @@ html.ft-no-select * {
 }
 
 [data-theme="dark"] .ft-mobile-nav {
-    background: rgba(18, 20, 23, 0.66);
+    background: rgba(18, 20, 23, 0.56);
     border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
