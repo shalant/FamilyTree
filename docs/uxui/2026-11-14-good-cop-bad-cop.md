@@ -247,3 +247,9 @@ Findings 1, 3 and 6 are plainly checkable in the code; 4, 5, 8 and 9 are visible
 - **Fix.** Doug set `Layout__Engine=TimelineBest` on the App Service (no code change, no deploy; delete the setting to roll back). On the 30-person live-data fixture: lines through names 10 to 0, loose couples 1 to 0, overlaps 1 to 0, width 1900 to 1240.
 - **Seen.** Doug looked at his own tree on desktop and on his phone after the switch and said it looks great. Reviewer: the same model that made the fixes; not viewed by me on the live site.
 - **Open.** The third-son reorder (a third child can reorder the live tree) and the 240 generated-family lines through names. Re-score after the nav drawer (#101) is deployed and viewed.
+
+### Addendum 2026-11-15: A1 and A2 fixed (`fix/admin-polish`)
+
+- **A1 (Medium).** Measured on the live Admin page at 1626px: the tab panel area was 852px on six tabs, 940px on Users and 976px on Stories, because a wide table pushed past the page's 1100px container. The panel area now keeps its width and a wide table scrolls inside it. Checked by injecting the rule into the live page: 852px on all eight tabs, Users and Stories scrolling at 940 and 976.
+- **A2 (Medium).** The Stories table lost the red trash icon on every row; Delete is in the Edit story dialog behind the existing confirmation. Dates, "About" and "Submitted by" stay on one line. The table itself now scrolls inside the panel when it is wider than it.
+- **Not re-scored** until deployed and viewed. Not viewed: the dialog's Delete button on the live site.

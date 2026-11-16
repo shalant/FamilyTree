@@ -29,6 +29,11 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       app bar; `CanvasDefaultView` + `canvas-interaction.js` now fit the immediate family across and below the bar.
       Browser test failed before (parent at -71px), passes after. Re-score after deploy.
 - [x] P7 confirmed on Doug's real phone after the #100 deploy (2026-11-15): "looks fantastic".
+- [x] A1 and A2 (2026-11-15, `fix/admin-polish`): the Admin panel area keeps one width on every tab (Users and
+      Stories scroll inside it instead of pushing the page edge; measured live: 852px on all eight tabs with the
+      rule applied, was 852/940/976). The Stories table lost its per-row red trash icon: Delete is now in the Edit
+      story dialog behind the same confirmation, and dates, "About" and "Submitted by" no longer wrap.
+      `AdminStoryEditDialogTests` (2). Not re-scored until deployed.
 - [x] P9 (2026-11-15, `fix/mobile-nav-sizes`, found by Doug on his phone): the mobile nav drawer's text was too small
       for an older relative (14px rows, 11px role label) and each row was mostly empty. Rows are now 18px text with
       24px icons on 56px rows, name 17px, role 13px and darker. Browser test failed before (14px), passes after.
@@ -585,7 +590,8 @@ stopping placement patches and replacing the placement algorithm, measured first
       ordering) or accept it. Not reproduced in a public-safe test yet; the small
       transition-test family doesn't show it. 2026-11-15: it is the generations above the
       anchor's parents turning, not a mirror, and a crossing threshold can't hold it (ADR 004);
-      only a remembered order would. Layout v2 cut the same day, so the family's `TimelineBest`
+      only a remembered order would. **Accepted for now (2026-11-15):** it happens only when someone is added, and
+      the result is a valid, tidier layout; build the remembered order if a real edit bothers someone. Layout v2 cut the same day, so the family's `TimelineBest`
       now has the #92 fix (William's daughter: 19 of 30 move, no row swaps; v1 moved 28 with 12 swaps).
 
 ---
