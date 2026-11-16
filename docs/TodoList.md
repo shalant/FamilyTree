@@ -32,8 +32,10 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
 - [x] P9 (2026-11-15, `fix/mobile-nav-sizes`, found by Doug on his phone): the mobile nav drawer's text was too small
       for an older relative (14px rows, 11px role label) and each row was mostly empty. Rows are now 18px text with
       24px icons on 56px rows, name 17px, role 13px and darker. Browser test failed before (14px), passes after.
-- [ ] P8 (a connector runs through the parent's name label on the phone view). Edit person with data, photo
-      upload and four Admin tabs (Audit log, Activity, Deleted, Messages) still unreviewed.
+- [x] P8 (2026-11-15): the connector through the parent's name label was the archived engine's straight lines.
+      Fixed by the A5 switch to `TimelineBest` (below); Doug confirmed on desktop and phone.
+- [ ] Edit person with data, photo upload and four Admin tabs (Audit log, Activity, Deleted, Messages) still
+      unreviewed.
 - [x] First UX/UI score (2026-11-15): good cop 70/100 provisional, with fixed weights and a score log in
       `docs/uxui/`. Re-score the whole app after each merge; the unviewed rows (Edit person with data, photo
       upload, four Admin tabs, a real phone) stay provisional until seen. New findings A1-A4, F1, then D1, D2, L1 from
@@ -212,6 +214,12 @@ Work A in order before the first invite; B and C can follow.
       Decided 2026-10-25: no change for now. The family stays on the archived engine;
       Doug switches them later by setting `Layout__Engine=TimelineBest` on the App
       Service (the prototype doesn't have this overlap).
+      **Switched 2026-11-15:** Doug set `Layout__Engine=TimelineBest` on the App Service and
+      checked his own tree on desktop and phone ("looks great"). On his 30-person live-data
+      fixture the archived engine scored 10 lines through names, one couple drawn 680px apart,
+      one overlap and width 1900; Timeline scored 0, 0, 0 and 1240. Rollback is deleting the
+      setting (or `Legacy`), no deploy. Still open on Timeline: the third-son reorder, and
+      240 lines through names across the generated-family ratchet.
 - [x] **A6: walk the invitee journey**, invite email to first tree view, on a phone as well
       as desktop. **Done locally 2026-10-25** (`feat/a6-invitee-journey`): the walk is now
       `InviteeJourneyTests` (E2E, invite-only like production, desktop and a 390px touch
