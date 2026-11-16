@@ -109,6 +109,33 @@ public class MobileViewportTests(E2eAppFixture fixture) : E2eTestBase(fixture)
         Assert.True(itemBox!.Height >= 44, $"Drawer item height {itemBox.Height} < 44px");
     }
 
+    // 2026-11-15, Doug on his phone: the drawer's text was too small for an older relative to read
+    // comfortably (14px rows, 11px role label). Rows are now 18px text on 56px rows.
+    [Fact]
+    [Trait("Category", "Regression")]
+    public async Task MobileDrawer_TextIsLargeEnoughToReadComfortably()
+    {
+        var (page, _) = await NewMobilePageAsync();
+        await page.GotoAsync(Fixture.BaseUrl);
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        await page.Locator(".ft-hamburger-btn").ClickAsync();
+        await Expect(page.Locator(".ft-mobile-nav")).ToBeVisibleAsync();
+        await SettleDrawerAnimationAsync();
+
+        var itemFont = await page.Locator(".ft-drawer-item span").First
+            .EvaluateAsync<double>("e => parseFloat(getComputedStyle(e).fontSize)");
+        Assert.True(itemFont >= 17, $"Drawer item text is {itemFont}px, under 17px.");
+
+        var itemBox = await page.Locator(".ft-drawer-item").First.BoundingBoxAsync();
+        Assert.NotNull(itemBox);
+        Assert.True(itemBox!.Height >= 52, $"Drawer item height {itemBox.Height} < 52px");
+
+        var nameFont = await page.Locator(".ft-drawer-username")
+            .EvaluateAsync<double>("e => parseFloat(getComputedStyle(e).fontSize)");
+        Assert.True(nameFont >= 16, $"Drawer name is {nameFont}px, under 16px.");
+    }
+
     [Fact]
     public async Task MobileDrawer_MaxHeightAllowsNearlyFullViewport_NotAFlat55vh()
     {
