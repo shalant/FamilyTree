@@ -39,8 +39,10 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       24px icons on 56px rows, name 17px, role 13px and darker. Browser test failed before (14px), passes after.
 - [x] P8 (2026-11-15): the connector through the parent's name label was the archived engine's straight lines.
       Fixed by the A5 switch to `TimelineBest` (below); Doug confirmed on desktop and phone.
-- [ ] Edit person with data, photo upload and four Admin tabs (Audit log, Activity, Deleted, Messages) still
-      unreviewed.
+- [x] The four Admin tabs (Audit log, Activity, Deleted, Messages) were viewed 2026-11-15: new Low findings A5 to A8
+      (raw user ids, filter alignment, faint 11px text, ragged table widths); see `docs/uxui/`.
+- [ ] Edit person with data and photo upload still unreviewed. Ask where the Messages feature request ("make
+      primary photo easy") came from: its sender shows as a dash.
 - [x] First UX/UI score (2026-11-15): good cop 70/100 provisional, with fixed weights and a score log in
       `docs/uxui/`. Re-score the whole app after each merge; the unviewed rows (Edit person with data, photo
       upload, four Admin tabs, a real phone) stay provisional until seen. New findings A1-A4, F1, then D1, D2, L1 from

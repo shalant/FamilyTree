@@ -253,3 +253,15 @@ Findings 1, 3 and 6 are plainly checkable in the code; 4, 5, 8 and 9 are visible
 - **A1 (Medium).** Measured on the live Admin page at 1626px: the tab panel area was 852px on six tabs, 940px on Users and 976px on Stories, because a wide table pushed past the page's 1100px container. The panel area now keeps its width and a wide table scrolls inside it. Checked by injecting the rule into the live page: 852px on all eight tabs, Users and Stories scrolling at 940 and 976.
 - **A2 (Medium).** The Stories table lost the red trash icon on every row; Delete is in the Edit story dialog behind the existing confirmation. Dates, "About" and "Submitted by" stay on one line. The table itself now scrolls inside the panel when it is wider than it.
 - **Not re-scored** until deployed and viewed. Not viewed: the dialog's Delete button on the live site.
+
+### Seen 2026-11-15: the four Admin tabs not viewed before (Audit log, Activity, Deleted, Messages)
+
+Live arborkin.com, desktop 1626px, light theme, signed in as the super-user, read only (nothing clicked beyond switching tabs). Reviewer: the same model that made the fixes.
+
+- **A5 (Low):** Audit log and Activity show the User as a truncated raw id (`f9b335bf…`), not a name, so "who did this" needs a lookup. Show the display name (or email) with the id as a tooltip.
+- **A6 (Low):** the Audit log's Action and Entity filters are different widths and don't line up with the table below them.
+- **A7 (Low):** secondary text and dates in the Admin tables are 11px light grey (Deleted date, Messages date and sender, Activity user), the same readability problem the nav drawer had (P9).
+- **A8 (Low):** each table is only as wide as its content (Activity is narrow, Messages wide), so the panel looks ragged from tab to tab even with A1 fixed. Give the tables the full panel width.
+- **Fine:** Deleted reads clearly (name, deleted date, born year, one Restore button), and its Data integrity card explains itself.
+- **Worth a look by Doug:** Messages holds one real entry, a feature request ("make primary photo easy", category Tree visualization), with the sender shown as a dash. Find out whether it came from a family member and whether the sender is lost.
+- **Effect on the score:** these tabs are no longer unviewed, and they cost nothing in the numbers above (all Low). **Still not viewed:** Edit person with data and photo upload.
