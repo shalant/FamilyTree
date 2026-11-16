@@ -58,6 +58,27 @@ Same fixed weights as above. Build scored: live arborkin.com after the deploy th
 
 **Reviewer:** the same model that fixed these findings, so allow about 3 points either way. Of the +4, the invite-flow +3 rests on the least direct evidence (a local build, not the live site).
 
+### Good cop re-score, 2026-11-15 (after the #100 and #101 deploys and the TimelineBest switch): **78 / 100, provisional**
+
+Same fixed weights. Build scored: live arborkin.com with `Layout__Engine=TimelineBest` set on the App Service, plus the phone default zoom (#100) and the readable nav drawer (#101).
+
+| Area | Was | Now | Why it moved |
+|---|---|---|---|
+| Invite to first-tree flow | 17 | 17 | Unchanged. |
+| Tree canvas readability | 15 | **17** | The first view now frames the family on a phone (P7) and the family's tree draws with Timeline, which keeps lines out of names and couples together (P8, A5). Doug confirmed both on desktop and a real phone. Costs that remain: the third-son reorder, 240 generated-family lines through names, the dark banner running under the top ticks. |
+| Identity and first impression | 12 | 12 | Unchanged. |
+| Mobile | 10 | **12** | The first look on a real phone: the tree's first view and the nav drawer (18px text, 56px rows, more translucent) both read well. Still not seen on a real phone: the invite flow, forms, Admin. |
+| Empty, error and loading states | 7 | 7 | Unchanged. |
+| Forms (Add/Edit person) | 7 | 7 | Unchanged. |
+| Craft and consistency | 6 | 6 | Unchanged. |
+| **Total** | 74 | **78** | 17 + 17 + 12 + 12 + 7 + 7 + 6 |
+
+**Bad cop, open now:** 0 High, **5 Medium** (#8 Stories empty-state styling, #9 inline-style drift, #10 blank space under short pages, A1 Admin width, A2 Admin Stories table), **12 Low**. P7, P8 and P9 are fixed and deployed.
+
+**What was and wasn't viewed.** Not by me: I did not open the live site this time. Doug looked at his own tree on desktop and on his phone, and at the nav drawer, and described them as looking great; that is the evidence for the +4. **Still not viewed:** Edit person with data, photo upload, the Audit log, Activity, Deleted and Messages tabs, the invite flow live and on a real phone. The rows that depend on them stay provisional, about 4 points either way.
+
+**Reviewer:** the same model that made these fixes, and the +4 rests on the person who asked for them saying they look good, so allow about 3 points either way.
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
@@ -90,6 +111,8 @@ New from the Admin and Add person pass (2026-11-15):
 | 2026-11-15 | bad cop | same | 0 High, 11 Medium, 13 Low open | Adds D1 and D2 (Medium), L1 (Low). |
 | 2026-11-15 | good cop | live arborkin.com after the #96 and #98 deploy | 74 (provisional) | +3 invite flow (P1-P3 fixed, seen in a local E2E build, not walked live), +1 identity (dark wordmark fixed). |
 | 2026-11-15 | bad cop | same | 0 High, 6 Medium, 13 Low open | P1-P3, D1, D2 fixed and deployed. |
+| 2026-11-15 | good cop | live arborkin.com after the #100 and #101 deploys, `Layout__Engine=TimelineBest`, seen by Doug on a real phone and on desktop | 78 (provisional) | +2 tree canvas (P7 and P8 fixed), +2 mobile (first real-phone look: tree first view and nav drawer fine). Evidence is Doug's report, not my own look at the live site. |
+| 2026-11-15 | bad cop | same | 0 High, 5 Medium, 12 Low open | P7, P8 and P9 fixed and deployed. |
 
 ## Scope and method
 

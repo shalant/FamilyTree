@@ -43,6 +43,8 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
 - [x] D1 and D2 (2026-11-15, `fix/dark-mode-banner-and-logo`): dark facts banner text now `--ft-green-800` (was 1.8:1),
       large logos recoloured on the dark cards. `DarkModeLegibilityTests` fails on the old CSS. Deployed and re-scored 2026-11-15: good cop 74/100
       (provisional), bad cop 0 High / 6 Medium / 13 Low; D1 and D2 confirmed live.
+- [x] Re-scored 2026-11-15 after #100 and #101 deployed and the TimelineBest switch: good cop 78/100 (provisional),
+      bad cop 0 High / 5 Medium / 12 Low. Evidence is Doug's look on desktop and a real phone, not mine.
 - [ ] Medium/low items still open: Stories empty-state double button and glass card, inline-style
       drift between pages, login card exits and "Create an account" copy.
 
