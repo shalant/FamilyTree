@@ -28,6 +28,10 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
 - [x] P7 (2026-11-15, `fix/phone-initial-zoom`): the phone's default tree view fitted height only and sat under the
       app bar; `CanvasDefaultView` + `canvas-interaction.js` now fit the immediate family across and below the bar.
       Browser test failed before (parent at -71px), passes after. Re-score after deploy.
+- [x] P7 confirmed on Doug's real phone after the #100 deploy (2026-11-15): "looks fantastic".
+- [x] P9 (2026-11-15, `fix/mobile-nav-sizes`, found by Doug on his phone): the mobile nav drawer's text was too small
+      for an older relative (14px rows, 11px role label) and each row was mostly empty. Rows are now 18px text with
+      24px icons on 56px rows, name 17px, role 13px and darker. Browser test failed before (14px), passes after.
 - [ ] P8 (a connector runs through the parent's name label on the phone view). Edit person with data, photo
       upload and four Admin tabs (Audit log, Activity, Deleted, Messages) still unreviewed.
 - [x] First UX/UI score (2026-11-15): good cop 70/100 provisional, with fixed weights and a score log in
