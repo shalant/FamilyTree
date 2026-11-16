@@ -41,7 +41,9 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       Fixed by the A5 switch to `TimelineBest` (below); Doug confirmed on desktop and phone.
 - [x] The four Admin tabs (Audit log, Activity, Deleted, Messages) were viewed 2026-11-15: new Low findings A5 to A8
       (raw user ids, filter alignment, faint 11px text, ragged table widths); see `docs/uxui/`.
-- [ ] Edit person with data and photo upload still unreviewed. Ask where the Messages feature request ("make
+- [x] Edit person with data viewed 2026-11-15 (nothing saved): fine, one Low finding E1 (the photo's remove ✕ is a small
+      unlabelled corner control). Photo upload itself not exercised (a write to live data).
+- [ ] Ask where the Messages feature request ("make
       primary photo easy") came from: its sender shows as a dash.
 - [x] First UX/UI score (2026-11-15): good cop 70/100 provisional, with fixed weights and a score log in
       `docs/uxui/`. Re-score the whole app after each merge; the unviewed rows (Edit person with data, photo
