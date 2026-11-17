@@ -79,6 +79,23 @@ Same fixed weights. Build scored: live arborkin.com with `Layout__Engine=Timelin
 
 **Reviewer:** the same model that made these fixes, and the +4 rests on the person who asked for them saying they look good, so allow about 3 points either way.
 
+### Good cop re-score, 2026-11-17 (after the #105 and #106 deploys): **79 / 100, provisional**
+
+| Area | Was | Now | Why it moved |
+|---|---|---|---|
+| Invite to first-tree flow | 17 | 17 | Unchanged. |
+| Tree canvas readability | 17 | 17 | Unchanged. |
+| Identity and first impression | 12 | 12 | Unchanged. |
+| Mobile | 12 | 12 | Unchanged. |
+| Empty, error and loading states | 7 | 7 | Unchanged. |
+| Forms (Add/Edit person) | 7 | 7 | Unchanged. |
+| Craft and consistency | 6 | **7** | A1 and A2 are gone, seen by me on the live site at 1536px: all eight Admin tabs hold a 1152px panel, the Stories table fits with Status, approve/hide and edit visible, no trash icons, and the Edit story dialog offers "Delete story" in red at the left of its buttons (opened on a published story, cancelled, nothing deleted). Costs that remain: inline-style drift (#9), mixed button colours, Admin tables with raw user ids and faint 11px text (A5 to A8). |
+| **Total** | 78 | **79** | 17 + 17 + 12 + 12 + 7 + 7 + 7 |
+
+**Bad cop, open now:** 0 High, **3 Medium** (#8 Stories empty-state styling, #9 inline-style drift, #10 blank space under short pages), **17 Low** (the earlier 12 plus A5 to A8 and E1, found when the other Admin tabs and Edit person were viewed). A1 and A2 are fixed and deployed.
+
+**Not checked:** the Admin at a laptop width near 1280px (the Stories table should scroll about 100px inside its panel), the Delete story confirmation on live data (covered by `AdminStoryEditDialogTests`, not clicked live on purpose), and everything listed as unviewed above. **Reviewer:** the same model that made the fixes; the one point is small enough to sit inside the plus or minus 3.
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
@@ -113,6 +130,8 @@ New from the Admin and Add person pass (2026-11-15):
 | 2026-11-15 | bad cop | same | 0 High, 6 Medium, 13 Low open | P1-P3, D1, D2 fixed and deployed. |
 | 2026-11-15 | good cop | live arborkin.com after the #100 and #101 deploys, `Layout__Engine=TimelineBest`, seen by Doug on a real phone and on desktop | 78 (provisional) | +2 tree canvas (P7 and P8 fixed), +2 mobile (first real-phone look: tree first view and nav drawer fine). Evidence is Doug's report, not my own look at the live site. |
 | 2026-11-15 | bad cop | same | 0 High, 5 Medium, 12 Low open | P7, P8 and P9 fixed and deployed. |
+| 2026-11-17 | good cop | live arborkin.com after the #105 and #106 deploys, seen by me at 1536px | 79 (provisional) | +1 craft (A1 and A2 fixed, seen live). |
+| 2026-11-17 | bad cop | same | 0 High, 3 Medium, 17 Low open | A1 and A2 fixed and deployed; A5 to A8 and E1 counted as Low. |
 
 ## Scope and method
 
