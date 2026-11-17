@@ -267,3 +267,9 @@ Live arborkin.com, desktop 1626px, light theme, signed in as the super-user, rea
 - **Edit person with data (viewed, nothing saved):** a real person with a middle name, birth date and place, a profile photo and two parents. The form reads clearly: Identity, Photos, Relationships, then Notes, with the person's name in the heading. The parent chips show birth years and a clear remove control.
 - **E1 (Low):** the uploaded photo's remove control is a small unlabelled ✕ on the thumbnail's corner, always visible: the same destructive-control pattern as A2 and the People rows. Move it behind the photo's own menu or a labelled "Remove photo", with a confirmation.
 - **Effect on the score:** these screens are no longer unviewed, and they cost nothing in the numbers above (all Low). **Still not viewed:** the photo upload itself (a write to live data, so not exercised) and anything on a real phone beyond the tree and the nav drawer.
+
+### Seen live 2026-11-15, after the #105 deploy: A1 and A2 worked, but the Stories table scrolled
+
+- **A1 and A2 confirmed live.** Dates, names and "Submitted by" stay on one line and the red trash icons are gone from the rows.
+- **Side effect, found by looking.** With the page container still at 1100px, the one-line Stories table is 1124px wide against an 852px panel, so Status and the action icons sat off to the right behind a scrollbar. A fix that hides the approve button isn't one.
+- **Fix (`fix/admin-width`).** The Admin container is now 1400px wide, so every tab keeps one panel width (1152px at a 1626px screen, measured live by injecting the change) and Stories and Users fit without scrolling. On a screen narrower than the table, the panel still scrolls inside itself. Not checked: a laptop-width screen (1280px), where Stories will scroll by about 100px.

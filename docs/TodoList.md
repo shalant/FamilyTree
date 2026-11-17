@@ -33,7 +33,9 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       Stories scroll inside it instead of pushing the page edge; measured live: 852px on all eight tabs with the
       rule applied, was 852/940/976). The Stories table lost its per-row red trash icon: Delete is now in the Edit
       story dialog behind the same confirmation, and dates, "About" and "Submitted by" no longer wrap.
-      `AdminStoryEditDialogTests` (2). Not re-scored until deployed.
+      `AdminStoryEditDialogTests` (2). Live check after deploy found the one-line Stories table (1124px) scrolled
+      inside the 852px panel, hiding the action icons; `fix/admin-width` widens the Admin container to 1400px (panel
+      1152px, checked live). Not re-scored until that is deployed.
 - [x] P9 (2026-11-15, `fix/mobile-nav-sizes`, found by Doug on his phone): the mobile nav drawer's text was too small
       for an older relative (14px rows, 11px role label) and each row was mostly empty. Rows are now 18px text with
       24px icons on 56px rows, name 17px, role 13px and darker. Browser test failed before (14px), passes after.
