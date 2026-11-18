@@ -60,6 +60,10 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       identical "Add story" buttons in a frosted-glass card. Now one action ("Write the first story") in
       the same plain card style as the stories, with an icon and warmer copy; `StoriesPageTests`. Not yet
       seen live (needs deploy).
+- [x] Fixed 2026-11-17 (`fix/admin-tables`, UX/UI review A3, A5 to A8): Admin tables fill the panel (the flex
+      basis, not the width, was the bug), the Audit log and Activity show names not raw ids, the two filters
+      match, secondary text is readable, and the always-empty "Last login" column is gone (`LastLoginAt` is never
+      written; recording it on sign-in is an open option). `AdminUserNamesTests`. Not yet seen live.
 - [ ] Medium/low items still open: inline-style drift between pages, login card exits and
       "Create an account" copy.
 

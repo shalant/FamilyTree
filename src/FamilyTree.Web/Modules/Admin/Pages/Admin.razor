@@ -9,7 +9,14 @@
     .ft-admin-stat:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important; }
     .ft-admin-nav-row { transition: background 0.1s; border-radius: 8px; cursor: pointer; }
     .ft-admin-nav-row:hover { background: var(--ft-green-50) !important; }
-    .ft-admin-tabs .mud-tabs-panel { width: 100%; }
+    /* The panels area is a flex row and the active panel is its only child, so without a basis it
+       shrank to its content: Activity's table was 519px and Messages' 787px in a 1152px panel
+       (UX/UI review A8, 2026-11-17). The old rule here named .mud-tabs-panel, a class MudBlazor
+       does not render (it is .mud-tab-panel). */
+    .ft-admin-tabs .mud-tab-panel { flex: 1 1 100%; min-width: 0; }
+    /* Secondary text in the Admin tables (dates, ids, senders) is 12px or smaller light grey;
+       readable for a quick look, not for someone squinting at a laptop (A7). */
+    .ft-admin-tabs .ft-admin-secondary { font-size: 13px; color: var(--ft-gray-600); }
     .mud-tabs-panel { min-width: 0; }
     /* A wide table (Users, Stories) used to push the panel past the page's 1100px container, so
        the right edge jumped from tab to tab (UX/UI review A1, 2026-11-15). The panel area keeps

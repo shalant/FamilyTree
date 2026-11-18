@@ -75,14 +75,10 @@ else
         <RowTemplate>
             <MudTd Style="@(context.IsRestored ? "opacity:0.5;" : null)">@context.FullName</MudTd>
             <MudTd Style="@(context.IsRestored ? "opacity:0.5;" : null)">
-                <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
-                    @context.DeletedAt?.ToString("MMM d, yyyy h:mm tt")
-                </MudText>
+                <span class="ft-admin-secondary">@context.DeletedAt?.ToString("MMM d, yyyy h:mm tt")</span>
             </MudTd>
             <MudTd Style="@(context.IsRestored ? "opacity:0.5;" : null)">
-                <MudText Typo="Typo.caption">
-                    @(context.BirthDate?.ToString("yyyy") ?? "—")
-                </MudText>
+                <span class="ft-admin-secondary">@(context.BirthDate?.ToString("yyyy") ?? "—")</span>
             </MudTd>
             <MudTd Style="text-align:right;">
                 @if (context.IsRestored)

@@ -33,7 +33,7 @@ else
                         @(context.Type == "FeatureRequest" ? "Feature" : "Message")
                     </MudChip>
                 </MudTd>
-                <MudTd Style="font-size:12px; color:var(--ft-gray-400);">
+                <MudTd Class="ft-admin-secondary">
                     @(string.IsNullOrWhiteSpace(context.SenderEmail) ? "—" : context.SenderEmail)
                 </MudTd>
                 <MudTd>
@@ -43,19 +43,19 @@ else
                     </div>
                     @if (!string.IsNullOrWhiteSpace(context.Body))
                     {
-                        <div style="font-size:11px; color:var(--ft-gray-300); margin-top:2px;
+                        <div style="font-size:12px; color:var(--ft-gray-500); margin-top:2px;
                             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:300px;">
                             @context.Body
                         </div>
                     }
                 </MudTd>
-                <MudTd Style="font-size:12px; color:var(--ft-gray-400);">
+                <MudTd Class="ft-admin-secondary">
                     @(context.Category ?? "—")
                 </MudTd>
-                <MudTd Style="font-size:12px; color:var(--ft-gray-400);">
+                <MudTd Class="ft-admin-secondary">
                     @(context.Priority ?? "—")
                 </MudTd>
-                <MudTd Style="font-size:11px; color:var(--ft-gray-300);">
+                <MudTd Class="ft-admin-secondary">
                     @context.CreatedAt.ToLocalTime().ToString("MMM d, h:mm tt")
                 </MudTd>
                 <MudTd>
