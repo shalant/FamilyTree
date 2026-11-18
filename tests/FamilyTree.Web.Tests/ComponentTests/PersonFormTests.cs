@@ -113,8 +113,9 @@ class FakeMediumServiceForPersonForm : IMediumService
 {
     public Task<ServiceResponse<List<MediumDto>>> GetAllAsync(CancellationToken ct = default)
         => throw new NotImplementedException();
+    // Edit mode loads the person's photos after the first render; a person with none is the common case.
     public Task<ServiceResponse<List<MediumDto>>> GetByPersonIdAsync(Guid personId, CancellationToken ct = default)
-        => throw new NotImplementedException();
+        => Task.FromResult(ServiceResponse<List<MediumDto>>.Ok([]));
     public Task<ServiceResponse<MediumDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
         => throw new NotImplementedException();
     public Task<ServiceResponse<MediumDto>> CreateAsync(MediumUpsertDto dto, Stream fileStream, CancellationToken ct = default)

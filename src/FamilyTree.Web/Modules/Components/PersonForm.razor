@@ -9,7 +9,7 @@
 @inject IJSRuntime JS
 @inject IDialogService DialogService
 
-<MudStack Spacing="4" Style="margin:auto; max-width:680px; font-family:var(--ft-font-body);">
+<MudStack Spacing="4" Class="ft-person-form" Style="margin:auto; max-width:680px; font-family:var(--ft-font-body);">
 
     <!-- Identity Card -->
     <MudPaper Elevation="0" Class="pa-5" Style="background:var(--ft-surface-card); border-radius:12px;">
@@ -183,7 +183,7 @@
                                 }
                                 else
                                 {
-                                    <span style="font-size:11px; color:var(--ft-gray-300); text-align:center; line-height:1.4;">profile photo</span>
+                                    <span style="font-size:12px; color:var(--ft-gray-500); text-align:center; line-height:1.4;">profile photo</span>
                                 }
                             </div>
                         }
@@ -239,7 +239,7 @@
                                 }
                                 else
                                 {
-                                    <span style="font-size:11px; color:var(--ft-gray-300); text-align:center; line-height:1.4;">profile photo</span>
+                                    <span style="font-size:12px; color:var(--ft-gray-500); text-align:center; line-height:1.4;">profile photo</span>
                                 }
                             </div>
                         }
@@ -274,7 +274,7 @@
                         <MudIcon Icon="@Icons.Material.Outlined.AddPhotoAlternate"
                                  Style="font-size:32px;" />
                         <span style="font-size:13px;">Add photos</span>
-                        <span style="font-size:11px; color:var(--ft-gray-300);">Click to browse</span>
+                        <span style="font-size:12px; color:var(--ft-gray-500);">Click to browse</span>
                     }
                 </label>
             }
@@ -306,9 +306,38 @@
 
     <!-- Relationships Card -->
     <MudPaper Elevation="0" Class="pa-5" Style="background:var(--ft-surface-card); border-radius:12px;">
-        <MudText Typo="Typo.h5" Class="mb-4" Style="font-family:var(--ft-font-display); color:var(--ft-green-800);">Relationships</MudText>
+        @* The five pickers used to sit open between the name and the notes, so adding someone by name
+           alone meant scrolling past all of them (UX/UI review F1, 2026-11-17). They are folded away
+           until asked for, and open from the start when the person already has relationships. *@
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div>
+                <MudText Typo="Typo.h5" Style="font-family:var(--ft-font-display); color:var(--ft-green-800);">Relationships</MudText>
+                <div class="ft-relationships-hint">
+                    @if (_showRelationships)
+                    {
+                        <span>Optional. Link this person to parents, partners, siblings and children.</span>
+                    }
+                    else if (RelationshipCount > 0)
+                    {
+                        <span>@RelationshipCount @(RelationshipCount == 1 ? "connection" : "connections") added</span>
+                    }
+                    else
+                    {
+                        <span>Optional. You can link parents, partners, siblings and children now or later.</span>
+                    }
+                </div>
+            </div>
+            <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Medium"
+                       Class="ft-relationships-toggle"
+                       StartIcon="@(_showRelationships ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.AccountTree)"
+                       OnClick="ToggleRelationships">
+                @(_showRelationships ? "Hide" : (RelationshipCount > 0 ? "Show relationships" : "Add relationships"))
+            </MudButton>
+        </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+        @if (_showRelationships)
+        {
+        <div class="ft-relationships-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:16px;">
 
             <!-- Parents -->
             <div>
@@ -486,6 +515,7 @@
             </div>
 
         </div>
+        }
     </MudPaper>
 
     <!-- Notes Card -->
@@ -596,6 +626,16 @@
 
     public bool HasPendingPhotos => _pendingPreviews.Count > 0;
 
+    private bool _showRelationships;
+    private bool _relationshipsTouched;
+    private void ToggleRelationships()
+    {
+        _relationshipsTouched = true;
+        _showRelationships = !_showRelationships;
+    }
+    private int RelationshipCount =>
+        _parentIds.Count + _spouseIds.Count + _formerSpouseIds.Count + _siblingIds.Count + _childIds.Count;
+
     // ── lifecycle ──────────────────────────────────────────────────
     protected override void OnParametersSet()
     {
@@ -618,6 +658,8 @@
         _formerSpouseIds = [..Initial.FormerSpouseIds];
         _siblingIds = [..Initial.SiblingIds];
         _childIds = [..Initial.ChildIds];
+        // Open for someone who already has relationships; the user's own toggle wins after that.
+        if (!_relationshipsTouched) _showRelationships = RelationshipCount > 0;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

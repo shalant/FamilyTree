@@ -68,6 +68,9 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       readable years, names and axis, a heavier parent-child spine, "1948–2019" life spans (who has died),
       an add-photo badge on nodes with no photo, full-name tooltips, keyboard-reachable nodes. The floating
       toolbar was left alone (its position is the user's own drag). Not yet seen live.
+- [x] Add person form 2026-11-17 (`fix/add-person-form`, UX/UI review F1): relationship pickers fold behind
+      "Add relationships" (open when the person already has some), labels 14px, pickers stack on a phone.
+      `PersonFormRelationshipsFoldTests`. Not yet seen live.
 - [ ] Medium/low items still open: inline-style drift between pages, login card exits and
       "Create an account" copy.
 

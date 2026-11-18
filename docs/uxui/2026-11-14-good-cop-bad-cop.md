@@ -122,6 +122,13 @@ Doug asked whether the main canvas is beautiful and can be improved. Looked at t
 - **UX 3, preview and keyboard:** every node has a tooltip with the full name and years (the label is the first name only, so two relatives called Sarah were indistinguishable), and is now a keyboard-reachable button (Tab, then Enter or Space) with an accessible name.
 - `PersonNodeCanvasPolishTests` (14 cases with the existing broken-photo tests). Not yet seen live (needs a deploy); the score moves only after it is deployed and viewed.
 
+### Addendum 2026-11-17: F1, the Add person form (`fix/add-person-form`)
+
+- The five relationship pickers (Parents, Spouses/partners, Former partners, Siblings, Children) sat open between the name and the notes, so adding someone by name alone meant scrolling past all of them. They are now folded behind an outlined "Add relationships" button with the line "Optional. You can link parents, partners, siblings and children now or later." A person who already has relationships (Edit) opens with them shown; once the user toggles, their choice stands. Folded with connections it reads "3 connections added" and the button says "Show relationships". The pickers' selections are kept while folded and saved as before.
+- Labels in this form are 14px (were 12px), scoped to the person form because `.ft-field-label` is shared with the sign-in and story dialogs; the photo-area captions (11px gray-300) are 12px gray-500.
+- On a phone (600px and under) the pickers stack in one column instead of two.
+- `PersonFormRelationshipsFoldTests` (4 cases). `FakeMediumServiceForPersonForm.GetByPersonIdAsync` returns no photos instead of throwing, so Edit mode can render in a test. Not yet seen live (needs a deploy); the score moves only after it is deployed and viewed.
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
