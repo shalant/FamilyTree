@@ -2402,3 +2402,22 @@ img.ft-photo { color: transparent; font-size: 0; }
 
 .ft-tree-hint-btn:hover { background: var(--ft-green-50); }
 .ft-tree-hint-btn:focus-visible { outline: 2px solid var(--ft-green-600); outline-offset: 1px; }
+
+/* ── Add / Edit person form (UX/UI review F1, 2026-11-17) ─────────────────── */
+/* Labels were 12px; 14px is what a relative reading a form wants. Scoped to this form, since
+   .ft-field-label is shared by the sign-in and story dialogs. */
+.ft-person-form .ft-field-label {
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+.ft-relationships-hint {
+    font-size: 14px;
+    color: var(--ft-gray-500);
+    margin-top: 2px;
+    line-height: 1.45;
+}
+.ft-relationships-toggle { text-transform: none !important; font-weight: 600; }
+@media (max-width: 600px) {
+    /* Two pickers side by side don't fit a phone. */
+    .ft-person-form .ft-relationships-grid { grid-template-columns: 1fr !important; }
+}

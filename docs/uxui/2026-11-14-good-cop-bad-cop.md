@@ -109,6 +109,13 @@ With no stories, /stories showed an "Add story" button in the header and an iden
 - **A3:** the Users table's "Last login" column is removed. `AppUser.LastLoginAt` is never written anywhere (only read), so it showed a dash for everyone; a column that can't be filled looks broken. Recording it on sign-in is a separate, small change if Doug wants to see who has visited; a long-lived cookie means it would be the last sign-in, not the last visit.
 - Not yet seen live (needs a deploy). The score moves only after it is deployed and viewed.
 
+### Addendum 2026-11-17: F1, the Add person form (`fix/add-person-form`)
+
+- The five relationship pickers (Parents, Spouses/partners, Former partners, Siblings, Children) sat open between the name and the notes, so adding someone by name alone meant scrolling past all of them. They are now folded behind an outlined "Add relationships" button with the line "Optional. You can link parents, partners, siblings and children now or later." A person who already has relationships (Edit) opens with them shown; once the user toggles, their choice stands. Folded with connections it reads "3 connections added" and the button says "Show relationships". The pickers' selections are kept while folded and saved as before.
+- Labels in this form are 14px (were 12px), scoped to the person form because `.ft-field-label` is shared with the sign-in and story dialogs; the photo-area captions (11px gray-300) are 12px gray-500.
+- On a phone (600px and under) the pickers stack in one column instead of two.
+- `PersonFormRelationshipsFoldTests` (4 cases). `FakeMediumServiceForPersonForm.GetByPersonIdAsync` returns no photos instead of throwing, so Edit mode can render in a test. Not yet seen live (needs a deploy); the score moves only after it is deployed and viewed.
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
