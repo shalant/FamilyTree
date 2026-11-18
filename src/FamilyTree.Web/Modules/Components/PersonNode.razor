@@ -38,9 +38,11 @@
     @Person.FirstName
 </div>
 
-<div class="person-label person-label--year @(Person.IsDeceased ? "person-label--deceased" : "")"
+@* A person with no dates gets a quiet dash, not nothing: an empty label made the node look cut off,
+   and 12 of 30 people on the live tree had none (UX/UI review N2, 2026-11-18). *@
+<div class="person-label person-label--year @(Person.IsDeceased ? "person-label--deceased" : "") @(HasDates ? "" : "person-label--undated")"
      style="position:absolute; left:@(Left - (LabelWidth - Size) / 2)px; top:@(Top + Size + 22)px;">
-    @LifeSpan(Person)
+    @(HasDates ? LifeSpan(Person) : "—")
 </div>
 
 @* A person with no photo gets an invitation to add one (a family member asked for exactly this:
@@ -89,14 +91,9 @@
         return born is null ? $"d. {died}" : $"{born}–{died}";
     }
 
-    private string Tooltip
-    {
-        get
-        {
-            var span = LifeSpan(Person);
-            return string.IsNullOrEmpty(span) ? Person.FullName : $"{Person.FullName}, {span}";
-        }
-    }
+    private bool HasDates => !string.IsNullOrEmpty(LifeSpan(Person));
+
+    private string Tooltip => HasDates ? $"{Person.FullName}, {LifeSpan(Person)}" : $"{Person.FullName} (dates unknown)";
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
@@ -129,8 +126,9 @@
 
     // A person with no photo is a tinted disc, not a ghost: white at 45% on the pale green canvas was
     // nearly invisible beside photo circles, so a tree with a few gaps looked half-finished.
+    // Hovering a disc must not turn it paler than it is at rest (it went nearly white, N1).
     private string BgColor => (_hovered && !IsFocus)
-        ? "rgba(220, 245, 225, 0.65)"
+        ? (HasPhoto ? "rgba(220, 245, 225, 0.65)" : "var(--ft-green-300)")
         : IsFocus
             ? "rgba(214, 242, 224, 0.60)"
             : HasPhoto ? "rgba(255, 255, 255, 0.45)" : "var(--ft-green-200)";

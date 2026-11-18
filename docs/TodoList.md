@@ -71,6 +71,10 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
 - [x] Add person form 2026-11-17 (`fix/add-person-form`, UX/UI review F1): relationship pickers fold behind
       "Add relationships" (open when the person already has some), labels 14px, pickers stack on a phone.
       `PersonFormRelationshipsFoldTests`. Not yet seen live.
+- [x] Canvas follow-ups 2026-11-18 (`fix/canvas-hover-and-undated`, UX/UI review N1, N2): a no-photo disc deepens on
+      hover instead of washing out; people with no dates show a quiet dash and "dates unknown" in the tooltip.
+      Open idea: a Data check rule for "born over ~110 years ago with no death date" (someone who has died
+      with no death date looks living). Not yet seen live.
 - [ ] Medium/low items still open: inline-style drift between pages, login card exits and
       "Create an account" copy.
 

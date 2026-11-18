@@ -120,4 +120,47 @@ public class PersonNodeCanvasPolishTests : ComponentTestBase
         cut.Find(".person-node").TriggerEvent("onmouseleave", new MouseEventArgs());
         cut.FindAll(".person-add-photo").Should().BeEmpty();
     }
+
+    // UX/UI review N2 (2026-11-18): 12 of 30 people on the live tree had no birth date and an empty
+    // label, which made the node look cut off.
+    [Fact]
+    public void PersonWithNoDates_ShowsAQuietDash_AndSaysDatesUnknownInTheTooltip()
+    {
+        var cut = Render(Person(born: null));
+
+        cut.Find(".person-label--year").TextContent.Trim().Should().Be("—");
+        cut.Find(".person-label--year").ClassList.Should().Contain("person-label--undated");
+        cut.Find(".person-node").GetAttribute("title").Should().Be("Marc Rosenberg (dates unknown)");
+    }
+
+    [Fact]
+    public void PersonWithDates_HasNoUndatedStyling()
+    {
+        var cut = Render(Person(born: 1948));
+
+        cut.Find(".person-label--year").ClassList.Should().NotContain("person-label--undated");
+    }
+
+    // N1: hovering a no-photo disc used to turn it nearly white (the glass hover fill), paler than at rest.
+    [Fact]
+    public void HoveringANoPhotoDisc_DeepensItInsteadOfWashingItOut()
+    {
+        var cut = Render(Person());
+
+        cut.Find(".person-node").TriggerEvent("onmouseenter", new MouseEventArgs());
+
+        var style = cut.Find(".person-node").GetAttribute("style")!;
+        style.Should().Contain("background:var(--ft-green-300)");
+        style.Should().NotContain("rgba(220, 245, 225, 0.65)");
+    }
+
+    [Fact]
+    public void HoveringAPhotoNode_KeepsTheGlassHoverFill()
+    {
+        var cut = Render(Person(photo: "/media/a.jpg"));
+
+        cut.Find(".person-node").TriggerEvent("onmouseenter", new MouseEventArgs());
+
+        cut.Find(".person-node").GetAttribute("style").Should().Contain("rgba(220, 245, 225, 0.65)");
+    }
 }

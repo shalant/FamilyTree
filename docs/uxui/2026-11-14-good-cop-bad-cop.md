@@ -148,6 +148,12 @@ Seen by me on the live site (desktop, 1280px, light theme, signed in as the supe
 
 **Not checked:** the canvas, the add-photo badge on the focus person, and the folded form on a real phone; the Stories empty state live; a second family member's view. **Reviewer:** the same model that made the changes, so allow about 3 points either way; the +3 is mostly craft and legibility, which I could measure (font sizes, widths), not taste.
 
+### Addendum 2026-11-18: N1 and N2 (`fix/canvas-hover-and-undated`)
+
+- **N1:** hovering a node with no photo applied the glass hover fill (white-green at 65%), so the disc went from solid green to nearly white under the pointer. A no-photo disc now deepens to `--ft-green-300` on hover; photo nodes keep the glass fill.
+- **N2:** a person with no birth date and no death date had an empty label (12 of 30 on the live tree), which made the node look cut off. The label is now a quiet em dash in gray-400 and the tooltip reads "Name (dates unknown)". Not solvable in the renderer: someone who has died but has no death date recorded still looks living, because the app has no way to know. A Data check rule for "born long ago, no death date" is the place for that, if wanted.
+- Four more cases in `PersonNodeCanvasPolishTests`. Not yet seen live (needs a deploy).
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
