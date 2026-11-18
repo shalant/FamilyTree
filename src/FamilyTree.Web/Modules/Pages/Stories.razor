@@ -34,12 +34,17 @@
             }
         </MudStack>
 
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Success"
-                   StartIcon="@Icons.Material.Outlined.AddCircleOutline"
-                   OnClick="AddStory">
-            Add story
-        </MudButton>
+        @* With no stories the page's one action is in the empty card below; a second identical
+           button up here read as a duplicate (UX/UI review #8, 2026-11-17). *@
+        @if (_loading || _stories.Any())
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Outlined.AddCircleOutline"
+                       OnClick="AddStory">
+                Add story
+            </MudButton>
+        }
     </MudStack>
 
     @if (_loading)
@@ -48,22 +53,28 @@
     }
     else if (!_stories.Any())
     {
-        <MudPaper Elevation="2" Class="pa-6 mx-auto text-center"
-                  Style="max-width:420px; background:rgba(245,245,245,0.4);
-            backdrop-filter:blur(12px); border-radius:12px;">
-            <MudText Typo="Typo.h6" Style="font-style:italic; color:var(--ft-green-800);">
+        <div class="ft-stories-empty"
+             style="max-width:460px; margin:48px auto 0; padding:32px 28px; text-align:center;
+                    background:var(--ft-surface-card); border:0.5px solid var(--ft-line-border);
+                    border-radius:var(--ft-radius-card);">
+            <MudIcon Icon="@Icons.Material.Outlined.AutoStories"
+                     Style="font-size:40px; color:var(--ft-green-600);" />
+            <div style="font-size:20px; font-style:italic; font-family:var(--ft-font-display);
+                        color:var(--ft-green-800); margin:12px 0 6px;">
                 No stories yet
-            </MudText>
-            <MudText Typo="Typo.body2" Style="color:var(--ft-gray-500);">
-                Share a memory about a family member to start the collection.
-            </MudText>
+            </div>
+            <div style="font-size:15px; color:var(--ft-gray-600); line-height:1.6;">
+                A story can be a memory, a saying, or how two people met.
+                Start with someone you remember well.
+            </div>
             <MudButton Variant="Variant.Filled"
-                       StartIcon="@Icons.Material.Filled.AddCircleOutline"
-                       Style="background:var(--ft-green-600); color:#fff; margin-top:16px;"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Outlined.AddCircleOutline"
+                       Class="mt-5"
                        OnClick="AddStory">
-                Add story
+                Write the first story
             </MudButton>
-        </MudPaper>
+        </div>
     }
     else
     {

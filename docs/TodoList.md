@@ -56,8 +56,12 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       (provisional), bad cop 0 High / 6 Medium / 13 Low; D1 and D2 confirmed live.
 - [x] Re-scored 2026-11-15 after #100 and #101 deployed and the TimelineBest switch: good cop 78/100 (provisional),
       bad cop 0 High / 5 Medium / 12 Low. Evidence is Doug's look on desktop and a real phone, not mine.
-- [ ] Medium/low items still open: Stories empty-state double button and glass card, inline-style
-      drift between pages, login card exits and "Create an account" copy.
+- [x] Fixed 2026-11-17 (`fix/stories-empty-state`, UX/UI review #8): the Stories empty state had two
+      identical "Add story" buttons in a frosted-glass card. Now one action ("Write the first story") in
+      the same plain card style as the stories, with an icon and warmer copy; `StoriesPageTests`. Not yet
+      seen live (needs deploy).
+- [ ] Medium/low items still open: inline-style drift between pages, login card exits and
+      "Create an account" copy.
 
 ---
 

@@ -96,6 +96,10 @@ Same fixed weights. Build scored: live arborkin.com with `Layout__Engine=Timelin
 
 **Not checked:** the Admin at a laptop width near 1280px (the Stories table should scroll about 100px inside its panel), the Delete story confirmation on live data (covered by `AdminStoryEditDialogTests`, not clicked live on purpose), and everything listed as unviewed above. **Reviewer:** the same model that made the fixes; the one point is small enough to sit inside the plus or minus 3.
 
+### Addendum 2026-11-17: #8 Stories empty state fixed (`fix/stories-empty-state`)
+
+With no stories, /stories showed an "Add story" button in the header and an identical one in the empty card, inside a frosted-glass card (`backdrop-filter`), unlike every other card in the app. The header button now hides while the list is empty; the card is the app's plain card (`--ft-surface-card`, hairline border, `--ft-radius-card`) with a book icon, a Georgia italic heading, copy that says what a story can be ("a memory, a saying, or how two people met") and one button, "Write the first story". Pinned by `StoriesPageTests` (one add action when empty, header button returns once stories exist, no `backdrop-filter`). Not yet seen live; the score moves only after it is deployed and viewed.
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
