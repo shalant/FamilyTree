@@ -2511,3 +2511,6 @@ img.ft-photo { color: transparent; font-size: 0; }
     min-height: 44px;
 }
 .ft-page-footer a:hover { text-decoration: underline; }
+
+/* Sign-in card: the invitation note replaces a "Create an account" link that led to an error (#11). */
+.auth-invite-note { font-size: 14px; line-height: 1.5; margin-top: 18px; }

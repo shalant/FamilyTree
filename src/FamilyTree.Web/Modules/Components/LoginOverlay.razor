@@ -86,7 +86,7 @@
 
             <div class="ft-field-label">Password</div>
             <MudTextField @bind-Value="_password"
-                          Placeholder="••••••••••"
+                          Placeholder="Your password"
                           Variant="Variant.Outlined"
                           InputType="InputType.Password"
                           Margin="Margin.Dense"
@@ -103,9 +103,13 @@
             </MudButton>
         </form>
 
-        @* ── Register link ─────────────────────────────────────────────────── *@
-        <div class="auth-register-link">
-            New here? <a href="/register">Create an account</a>
+        @* ── New here ──────────────────────────────────────────────────────── *@
+        @* Registration is by invitation, so "Create an account" led anyone without an invite link to an
+           error (UX/UI review #11, 2026-11-18). The honest line says what to do instead. An invitation
+           email's link goes straight to /register. *@
+        <div class="auth-register-link auth-invite-note">
+            New to ArborKin? Joining is by invitation. Open the link in your invitation email, or ask the
+            family member who set up this tree to send you one.
         </div>
 
     </div>
