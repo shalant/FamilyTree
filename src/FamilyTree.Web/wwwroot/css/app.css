@@ -2476,3 +2476,38 @@ img.ft-photo { color: transparent; font-size: 0; }
     text-align: center;
     box-shadow: 0 0 0 1px var(--ft-green-600);
 }
+
+/* ── Page footer (UX/UI review #10, 2026-11-18) ────────────────────────────── */
+/* Ordinary pages fill the screen, so a short page ends with a footer at the bottom instead of
+   blank space, and a long page ends with it after the content. The tree (TreeLayout) and the
+   auth pages (AuthLayout) don't use MainLayout, so they don't get it. */
+.ft-main--page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    box-sizing: border-box;
+}
+.ft-page-body { flex: 1 0 auto; }
+.ft-page-footer {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 20px 24px;
+    margin-top: 32px;
+    border-top: 1px solid var(--ft-line-border);
+    font-size: 14px;
+    color: var(--ft-gray-500);
+}
+.ft-page-footer a {
+    color: var(--ft-green-700);
+    font-weight: 600;
+    text-decoration: none;
+    /* 44px tall tap target on a phone */
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+}
+.ft-page-footer a:hover { text-decoration: underline; }

@@ -75,6 +75,8 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       hover instead of washing out; people with no dates show a quiet dash and "dates unknown" in the tooltip.
       Open idea: a Data check rule for "born over ~110 years ago with no death date" (someone who has died
       with no death date looks living). Not yet seen live.
+- [x] Page footer 2026-11-18 (`fix/page-blank-space`, UX/UI review #10): pages on MainLayout end with "Back to the
+      family tree" and the ArborKin tagline, pinned to the bottom on a short page. `PageFooterTests`. Not yet seen live.
 - [ ] Medium/low items still open: inline-style drift between pages, login card exits and
       "Create an account" copy.
 

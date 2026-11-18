@@ -154,6 +154,11 @@ Seen by me on the live site (desktop, 1280px, light theme, signed in as the supe
 - **N2:** a person with no birth date and no death date had an empty label (12 of 30 on the live tree), which made the node look cut off. The label is now a quiet em dash in gray-400 and the tooltip reads "Name (dates unknown)". Not solvable in the renderer: someone who has died but has no death date recorded still looks living, because the app has no way to know. A Data check rule for "born long ago, no death date" is the place for that, if wanted.
 - Four more cases in `PersonNodeCanvasPolishTests`. Not yet seen live (needs a deploy).
 
+### Addendum 2026-11-18: #113 seen live, and #10 fixed (`fix/page-blank-space`)
+
+- **#113 live (desktop):** hovering a no-photo disc deepens it; the 15 of 30 people with no dates show a quiet dash and "(dates unknown)" in the tooltip. 15, not the 12 first counted: the live tree has more undated people than the first look found, so filling in dates is a data job for the family, not a rendering one.
+- **#10:** /people and /stories left the rest of the screen blank under short content, and the only way back to the tree was the icon row at the top. Every page on `MainLayout` (People, Stories, Admin, About, FAQ, the person forms) now ends with a quiet footer, "← Back to the family tree" and "ArborKin · your family's story", pinned to the bottom of the screen on a short page and after the content on a long one (`.ft-main--page` is a flex column with `min-height: 100dvh`; `PageFooter`). The back link is 44px tall for a thumb. The tree (`TreeLayout`) and the sign-in pages (`AuthLayout`) don't get it. Previewed on the live /people page by injecting the same markup and CSS: the document height equals the viewport, so no extra scroll appears. `PageFooterTests` (the link, and that only `MainLayout` renders it). Not yet seen live (needs a deploy).
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
