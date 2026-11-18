@@ -168,6 +168,25 @@ The look of the card is unchanged (Doug likes it, and the review had scored it c
 - **L1:** `TreeLayout` renders the app bar only inside an `AuthorizeView`, so signed out, the sign-in card sits alone on the green instead of over a blurred ghost of the logo, search and avatar. Signed-in users are unchanged.
 - `LoginCardTests` (3) and `TreePageAppBar*Tests` (signed out has no `#ft-appbar`, signed in does). Not yet seen live.
 
+### Good cop re-score, 2026-11-18 (after the #113 and #114 deploys): **84 / 100, provisional**
+
+Seen by me on the live site (desktop, 1280px, light theme, super-user): the tree (hover on a no-photo disc, undated labels), /stories (the empty state), /admin, and the tree again for the absence of the footer.
+
+| Area | Was | Now | Why it moved |
+|---|---|---|---|
+| Invite to first-tree flow | 17 | 17 | Unchanged. |
+| Tree canvas readability | 18 | 18 | N1 and N2 are fixed and live, but they were Low findings; the score already allowed for them. |
+| Identity and first impression | 12 | 12 | Unchanged. |
+| Mobile | 12 | 12 | Unchanged: none of this round was seen on a phone. |
+| Empty, error and loading states | 7 | **8** | The Stories empty state is live and seen: one clear card with an icon, a plain-language line and one button ("Write the first story"), no duplicate button, no glass. (It shows to the super-user because that account has no family, so no stories; a family member sees their stories.) |
+| Forms (Add/Edit person) | 8 | 8 | Unchanged. |
+| Craft and consistency | 8 | **9** | #10 is fixed and live: /stories and /admin end with the footer at the bottom of the screen (document height equals the viewport, so no extra scroll), a 44px "Back to the family tree" link, the tree has none. Costs that remain: inline-style drift (#9), mixed button colours. |
+| **Total** | 82 | **84** | 17 + 18 + 12 + 12 + 8 + 8 + 9 |
+
+**Bad cop, open now:** 0 High, **1 Medium** (#9 inline-style drift), **11 Low**. Fixed and live this round: #10, N1, N2.
+
+**Not checked:** anything on a phone (the footer, the add-photo badge, the folded form, the canvas); a family member's own view; the invite flow live. **Reviewer:** the same model that made the changes; the +2 is a legibility and consistency gain I could measure, so allow about 3 points either way. Further points now mostly need a real phone, real family data, or the #9 clean-up, not more small fixes.
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
@@ -206,6 +225,8 @@ New from the Admin and Add person pass (2026-11-15):
 | 2026-11-17 | bad cop | same | 0 High, 3 Medium, 17 Low open | A1 and A2 fixed and deployed; A5 to A8 and E1 counted as Low. |
 | 2026-11-18 | good cop | live arborkin.com after the #108 to #111 deploy, seen by me on desktop | 82 (provisional) | +1 tree canvas (readable text, solid placeholders, life spans), +1 forms (relationships folded, 14px labels), +1 craft (Admin tables, names). Stories empty state and anything on a phone not seen. |
 | 2026-11-18 | bad cop | same | 0 High, 2 Medium, 13 Low open | #8, A3, A5 to A8, F1 fixed and live; N1 (hover washes a no-photo disc) and N2 (undated people have no label) added. |
+| 2026-11-18 | good cop | live arborkin.com after the #113 and #114 deploys, seen by me on desktop | 84 (provisional) | +1 empty states (Stories empty state seen live), +1 craft (#10 footer live). |
+| 2026-11-18 | bad cop | same | 0 High, 1 Medium, 11 Low open | #10, N1 and N2 fixed and live; only #9 (inline-style drift) remains Medium. |
 
 ## Scope and method
 
