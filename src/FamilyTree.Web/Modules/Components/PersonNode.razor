@@ -3,13 +3,19 @@
 @* Rendered absolutely by FamilyTreeCanvas — receives pre-computed Left/Top/Size.
    RelativeDepth: 0 = focus person, +N = Nth-generation ancestor, -N = Nth-generation descendant. *@
 
-<div class="person-node @(IsFocus ? "person-node--focus" : "")"
+@* The title is the full name and dates: the label under the circle is the first name only, so two
+   relatives who share one (and anyone not sure who "Sarah" is) get the rest on hover. The circle is
+   also a keyboard-reachable button. *@
+<div class="person-node @(IsFocus ? "person-node--focus" : "") @(HasPhoto ? "" : "person-node--no-photo")"
      style="position:absolute; left:@(Left)px; top:@(Top)px; width:@(Size)px; height:@(Size)px;
     border:@BorderWidth solid @BorderColor; background:@BgColor;"
+     title="@Tooltip"
+     role="button" tabindex="0" aria-label="@Tooltip"
      @onclick="() => OnClick.InvokeAsync(Person)"
+     @onkeydown="OnKeyDown"
      @onmouseenter="OnMouseEnter"
      @onmouseleave="OnMouseLeave">
-    @if (!string.IsNullOrWhiteSpace(Person.ProfilePhotoUrl) && Person.ProfilePhotoUrl != _brokenPhotoUrl)
+    @if (HasPhoto)
     {
         @* A photo that fails to load falls back to the initials below, rather than the
            browser drawing the alt text inside the circle (2026-10-12). *@
@@ -32,10 +38,28 @@
     @Person.FirstName
 </div>
 
-<div class="person-label person-label--year"
-     style="position:absolute; left:@(Left - (LabelWidth - Size) / 2)px; top:@(Top + Size + 20)px;">
-    @Person.BirthDate?.Year
+<div class="person-label person-label--year @(Person.IsDeceased ? "person-label--deceased" : "")"
+     style="position:absolute; left:@(Left - (LabelWidth - Size) / 2)px; top:@(Top + Size + 22)px;">
+    @LifeSpan(Person)
 </div>
+
+@* A person with no photo gets an invitation to add one (a family member asked for exactly this:
+   "make primary photo easy"). It is a sibling of the circle, which clips its contents, and shows
+   on hover and on the focus person, so a phone, which has no hover, still sees one. *@
+@if (!HasPhoto && (IsFocus || _hovered || _badgeHovered))
+{
+    <a class="person-add-photo" href="/people/@Person.Id/media"
+       style="left:@(Left + Size - 22)px; top:@(Top + Size - 22)px;"
+       title="Add a photo of @Person.FirstName" aria-label="Add a photo of @Person.FirstName"
+       @onmouseenter="() => { _badgeHovered = true; }"
+       @onmouseleave="() => { _badgeHovered = false; }">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path fill="currentColor" d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/>
+            <path fill="currentColor" d="M9 3 7.2 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9Zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/>
+        </svg>
+        <span class="person-add-photo__plus">+</span>
+    </a>
+}
 
 @code {
     [Parameter, EditorRequired] public PersonDto Person { get; set; } = null!;
@@ -48,7 +72,36 @@
 
     private const int LabelWidth = 88;
     private bool _hovered;
+    private bool _badgeHovered;
     private string? _brokenPhotoUrl;
+
+    private bool HasPhoto =>
+        !string.IsNullOrWhiteSpace(Person.ProfilePhotoUrl) && Person.ProfilePhotoUrl != _brokenPhotoUrl;
+
+    /// <summary>"1948–2019" for someone who has died, "1978" for someone living, "d. 2019" when only
+    /// the death year is known. The tree used to show the birth year alone, so nothing on it said who
+    /// was still living (UX/UI review, canvas pass 2026-11-17).</summary>
+    public static string LifeSpan(PersonDto p)
+    {
+        var born = p.BirthDate?.Year;
+        var died = p.DeathDate?.Year;
+        if (died is null) return born?.ToString() ?? "";
+        return born is null ? $"d. {died}" : $"{born}–{died}";
+    }
+
+    private string Tooltip
+    {
+        get
+        {
+            var span = LifeSpan(Person);
+            return string.IsNullOrEmpty(span) ? Person.FullName : $"{Person.FullName}, {span}";
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or " ") await OnClick.InvokeAsync(Person);
+    }
 
     private string Initials =>
         $"{Person.FirstName?.FirstOrDefault()}{Person.LastName?.FirstOrDefault()}"
@@ -66,27 +119,27 @@
         ? "var(--ft-green-600)"
         : IsFocus
             ? "var(--ft-focus-border)"
+            : !HasPhoto
+                ? "var(--ft-green-400)"   // a tinted disc keeps a clear edge at every distance
             : Math.Abs(RelativeDepth) == 1   // parents / children
                 ? "var(--ft-leaf-mid)"
                 : Math.Abs(RelativeDepth) == 2   // grandparents / grandchildren
                     ? "var(--ft-gray-400)"
                     : "var(--ft-gray-100)";           // more distant
 
+    // A person with no photo is a tinted disc, not a ghost: white at 45% on the pale green canvas was
+    // nearly invisible beside photo circles, so a tree with a few gaps looked half-finished.
     private string BgColor => (_hovered && !IsFocus)
         ? "rgba(220, 245, 225, 0.65)"
         : IsFocus
             ? "rgba(214, 242, 224, 0.60)"
-            : "rgba(255, 255, 255, 0.45)";
+            : HasPhoto ? "rgba(255, 255, 255, 0.45)" : "var(--ft-green-200)";
 
     private string TextColor => (_hovered && !IsFocus)
         ? "var(--ft-green-800)"
         : IsFocus
             ? "var(--ft-focus-text)"
-            : Math.Abs(RelativeDepth) >= 3
-                ? "var(--ft-gray-400)"
-                : Math.Abs(RelativeDepth) == 2
-                    ? "var(--ft-gray-500)"
-                    : "var(--ft-gray-700)";
+            : "var(--ft-green-800)";
 
     private void OnMouseEnter() { _hovered = true; StateHasChanged(); }
     private void OnMouseLeave() { _hovered = false; StateHasChanged(); }

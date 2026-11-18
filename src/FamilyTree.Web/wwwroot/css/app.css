@@ -814,20 +814,20 @@ html body #blazor-error-ui .dismiss {
 .ft-band-label {
     position: absolute;
     left: 10px;
-    font-size: 10px;
-    font-weight: 500;
-    color: var(--ft-green-700);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ft-green-800);
     letter-spacing: 0.04em;
     font-family: var(--ft-font-body);
     pointer-events: none;
     white-space: nowrap;
-    opacity: 0.65;
+    opacity: 0.85;
     line-height: 1;
 }
 
 [data-theme="dark"] .ft-band-label {
     color: var(--ft-green-300);
-    opacity: 0.55;
+    opacity: 0.8;
 }
 
 .ft-band--grandparents {
@@ -943,7 +943,7 @@ html body #blazor-error-ui .dismiss {
 }
 
 .person-label--name {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--ft-text-primary);
     white-space: nowrap;
@@ -952,9 +952,12 @@ html body #blazor-error-ui .dismiss {
 }
 
 .person-label--year {
-    font-size: 10px;
-    color: var(--ft-text-muted);
+    font-size: 12px;
+    /* Was --ft-text-muted (gray-300): about 2:1 on the pale green canvas, which an older relative
+       cannot read. gray-500 is #495057 in light and #adb5bd in dark. */
+    color: var(--ft-gray-500);
     margin-top: 1px;
+    min-height: 14px;
 }
 /* ── Toolbar ───────────────────────────────────────────────────────────── */
 #toolbar-container {
@@ -1210,7 +1213,7 @@ html body #blazor-error-ui .dismiss {
 
 .facts-banner-text {
     flex: 1;
-    font-size: 12.5px;
+    font-size: 14px;
     color: var(--ft-green-800);
     font-family: var(--ft-font-body);
     white-space: nowrap;
@@ -2402,3 +2405,53 @@ img.ft-photo { color: transparent; font-size: 0; }
 
 .ft-tree-hint-btn:hover { background: var(--ft-green-50); }
 .ft-tree-hint-btn:focus-visible { outline: 2px solid var(--ft-green-600); outline-offset: 1px; }
+
+/* ── Canvas polish (2026-11-17) ────────────────────────────────────────────── */
+
+/* The parent-to-child spine (stem, bar, drops) is the structure of the tree, so it is a step
+   heavier than the couple arcs and sibling dots, which are annotations on it. */
+.ft-svg path.ft-line-parent-path {
+    stroke-width: 2px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* A person with no photo: strong initials on a solid green tint (set inline by PersonNode). */
+.person-node--no-photo > span {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    user-select: none;
+}
+
+/* "Add a photo" badge on a node with none. Sits outside the circle, which clips its contents. */
+.person-add-photo {
+    position: absolute;
+    z-index: 4;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--ft-green-600);
+    color: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    text-decoration: none;
+    transition: transform .15s ease;
+}
+.person-add-photo:hover { transform: scale(1.15); }
+.person-add-photo__plus {
+    position: absolute;
+    right: -3px;
+    top: -4px;
+    width: 12px;
+    height: 12px;
+    line-height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    color: var(--ft-green-700);
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    box-shadow: 0 0 0 1px var(--ft-green-600);
+}
