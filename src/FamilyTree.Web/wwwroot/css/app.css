@@ -951,6 +951,8 @@ html body #blazor-error-ui .dismiss {
     text-overflow: ellipsis;
 }
 
+.person-label--year.person-label--undated { color: var(--ft-gray-400); }
+
 .person-label--year {
     font-size: 12px;
     /* Was --ft-text-muted (gray-300): about 2:1 on the pale green canvas, which an older relative

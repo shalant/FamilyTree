@@ -129,6 +129,12 @@ Doug asked whether the main canvas is beautiful and can be improved. Looked at t
 - On a phone (600px and under) the pickers stack in one column instead of two.
 - `PersonFormRelationshipsFoldTests` (4 cases). `FakeMediumServiceForPersonForm.GetByPersonIdAsync` returns no photos instead of throwing, so Edit mode can render in a test. Not yet seen live (needs a deploy); the score moves only after it is deployed and viewed.
 
+### Addendum 2026-11-18: N1 and N2 (`fix/canvas-hover-and-undated`)
+
+- **N1:** hovering a node with no photo applied the glass hover fill (white-green at 65%), so the disc went from solid green to nearly white under the pointer. A no-photo disc now deepens to `--ft-green-300` on hover; photo nodes keep the glass fill.
+- **N2:** a person with no birth date and no death date had an empty label (12 of 30 on the live tree), which made the node look cut off. The label is now a quiet em dash in gray-400 and the tooltip reads "Name (dates unknown)". Not solvable in the renderer: someone who has died but has no death date recorded still looks living, because the app has no way to know. A Data check rule for "born long ago, no death date" is the place for that, if wanted.
+- Four more cases in `PersonNodeCanvasPolishTests`. Not yet seen live (needs a deploy).
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
