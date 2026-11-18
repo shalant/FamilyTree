@@ -109,6 +109,19 @@ With no stories, /stories showed an "Add story" button in the header and an iden
 - **A3:** the Users table's "Last login" column is removed. `AppUser.LastLoginAt` is never written anywhere (only read), so it showed a dash for everyone; a column that can't be filled looks broken. Recording it on sign-in is a separate, small change if Doug wants to see who has visited; a long-lived cookie means it would be the last sign-in, not the last visit.
 - Not yet seen live (needs a deploy). The score moves only after it is deployed and viewed.
 
+### Addendum 2026-11-17: the main canvas, seven changes (`feature/canvas-polish`)
+
+Doug asked whether the main canvas is beautiful and can be improved. Looked at the live tree on desktop (1280px). Verdict: calm and cohesive (green gradient, tan lines, Georgia italic title, photo nodes, focus ring), not yet beautiful. Changes, one branch so they stay coherent:
+
+- **UI 1, placeholders:** a person with no photo was white at 45% on a pale green canvas, nearly invisible beside photo circles. Now a solid `--ft-green-200` disc, `--ft-green-400` edge and `--ft-green-800` initials at every distance. (Previewed on the live page by injecting the CSS: the discs read as intentional.)
+- **UI 2, text contrast:** birth years were `--ft-text-muted` (gray-300, about 2:1 on the canvas) at 10px, names 11px, year-axis labels 10px at 65% opacity, the facts banner 12.5px. Now years 12px gray-500 (#495057 light, #adb5bd dark), names 13px, axis labels 12px semi-bold green-800, banner 14px.
+- **UI 3, toolbar over the tree:** not changed. The toolbar's position is the one Doug dragged it to and the app remembers (`ft-toolbar` in local storage); there is no default to move. A line passing behind a glass toolbar is what a draggable toolbar over a pannable canvas does. Left as a known trade-off.
+- **UI 4, line weight:** the parent-to-child spine (stem, bar, drops) is 2px with round caps; couple arcs, the former-marriage dash and sibling dots stay 1.5px, so the structure reads before the annotations.
+- **UX 1, living or not:** the year under a name is now "1948–2019" for someone who has died, "d. 2019" when only the death year is known, and just the birth year for the living. (A cross was rejected: the family is not all Christian.) The banner already said "26 of 30 are living"; now the tree shows who.
+- **UX 2, photo invitation:** a node with no photo shows a small camera-plus badge linking to that person's photo page, on hover and always on the focus person (a phone has no hover). A family member's feature request, "make primary photo easy", is the origin.
+- **UX 3, preview and keyboard:** every node has a tooltip with the full name and years (the label is the first name only, so two relatives called Sarah were indistinguishable), and is now a keyboard-reachable button (Tab, then Enter or Space) with an accessible name.
+- `PersonNodeCanvasPolishTests` (14 cases with the existing broken-photo tests). Not yet seen live (needs a deploy); the score moves only after it is deployed and viewed.
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
