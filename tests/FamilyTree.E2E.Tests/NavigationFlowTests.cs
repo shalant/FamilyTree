@@ -36,7 +36,7 @@ public class NavigationFlowTests(E2eAppFixture fixture) : E2eTestBase(fixture)
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
         await page.GetByPlaceholder("your@email.com").FillAsync(email);
-        await page.GetByPlaceholder("••••••••••").FillAsync(password);
+        await page.GetByPlaceholder("Your password").FillAsync(password);
 
         // LoginOverlay.razor's real <form method="post" action="/auth/do-login"> submits
         // hidden <input type="hidden" name="email"/"password"> fields, not the visible

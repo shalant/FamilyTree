@@ -53,7 +53,7 @@ public class MobileViewportTests(E2eAppFixture fixture) : E2eTestBase(fixture)
                     await loginPage.GotoAsync(Fixture.BaseUrl);
                     await loginPage.WaitForLoadStateAsync(LoadState.NetworkIdle);
                     await loginPage.GetByPlaceholder("your@email.com").FillAsync(email);
-                    await loginPage.GetByPlaceholder("••••••••••").FillAsync(password);
+                    await loginPage.GetByPlaceholder("Your password").FillAsync(password);
                     await Expect(loginPage.Locator("input[name='email']")).ToHaveValueAsync(email);
                     await Expect(loginPage.Locator("input[name='password']")).ToHaveValueAsync(password);
                     await loginPage.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();

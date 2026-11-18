@@ -30,7 +30,7 @@ public class ReturnUrlIsolatedTests(E2eAppFixture fixture) : E2eTestBase(fixture
         Assert.Contains("ReturnUrl=%2Fstories", page.Url);
 
         await page.GetByPlaceholder("your@email.com").FillAsync(email);
-        await page.GetByPlaceholder("••••••••••").FillAsync(password);
+        await page.GetByPlaceholder("Your password").FillAsync(password);
         await Expect(page.Locator("input[name='email']")).ToHaveValueAsync(email);
         await Expect(page.Locator("input[name='password']")).ToHaveValueAsync(password);
         await Expect(page.Locator("input[name='returnUrl']")).ToHaveValueAsync("/stories");

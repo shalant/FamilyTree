@@ -35,7 +35,14 @@
 <MudPopoverProvider />
 @* ToastContainer lives once at Routes.razor's root, not here — see the comment there. *@
 
-<CustomAppBar @bind-IsDark="_isDark" />
+@* Signed out, the tree page is only the sign-in card. The app bar (logo, search, avatar) used to show
+   as a blurred ghost behind it, the "am I already in?" signal AuthLayout exists to prevent
+   (UX/UI review L1, 2026-11-18). *@
+<AuthorizeView>
+    <Authorized>
+        <CustomAppBar @bind-IsDark="_isDark" />
+    </Authorized>
+</AuthorizeView>
 
 @Body
 

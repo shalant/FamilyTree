@@ -159,6 +159,15 @@ Seen by me on the live site (desktop, 1280px, light theme, signed in as the supe
 - **#113 live (desktop):** hovering a no-photo disc deepens it; the 15 of 30 people with no dates show a quiet dash and "(dates unknown)" in the tooltip. 15, not the 12 first counted: the live tree has more undated people than the first look found, so filling in dates is a data job for the family, not a rendering one.
 - **#10:** /people and /stories left the rest of the screen blank under short content, and the only way back to the tree was the icon row at the top. Every page on `MainLayout` (People, Stories, Admin, About, FAQ, the person forms) now ends with a quiet footer, "← Back to the family tree" and "ArborKin · your family's story", pinned to the bottom of the screen on a short page and after the content on a long one (`.ft-main--page` is a flex column with `min-height: 100dvh`; `PageFooter`). The back link is 44px tall for a thumb. The tree (`TreeLayout`) and the sign-in pages (`AuthLayout`) don't get it. Previewed on the live /people page by injecting the same markup and CSS: the document height equals the viewport, so no extra scroll appears. `PageFooterTests` (the link, and that only `MainLayout` renders it). Not yet seen live (needs a deploy).
 
+### Addendum 2026-11-18: the sign-in card, #11, #12 and L1 (`fix/login-card`)
+
+The look of the card is unchanged (Doug likes it, and the review had scored it clean). Three functional fixes:
+
+- **#11:** "New here? Create an account" is replaced by a plain note in the same place and size: "New to ArborKin? Joining is by invitation. Open the link in your invitation email, or ask the family member who set up this tree to send you one." Registration is invite-only in production, so the link sent anyone without an invitation to an error. An invitation email's link still goes straight to /register; Google sign-in and "Forgot password?" are unchanged, so the card has three exits, not five.
+- **#12:** the password placeholder is "Your password", not ten bullets that read as an already-filled field. Three E2E tests located the field by the bullet placeholder (`GetByPlaceholder`); updated.
+- **L1:** `TreeLayout` renders the app bar only inside an `AuthorizeView`, so signed out, the sign-in card sits alone on the green instead of over a blurred ghost of the logo, search and avatar. Signed-in users are unchanged.
+- `LoginCardTests` (3) and `TreePageAppBar*Tests` (signed out has no `#ft-appbar`, signed in does). Not yet seen live.
+
 ### Good cop re-score, 2026-11-18 (after the #113 and #114 deploys): **84 / 100, provisional**
 
 Seen by me on the live site (desktop, 1280px, light theme, super-user): the tree (hover on a no-photo disc, undated labels), /stories (the empty state), /admin, and the tree again for the absence of the footer.

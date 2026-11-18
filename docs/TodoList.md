@@ -77,8 +77,10 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       with no death date looks living). Not yet seen live.
 - [x] Page footer 2026-11-18 (`fix/page-blank-space`, UX/UI review #10): pages on MainLayout end with "Back to the
       family tree" and the ArborKin tagline, pinned to the bottom on a short page. `PageFooterTests`. Not yet seen live.
-- [ ] Medium/low items still open: inline-style drift between pages, login card exits and
-      "Create an account" copy.
+- [x] Sign-in card 2026-11-18 (`fix/login-card`, UX/UI review #11, #12, L1): "Create an account" replaced by an
+      invitation note (registration is invite-only), password placeholder in words, no ghost app bar behind the card
+      when signed out; three E2E locators updated. Not yet seen live.
+- [ ] Medium/low items still open: inline-style drift between pages.
 
 ---
 
