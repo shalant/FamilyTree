@@ -5,6 +5,7 @@
 @using FamilyTree.Web.Components
 @using FamilyTree.Web.Modules.Components
 @inject IAdminActivityService AdminActivityService
+@inject IAdminUserService AdminUserService
 @inject IDialogService DialogService
 
 @if (_loadingActivity)
@@ -30,9 +31,7 @@ else
         <RowTemplate>
             <MudTd>@context.Date.ToString("MMM d, yyyy")</MudTd>
             <MudTd>
-                <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
-                    @(context.UserId.HasValue ? context.UserId.Value.ToString()[..8] + "…" : "—")
-                </MudText>
+                <span title="@(context.UserId?.ToString())">@_names.Label(context.UserId)</span>
             </MudTd>
             <MudTd>@context.ActionCount</MudTd>
         </RowTemplate>
@@ -46,6 +45,7 @@ else
     private bool _loadingActivity = true;
     private List<UserActivity> _activity = [];
     private List<AuditLog> _auditLogs = [];
+    private AdminUserNames _names = AdminUserNames.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -62,6 +62,10 @@ else
             () => AdminActivityService.GetActivityAuditLogsAsync(null, DateOnly.FromDateTime(DateTime.Today)),
             "Loading audit logs") ?? [];
 
+        // A failed lookup leaves short ids, which is what this tab always showed.
+        var users = await AdminUserService.GetAllUsersAsync();
+        if (users.Success) _names = new AdminUserNames(users.Data!);
+
         _loadingActivity = false;
     }
 
@@ -71,9 +75,7 @@ else
             () => AdminActivityService.GetActivityAuditLogsAsync(activity.UserId, activity.Date),
             "Loading activity details") ?? [];
 
-        var who = activity.UserId.HasValue
-            ? activity.UserId.Value.ToString()[..8] + "…"
-            : "Unknown user";
+        var who = activity.UserId.HasValue ? _names.Label(activity.UserId) : "Unknown user";
 
         var parameters = new DialogParameters<ActivityDetailDialog>
         {

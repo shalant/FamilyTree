@@ -100,6 +100,15 @@ Same fixed weights. Build scored: live arborkin.com with `Layout__Engine=Timelin
 
 With no stories, /stories showed an "Add story" button in the header and an identical one in the empty card, inside a frosted-glass card (`backdrop-filter`), unlike every other card in the app. The header button now hides while the list is empty; the card is the app's plain card (`--ft-surface-card`, hairline border, `--ft-radius-card`) with a book icon, a Georgia italic heading, copy that says what a story can be ("a memory, a saying, or how two people met") and one button, "Write the first story". Pinned by `StoriesPageTests` (one add action when empty, header button returns once stories exist, no `backdrop-filter`). Not yet seen live; the score moves only after it is deployed and viewed.
 
+### Addendum 2026-11-17: Admin tables, A3 and A5 to A8 (`fix/admin-tables`)
+
+- **A8 (and the real cause of the ragged widths):** the panels area is a flex row and the active panel its only child, with no flex basis, so it shrank to its content (Activity's table 519px, Audit log 574, Deleted 721, Messages 787, Users 970 in a 1152px panel). The old CSS rule named `.mud-tabs-panel`, a class MudBlazor doesn't render. Now `.ft-admin-tabs .mud-tab-panel { flex: 1 1 100%; min-width: 0 }`. Checked by injecting it on the live page: every table is 1152px on all eight tabs, no scroll.
+- **A5:** Audit log and Activity show the user's display name (else email, else the short id), with the full id as a tooltip; `AdminUserNames` (`AdminUserNamesTests`). If the lookup fails they fall back to the short ids they always showed. The Activity detail dialog's title uses the name too.
+- **A6:** the Audit log's Action and Entity filters are both 180px wide (they were a max-width, so they sized to their contents).
+- **A7:** secondary text in Deleted, Messages and the Audit log's timestamp and id is 13px `--ft-gray-600` (`.ft-admin-secondary`), the message preview 12px `--ft-gray-500`; they were 11 to 12px in `--ft-gray-300` or `-400`.
+- **A3:** the Users table's "Last login" column is removed. `AppUser.LastLoginAt` is never written anywhere (only read), so it showed a dash for everyone; a column that can't be filled looks broken. Recording it on sign-in is a separate, small change if Doug wants to see who has visited; a long-lived cookie means it would be the last sign-in, not the last visit.
+- Not yet seen live (needs a deploy). The score moves only after it is deployed and viewed.
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:

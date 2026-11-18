@@ -170,7 +170,6 @@ else
                 <MudTh>Display name</MudTh>
                 <MudTh>Role</MudTh>
                 <MudTh>Linked person</MudTh>
-                <MudTh>Last login</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd>@context.Email</MudTd>
@@ -236,11 +235,6 @@ else
                             <MudSelectItem T="Guid?" Value="@((Guid?)p.Id)">@p.FullName</MudSelectItem>
                         }
                     </MudSelect>
-                </MudTd>
-                <MudTd>
-                    <MudText Typo="Typo.caption" Style="color:var(--ft-text-muted);">
-                        @(context.LastLoginAt?.ToString("MMM d, yyyy") ?? "—")
-                    </MudText>
                 </MudTd>
             </RowTemplate>
             <PagerContent>
