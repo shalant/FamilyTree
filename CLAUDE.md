@@ -196,7 +196,7 @@ depth, which would remove the fragile birth-year inference machinery entirely.
 | Component | Role |
 |-----------|------|
 | `FamilyTreeCanvas` | Calls `LayoutEngine.ComputeLayout()`, renders SVG connectors + nodes; emits `OnPersonSelected` |
-| `PersonNode` | Presentational circle node — initials, name, years. Purely presentational. A profile photo that fails to load (`@onerror`) falls back to the initials. |
+| `PersonNode` | Circle node — initials or photo, first name, life span ("1948–2019" if deceased, birth year if living); full-name tooltip, keyboard-reachable. A person with no photo is a solid green disc with an add-photo badge (hover, and always on the focus person) linking to `/people/{id}/media`. A profile photo that fails to load (`@onerror`) falls back to the initials. |
 | `PersonDetailDrawer` | Read-only side drawer; emits `OnEdit`, `OnDelete`, `OnFocusPerson`. A photo that fails to load shows the initials with a broken-image badge and "Photo couldn't be loaded" (2026-10-12) |
 | `PersonForm` | All form fields for add and edit; shared by `PersonAdd` and `PersonEdit` |
 | `Home.razor` | Orchestrator — owns all state, dialog invocation, focus, drag positions |
