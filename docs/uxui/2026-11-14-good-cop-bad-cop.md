@@ -129,6 +129,25 @@ Doug asked whether the main canvas is beautiful and can be improved. Looked at t
 - On a phone (600px and under) the pickers stack in one column instead of two.
 - `PersonFormRelationshipsFoldTests` (4 cases). `FakeMediumServiceForPersonForm.GetByPersonIdAsync` returns no photos instead of throwing, so Edit mode can render in a test. Not yet seen live (needs a deploy); the score moves only after it is deployed and viewed.
 
+### Good cop re-score, 2026-11-18 (after the #108 to #111 deploy): **82 / 100, provisional**
+
+Seen by me on the live site (desktop, 1280px, light theme, signed in as the super-user): the tree, hover on a node with no photo, all eight Admin tabs, the Audit log rows, and /people/add (nothing saved).
+
+| Area | Was | Now | Why it moved |
+|---|---|---|---|
+| Invite to first-tree flow | 17 | 17 | Unchanged. |
+| Tree canvas readability | 17 | **18** | Years, names and the year axis are readable; 23 of the 30 people have no photo and now read as solid green discs, not ghosts; life spans show who has died ("1902–1983", 4 on screen); the parent-child spine is heavier. Costs that remain: the third-son reorder, many people with no birth year show no label at all, the hover state washes a placeholder disc almost white, and I have not seen it on a phone. |
+| Identity and first impression | 12 | 12 | Unchanged. |
+| Mobile | 12 | 12 | Unchanged: nothing of this round was seen on a phone. |
+| Empty, error and loading states | 7 | 7 | The Stories empty state is fixed (one action, plain card), but live data has stories, so it is covered by a test and not seen. Moves when it is. |
+| Forms (Add/Edit person) | 7 | **8** | The relationship pickers are folded behind "Add relationships" (seen live: the form is now Identity, Photos, a one-line Relationships card, Notes), labels are 14px. Costs: photo upload and Edit with real data still not exercised. |
+| Craft and consistency | 7 | **8** | Admin tables fill the panel on every tab with names, not ids, and readable text; the empty "Last login" column is gone; form labels and captions are readable. Costs: inline-style drift (#9), mixed button colours, blank space under short pages (#10). |
+| **Total** | 79 | **82** | 17 + 18 + 12 + 12 + 7 + 8 + 8 |
+
+**Bad cop, open now:** 0 High, **2 Medium** (#9 inline-style drift, #10 blank space under short pages), **13 Low**. Fixed and live: #8, A3, A5, A6, A7, A8, F1. New Low findings from this look: **N1**, hovering a node with no photo turns its disc nearly white (the old hover fill), lighter than at rest; **N2**, people with no birth date show no label under the name, and someone who has died with no death date looks living.
+
+**Not checked:** the canvas, the add-photo badge on the focus person, and the folded form on a real phone; the Stories empty state live; a second family member's view. **Reviewer:** the same model that made the changes, so allow about 3 points either way; the +3 is mostly craft and legibility, which I could measure (font sizes, widths), not taste.
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
@@ -165,6 +184,8 @@ New from the Admin and Add person pass (2026-11-15):
 | 2026-11-15 | bad cop | same | 0 High, 5 Medium, 12 Low open | P7, P8 and P9 fixed and deployed. |
 | 2026-11-17 | good cop | live arborkin.com after the #105 and #106 deploys, seen by me at 1536px | 79 (provisional) | +1 craft (A1 and A2 fixed, seen live). |
 | 2026-11-17 | bad cop | same | 0 High, 3 Medium, 17 Low open | A1 and A2 fixed and deployed; A5 to A8 and E1 counted as Low. |
+| 2026-11-18 | good cop | live arborkin.com after the #108 to #111 deploy, seen by me on desktop | 82 (provisional) | +1 tree canvas (readable text, solid placeholders, life spans), +1 forms (relationships folded, 14px labels), +1 craft (Admin tables, names). Stories empty state and anything on a phone not seen. |
+| 2026-11-18 | bad cop | same | 0 High, 2 Medium, 13 Low open | #8, A3, A5 to A8, F1 fixed and live; N1 (hover washes a no-photo disc) and N2 (undated people have no label) added. |
 
 ## Scope and method
 
