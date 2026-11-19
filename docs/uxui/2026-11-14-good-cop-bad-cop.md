@@ -387,3 +387,7 @@ Live arborkin.com, desktop 1626px, light theme, signed in as the super-user, rea
 - **A1 and A2 confirmed live.** Dates, names and "Submitted by" stay on one line and the red trash icons are gone from the rows.
 - **Side effect, found by looking.** With the page container still at 1100px, the one-line Stories table is 1124px wide against an 852px panel, so Status and the action icons sat off to the right behind a scrollbar. A fix that hides the approve button isn't one.
 - **Fix (`fix/admin-width`).** The Admin container is now 1400px wide, so every tab keeps one panel width (1152px at a 1626px screen, measured live by injecting the change) and Stories and Users fit without scrolling. On a screen narrower than the table, the panel still scrolls inside itself. Not checked: a laptop-width screen (1280px), where Stories will scroll by about 100px.
+
+### Addendum 2026-11-19: page titles, #13 to #15 (`fix/page-headers`)
+
+Browser tabs and history read "Stories", "People", "Admin", "Create account — Arborkin" and "Not found", with and without the product name, and one misspelled it. Every page title now ends "— ArborKin" (the tree's own title stays "ArborKin"). `PageTitleTests` scans every `.razor` file and fails on a title without it; it failed on the old titles and passes now. Not yet seen live.
