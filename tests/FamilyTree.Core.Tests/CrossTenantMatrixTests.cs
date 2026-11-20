@@ -53,6 +53,7 @@ public class CrossTenantMatrixTests
         public Guid StoryInviteB;
         public string StoryInviteBToken = "";
         public Guid UserInviteB, ResetRequestB, AuditB;
+        public Guid MessageB = Guid.NewGuid();
 
         public FakeCurrentUserService As(Caller c) => c switch
         {
@@ -203,6 +204,9 @@ public class CrossTenantMatrixTests
 
     private static AdminUserService AdminUserSvc(World w, ICurrentUserService u) =>
         new(w.Db, NullLogger<AdminUserService>.Instance, u);
+
+    private static UserMessageService MessageSvc(World w, ICurrentUserService u) =>
+        new(w.Db, new RecordingEmailSender(), u, new ConfigurationBuilder().Build(), NullLogger<UserMessageService>.Instance);
 
     private static AdminAuditService AdminAuditSvc(World w, ICurrentUserService u) =>
         new(w.Db, NullLogger<AdminAuditService>.Instance, u);
@@ -866,6 +870,27 @@ public class CrossTenantMatrixTests
     {
         var w = await SeedAsync();
         (await AdminAuditSvc(w, w.As(Caller.AdminA)).GetAllAuditLogsAsync()).Data.Should().BeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task Messages_DenyFamilyAdmin_AndSuperUserReadsThem()
+    {
+        var w = await SeedAsync();
+        await using (var ctx = w.Db.CreateDbContext())
+        {
+            ctx.UserMessages.Add(new UserMessage { Id = w.MessageB, Type = "ContactAdmin", UserId = w.UserB, Title = "From B", CreatedAt = DateTime.UtcNow });
+            await ctx.SaveChangesAsync();
+        }
+        var admin = MessageSvc(w, w.As(Caller.AdminA));
+        var denied = await admin.GetAllAsync();
+        denied.Success.Should().BeFalse();
+        denied.Data.Should().BeNullOrEmpty();
+        await admin.MarkReadAsync(w.MessageB);
+
+        var owner = MessageSvc(w, w.SuperUser);
+        (await owner.GetAllAsync()).Data!.Single(m => m.Id == w.MessageB).ReadAt.Should().BeNull("a refused MarkRead changed nothing");
+        await owner.MarkReadAsync(w.MessageB);
+        (await owner.GetAllAsync()).Data!.Single(m => m.Id == w.MessageB).ReadAt.Should().NotBeNull();
     }
 
     [Fact]

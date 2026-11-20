@@ -66,8 +66,15 @@ public class UserMessageService(
         }
     }
 
+    // Every family writes to one inbox, the site owner's, so reading it is owner-only: a family
+    // Admin would otherwise see every other family's requests and contact messages.
+    public const string OwnerOnly = "Only the site owner can read messages.";
+
     public async Task<ServiceResponse<List<UserMessage>>> GetAllAsync()
     {
+        if (!currentUser.IsSuperUser)
+            return ServiceResponse<List<UserMessage>>.Fail(OwnerOnly);
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync();
@@ -85,6 +92,8 @@ public class UserMessageService(
 
     public async Task MarkReadAsync(Guid id)
     {
+        if (!currentUser.IsSuperUser) return;
+
         try
         {
             await using var ctx = await dbFactory.CreateDbContextAsync();
