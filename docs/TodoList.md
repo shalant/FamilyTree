@@ -896,10 +896,13 @@ PR #43).
       plain Open-mode signup still land in the oldest family (documented as a
       single-family assumption). Needs a family picker or per-family invites before a
       second family uses Open mode.
-- [ ] **Unscoped admin tabs outside the review's scope:** Messages
-      (`UserMessageService.GetAllAsync`, every family's feature requests/contact messages)
-      and the Admin Dashboard stats (`DashboardService`, global counts) are visible to
-      every family Admin. Decide: SuperUser-only, or scope by family.
+- [ ] **Unscoped admin tabs outside the review's scope:** ~~Messages~~ (fixed 2026-11-19,
+      `fix/messages-scope`: `UserMessageService.GetAllAsync`/`MarkReadAsync` refuse anyone but
+      the super-user and the tab is hidden for family Admins, since every family writes to
+      the owner's one inbox; `CrossTenantMatrixTests.Messages_DenyFamilyAdmin_AndSuperUserReadsThem`
+      fails against the old service; not yet seen live). Still open: the Admin Dashboard
+      stats (`DashboardService`, global counts) are visible to every family Admin. Decide:
+      SuperUser-only, or scope by family.
 - [ ] **S9 lows:** ~~`Auth:RegistrationMode` fails open when missing or mis-cased~~
       (fixed 2026-10-25, A4); story-invite `IsUsed` check-then-set race (double submit makes two stories);
       CR/LF in names/places injects GEDCOM records; null MIME type skips the upload

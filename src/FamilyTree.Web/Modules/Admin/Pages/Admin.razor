@@ -69,14 +69,15 @@
             <MudTabPanel Text="Activity" Icon="@Icons.Material.Outlined.BarChart">
                 <ActivityTab />
             </MudTabPanel>
+
+            @* Messages: every family writes to the owner's one inbox (UserMessageService). *@
+            <MudTabPanel Text="Messages" Icon="@Icons.Material.Outlined.MailOutline">
+                <MessagesTab />
+            </MudTabPanel>
         }
 
         <MudTabPanel Text="Stories" Icon="@Icons.Material.Outlined.AutoStories">
             <StoriesTab />
-        </MudTabPanel>
-
-        <MudTabPanel Text="Messages" Icon="@Icons.Material.Outlined.MailOutline">
-            <MessagesTab />
         </MudTabPanel>
 
     </MudTabs>
