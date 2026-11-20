@@ -209,6 +209,21 @@ New from the Admin and Add person pass (2026-11-15):
 - **Keep:** the Data check tab explains itself ("Nothing is changed for you: open a person to check and fix them") and offers a Check link per person; the Dashboard is calmer now that only the working export shows.
 - **Verified live:** after the deploy the Dashboard "Generations" tile reads 6 (it read 3), and the FAQ is the rewritten one.
 
+### Good cop re-score, 2026-11-19 (after the #116 and #117 deploys): **85 / 100, provisional**
+
+Seen by me on the live site (desktop, signed in as the super-user): page titles on /about, /dashboard, /people and /stories all end "— ArborKin"; the signed-in app bar and tree are unchanged. Not seen: the signed-out sign-in card (invitation note, "Your password" placeholder, no ghost app bar), because the browser available to me is signed in; and anything on a phone.
+
+| Area | Was | Now | Why it moved |
+|---|---|---|---|
+| Invite to first-tree flow | 17 | 17 | Unchanged. |
+| Tree canvas readability | 18 | 18 | Unchanged. |
+| Identity and first impression | 12 | 12 | The card fixes are likely worth a point once seen. |
+| Mobile | 12 | 12 | Unchanged: nothing from the last rounds seen on a phone. |
+| Empty, error and loading states | 8 | 8 | Unchanged. |
+| Forms (Add/Edit person) | 8 | 8 | Unchanged. |
+| Craft and consistency | 9 | **10** | Page titles are uniform and correctly spelled, live. |
+| **Total** | 84 | **85** | 17 + 18 + 12 + 12 + 8 + 8 + 10 |
+
 ### Score log
 
 | Date | Lens | Build scored | Score | What changed or cost points |
@@ -227,6 +242,8 @@ New from the Admin and Add person pass (2026-11-15):
 | 2026-11-18 | bad cop | same | 0 High, 2 Medium, 13 Low open | #8, A3, A5 to A8, F1 fixed and live; N1 (hover washes a no-photo disc) and N2 (undated people have no label) added. |
 | 2026-11-18 | good cop | live arborkin.com after the #113 and #114 deploys, seen by me on desktop | 84 (provisional) | +1 empty states (Stories empty state seen live), +1 craft (#10 footer live). |
 | 2026-11-18 | bad cop | same | 0 High, 1 Medium, 11 Low open | #10, N1 and N2 fixed and live; only #9 (inline-style drift) remains Medium. |
+| 2026-11-19 | good cop | live arborkin.com after the #116 and #117 deploys, seen by me on desktop (signed in) | 85 (provisional) | +1 craft (every page title ends "ArborKin", seen live on /about, /dashboard, /people, /stories). Identity stays 12: the signed-out sign-in card changes are not yet seen live. |
+| 2026-11-19 | bad cop | same | 0 High, 1 Medium, 8 Low open (+3 fixed, awaiting a live look) | #13 to #15 fixed and live; #11, #12 and L1 merged and deployed but unseen. |
 
 ## Scope and method
 
