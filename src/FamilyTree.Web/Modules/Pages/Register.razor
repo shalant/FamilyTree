@@ -208,12 +208,12 @@
                     </div>
 
                     <p style="font-size:14px; color:var(--ft-text-muted); margin-bottom:24px; line-height:1.6;">
-                        Welcome, @_firstName — your ArborKin account is ready. Let's link you to your family tree.
+                        Welcome, @_firstName — your ArborKin account is ready. @(_invitedPersonLinked ? "Your family tree is ready." : "Let's link you to your family tree.")
                     </p>
 
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
                                OnClick="ShowLinkModal">
-                        Link to your tree →
+                        @(_invitedPersonLinked ? "Open your tree →" : "Link to your tree →")
                     </MudButton>
                 </div>
             }
@@ -267,6 +267,7 @@
     private Guid? _inviteId; // saved from query param before URL strip
     private string _mode = "Open";
     private UserInvite? _invite;
+    private bool _invitedPersonLinked;
     private bool _checkingInvite;
 
     private string _firstName = "";
@@ -373,6 +374,14 @@
         {
             _registeredUserId = result.Data;
             _registered = true;
+
+            // Linked at sign-up only if the person was still free; if not, the ordinary
+            // "Who are you?" step runs.
+            if (_invite?.PersonId is { } invited)
+            {
+                var linked = await AuthService.GetLinkedPersonIdsAsync([invited]);
+                _invitedPersonLinked = linked is { Success: true, Data: not null } && linked.Data.Contains(invited);
+            }
         }
     }
 
@@ -380,6 +389,15 @@
     {
         if (!_registeredUserId.HasValue)
             return;
+
+        // The invite named this person (Admin > Users, "Who is this?") and sign-up linked the
+        // account to them: nothing to ask, go straight to their tree.
+        if (_invitedPersonLinked && _invite?.PersonId is { } invitedPersonId)
+        {
+            await AuthService.SaveFocusPersonAsync(_registeredUserId.Value, invitedPersonId);
+            await JS.InvokeVoidAsync("ftSubmitFormById", "ft-auto-login-form");
+            return;
+        }
 
         var parameters = new DialogParameters<LinkToTreeModal>
         {

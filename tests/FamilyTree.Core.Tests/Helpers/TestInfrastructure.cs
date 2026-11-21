@@ -112,7 +112,7 @@ internal sealed class FakeAuthService : IAuthService
 
     public Guid? LastInviteFamilyId { get; private set; }
 
-    public Task<ServiceResponse<Guid>> CreateInviteAsync(string email)
+    public Task<ServiceResponse<Guid>> CreateInviteAsync(string email, Guid? personId = null)
         => throw new InvalidOperationException("Story responses must use CreateInviteForStoryResponseAsync (CreateInviteAsync is SuperUser-only).");
 
     public Task<ServiceResponse> SendInviteEmailAsync(Guid inviteId, string baseUrl)

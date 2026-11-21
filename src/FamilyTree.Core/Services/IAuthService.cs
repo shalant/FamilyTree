@@ -20,8 +20,13 @@ public interface IAuthService
     /// </summary>
     Task<ServiceResponse<Guid>> RegisterExternalAsync(string email, string firstName, string lastName, bool emailVerified);
 
-    /// <summary>SuperUser-only admin invite (Admin › Users).</summary>
-    Task<ServiceResponse<Guid>>                  CreateInviteAsync(string email);
+    /// <summary>
+    /// SuperUser-only admin invite (Admin › Users). With <paramref name="personId"/> the invite is
+    /// for that person on the tree (in their family): signing up links the new account to them
+    /// and skips the "Who are you?" step. The person must exist and have no account or open
+    /// invite already.
+    /// </summary>
+    Task<ServiceResponse<Guid>>                  CreateInviteAsync(string email, Guid? personId = null);
 
     /// <summary>
     /// SuperUser-only: emails an open admin invite's register link to the address it was

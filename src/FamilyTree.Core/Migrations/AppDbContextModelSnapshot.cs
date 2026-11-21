@@ -706,6 +706,9 @@ namespace FamilyTree.Core.Migrations
                     b.Property<Guid>("FamilyId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("PersonId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("RoleToGrant")
                         .IsRequired()
                         .HasMaxLength(20)

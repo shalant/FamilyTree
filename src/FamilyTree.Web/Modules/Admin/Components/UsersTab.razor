@@ -40,6 +40,24 @@
                 Send invite
             </MudButton>
         </div>
+
+        <div style="font-size:12px; color:var(--ft-text-muted); margin:12px 0 6px;">
+            Who is this? (optional)
+        </div>
+        <MudSelect T="Guid?" @bind-Value="_invitePersonId"
+                   Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Placeholder="Not someone on the tree yet"
+                   Disabled="_creatingInvite">
+            <MudSelectItem T="Guid?" Value="@((Guid?)null)">Not someone on the tree yet</MudSelectItem>
+            @foreach (var p in InvitablePeople)
+            {
+                <MudSelectItem T="Guid?" Value="@((Guid?)p.Id)">@p.FullName@(p.BirthDate.HasValue ? $" (b. {p.BirthDate.Value.Year})" : "")</MudSelectItem>
+            }
+        </MudSelect>
+        <div style="font-size:12px; color:var(--ft-text-muted); margin-top:4px;">
+            Pick them and signing up links their account to that person, so they skip the
+            "Who are you?" question. People who already have an account aren't listed.
+        </div>
     </div>
 
     @if (_inviteError is not null)
@@ -253,6 +271,17 @@ else
     private List<AdminPasswordResetDto> _pendingResets = [];
 
     private string _inviteEmail = "";
+    private Guid? _invitePersonId;
+
+    // People nobody has claimed: the only ones an invite can be for.
+    private IEnumerable<PersonDto> InvitablePeople
+    {
+        get
+        {
+            var claimed = _personLinks.Values.Where(v => v.HasValue).Select(v => v!.Value).ToHashSet();
+            return _people.Where(p => !claimed.Contains(p.Id)).OrderBy(p => p.FullName);
+        }
+    }
     private string? _inviteLink;
     private string? _inviteError;
     // The address the current link was made for (_inviteEmail is cleared once it's created),
@@ -387,7 +416,7 @@ else
         _inviteEmailed = false;
         _creatingInvite = true;
 
-        var result = await AuthService.CreateInviteAsync(_inviteEmail.Trim());
+        var result = await AuthService.CreateInviteAsync(_inviteEmail.Trim(), _invitePersonId);
 
         if (!result.Success)
         {
@@ -400,6 +429,7 @@ else
         _inviteLink = $"{baseUri}/register?invite={result.Data}";
         _invitedEmail = _inviteEmail.Trim();
         _inviteEmail = "";
+        _invitePersonId = null;
 
         // The invite is valid whether or not the email goes out; the link stays on screen
         // as the fallback.

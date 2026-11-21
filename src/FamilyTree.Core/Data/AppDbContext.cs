@@ -185,6 +185,10 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithMany(u => u.SentInvites)
                 .HasForeignKey(i => i.CreatedBy)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // PersonId is a plain column, not a foreign key: SQL Server refuses a SET NULL key
+            // here (Family reaches both UserInvites and People by cascade), and every use
+            // re-checks the person still exists.
         });
 
         // ── AUDIT LOG ─────────────────────────────────────────────────────────

@@ -101,7 +101,7 @@ class FakeAuthService : IAuthService
     public ServiceResponse? SendInviteEmailResult { get; set; }
     public List<(Guid InviteId, string BaseUrl)> EmailedInvites { get; } = [];
 
-    public Task<ServiceResponse<Guid>> CreateInviteAsync(string email)
+    public Task<ServiceResponse<Guid>> CreateInviteAsync(string email, Guid? personId = null)
         => CreatedInviteId is { } id
             ? Task.FromResult(ServiceResponse<Guid>.Ok(id))
             : throw new NotImplementedException();
