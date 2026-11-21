@@ -11,6 +11,13 @@ public class UserInvite
     public DateTime? AcceptedAt { get; set; }
     public DateTime? CancelledAt { get; set; }
     public Guid? CreatedBy { get; set; }
+
+    /// <summary>
+    /// The person on the tree this invite is for (Admin > Users, "Who is this?"). When set, the
+    /// account made from the invite is linked to them at sign-up and the "Who are you?" step is
+    /// skipped. Null for story invites and for an invite sent without naming anyone.
+    /// </summary>
+    public Guid? PersonId { get; set; }
     public DateTime CreatedAt { get; set; }
 
     public virtual Family Family { get; set; } = null!;

@@ -14,8 +14,14 @@ Found by Doug walking the story-invite flow on a real phone, 2026-11-19.
 - [ ] Still open from that walkthrough: the photo drop zone says "Click to browse" on a touch
       device; the generation year label overlaps names at the left edge of the phone tree; the
       email button's arrow wraps onto its own line.
-- [ ] Planned next, own branch: an optional "who is this?" person on an Admin > Users invite, so
-      sign-up links the account automatically and skips the question.
+- [x] Added an optional "Who is this?" person to an Admin > Users invite (2026-11-20,
+      `UserInvite.PersonId`, migration `InviteForPerson`: one nullable column, no foreign key,
+      because SQL Server refuses a SET NULL key here). The invite joins the person's family; signing
+      up (email or Google) links the new account to them and the sign-up page skips "Who are you?"
+      (`InviteForPersonTests`). It refuses a person who already has an account or an open invite,
+      and a claim that went stale is skipped, never stolen: the account just gets the ordinary
+      question. Story invites are unchanged. Not yet seen live: send one to a +alias address and walk
+      it before using it for real family.
 
 ## People page order (2026-11-20)
 

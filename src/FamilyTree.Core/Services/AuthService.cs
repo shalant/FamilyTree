@@ -119,6 +119,8 @@ public class AuthService(
                 await ctx.SaveChangesAsync();
             }
 
+            await LinkInvitedPersonAsync(user, matchedInvite);
+
             return ServiceResponse<Guid>.Ok(user.Id);
         }
         catch (Exception ex)
@@ -179,12 +181,40 @@ public class AuthService(
             });
             await ctx.SaveChangesAsync();
 
+            await LinkInvitedPersonAsync(user, invite);
+
             return ServiceResponse<Guid>.Ok(user.Id);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "RegisterExternalAsync failed for email {Email}", email);
             return ServiceResponse<Guid>.Fail("Registration failed. Please try again.");
+        }
+    }
+
+    // Links a new account to the person its invite named. Best-effort and safe to skip: the
+    // person must still be on the tree, in the invite's family, and held by no other account;
+    // otherwise the account is left unlinked and the sign-up shows the ordinary "Who are you?"
+    // step, so a stale invite can never fail a registration or take over someone else's record.
+    private async Task LinkInvitedPersonAsync(AppUser user, UserInvite? invite)
+    {
+        if (invite?.PersonId is not { } personId) return;
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync();
+            var free = await ctx.People.AnyAsync(p => p.Id == personId && p.FamilyId == invite.FamilyId)
+                && !await ctx.Users.AnyAsync(u => u.PersonId == personId);
+            if (!free) return;
+
+            user.PersonId = personId;
+            var updated = await userManager.UpdateAsync(user);
+            if (!updated.Succeeded)
+                logger.LogWarning("Could not link new account {UserId} to invited person {PersonId}: {Error}",
+                    user.Id, personId, updated.Errors.FirstOrDefault()?.Description);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not link new account {UserId} to invited person {PersonId}", user.Id, personId);
         }
     }
 
@@ -240,10 +270,10 @@ public class AuthService(
         }
     }
 
-    public async Task<ServiceResponse<Guid>> CreateInviteAsync(string email)
+    public async Task<ServiceResponse<Guid>> CreateInviteAsync(string email, Guid? personId = null)
     {
         if (!currentUser.IsSuperUser) return ServiceResponse<Guid>.Fail(SuperUserOnly);
-        return await CreateInviteCoreAsync(email, familyId: null);
+        return await CreateInviteCoreAsync(email, familyId: null, personId: personId);
     }
 
     public async Task<ServiceResponse> SendInviteEmailAsync(Guid inviteId, string baseUrl)
@@ -297,13 +327,32 @@ public class AuthService(
     public Task<ServiceResponse<Guid>> CreateInviteForStoryResponseAsync(string email, Guid? familyId) =>
         CreateInviteCoreAsync(email, familyId, reuseOpenInvite: true);
 
-    private async Task<ServiceResponse<Guid>> CreateInviteCoreAsync(string email, Guid? familyId, bool reuseOpenInvite = false)
+    private async Task<ServiceResponse<Guid>> CreateInviteCoreAsync(
+        string email, Guid? familyId, bool reuseOpenInvite = false, Guid? personId = null)
     {
         try
         {
             var ttlDays = config.GetValue("Auth:InviteTtlDays", 7);
 
             await using var ctx = await dbFactory.CreateDbContextAsync();
+
+            // An invite for a named person joins their family and claims only a person nobody
+            // else holds: one with an account, or with another open invite, would make the
+            // second sign-up either steal the link or silently fail to get it.
+            if (personId.HasValue)
+            {
+                var person = await ctx.People.FirstOrDefaultAsync(p => p.Id == personId.Value);
+                if (person == null || person.FamilyId == null)
+                    return ServiceResponse<Guid>.Fail("That person is not on the tree.");
+                if (await ctx.Users.AnyAsync(u => u.PersonId == personId.Value))
+                    return ServiceResponse<Guid>.Fail(
+                        $"{person.FirstName} {person.LastName} already has an account.");
+                if (await ctx.UserInvites.AnyAsync(i => i.PersonId == personId.Value
+                        && i.AcceptedAt == null && i.CancelledAt == null && i.ExpiresAt > DateTime.UtcNow))
+                    return ServiceResponse<Guid>.Fail(
+                        $"{person.FirstName} {person.LastName} already has an open invite. Cancel it first to send another.");
+                familyId = person.FamilyId;
+            }
 
             var existing = await ctx.UserInvites.FirstOrDefaultAsync(i =>
                 i.Email.ToLower() == email.ToLower()
@@ -329,6 +378,7 @@ public class AuthService(
                 Email       = email.Trim().ToLower(),
                 FamilyId    = inviteFamilyId,
                 RoleToGrant = "Member",
+                PersonId    = personId,
                 Token       = token,
                 ExpiresAt   = DateTime.UtcNow.AddDays(ttlDays),
                 CreatedAt   = DateTime.UtcNow,
