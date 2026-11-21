@@ -123,9 +123,12 @@
                     }
                     else if (_stage == Stage.PickUserPerson)
                     {
+                        @* Only people nobody has claimed yet: an already-linked person is someone
+                           else's account, and offering them let a newcomer pick a relative who is
+                           already signed up. *@
                         <MudSelect T="Guid?" Placeholder="Select a person…" Variant="Variant.Outlined"
                                    @bind-Value="_selectedPerson" Dense="true">
-                            @foreach (var p in _treePersons.OrderBy(x => x.FullName))
+                            @foreach (var p in _treePersons.Where(x => !_linkedPersonIds.Contains(x.Id)).OrderBy(x => x.FullName))
                             {
                                 <MudSelectItem Value="@((Guid?)p.Id)">@p.FullName</MudSelectItem>
                             }
@@ -223,6 +226,7 @@
 
     private Stage _stage;
     private List<PersonDto> _treePersons = [];
+    private HashSet<Guid> _linkedPersonIds = [];   // people who already have an account
     private bool _loading = true;
     private bool _complete = false;
     private string _completeMessage = "";
@@ -301,6 +305,11 @@
         _treePersons = await TryAsync(
             () => PersonService.GetAllForUserAsync(UserId),
             "Loading tree") ?? [];
+
+        // Best-effort: if this fails the list simply isn't filtered, and LinkUserToTreeAsync
+        // still refuses an already-claimed person.
+        var linked = await AuthService.GetLinkedPersonIdsAsync(_treePersons.Select(p => p.Id));
+        _linkedPersonIds = linked is { Success: true, Data: not null } ? linked.Data : [];
     }
 
     // ── Bill-first path ──────────────────────────────────────────────────────

@@ -2,6 +2,21 @@
 
 ---
 
+## Phone walkthrough fixes (2026-11-20)
+
+Found by Doug walking the story-invite flow on a real phone, 2026-11-19.
+- [x] Fixed the sign-up "Who are you?" step listing people who already have an account (it
+      offered the site owner's own record). It now lists only unclaimed people, nothing
+      preselected (`LinkToTreeModalTests`). A wrong pick is still fixable by the super-user in
+      Admin > Users > Linked person.
+- [x] Fixed the People page on a phone: MudBlazor's stacked-card mode pushed values off the right
+      edge and showed an empty sort picker. A phone now shows Name, Born and Died in a plain table.
+- [ ] Still open from that walkthrough: the photo drop zone says "Click to browse" on a touch
+      device; the generation year label overlaps names at the left edge of the phone tree; the
+      email button's arrow wraps onto its own line.
+- [ ] Planned next, own branch: an optional "who is this?" person on an Admin > Users invite, so
+      sign-up links the account automatically and skips the question.
+
 ## People page order (2026-11-20)
 
 - [x] Fixed the People page ("Family members") listing people in database order, which read as

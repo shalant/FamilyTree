@@ -135,8 +135,10 @@ class FakeAuthService : IAuthService
         => throw new NotImplementedException();
     public Task<ServiceResponse<Guid>> CreateUnlinkedPersonAsync(string? firstName, string? lastName, Guid connectedPersonId, string relationshipType, Guid createdByUserId)
         => throw new NotImplementedException();
+    // People who already have an account (LinkToTreeModal hides them from "Who are you?").
+    public HashSet<Guid> LinkedPersonIds { get; } = [];
     public Task<ServiceResponse<HashSet<Guid>>> GetLinkedPersonIdsAsync(IEnumerable<Guid> personIds)
-        => throw new NotImplementedException();
+        => Task.FromResult(ServiceResponse<HashSet<Guid>>.Ok([.. personIds.Where(LinkedPersonIds.Contains)]));
 }
 
 // Only GetPendingLinkingSubjectAsync is exercised by Register.razor's initialization

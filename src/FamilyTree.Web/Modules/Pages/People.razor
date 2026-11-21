@@ -82,6 +82,7 @@
     {
         <MudTable Items="FilteredPeople" Hover="true"
                   T="PersonDto"
+                  Breakpoint="Breakpoint.None"
                   OnRowClick="@(e => Nav.NavigateTo($"/people/{e.Item!.Id}/edit"))"
                   Class="people-table">
             <HeaderContent>
