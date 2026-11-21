@@ -2,6 +2,12 @@
 
 ---
 
+## People page order (2026-11-20)
+
+- [x] Fixed the People page ("Family members") listing people in database order, which read as
+      random. It now starts alphabetical: last name, first name, then oldest first
+      (`PeoplePageOrderTests`); the column headers still re-sort it.
+
 ## UX/UI review (2026-11-14)
 
 Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 2026-11-14

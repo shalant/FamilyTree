@@ -175,7 +175,13 @@
                 _ => q
             };
 
-            return q;
+            // The list arrives in database order, which reads as random. Start alphabetical (last
+            // name, first name, then oldest first so two people with one name stay in a fixed
+            // order); the column headers still re-sort it.
+            return q.OrderBy(p => p.LastName, StringComparer.CurrentCultureIgnoreCase)
+                    .ThenBy(p => p.FirstName, StringComparer.CurrentCultureIgnoreCase)
+                    .ThenBy(p => p.BirthDate ?? DateOnly.MaxValue)
+                    .ThenBy(p => p.Id);
         }
     }
 
