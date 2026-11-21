@@ -2261,11 +2261,16 @@ html.ft-no-select * {
     .ft-people-actions { flex-wrap: wrap; width: 100%; }
     .ft-people-actions .search-field { flex: 1 1 100%; }
 
-    /* Five columns of real data (Name/Born/Birthplace/Died/Age) don't fit a
-       phone width — let the table itself scroll horizontally instead of
-       forcing the whole page to. */
+    /* A phone shows Name, Born and Died only (status dot, birthplace, age and the edit
+       pencil are hidden; tapping a row opens it). The table is not stacked into cards
+       (Breakpoint.None in People.razor): MudBlazor's stacked mode pushed values off the
+       right edge here, and its sort picker rendered empty. */
     .people-table .mud-table-container { overflow-x: auto; }
-    .people-table table { min-width: 640px; }
+    .people-table .mud-table-cell { padding: 10px 8px; font-size: 14px; }
+    .people-table th:nth-child(1), .people-table td:nth-child(1),
+    .people-table th:nth-child(4), .people-table td:nth-child(4),
+    .people-table th:nth-child(6), .people-table td:nth-child(6),
+    .people-table th:nth-child(7), .people-table td:nth-child(7) { display: none; }
 }
 
 .ft-toast-x {
