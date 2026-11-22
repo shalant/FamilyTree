@@ -11,9 +11,20 @@ Found by Doug walking the story-invite flow on a real phone, 2026-11-19.
       Admin > Users > Linked person.
 - [x] Fixed the People page on a phone: MudBlazor's stacked-card mode pushed values off the right
       edge and showed an empty sort picker. A phone now shows Name, Born and Died in a plain table.
-- [ ] Still open from that walkthrough: the photo drop zone says "Click to browse" on a touch
-      device; the generation year label overlaps names at the left edge of the phone tree; the
-      email button's arrow wraps onto its own line.
+- [x] Fixed the rest of that walkthrough (2026-11-22, `fix/ux-round-phone`):
+      - The photo upload boxes (a person's Photos page and the Add/Edit Person form) said "Drop
+        photos here or click to browse" on a phone. A touch screen now reads "Tap to choose
+        photos": both phrasings are rendered, and `.ft-on-pointer`/`.ft-on-touch` in `app.css`
+        pick by the primary pointer (`(hover: none) and (pointer: coarse)`), not by width
+        (`TouchWordingTests`).
+      - The decade labels on the tree's left edge sat over the leftmost names on a phone. The
+        default view now frames the family to the right of a 52px label gutter
+        (`canvas-interaction.js`), and each label has a soft backdrop so one panned over a name
+        stays readable. Not checked on a real phone yet, and not covered by a test: the E2E
+        invitee tree is too narrow to reach the gutter.
+      - The invite emails' button broke before its arrow, leaving "→" alone on a second line.
+        The arrow is joined with a non-breaking space and the button doesn't wrap
+        (`EmailButtonWrapTests`); the in-app links ending in "→" got the same space.
 - [x] Added an optional "Who is this?" person to an Admin > Users invite (2026-11-20,
       `UserInvite.PersonId`, migration `InviteForPerson`: one nullable column, no foreign key,
       because SQL Server refuses a SET NULL key here). The invite joins the person's family; signing

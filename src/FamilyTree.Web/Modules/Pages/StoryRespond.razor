@@ -48,7 +48,7 @@
                     </p>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
                                Href="@($"/?focus={_validation?.PersonId}")">
-                        See @_validation?.DisplayName's tree →
+                        See @_validation?.DisplayName's tree&nbsp;→
                     </MudButton>
                 }
                 else if (_validation.IsExpired)
@@ -106,7 +106,7 @@
                 }
                 <button class="auth-browse" style="margin-top:14px;"
                         @onclick='() => Nav.NavigateTo("/")'>
-                    No thanks, I'm done →
+                    No thanks, I'm done&nbsp;→
                 </button>
             </div>
         }

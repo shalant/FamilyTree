@@ -53,6 +53,9 @@ export function resetView(focusX, focusY, genTopY, genBotY, genLeftX, genRightX)
 // full-screen canvas, so the framed area starts below it.
 const MOBILE_MAX_WIDTH = 768;
 
+// Width of the decade-label column on the left (label at left:10px, about 34px wide, plus room).
+const TIMELINE_GUTTER = 52;
+
 function _appBarBottom(viewportWidth) {
     if (viewportWidth > MOBILE_MAX_WIDTH) return 0;
     const bar = document.getElementById('ft-appbar');
@@ -72,10 +75,16 @@ function _applyDefaultView(focusX, focusY, genTopY, genBotY, genLeftX, genRightX
         const availH = Math.max(rect.height - topInset, 100);
         const zoomH = availH / (genHeight + padding * 2);
 
+        // The decade labels (#ft-timeline) sit over the canvas's left edge, so the framed area
+        // starts to their right: on a phone the family fills the width and its leftmost name
+        // used to land under a label (2026-11-22).
+        const leftInset = TIMELINE_GUTTER;
+        const rightInset = 16;
+        const availW = Math.max(rect.width - leftInset - rightInset, 100);
+
         let zoomW = Infinity;
         if (genLeftX != null && genRightX != null && genRightX > genLeftX) {
-            const sidePad = 16;
-            zoomW = Math.max(rect.width - sidePad * 2, 100) / (genRightX - genLeftX);
+            zoomW = availW / (genRightX - genLeftX);
         }
 
         const fit = Math.min(zoomH, 2.5);
@@ -86,7 +95,9 @@ function _applyDefaultView(focusX, focusY, genTopY, genBotY, genLeftX, genRightX
         // Width-limited: centre the family, so all of it is on screen. Otherwise keep the focus
         // person centred, as before.
         const centreX = widthLimited ? (genLeftX + genRightX) / 2 : focusX;
-        _panX = rect.width / 2 - centreX * _zoom;
+        _panX = widthLimited
+            ? leftInset + availW / 2 - centreX * _zoom
+            : rect.width / 2 - centreX * _zoom;
         _panY = topInset + availH / 2 - midY * _zoom;
     } else {
         _zoom = 0.8;

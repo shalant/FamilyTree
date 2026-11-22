@@ -823,6 +823,12 @@ html body #blazor-error-ui .dismiss {
     white-space: nowrap;
     opacity: 0.85;
     line-height: 1;
+    /* A soft backdrop, so a year panned over a name stays readable instead of the two
+       garbling into each other (2026-11-22, phone walkthrough). */
+    padding: 2px 4px;
+    margin-left: -4px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--ft-surface, #fff) 70%, transparent);
 }
 
 [data-theme="dark"] .ft-band-label {
@@ -2519,3 +2525,12 @@ img.ft-photo { color: transparent; font-size: 0; }
 
 /* Sign-in card: the invitation note replaces a "Create an account" link that led to an error (#11). */
 .auth-invite-note { font-size: 14px; line-height: 1.5; margin-top: 18px; }
+
+/* Pointer-specific wording (2026-11-22): "Drop photos here or click to browse" means nothing on a
+   phone, which has no drag and no click. Wrap the two phrasings in these and the device picks one.
+   Judged by the primary pointer, not by width: a touch laptop with a mouse keeps the mouse words. */
+.ft-on-touch { display: none; }
+@media (hover: none) and (pointer: coarse) {
+    .ft-on-pointer { display: none; }
+    .ft-on-touch { display: inline; }
+}
