@@ -118,7 +118,12 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
 - [x] Sign-in card 2026-11-18 (`fix/login-card`, UX/UI review #11, #12, L1): "Create an account" replaced by an
       invitation note (registration is invite-only), password placeholder in words, no ghost app bar behind the card
       when signed out; three E2E locators updated. Not yet seen live.
-- [ ] Medium/low items still open: inline-style drift between pages.
+- [x] Photo tiles 2026-11-22 (`fix/ux-round-2`, UX/UI review E1, P6): a person's Photos page hid Edit and Delete
+      behind mouse hover, and the Add/Edit Person form's photos had a 22px unlabelled ✕. Both now show labelled
+      "Use as profile" / caption / "Remove" buttons under each photo (44px on touch, confirmation kept), styled by
+      `.ft-photo-tile*` classes instead of inline styles. The register page's Google hint no longer repeats the
+      invited email. `PersonMediaTests`, `RegisterToastTests`. Not yet seen in a browser.
+- [ ] Medium/low items still open: inline-style drift between pages (the photo tiles moved to classes 2026-11-22).
 
 ---
 

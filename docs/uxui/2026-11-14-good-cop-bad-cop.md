@@ -418,3 +418,9 @@ These are the three Low items left from Doug's 2026-11-19 phone walkthrough (`do
 - **Email button arrow.** "Share your memory →" and "Create your account →" no longer break before the arrow.
 
 **Effect on the score:** Mobile stays at 12 until these are seen on a real phone. They were found after the last bad-cop count, so they don't change it; #9 (inline-style drift) is still the one Medium.
+
+### Addendum 2026-11-22: E1 and P6 (`fix/ux-round-2`)
+
+- **E1 fixed.** The Add/Edit Person form's photos had a 22px unlabelled ✕ on the corner. The Photos page was worse than recorded: Edit and Delete appeared only on mouse hover, so a phone couldn't reliably reach them at all. Both pages now show a labelled row under each photo: "Use as profile", "Add caption"/"Edit caption" (Photos page), and "Remove". Each button is named for a screen reader ("Remove photo: …") and is 44px tall on touch screens. Remove still asks first for an uploaded photo. A photo that won't load can still be removed. The caption now shows under the photo instead of in the hover overlay. The tiles' inline styles became `.ft-photo-tile*` classes in `app.css`, which is a small part of #9.
+- **P6 fixed.** The Google hint on the register page no longer repeats the invited address that the Email field shows.
+- **Not seen.** Neither change has been rendered in a browser (the local dev database wasn't running) or on a phone. Look at a person's Photos page after the deploy.

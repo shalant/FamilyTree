@@ -73,6 +73,20 @@ public class RegisterToastTests : ComponentTestBase
         cut.Markup.Should().Contain("You've been invited");
         Services.GetRequiredService<ToastService>().Toasts.Should().BeEmpty();
     }
+
+    // UX/UI review P6 (2026-11-22): the invited address was printed in the Google hint and again
+    // in the Email field, and a long one wrapped awkwardly twice on a 390px phone.
+    [Fact]
+    public void InvitedEmail_IsShownOnce_InTheEmailField()
+    {
+        RegisterFakes(pendingStory: null);
+        NavigateWithInvite();
+
+        var cut = RenderComponent<Register>();
+
+        cut.Find(".auth-hint").TextContent.Should().NotContain("family@example.com");
+        cut.Find("input[type=email]").GetAttribute("value").Should().Be("family@example.com");
+    }
 }
 
 // Only ValidateInviteAsync/GetRegistrationMode are exercised by Register.razor's

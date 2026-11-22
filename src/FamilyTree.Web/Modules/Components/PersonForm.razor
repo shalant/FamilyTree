@@ -152,39 +152,28 @@
                         @foreach (var photo in _existingPhotos)
                         {
                             var isPrimary = photo.Url == _photoUrl;
-                            <div style="display:flex; flex-direction:column; align-items:center; gap:6px; width:88px;">
-                                <div style="position:relative; width:88px; height:88px; flex-shrink:0;">
-                                    <img src="@photo.Url"
-                                         style="width:88px; height:88px; object-fit:cover; border-radius:8px;
-                                                border:@(isPrimary ? "2.5px solid var(--ft-green-600)" : "1.5px solid var(--ft-line-border)");"
-                                         alt="@photo.FileName" />
+                            <div class="ft-photo-tile ft-photo-tile--small">
+                                <div class="ft-photo-tile__frame @(isPrimary ? "ft-photo-tile__frame--primary" : "")">
+                                    <img src="@photo.Url" alt="@photo.FileName" />
                                     @if (isPrimary)
                                     {
-                                        <div style="position:absolute; top:5px; left:5px;
-                                                    background:var(--ft-green-600); color:#fff;
-                                                    border-radius:4px; padding:2px 6px;
-                                                    font-size:10px; font-weight:600; letter-spacing:0.03em;
-                                                    line-height:1.4;">
-                                            ✓ Profile
-                                        </div>
+                                        <div class="ft-photo-tile__badge">✓ Profile</div>
                                     }
-                                    <MudIconButton Icon="@Icons.Material.Outlined.Close"
-                                                   Size="Size.Small"
-                                                   Style="position:absolute; top:-9px; right:-9px; background:var(--ft-gray-100); border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:var(--ft-gray-600);"
-                                                   OnClick="@(() => DeletePhoto(photo))" />
                                 </div>
-                                @if (!isPrimary)
-                                {
-                                    <MudButton Variant="Variant.Text" Size="Size.Small"
-                                               OnClick="@(() => SetPrimary(photo.Url))"
-                                               Style="font-size:11px; color:var(--ft-green-600); padding:2px 4px; min-height:0; height:auto; line-height:1.4; width:100%; text-align:center;">
-                                        Use as profile
-                                    </MudButton>
-                                }
-                                else
-                                {
-                                    <span style="font-size:12px; color:var(--ft-gray-500); text-align:center; line-height:1.4;">profile photo</span>
-                                }
+                                <div class="ft-photo-tile__actions">
+                                    @if (!isPrimary)
+                                    {
+                                        <button type="button" class="ft-photo-tile__action ft-photo-tile__action--primary"
+                                                @onclick="@(() => SetPrimary(photo.Url))">
+                                            Use as profile
+                                        </button>
+                                    }
+                                    <button type="button" class="ft-photo-tile__action ft-photo-tile__action--remove"
+                                            aria-label="@($"Remove photo: {photo.FileName}")"
+                                            @onclick="@(() => DeletePhoto(photo))">
+                                        Remove
+                                    </button>
+                                </div>
                             </div>
                         }
                     </div>
@@ -208,39 +197,29 @@
                             var idx = i;
                             var preview = _pendingPreviews[i];
                             var isPrimary = idx == _primaryPendingIndex;
-                            <div style="display:flex; flex-direction:column; align-items:center; gap:6px; width:88px;">
-                                <div style="position:relative; width:88px; height:88px; flex-shrink:0;">
-                                    <img src="@preview.DataUrl"
-                                         style="width:88px; height:88px; object-fit:cover; border-radius:8px;
-                                                border:@(isPrimary ? "2.5px solid var(--ft-green-600)" : "1.5px solid var(--ft-line-border)");"
-                                         alt="@preview.FileName" />
+                            <div class="ft-photo-tile ft-photo-tile--small">
+                                <div class="ft-photo-tile__frame @(isPrimary ? "ft-photo-tile__frame--primary" : "")">
+                                    <img src="@preview.DataUrl" alt="@preview.FileName" />
                                     @if (isPrimary)
                                     {
-                                        <div style="position:absolute; top:5px; left:5px;
-                                                    background:var(--ft-green-600); color:#fff;
-                                                    border-radius:4px; padding:2px 6px;
-                                                    font-size:10px; font-weight:600; letter-spacing:0.03em;
-                                                    line-height:1.4;">
-                                            ✓ Profile
-                                        </div>
+                                        <div class="ft-photo-tile__badge">✓ Profile</div>
                                     }
-                                    <MudIconButton Icon="@Icons.Material.Outlined.Close"
-                                                   Size="Size.Small"
-                                                   Style="position:absolute; top:-9px; right:-9px; background:var(--ft-gray-100); border-radius:50%; padding:0; min-width:0; width:22px; height:22px; color:var(--ft-gray-600);"
-                                                   OnClick="@(() => RemovePending(idx))" />
                                 </div>
-                                @if (!isPrimary)
-                                {
-                                    <MudButton Variant="Variant.Text" Size="Size.Small"
-                                               OnClick="@(() => _primaryPendingIndex = idx)"
-                                               Style="font-size:11px; color:var(--ft-green-600); padding:2px 4px; min-height:0; height:auto; line-height:1.4; width:100%; text-align:center;">
-                                        Use as profile
-                                    </MudButton>
-                                }
-                                else
-                                {
-                                    <span style="font-size:12px; color:var(--ft-gray-500); text-align:center; line-height:1.4;">profile photo</span>
-                                }
+                                <div class="ft-photo-tile__actions">
+                                    @if (!isPrimary)
+                                    {
+                                        <button type="button" class="ft-photo-tile__action ft-photo-tile__action--primary"
+                                                @onclick="@(() => _primaryPendingIndex = idx)">
+                                            Use as profile
+                                        </button>
+                                    }
+                                    @* Not uploaded yet, so nothing is lost: no confirmation. *@
+                                    <button type="button" class="ft-photo-tile__action ft-photo-tile__action--remove"
+                                            aria-label="@($"Remove photo: {preview.FileName}")"
+                                            @onclick="@(() => RemovePending(idx))">
+                                        Remove
+                                    </button>
+                                </div>
                             </div>
                         }
                     </div>

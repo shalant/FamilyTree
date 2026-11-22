@@ -120,7 +120,9 @@
                 </button>
                 @if (_invite != null)
                 {
-                    <div class="auth-hint">Use the Google account for @_invite.Email.</div>
+                    @* UX/UI review P6: this used to print the invited address, which the Email field
+                       below already shows; a long address wrapped awkwardly twice on a phone. *@
+                    <div class="auth-hint">Use the Google account for the email address below.</div>
                 }
                 <div class="auth-or-divider"><span>or</span></div>
             }
