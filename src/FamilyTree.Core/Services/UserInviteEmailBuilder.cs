@@ -51,8 +51,8 @@ public static class UserInviteEmailBuilder
                           <a href="{safeLink}"
                              style="display:inline-block;background:#085041;color:#ffffff;text-decoration:none;
                                     font-family:Georgia,serif;font-size:15px;font-weight:600;
-                                    padding:14px 36px;border-radius:8px;letter-spacing:0.3px;">
-                            Create your account →
+                                    padding:14px 28px;border-radius:8px;letter-spacing:0.3px;white-space:nowrap;">
+                            Create your account&nbsp;→
                           </a>
                         </div>
 

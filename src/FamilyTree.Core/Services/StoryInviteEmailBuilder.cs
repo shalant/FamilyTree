@@ -100,8 +100,8 @@ public static class StoryInviteEmailBuilder
                           <a href="{respondLink}"
                              style="display:inline-block;background:#085041;color:#ffffff;text-decoration:none;
                                     font-family:Georgia,serif;font-size:15px;font-weight:600;
-                                    padding:14px 36px;border-radius:8px;letter-spacing:0.3px;">
-                            Share your memory →
+                                    padding:14px 28px;border-radius:8px;letter-spacing:0.3px;white-space:nowrap;">
+                            Share your memory&nbsp;→
                           </a>
                         </div>
 

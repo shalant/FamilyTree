@@ -408,3 +408,13 @@ Live arborkin.com, desktop 1626px, light theme, signed in as the super-user, rea
 ### Addendum 2026-11-19: page titles, #13 to #15 (`fix/page-headers`)
 
 Browser tabs and history read "Stories", "People", "Admin", "Create account — Arborkin" and "Not found", with and without the product name, and one misspelled it. Every page title now ends "— ArborKin" (the tree's own title stays "ArborKin"). `PageTitleTests` scans every `.razor` file and fails on a title without it; it failed on the old titles and passes now. Not yet seen live.
+
+### Addendum 2026-11-22: phone walkthrough leftovers (`fix/ux-round-phone`)
+
+These are the three Low items left from Doug's 2026-11-19 phone walkthrough (`docs/TodoList.md`, "Phone walkthrough fixes"):
+
+- **Touch wording.** The photo upload boxes now say "Tap to choose photos" on a touch screen, not "Drop photos here or click to browse". The choice is made by primary pointer, so a touch laptop with a mouse keeps the mouse wording.
+- **Decade labels over names.** The phone's default view leaves a 52px gutter for the labels, and the labels have a soft backdrop.
+- **Email button arrow.** "Share your memory →" and "Create your account →" no longer break before the arrow.
+
+**Effect on the score:** Mobile stays at 12 until these are seen on a real phone. They were found after the last bad-cop count, so they don't change it; #9 (inline-style drift) is still the one Medium.

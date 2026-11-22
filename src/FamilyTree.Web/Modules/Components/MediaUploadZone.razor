@@ -35,7 +35,7 @@
             <div class="ft-upload-inner" style="display:flex; align-items:center;
                 justify-content:center; gap:8px; pointer-events:none;">
                 <MudIcon Icon="@UploadIcon" Style="font-size:18px; color:var(--ft-green-600);" />
-                <span style="font-size:13px; color:var(--ft-green-600);">@Label</span>
+                <span style="font-size:13px; color:var(--ft-green-600);">@LabelText</span>
             </div>
         }
         else
@@ -55,7 +55,14 @@
                 @* Primary label *@
                 <div style="font-size:14px; color:var(--ft-text-primary); font-weight:500;
                     text-align:center; line-height:1.4;">
-                    @(_dragging ? "Release to upload" : Label)
+                    @if (_dragging)
+                    {
+                        <text>Release to upload</text>
+                    }
+                    else
+                    {
+                        @LabelText
+                    }
                 </div>
 
                 @* Hint *@
@@ -109,10 +116,22 @@
 </div>
 
 @code {
+    // Both phrasings are rendered; app.css's .ft-on-pointer/.ft-on-touch show the one that fits
+    // the device's primary pointer.
+    private RenderFragment LabelText => string.IsNullOrWhiteSpace(TouchLabel)
+        ? @<text>@Label</text>
+        : @<text><span class="ft-on-pointer">@Label</span><span class="ft-on-touch">@TouchLabel</span></text>;
+
     // ── Parameters ────────────────────────────────────────────────────────
 
     /// <summary>Text shown inside the zone when not dragging.</summary>
     [Parameter] public string Label { get; set; } = "Drop files here or click to browse";
+
+    /// <summary>
+    /// Shown instead of <see cref="Label"/> on a touch screen, which can't drop or click (2026-11-22).
+    /// Leave empty to show <see cref="Label"/> everywhere.
+    /// </summary>
+    [Parameter] public string TouchLabel { get; set; } = "Tap to choose files";
 
     /// <summary>Secondary hint line (e.g. "JPG, PNG up to 20 MB").</summary>
     [Parameter] public string Hint { get; set; } = "";
