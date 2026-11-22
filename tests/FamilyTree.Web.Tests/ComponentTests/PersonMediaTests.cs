@@ -68,6 +68,51 @@ public class PersonMediaTests : ComponentTestBase
         cut.FindAll("button").Should().NotContain(b => b.TextContent.Contains("Use as profile"));
     }
 
+    // UX/UI review E1 (2026-11-22): Edit and Delete only appeared on mouse hover, which a phone
+    // can't do. Every action is a labelled button under the photo from the first render.
+    [Fact]
+    public void PhotoActions_AreVisibleWithoutHover_AndNamedForScreenReaders()
+    {
+        Services.AddSingleton<IPersonService>(new FakePersonServiceForMedia(
+            new PersonDto { Id = PersonId, FirstName = "Ada", LastName = "Arden" }));
+        Services.AddSingleton<IMediumService>(new FakeMediumServiceForMedia());
+        RenderComponent<MudPopoverProvider>();
+
+        var cut = RenderComponent<PersonMedia>(p => p.Add(x => x.Id, PersonId));
+
+        var actions = cut.FindAll(".ft-photo-tile__action").Select(b => b.TextContent.Trim()).ToList();
+        actions.Should().Contain("Use as profile");
+        actions.Should().Contain(a => a.EndsWith("caption"));
+        actions.Should().Contain("Remove");
+        cut.Find(".ft-photo-tile__action--remove").GetAttribute("aria-label").Should().StartWith("Remove photo: ");
+    }
+
+    [Fact]
+    public void BrokenPhoto_CanStillBeRemoved()
+    {
+        Services.AddSingleton<IPersonService>(new FakePersonServiceForMedia(
+            new PersonDto { Id = PersonId, FirstName = "Ada", LastName = "Arden" }));
+        Services.AddSingleton<IMediumService>(new FakeMediumServiceForMedia());
+        RenderComponent<MudPopoverProvider>();
+
+        var cut = RenderComponent<PersonMedia>(p => p.Add(x => x.Id, PersonId));
+        cut.Find("img").TriggerEvent("onerror", new Microsoft.AspNetCore.Components.Web.ErrorEventArgs());
+
+        cut.FindAll(".ft-photo-tile__action").Select(b => b.TextContent.Trim()).Should().Contain("Remove");
+    }
+
+    // The Add/Edit Person form's photo tiles had the same 22px unlabelled ✕ in the corner.
+    [Fact]
+    public void PersonForm_HasNoUnlabelledCornerCloseButtonOnPhotos()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "FamilyTree.sln"))) dir = dir.Parent;
+        var form = File.ReadAllText(Path.Combine(dir!.FullName, "src", "FamilyTree.Web", "Modules", "Components", "PersonForm.razor"));
+
+        form.Should().NotContain("Icons.Material.Outlined.Close");
+        form.Should().Contain("ft-photo-tile__action--remove");
+    }
+
     [Fact]
     public void UploadHint_DoesNotPromiseHeic()
     {

@@ -2376,6 +2376,101 @@ img.ft-photo { color: transparent; font-size: 0; }
     color: var(--ft-gray-400);
 }
 
+/* ── Photo tiles (a person's Photos page and the Add/Edit Person form) ─────────
+   UX/UI review E1 (2026-11-22): removing a photo was a 22px unlabelled ✕ on the
+   thumbnail's corner (form) or a trash icon that only appeared on hover (Photos
+   page), which a phone can't do. Every action is now a labelled button under the
+   photo, always visible, and Remove still asks first. */
+.ft-photo-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.ft-photo-tile--small { width: 104px; }
+
+.ft-photo-tile__frame {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--ft-surface-card);
+    border: 1px solid var(--ft-line-border);
+}
+
+.ft-photo-tile__frame--primary { border: 2.5px solid var(--ft-green-600); }
+
+.ft-photo-tile__frame > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ft-photo-tile__badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: var(--ft-green-600);
+    color: #fff;
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    line-height: 1.4;
+}
+
+.ft-photo-tile__caption {
+    font-size: 13px;
+    color: var(--ft-text-secondary, var(--ft-gray-600));
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.ft-photo-tile__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 4px;
+}
+
+.ft-photo-tile--small .ft-photo-tile__actions { flex-direction: column; }
+
+.ft-photo-tile__action {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.3;
+    padding: 6px 6px;
+    min-height: 32px;
+    border-radius: 6px;
+    color: var(--ft-gray-600);
+    text-align: left;
+}
+
+.ft-photo-tile__action:hover,
+.ft-photo-tile__action:focus-visible { background: var(--ft-gray-100); }
+
+.ft-photo-tile__action:focus-visible { outline: 2px solid var(--ft-green-600); outline-offset: 1px; }
+
+.ft-photo-tile__action--primary { color: var(--ft-green-600); font-weight: 600; }
+
+.ft-photo-tile__action--remove:hover,
+.ft-photo-tile__action--remove:focus-visible { color: var(--mud-palette-error); }
+
+.ft-photo-tile__note {
+    font-size: 13px;
+    color: var(--ft-gray-500);
+    padding: 6px 6px;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .ft-photo-tile__action { min-height: 44px; }
+}
+
 /* ── First-visit tree hint ────────────────────────────────────────────────────
    A persistent hint, not a toast: it stays until the first touch on the tree or "Got it". Sits
    bottom-centre, above the toolbar pill on a phone, and below the toasts (z-index 9999). */

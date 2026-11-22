@@ -109,12 +109,8 @@ else
                     @foreach (var photo in _photos)
                     {
                         var isPrimary = photo.Url == _profilePhotoUrl;
-                        var cardBorder = isPrimary ? "2.5px solid var(--ft-green-600)" : "1px solid var(--ft-line-border)";
-                        <div style="display:flex; flex-direction:column; gap:6px;">
-                            <div style="position:relative; aspect-ratio:1; border-radius:8px;
-                                overflow:hidden; background:var(--ft-surface-card); border:@cardBorder;"
-                                 @onmouseenter="@(() => photo.Hovered = true)"
-                                 @onmouseleave="@(() => photo.Hovered = false)">
+                        <div class="ft-photo-tile">
+                            <div class="ft-photo-tile__frame @(isPrimary ? "ft-photo-tile__frame--primary" : "")">
                                 @if (photo.Broken)
                                 {
                                     <div class="ft-photo-broken-tile" style="flex-direction:column; gap:6px;
@@ -126,59 +122,38 @@ else
                                 else
                                 {
                                     <img src="@photo.Url" alt="@photo.Caption"
-                                         @onerror="() => photo.Broken = true"
-                                         style="width:100%; height:100%; object-fit:cover;" />
+                                         @onerror="() => photo.Broken = true" />
                                 }
                                 @if (isPrimary)
                                 {
-                                    <div style="position:absolute; top:6px; left:6px;
-                                        background:var(--ft-green-600); border-radius:4px;
-                                        padding:2px 7px; font-size:10px; color:#fff;
-                                        font-weight:600; letter-spacing:0.03em;">
-                                        ✓ Profile
-                                    </div>
-                                }
-                                @if (photo.Hovered)
-                                {
-                                    <div style="position:absolute; inset:0; background:rgba(0,0,0,0.42);
-                                        display:flex; flex-direction:column; align-items:center;
-                                        justify-content:flex-end; padding:8px; gap:4px;">
-                                        @if (!string.IsNullOrWhiteSpace(photo.Caption))
-                                        {
-                                            <div style="font-size:12px; color:#fff; text-align:center;
-                                                text-shadow:0 1px 3px rgba(0,0,0,0.6);">
-                                                @photo.Caption
-                                            </div>
-                                        }
-                                        <div style="display:flex; gap:6px;">
-                                            <MudIconButton Icon="@Icons.Material.Outlined.Edit"
-                                                           Size="Size.Small"
-                                                           Style="color:#fff; background:rgba(255,255,255,0.18);"
-                                                           OnClick="@(() => EditPhoto(photo))" />
-                                            <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                                           Size="Size.Small"
-                                                           Style="color:#fff; background:rgba(255,255,255,0.18);"
-                                                           OnClick="@(() => DeletePhoto(photo))" />
-                                        </div>
-                                    </div>
+                                    <div class="ft-photo-tile__badge">✓ Profile</div>
                                 }
                             </div>
-                            @if (photo.Broken)
+                            @if (!string.IsNullOrWhiteSpace(photo.Caption))
                             {
-                                @* A photo that won't load can't be a profile photo; Delete stays in the hover overlay. *@
+                                <div class="ft-photo-tile__caption">@photo.Caption</div>
                             }
-                            else if (!isPrimary)
-                            {
-                                <MudButton Variant="Variant.Text" Size="Size.Small"
-                                           OnClick="@(() => SetProfilePhoto(photo))"
-                                           Style="font-size:11px; color:var(--ft-green-600); padding:2px 4px; min-height:0; height:auto; line-height:1.4; width:100%; text-align:center;">
-                                    Use as profile
-                                </MudButton>
-                            }
-                            else
-                            {
-                                <span style="font-size:11px; color:var(--ft-gray-300); text-align:center; display:block;">profile photo</span>
-                            }
+                            @* Always visible (UX/UI review E1): the old hover overlay hid Edit and Delete from
+                               a phone. A photo that won't load can't be a profile photo, but can be removed. *@
+                            <div class="ft-photo-tile__actions">
+                                @if (!photo.Broken && !isPrimary)
+                                {
+                                    <button type="button" class="ft-photo-tile__action ft-photo-tile__action--primary"
+                                            @onclick="@(() => SetProfilePhoto(photo))">
+                                        Use as profile
+                                    </button>
+                                }
+                                <button type="button" class="ft-photo-tile__action"
+                                        aria-label="@($"{CaptionVerb(photo)} caption: {PhotoName(photo)}")"
+                                        @onclick="@(() => EditPhoto(photo))">
+                                    @CaptionVerb(photo) caption
+                                </button>
+                                <button type="button" class="ft-photo-tile__action ft-photo-tile__action--remove"
+                                        aria-label="@($"Remove photo: {PhotoName(photo)}")"
+                                        @onclick="@(() => DeletePhoto(photo))">
+                                    Remove
+                                </button>
+                            </div>
                         </div>
                     }
                 </div>
@@ -354,13 +329,19 @@ else
 
     private string? _profilePhotoUrl;
 
+    // A photo's name for a screen reader: its caption, else its file name.
+    private static string PhotoName(PhotoItem photo) =>
+        string.IsNullOrWhiteSpace(photo.Caption) ? photo.FileName : photo.Caption;
+
+    private static string CaptionVerb(PhotoItem photo) =>
+        string.IsNullOrWhiteSpace(photo.Caption) ? "Add" : "Edit";
+
     private class PhotoItem
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public string Url { get; set; } = "";
         public string FileName { get; set; } = "";
         public string? Caption { get; set; }
-        public bool Hovered { get; set; }
         // Set by the <img> @onerror; swaps the tile for a "couldn't be loaded" placeholder.
         public bool Broken { get; set; }
     }
