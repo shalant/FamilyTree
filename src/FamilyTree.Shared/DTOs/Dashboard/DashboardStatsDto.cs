@@ -2,6 +2,8 @@ namespace FamilyTree.Shared.DTOs.Dashboard;
 
 public class DashboardStatsDto
 {
+    /// <summary>True for the super-user (every family); false for a family Admin (their own family).</summary>
+    public bool IsSiteWide { get; set; }
     public int TotalPeople { get; set; }
     public int DeletedCount { get; set; }
     public int TotalRelationships { get; set; }
