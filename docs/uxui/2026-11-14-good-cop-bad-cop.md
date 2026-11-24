@@ -424,3 +424,19 @@ These are the three Low items left from Doug's 2026-11-19 phone walkthrough (`do
 - **E1 fixed.** The Add/Edit Person form's photos had a 22px unlabelled ✕ on the corner. The Photos page was worse than recorded: Edit and Delete appeared only on mouse hover, so a phone couldn't reliably reach them at all. Both pages now show a labelled row under each photo: "Use as profile", "Add caption"/"Edit caption" (Photos page), and "Remove". Each button is named for a screen reader ("Remove photo: …") and is 44px tall on touch screens. Remove still asks first for an uploaded photo. A photo that won't load can still be removed. The caption now shows under the photo instead of in the hover overlay. The tiles' inline styles became `.ft-photo-tile*` classes in `app.css`, which is a small part of #9.
 - **P6 fixed.** The Google hint on the register page no longer repeats the invited address that the Email field shows.
 - **Not seen.** Neither change has been rendered in a browser (the local dev database wasn't running) or on a phone. Look at a person's Photos page after the deploy.
+
+### Addendum 2026-11-24: #9 button drift, and dark-mode button contrast (`fix/inline-style-drift`)
+
+- **#9 fixed for buttons.** An inventory of all 97 `MudButton`s found primary actions coloured four ways, cancel links in three greys, and outlined buttons with hand-set borders. Twenty-nine buttons on 13 pages changed to one treatment per intent:
+  - Primary: Filled + `Color.Primary`.
+  - Secondary: Outlined + `Color.Primary`.
+  - Neutral answer: Outlined + `Color.Default`.
+  - Dismiss: Text in the default colour.
+  - Destructive: `Color.Error`.
+
+  `ButtonTreatmentTests` fails on any inline button colour or `Color.Success`, and three of its tests failed against the old markup. Venmo and the share-target buttons keep their brand colours.
+- **New finding, Medium, fixed: dark-mode buttons were unreadable.** Read on the live site in Doug's browser (dark theme), the tree's "Add Person" button was white on #4faa78, 2.86:1 (AA asks 4.5:1). Every filled primary button in dark mode was the same. The inline-styled ones were worse: white on dark-mode `--ft-green-700` (#9dd6ba) is 1.65:1, on the Home empty states, People's "Add person" and the Add/Edit Person Save button. The theme now gives dark-mode primary buttons dark text (#0b1f14, 6.0:1), and the hover goes lighter (7.2:1) instead of darker (2.7:1).
+- **Cancel links.** These were `--ft-gray-400` (3.3:1 on white) and now use the default text colour.
+- **Theme copies.** The three identical theme copies in MainLayout, TreeLayout and AuthLayout became one, `ArborKinTheme`. The `--mud-palette-*` lines in `app.css` turned out to lose to the theme provider on the live page.
+- **Not seen.** Not rendered in a browser after the change. After the deploy, look at the tree in dark mode ("Add Person") and at Add person's Save button.
+- **Effect on the score:** none until it's seen live. "Craft and consistency" was held back mostly by this drift.

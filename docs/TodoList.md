@@ -123,7 +123,15 @@ Good cop / bad cop review in `docs/uxui/2026-11-14-good-cop-bad-cop.md`. Done 20
       "Use as profile" / caption / "Remove" buttons under each photo (44px on touch, confirmation kept), styled by
       `.ft-photo-tile*` classes instead of inline styles. The register page's Google hint no longer repeats the
       invited email. `PersonMediaTests`, `RegisterToastTests`. Not yet seen in a browser.
-- [ ] Medium/low items still open: inline-style drift between pages (the photo tiles moved to classes 2026-11-22).
+- [x] Button drift 2026-11-24 (`fix/inline-style-drift`, UX/UI review #9): primary buttons were coloured four ways
+      (`Color.Primary`, `Color.Success`, inline `--ft-green-600`, inline `--ft-green-700`) and cancel links were inline
+      `--ft-gray-400` (3.3:1 on white). Found on the way, live: in dark mode every filled primary button was white
+      text on #4faa78, 2.86:1 (the tree's "Add Person", read in Doug's browser), and the inline greens were worse
+      (1.65:1). Now one theme (`ArborKinTheme`, replacing three identical copies in the layouts) with dark text on
+      dark-mode primary (6.0:1) and a lighter hover, and one treatment per intent (CLAUDE.md, Theme System), enforced
+      by `ButtonTreatmentTests`. 29 buttons on 13 pages changed. Not yet seen in a browser.
+- [ ] Still open from #9: other inline styles (cards, labels, spacing) remain on many pages; they no longer cause
+      visible button drift, so this is maintenance, not a user-facing gap.
 
 ---
 

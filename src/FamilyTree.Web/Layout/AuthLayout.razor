@@ -25,37 +25,8 @@
 @code {
     private bool _isDark;
 
-    private MudTheme _mudTheme = new()
-    {
-        PaletteLight = new PaletteLight
-        {
-            Primary = "#1e7d50",
-            PrimaryDarken = "#0f472c",
-            PrimaryLighten = "#4db282",
-            Success = "#1e7d50",
-            Background = "#ffffff",
-            Surface = "#f8faf9",
-            DrawerBackground = "#f8faf9",
-            AppbarBackground = "#f8faf9",
-            AppbarText = "#212529",
-        },
-        PaletteDark = new PaletteDark
-        {
-            Primary = "#4faa78",
-            PrimaryDarken = "#2e6b48",
-            PrimaryLighten = "#9dd6ba",
-            Success = "#4faa78",
-            Background = "#121417",
-            Surface = "#1a1d21",
-            DrawerBackground = "#1a1d21",
-            AppbarBackground = "#1a1d21",
-            AppbarText = "#dee2e6",
-        },
-        Typography = new Typography
-        {
-            Default = new DefaultTypography { FontFamily = ["Inter", "system-ui", "sans-serif"] }
-        }
-    };
+    // One shared theme for every layout (ArborKinTheme, 2026-11-24).
+    private readonly MudTheme _mudTheme = ArborKinTheme.Create();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
