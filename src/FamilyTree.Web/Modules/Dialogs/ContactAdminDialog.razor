@@ -51,12 +51,10 @@
     </DialogContent>
     <DialogActions>
         <MudButton Variant="Variant.Text"
-                   Style="color:var(--ft-gray-400);"
                    OnClick="Cancel">
             Cancel
         </MudButton>
-        <MudButton Variant="Variant.Filled"
-                   Style="background:var(--ft-green-600); color:#fff;"
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
                    Disabled="@(string.IsNullOrWhiteSpace(_subject) || string.IsNullOrWhiteSpace(_body) || _submitted)"
                    OnClick="Submit">
             @if (_saving)

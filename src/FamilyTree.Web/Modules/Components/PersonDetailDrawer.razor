@@ -324,16 +324,15 @@
 
             @* ── Actions ─────────────────────────────────────────────────── *@
             <div style="border-top:0.5px solid var(--ft-line-border); padding:12px 16px;">
-                <MudButton Variant="Variant.Outlined" FullWidth="true"
+                <MudButton Color="Color.Primary" Variant="Variant.Outlined" FullWidth="true"
                            StartIcon="@Icons.Material.Outlined.Edit"
-                           Style="border-color:var(--ft-line-border);
-                    color:var(--ft-gray-700); margin-bottom:2px;"
+                           Style="margin-bottom:2px;"
                            OnClick="() => OnEdit.InvokeAsync(Person)">
                     Edit
                 </MudButton>
-                <MudButton Variant="Variant.Text" FullWidth="true"
+                <MudButton Color="Color.Primary" Variant="Variant.Text" FullWidth="true"
                            StartIcon="@Icons.Material.Outlined.AccountTree"
-                           Style="color:var(--ft-green-600); margin-bottom:2px;"
+                           Style="margin-bottom:2px;"
                            OnClick="() => OnFocusPerson.InvokeAsync(Person)">
                     Focus tree here
                 </MudButton>

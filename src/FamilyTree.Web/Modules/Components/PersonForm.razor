@@ -260,12 +260,12 @@
             else
             {
                 <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                    <MudButton HtmlTag="label"
+                    <MudButton Color="Color.Primary" HtmlTag="label"
                                for="photo-upload"
                                Variant="Variant.Outlined"
                                StartIcon="@Icons.Material.Outlined.AddPhotoAlternate"
                                Disabled="_uploading"
-                               Style="color:var(--ft-gray-600); font-size:13px;">
+                               Style="font-size:13px;">
                         @(_uploading ? "Uploading…" : "Add photos")
                     </MudButton>
                     @if (_uploading)
@@ -306,7 +306,7 @@
                     }
                 </div>
             </div>
-            <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Medium"
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Medium"
                        Class="ft-relationships-toggle"
                        StartIcon="@(_showRelationships ? Icons.Material.Outlined.ExpandLess : Icons.Material.Outlined.AccountTree)"
                        OnClick="ToggleRelationships">
@@ -538,13 +538,12 @@
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center"
               Style="border-top:0.5px solid var(--ft-line-border); padding-top:8px;">
         <MudButton Variant="Variant.Text"
-                   Style="color:var(--ft-gray-500);"
                    OnClick="() => OnCancel.InvokeAsync()">
             Cancel
         </MudButton>
 
-        <MudButton Variant="Variant.Filled"
-                   Style="background:var(--ft-green-600); color:#fff; min-width:140px;"
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Style="min-width:140px;"
                    OnClick="Submit">
             @if (_saving)
             {

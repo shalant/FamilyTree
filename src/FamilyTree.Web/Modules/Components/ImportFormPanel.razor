@@ -251,13 +251,12 @@
             <div style="font-size:12px; color:var(--ft-gray-400);">
                 · @_preview.Relationships.Count relationships detected
             </div>
-            <MudButton Variant="Variant.Text" Size="Size.Small"
-                       Style="color:var(--ft-green-600); margin-left:auto;"
+            <MudButton Color="Color.Primary" Variant="Variant.Text" Size="Size.Small"
+                       Style="margin-left:auto;"
                        OnClick="@(() => _preview.People.ForEach(p => p.Selected = true))">
                 Select all
             </MudButton>
             <MudButton Variant="Variant.Text" Size="Size.Small"
-                       Style="color:var(--ft-gray-400);"
                        OnClick="@(() => _preview.People.ForEach(p => p.Selected = !p.ReferenceOnly))">
                 Skip reference-only
             </MudButton>
@@ -341,13 +340,13 @@
 
     @if (_activeTab == "text" && _textState == TextImportState.Preview)
     {
-        <MudButton Variant="Variant.Text" Style="color:var(--ft-gray-400);"
+        <MudButton Variant="Variant.Text"
                    OnClick="@(() => _textState = TextImportState.Idle)">
             ← Back
         </MudButton>
-        <MudButton Variant="Variant.Filled"
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
                    Disabled="@(_preview == null || !_preview.People.Any(p => p.Selected))"
-                   Style="background:var(--ft-green-600); color:#fff; min-width:180px;"
+                   Style="min-width:180px;"
                    StartIcon="@Icons.Material.Outlined.Download"
                    OnClick="CommitImportAsync">
             Import @(_preview?.People.Count(p => p.Selected) ?? 0) people
@@ -365,7 +364,7 @@
     {
         @if (!string.IsNullOrEmpty(BackUrl))
         {
-            <MudButton Variant="Variant.Text" Style="color:var(--ft-gray-400);"
+            <MudButton Variant="Variant.Text"
                        OnClick="@(() => Nav.NavigateTo(BackUrl))">
                 Cancel
             </MudButton>
@@ -374,9 +373,9 @@
         {
             <span />
         }
-        <MudButton Variant="Variant.Filled"
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
                    Disabled="@(!CanProceed)"
-                   Style="background:var(--ft-green-600); color:#fff; min-width:160px;"
+                   Style="min-width:160px;"
                    StartIcon="@Icons.Material.Outlined.Visibility"
                    OnClick="ProceedAsync">
             @(_activeTab == "text" ? "Extract people" : "Preview import")
