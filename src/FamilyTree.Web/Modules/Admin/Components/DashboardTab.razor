@@ -12,6 +12,11 @@
 }
 else
 {
+    @* A family Admin's counts are their own family's; only the super-user's span every family. *@
+    <div class="ft-admin-dashboard-scope" style="font-size:13px; color:var(--ft-text-secondary); margin-bottom:12px;">
+        @(_siteWide ? "All families on ArborKin" : "Your family")
+    </div>
+
     @* ── Stat cards ────────────────────────────────────────────── *@
     <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px;">
 
@@ -81,14 +86,14 @@ else
                 <MudIcon Icon="@Icons.Material.Outlined.FamilyRestroom"
                          Style="font-size:18px; color:var(--ft-green-600);" />
                 <span style="font-size:11px; color:var(--ft-gray-400); text-transform:uppercase; letter-spacing:.06em;">
-                    Families
+                    @(_siteWide ? "Families" : "Relationships")
                 </span>
             </div>
             <div style="font-size:28px; font-weight:700; color:var(--ft-green-800); line-height:1;">
-                @_familyCount
+                @(_siteWide ? _familyCount : _totalRelationships)
             </div>
             <div style="font-size:11px; color:var(--ft-gray-300); margin-top:4px;">
-                @_totalRelationships relationships
+                @(_siteWide ? $"{_totalRelationships} relationships" : "links between people")
             </div>
         </div>
 
@@ -207,6 +212,7 @@ else
 
 @code {
     private bool _loading = true;
+    private bool _siteWide;
 
     private int _totalPeople;
     private int _deletedCount;
@@ -228,6 +234,7 @@ else
         try
         {
             var stats = await DashboardService.GetDashboardStatsAsync();
+            _siteWide = stats.IsSiteWide;
             _totalPeople = stats.TotalPeople;
             _deletedCount = stats.DeletedCount;
             _totalRelationships = stats.TotalRelationships;

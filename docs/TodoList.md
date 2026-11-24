@@ -951,9 +951,14 @@ PR #43).
       `fix/messages-scope`: `UserMessageService.GetAllAsync`/`MarkReadAsync` refuse anyone but
       the super-user and the tab is hidden for family Admins, since every family writes to
       the owner's one inbox; `CrossTenantMatrixTests.Messages_DenyFamilyAdmin_AndSuperUserReadsThem`
-      fails against the old service; not yet seen live). Still open: the Admin Dashboard
-      stats (`DashboardService`, global counts) are visible to every family Admin. Decide:
-      SuperUser-only, or scope by family.
+      fails against the old service; not yet seen live). ~~Admin Dashboard stats~~ (fixed
+      2026-11-24, `fix/dashboard-stats-scope`: `DashboardService` counted every family for every
+      Admin and listed the latest audit entries of all of them. A family Admin now gets their own
+      family's counts, and audit entries made by their family's members, since `AuditLog` has
+      no family column. The super-user keeps the site-wide view, and a Member or anonymous
+      caller gets nothing. The tab says "Your family" or "All families on ArborKin", and a
+      family Admin sees a Relationships card instead of "Families: 1".
+      `CrossTenantMatrixTests.Dashboard_*`. Not yet seen live.)
 - [ ] **S9 lows:** ~~`Auth:RegistrationMode` fails open when missing or mis-cased~~
       (fixed 2026-10-25, A4); story-invite `IsUsed` check-then-set race (double submit makes two stories);
       CR/LF in names/places injects GEDCOM records; null MIME type skips the upload

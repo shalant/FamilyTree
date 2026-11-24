@@ -211,6 +211,8 @@ public class CrossTenantMatrixTests
     private static AdminAuditService AdminAuditSvc(World w, ICurrentUserService u) =>
         new(w.Db, NullLogger<AdminAuditService>.Instance, u);
 
+    private static DashboardService DashboardSvc(World w, ICurrentUserService u) => new(w.Db, u);
+
     private sealed class RecordingEmailSender : IEmailSender
     {
         public List<(string To, string Subject, string Body)> Sent { get; } = [];
@@ -503,6 +505,64 @@ public class CrossTenantMatrixTests
             .SelectMany(f => f.People).Select(p => p.PersonId).Should().Contain(slip);
         (await DataCheckSvc(w, w.SuperUser).GetFindingsAsync()).Data!
             .SelectMany(f => f.People).Select(p => p.PersonId).Should().Contain(slip);
+    }
+
+    // ── DashboardService ────────────────────────────────────────────────────────
+    // Until 2026-11-24 every Admin saw site-wide counts and the latest audit entries of every family.
+
+    [Fact]
+    public async Task Dashboard_FamilyAdmin_CountsOnlyTheirOwnFamily()
+    {
+        var w = await SeedAsync();
+        var s = await DashboardSvc(w, w.As(Caller.AdminA)).GetDashboardStatsAsync();
+
+        s.IsSiteWide.Should().BeFalse();
+        s.TotalPeople.Should().Be(2);           // Alice and Aaron, not B's
+        s.DeletedCount.Should().Be(0);          // Bertha is B's
+        s.TotalRelationships.Should().Be(0);    // B's parent link, and the legacy A-B sibling row
+        s.FamilyCount.Should().Be(1);
+        s.UserCount.Should().Be(1);
+        s.PendingInvites.Should().Be(0);        // newbie@b.test is B's
+        s.TotalAuditEntries.Should().Be(0);     // B's member made the only entry
+        s.RecentAudit.Select(a => a.EntityId).Should().NotContain(w.B1);
+    }
+
+    [Fact]
+    public async Task Dashboard_MemberAndAnonymous_GetNothing()
+    {
+        var w = await SeedAsync();
+        foreach (var caller in new[] { w.As(Caller.MemberA), World.Anonymous })
+        {
+            var s = await DashboardSvc(w, caller).GetDashboardStatsAsync();
+            s.TotalPeople.Should().Be(0);
+            s.UserCount.Should().Be(0);
+            s.RecentAudit.Should().BeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task Dashboard_PositiveControls()
+    {
+        var w = await SeedAsync();
+
+        var b = await DashboardSvc(w, w.AdminBUser).GetDashboardStatsAsync();
+        b.IsSiteWide.Should().BeFalse();
+        b.TotalPeople.Should().Be(2);
+        b.DeletedCount.Should().Be(1);
+        b.TotalRelationships.Should().Be(1);
+        b.UserCount.Should().Be(2);
+        b.PendingInvites.Should().Be(1);
+        b.TotalAuditEntries.Should().Be(1);
+        b.RecentAudit.Select(a => a.EntityId).Should().Contain(w.B1);
+
+        var su = await DashboardSvc(w, w.SuperUser).GetDashboardStatsAsync();
+        su.IsSiteWide.Should().BeTrue();
+        su.TotalPeople.Should().Be(4);
+        su.DeletedCount.Should().Be(1);
+        su.FamilyCount.Should().Be(2);
+        su.UserCount.Should().Be(4);
+        su.PendingInvites.Should().Be(1);
+        su.TotalAuditEntries.Should().Be(1);
     }
 
     // ── MediumService ───────────────────────────────────────────────────────────
