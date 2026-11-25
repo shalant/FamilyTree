@@ -187,6 +187,38 @@ Seen by me on the live site (desktop, 1280px, light theme, super-user): the tree
 
 **Not checked:** anything on a phone (the footer, the add-photo badge, the folded form, the canvas); a family member's own view; the invite flow live. **Reviewer:** the same model that made the changes; the +2 is a legibility and consistency gain I could measure, so allow about 3 points either way. Further points now mostly need a real phone, real family data, or the #9 clean-up, not more small fixes.
 
+### Good cop re-score, 2026-11-24 (after the #124 to #126 deploys): **83 / 100, provisional**
+
+Seen by me on the live site at 1536px, signed in as the super-user, read only: the tree (dark and light), the loading screen, a person drawer (light), People (dark and light), Stories, Dashboard and Add person (dark), Admin Dashboard and Data check. The drop from 85 is not a regression: this pass looked at light and dark more closely and found rough edges that were already there.
+
+| Area | Was | Now | Why |
+|---|---|---|---|
+| Invite to first-tree flow | 17 | 17 | Not walked. |
+| Tree canvas readability | 18 | 18 | Calm and legible in both themes. |
+| Identity and first impression | 12 | 12 | The signed-out card is still not seen live. |
+| Mobile | 12 | 12 | Nothing seen on a phone. |
+| Empty, error and loading states | 8 | 8 | The loading sketch reads well; its caption sits off to the left (T1). |
+| Forms (Add/Edit person) | 8 | 8 | Add person only, nothing saved. |
+| Craft and consistency | 10 | **8** | #9 is confirmed live (dark primary buttons now have dark text), but 10/10 was too generous: T1, T2, T4, T5 and T6. |
+| **Total** | 85 | **83** | 17 + 18 + 12 + 12 + 8 + 8 + 8 |
+
+**Bad cop, new findings:**
+
+- **B1 (Medium):** anyone with no death date counts as living (`PersonDto.IsDeceased => DeathDate.HasValue`), so undated ancestors get a green "living" dot on People and are counted in the Dashboard and banner totals. Needs a way to record "deceased, date unknown" or an "unknown" state.
+- **B2 (Medium):** the tree's facts banner quotes people's notes, picked at random and cut at 85 characters. A sensitive family history note can appear as a rotating header, cut mid-sentence.
+- **T1 (Low):** the loading caption is left-aligned in its 340px box (`.ft-loading-art`), so it doesn't sit under the sketch.
+- **T2 (Low):** light-mode muted text is faint: the hero card's "Born ..." line is rgb(173,181,189) on near-white, about 2.1:1. The drawer's section headings look similarly faint (not measured).
+- **T3 (Low):** story text runs the full page width, about 1,500px per line at this size.
+- **T4 (Low):** the Admin subtitle reads "Arborkin", not "ArborKin".
+- **T5 (Low):** People shows 10 rows by default, so 30 people take three pages.
+- **T6 (Low):** in dark mode Add person has a dark green page background; the other pages are near-black.
+
+**Bad cop, open now:** 0 High, **2 Medium** (B1, B2), **14 Low** (the 8 from 2026-11-19 plus T1 to T6; the older 8 were not re-checked one by one).
+
+**Suggested order:** T1, T4, T2, T3 and T5 together (small CSS and markup changes), then B2, then B1 (needs a data model decision).
+
+**Not checked:** anything on a phone, the signed-out card, the invite flow, Stories in light mode, Photos pages, Edit person, and the Users, Stories, Audit log, Activity, Deleted and Messages tabs. **Reviewer:** the same model that built much of this, so allow about 3 points either way.
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
@@ -244,6 +276,8 @@ Seen by me on the live site (desktop, signed in as the super-user): page titles 
 | 2026-11-18 | bad cop | same | 0 High, 1 Medium, 11 Low open | #10, N1 and N2 fixed and live; only #9 (inline-style drift) remains Medium. |
 | 2026-11-19 | good cop | live arborkin.com after the #116 and #117 deploys, seen by me on desktop (signed in) | 85 (provisional) | +1 craft (every page title ends "ArborKin", seen live on /about, /dashboard, /people, /stories). Identity stays 12: the signed-out sign-in card changes are not yet seen live. |
 | 2026-11-19 | bad cop | same | 0 High, 1 Medium, 8 Low open (+3 fixed, awaiting a live look) | #13 to #15 fixed and live; #11, #12 and L1 merged and deployed but unseen. |
+| 2026-11-24 | good cop | live arborkin.com after the #124 to #126 deploys, seen by me on desktop, dark and light | 83 (provisional) | -2 craft: 10/10 was too generous (off-centre loading caption, faint light-mode text, "Arborkin", unlike page backgrounds). #9 confirmed live. |
+| 2026-11-24 | bad cop | same | 0 High, 2 Medium, 14 Low open | Adds B1 (undated people count as living), B2 (banner quotes notes) and T1 to T6. |
 
 ## Scope and method
 
