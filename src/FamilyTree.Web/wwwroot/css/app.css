@@ -56,7 +56,8 @@
     /* Semantic colours */
     --ft-text-primary: var(--ft-gray-700);
     --ft-text-secondary: var(--ft-gray-500);
-    --ft-text-muted: var(--ft-gray-300);
+    /* Quieter than secondary but still readable: gray-300 was about 2:1 on white. */
+    --ft-text-muted: #5c636a;
     /* Shadows */
     --ft-shadow-sm: 0 1px 3px rgba(0, 0, 0, .08);
     --ft-shadow-md: 0 4px 12px rgba(0, 0, 0, .10);
@@ -124,7 +125,7 @@
     /* Semantic */
     --ft-text-primary: var(--ft-gray-700);
     --ft-text-secondary: var(--ft-gray-500);
-    --ft-text-muted: var(--ft-gray-300);
+    --ft-text-muted: #9aa2ab;
     /* Shadows */
     --ft-shadow-sm: 0 1px 3px rgba(0, 0, 0, .40);
     --ft-shadow-md: 0 4px 12px rgba(0, 0, 0, .50);
@@ -770,6 +771,7 @@ html body #blazor-error-ui .dismiss {
 
 .ft-loading-text {
     margin: 14px 0 0;
+    text-align: center;
     font: italic 500 17px/1.4 Georgia, serif;
     color: var(--ft-green-800);
     opacity: 0.8;
@@ -1112,6 +1114,17 @@ html body #blazor-error-ui .dismiss {
     /* pull up to cover the MudMainContent appbar-padding gap */
     margin-top: -64px;
     padding-top: 64px;
+}
+
+/* The inverted palette turns the fade's top into a dark green; match the other pages instead. */
+[data-theme="dark"] .ft-form-page {
+    background: var(--ft-surface);
+}
+
+/* A story is read, not scanned: keep the line length comfortable on a wide screen. */
+.ft-stories-page {
+    max-width: 760px;
+    margin: 0 auto;
 }
 
 .ft-field-label {

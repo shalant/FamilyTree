@@ -82,6 +82,7 @@
     {
         <MudTable Items="FilteredPeople" Hover="true"
                   T="PersonDto"
+                  @bind-RowsPerPage="_rowsPerPage"
                   Breakpoint="Breakpoint.None"
                   OnRowClick="@(e => Nav.NavigateTo($"/people/{e.Item!.Id}/edit"))"
                   Class="people-table">
@@ -145,6 +146,7 @@
     private bool _loading = true;
     private string _search = "";
     private string _statusFilter = "all";
+    private int _rowsPerPage = 25;
 
     protected override async Task OnInitializedAsync()
     {

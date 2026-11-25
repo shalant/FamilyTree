@@ -219,6 +219,17 @@ Seen by me on the live site at 1536px, signed in as the super-user, read only: t
 
 **Not checked:** anything on a phone, the signed-out card, the invite flow, Stories in light mode, Photos pages, Edit person, and the Users, Stories, Audit log, Activity, Deleted and Messages tabs. **Reviewer:** the same model that built much of this, so allow about 3 points either way.
 
+### Addendum 2026-11-24: B2 and T1 to T6 fixed (`fix/ux-touchups`)
+
+- **B2:** the facts banner no longer quotes anyone's notes.
+- **T1:** the loading caption is centred under the sketch.
+- **T2:** `--ft-text-muted` is now #5c636a in light and #9aa2ab in dark (both pass 4.5:1), and the person drawer's labels use it at 11px. This also darkens every other muted caption.
+- **T3:** the Stories page is a centred 760px column.
+- **T4:** the Admin subtitle reads "ArborKin".
+- **T5:** People starts at 25 rows a page.
+- **T6:** in dark mode the person form pages use the same background as the others.
+- `UiTouchUpTests` covers these. **Not seen** in a browser or on a phone, so the score doesn't move until they are seen live. **B1 is still open:** it needs a way to record "died, date unknown".
+
 ### Bad cop (severity list, no number)
 
 The numbered findings below stay as written. Open after the 2026-11-15 deploy:
