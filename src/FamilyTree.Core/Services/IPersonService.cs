@@ -1,5 +1,6 @@
 using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Person;
+using FamilyTree.Shared.Enums;
 
 namespace FamilyTree.Core.Services;
 
@@ -17,6 +18,8 @@ public interface IPersonService
     Task<ServiceResponse<PersonDto>> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<ServiceResponse<PersonDto>> CreateAsync(PersonUpsertDto dto, CancellationToken ct = default);
     Task<ServiceResponse<PersonDto>> UpdateAsync(Guid id, PersonUpsertDto dto, CancellationToken ct = default);
+    /// <summary>What the caller may change on this person.</summary>
+    Task<ServiceResponse<PersonEditAccess>> GetEditAccessAsync(Guid id, CancellationToken ct = default);
     /// <summary>
     /// Makes one of the person's own photos their profile photo. Allowed for any member
     /// of the person's family.

@@ -1,8 +1,10 @@
+using FamilyTree.Core.Mappers;
 using FamilyTree.Core.Models;
 using FamilyTree.Core.Services;
 using FamilyTree.Core.Tests.Helpers;
 using Xunit;
 using FamilyTree.Shared.DTOs.Person;
+using FamilyTree.Shared.Enums;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -543,6 +545,78 @@ public class PersonServiceTests
         result.Success.Should().BeFalse();
         await using var ctx = factory.CreateDbContext();
         ctx.People.Single(p => p.Id == bill.Data.Id).ProfilePhotoUrl.Should().BeNull();
+    }
+
+    // ── A Member editing their own record (2026-11-26) ───────────────────────────
+
+    /// A family of two: the Member's own person, linked to their account, and their parent.
+    private static async Task<(PersonService member, TestDbContextFactory factory, Guid own, Guid parent)>
+        MemberWithOwnPersonAsync()
+    {
+        var familyId = Guid.NewGuid();
+        var (admin, factory, _) = CreateSut(userId: Guid.NewGuid(), familyId: familyId);
+        var parent = await admin.CreateAsync(new PersonUpsertDto { FirstName = "Ray", LastName = "Small" });
+        var own = await admin.CreateAsync(new PersonUpsertDto
+        {
+            FirstName = "Willa", LastName = "Small", ParentIds = [parent.Data!.Id],
+        });
+
+        var userId = Guid.NewGuid();
+        await using (var ctx = factory.CreateDbContext())
+        {
+            ctx.Users.Add(new AppUser { Id = userId, PersonId = own.Data!.Id });
+            await ctx.SaveChangesAsync();
+        }
+        var user = new FakeCurrentUserService { UserId = userId, FamilyId = familyId };
+        var member = new PersonService(factory, NullLogger<PersonService>.Instance, new FakeAuditLogService(), user);
+        return (member, factory, own.Data!.Id, parent.Data.Id);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_MemberCanCorrectTheirOwnDetails_AndKeepsTheirLinks()
+    {
+        var (member, factory, own, parent) = await MemberWithOwnPersonAsync();
+        var dto = PersonMapper.ToUpsertDto((await member.GetByIdAsync(own)).Data!);
+        dto.BirthPlace = "Oak Park";
+
+        var result = await member.UpdateAsync(own, dto);
+
+        result.Success.Should().BeTrue(result.Message);
+        result.Data!.BirthPlace.Should().Be("Oak Park");
+        result.Data.ParentIds.Should().Equal(parent);
+        (await member.GetEditAccessAsync(own)).Data.Should().Be(PersonEditAccess.OwnDetails);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_MemberCannotChangeTheirOwnFamilyLinks()
+    {
+        var (member, factory, own, _) = await MemberWithOwnPersonAsync();
+        var dto = PersonMapper.ToUpsertDto((await member.GetByIdAsync(own)).Data!);
+        dto.ParentIds = [];
+        dto.BirthPlace = "Oak Park";
+
+        var result = await member.UpdateAsync(own, dto);
+
+        result.Success.Should().BeFalse();
+        result.Message.Should().Be("Only an admin can change family links.");
+        await using var ctx = factory.CreateDbContext();
+        ctx.Relationships.Count(r => r.DeletedAt == null).Should().Be(1);
+        ctx.People.Single(p => p.Id == own).BirthPlace.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_MemberCannotEditSomeoneElse()
+    {
+        var (member, factory, _, parent) = await MemberWithOwnPersonAsync();
+        var dto = PersonMapper.ToUpsertDto((await member.GetByIdAsync(parent)).Data!);
+        dto.BirthPlace = "Oak Park";
+
+        var result = await member.UpdateAsync(parent, dto);
+
+        result.Success.Should().BeFalse();
+        (await member.GetEditAccessAsync(parent)).Data.Should().Be(PersonEditAccess.None);
+        await using var ctx = factory.CreateDbContext();
+        ctx.People.Single(p => p.Id == parent).BirthPlace.Should().BeNull();
     }
 
     // S8 (2026-10-25): read DTOs carry /media/{blob}, so the edit form sends that back as

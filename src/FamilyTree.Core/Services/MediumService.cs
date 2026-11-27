@@ -247,6 +247,9 @@ public class MediumService(
             if (medium is null)
                 return ServiceResponse.Fail($"Medium {id} not found.");
 
+            if (!CanDelete(medium))
+                return ServiceResponse.Fail("Only the person who added this, or an admin, can delete it.");
+
             _ = await blobStorage.DeleteAsync(medium.Url, ct);
 
             // A profile photo that no longer exists must not stay on the person. Done here
@@ -392,8 +395,15 @@ public class MediumService(
         return null;
     }
 
-    private static MediumDto MapToDto(Medium medium) => new()
+    // Family photos are hard to replace, so a Member deletes only what they added
+    // (decided 2026-11-26). Rows with no recorded uploader are for admins.
+    private bool CanDelete(Medium medium) =>
+        currentUser.IsSuperUser || currentUser.IsAdmin ||
+        (currentUser.UserId.HasValue && medium.CreatedBy == currentUser.UserId);
+
+    private MediumDto MapToDto(Medium medium) => new()
     {
+        CanDelete = CanDelete(medium),
         Id = medium.Id,
         PersonId = medium.PersonId,
         // Served through the app, never the blob URL (S8): MediaPaths.

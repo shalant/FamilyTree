@@ -148,11 +148,14 @@ else
                                         @onclick="@(() => EditPhoto(photo))">
                                     @CaptionVerb(photo) caption
                                 </button>
-                                <button type="button" class="ft-photo-tile__action ft-photo-tile__action--remove"
-                                        aria-label="@($"Remove photo: {PhotoName(photo)}")"
-                                        @onclick="@(() => DeletePhoto(photo))">
-                                    Remove
-                                </button>
+                                @if (photo.CanDelete)
+                                {
+                                    <button type="button" class="ft-photo-tile__action ft-photo-tile__action--remove"
+                                            aria-label="@($"Remove photo: {PhotoName(photo)}")"
+                                            @onclick="@(() => DeletePhoto(photo))">
+                                        Remove
+                                    </button>
+                                }
                             </div>
                         </div>
                     }
@@ -287,10 +290,13 @@ else
                                                Size="Size.Small"
                                                Style="color:var(--ft-gray-400);"
                                                Href="@rec.Url" Target="_blank" />
-                                <MudIconButton Icon="@Icons.Material.Outlined.Delete"
-                                               Size="Size.Small"
-                                               Style="color:var(--ft-gray-300);"
-                                               OnClick="@(() => DeleteRecord(rec))" />
+                                @if (rec.CanDelete)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete"
+                                                   Size="Size.Small"
+                                                   Style="color:var(--ft-gray-300);"
+                                                   OnClick="@(() => DeleteRecord(rec))" />
+                                }
                             </div>
                         </div>
                     }
@@ -346,6 +352,7 @@ else
         public string? Caption { get; set; }
         // Set by the <img> @onerror; swaps the tile for a "couldn't be loaded" placeholder.
         public bool Broken { get; set; }
+        public bool CanDelete { get; set; }
     }
 
     // ── Records ──────────────────────────────────────────────────────────
@@ -366,6 +373,7 @@ else
         public string? DocType { get; set; }
         public string? Caption { get; set; }
         public DateOnly? Date { get; set; }
+        public bool CanDelete { get; set; }
     }
 
     // ── Document type taxonomy ────────────────────────────────────────────
@@ -408,7 +416,8 @@ else
                     Id = m.Id,
                     Url = m.Url,
                     FileName = m.FileName,
-                    Caption = m.Caption
+                    Caption = m.Caption,
+                    CanDelete = m.CanDelete
                 })
                 .ToList();
 
@@ -420,7 +429,8 @@ else
                     Url = m.Url,
                     FileName = m.FileName,
                     DocType = m.Caption,
-                    Date = null
+                    Date = null,
+                    CanDelete = m.CanDelete
                 })
                 .ToList();
         }
@@ -458,7 +468,8 @@ else
                         Id = medium.Id,
                         Url = medium.Url,
                         FileName = dto.FileName,
-                        Caption = null
+                        Caption = null,
+                        CanDelete = medium.CanDelete
                     });
                     Toast.Success($"{file.Name} uploaded successfully");
                 }
@@ -618,7 +629,8 @@ else
                     DocType = _newRecordType,
                     Caption = string.IsNullOrWhiteSpace(_newRecordCaption) ? null : _newRecordCaption,
                     Date = _newRecordDate.HasValue ? DateOnly.FromDateTime(_newRecordDate.Value) : null,
-                    Url = medium.Url
+                    Url = medium.Url,
+                    CanDelete = medium.CanDelete
                 });
                 Toast.Success($"{_newRecordType} saved successfully");
                 _pendingRecordFile = null;

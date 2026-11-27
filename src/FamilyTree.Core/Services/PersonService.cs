@@ -318,16 +318,21 @@ public class PersonService(
             if (!dtoValidation.Success)
                 return ServiceResponse<PersonDto>.Fail(dtoValidation.Message);
 
-            // Only super-users and admins can update people. Checked before the lookup so a
-            // Member gets the same answer for a real GUID and a made-up one.
-            if (!currentUser.IsSuperUser && !currentUser.IsAdmin)
-                return ServiceResponse<PersonDto>.Fail("You do not have permission to update this person.");
-
             await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            // Admins may update anyone; a Member only the person their account is linked to.
+            // Checked before the lookup so a Member gets the same answer for a real GUID and
+            // a made-up one.
+            var isAdmin = currentUser.IsSuperUser || currentUser.IsAdmin;
+            if (!isAdmin && !await IsOwnPersonAsync(ctx, id, ct))
+                return ServiceResponse<PersonDto>.Fail("You do not have permission to update this person.");
 
             var person = await ScopedPeople(ctx).FirstOrDefaultAsync(p => p.Id == id, ct);
             if (person is null)
                 return ServiceResponse<PersonDto>.Fail($"Person {id} not found.");
+
+            if (!isAdmin && await ChangesFamilyLinksAsync(ctx, person, dto, ct))
+                return ServiceResponse<PersonDto>.Fail("Only an admin can change family links.");
 
             var dateError = ValidatePersonDates(dto);
             if (dateError != null) return ServiceResponse<PersonDto>.Fail(dateError);
@@ -373,7 +378,9 @@ public class PersonService(
             person.UpdatedAt = DateTime.UtcNow;
             person.UpdatedBy = userId;
 
-            await SyncRelationshipsDiffAsync(ctx, id, dto, userId, ct);
+            // A Member's save has just been checked to leave every link as it is.
+            if (isAdmin)
+                await SyncRelationshipsDiffAsync(ctx, id, dto, userId, ct);
             if (oldDeathDate != dto.DeathDate)
                 await RefreshEndedMarriageDatesAsync(ctx, id, oldDeathDate, dto.DeathDate, ct);
             await ctx.SaveChangesAsync(ct);
@@ -389,6 +396,51 @@ public class PersonService(
             logger.LogError(ex, "Error updating person {Id}", id);
             return ServiceResponse<PersonDto>.Fail("An error occurred updating this person.");
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    //  WHO MAY EDIT (decided 2026-11-26)
+    // ─────────────────────────────────────────────────────────────
+    public async Task<ServiceResponse<PersonEditAccess>> GetEditAccessAsync(Guid id, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync(ct);
+
+            if (!await ScopedPeople(ctx).AnyAsync(p => p.Id == id, ct))
+                return ServiceResponse<PersonEditAccess>.Fail($"Person {id} not found.");
+
+            if (currentUser.IsSuperUser || currentUser.IsAdmin)
+                return ServiceResponse<PersonEditAccess>.Ok(PersonEditAccess.Full);
+
+            return ServiceResponse<PersonEditAccess>.Ok(
+                await IsOwnPersonAsync(ctx, id, ct) ? PersonEditAccess.OwnDetails : PersonEditAccess.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error checking edit access for person {Id}", id);
+            return ServiceResponse<PersonEditAccess>.Fail("An error occurred loading this person.");
+        }
+    }
+
+    // Read from the database, not the PersonId claim, which is stale until the session refreshes.
+    private async Task<bool> IsOwnPersonAsync(AppDbContext ctx, Guid personId, CancellationToken ct)
+    {
+        var userId = currentUser.UserId;
+        return userId.HasValue &&
+               await ctx.Users.AnyAsync(u => u.Id == userId && u.PersonId == personId, ct);
+    }
+
+    private async Task<bool> ChangesFamilyLinksAsync(
+        AppDbContext ctx, Person person, PersonUpsertDto dto, CancellationToken ct)
+    {
+        var stored = PersonMapper.ToUpsertDto(
+            PersonMapper.MapPersonToDto(person, await VisibleRelationshipsOfAsync(ctx, person.Id, ct)));
+
+        static bool Differs(List<Guid> a, List<Guid> b) => !a.ToHashSet().SetEquals(b);
+        return Differs(stored.ParentIds, dto.ParentIds) || Differs(stored.ChildIds, dto.ChildIds) ||
+               Differs(stored.SpouseIds, dto.SpouseIds) || Differs(stored.FormerSpouseIds, dto.FormerSpouseIds) ||
+               Differs(stored.SiblingIds, dto.SiblingIds);
     }
 
     // ─────────────────────────────────────────────────────────────

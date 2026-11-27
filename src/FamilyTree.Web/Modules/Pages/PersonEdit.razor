@@ -4,6 +4,7 @@
 @using FamilyTree.Core.Mappers
 @using FamilyTree.Core.Services
 @using FamilyTree.Shared.DTOs.Person
+@using FamilyTree.Shared.Enums
 @using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Modules.Dialogs
 @using FamilyTree.Web.Services
@@ -25,6 +26,24 @@ else if (_notFound)
 {
     <MudAlert Severity="Severity.Warning">Person not found.</MudAlert>
 }
+else if (_access == PersonEditAccess.None)
+{
+    @* Said up front: the form used to open and then refuse on Save. *@
+    <div class="ft-form-page">
+        <MudContainer MaxWidth="MaxWidth.Small">
+            <div class="page-header">@_person!.FullName</div>
+            <MudText Class="mb-4">
+                Only an admin can change someone else's details. You can still add photos of them.
+            </MudText>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@($"/people/{Id}/media")">
+                    Add photos
+                </MudButton>
+                <MudButton Variant="Variant.Text" Href="/">Back to the family tree</MudButton>
+            </div>
+        </MudContainer>
+    </div>
+}
 else
 {
     <div class="ft-form-page">
@@ -32,6 +51,7 @@ else
             <div class="page-header">Edit @_person!.FullName</div>
             <PersonForm Initial="_formModel"
                         EditingId="@Id"
+                        LockRelationships="@(_access != PersonEditAccess.Full)"
                         AllPeople="_allPeople"
                         SubmitLabel="Save changes"
                         OnSubmit="HandleSubmit"
@@ -39,13 +59,16 @@ else
             @* Same margin:auto; max-width:680px as PersonForm's own root MudStack, so this
                row's right edge lines up with Cancel/Save Changes instead of stretching to
                MudContainer's wider MaxWidth.Medium bound. *@
-            <div style="display:flex; gap:8px; justify-content:flex-end; margin:16px auto 0; max-width:680px;">
-                <MudButton Variant="Variant.Outlined" Color="Color.Error"
-                           StartIcon="@Icons.Material.Filled.Delete"
-                           OnClick="HandleDelete">
-                    Delete person
-                </MudButton>
-            </div>
+            @if (_access == PersonEditAccess.Full)
+            {
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin:16px auto 0; max-width:680px;">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                               StartIcon="@Icons.Material.Filled.Delete"
+                               OnClick="HandleDelete">
+                        Delete person
+                    </MudButton>
+                </div>
+            }
         </MudContainer>
     </div>
 }
@@ -58,6 +81,7 @@ else
     private List<PersonDto> _allPeople = [];
     private bool _loading = true;
     private bool _notFound;
+    private PersonEditAccess _access;
 
     protected override async Task OnInitializedAsync()
     {
@@ -75,6 +99,10 @@ else
         if (!allResult.Success)
             Toast.Warning(allResult.Message);
 
+        var accessResult = await PersonService.GetEditAccessAsync(Id);
+        if (!accessResult.Success)
+            Toast.Error(accessResult.Message);
+        _access    = accessResult.Success ? accessResult.Data : PersonEditAccess.None;
         _person    = personResult.Data!;
         _allPeople = allResult.Data ?? [];
         _formModel = PersonMapper.ToUpsertDto(_person);
