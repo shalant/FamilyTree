@@ -73,10 +73,10 @@
                     </div>
                 }
 
-                @* Browse button affordance *@
+                @* Browse button affordance; on a touch screen the whole zone already says "Tap" *@
                 @if (!_dragging)
                 {
-                    <div style="font-size:12px; color:var(--ft-green-600);
+                    <div class="ft-browse-pill" style="font-size:12px; color:var(--ft-green-600);
                         border:1px solid var(--ft-green-600); border-radius:6px;
                         padding:4px 14px; margin-top:2px;">
                         Browse files
@@ -87,7 +87,7 @@
     </label>
 
     @* ── Queued files summary chip ──────────────────────────────────────── *@
-    @if (_queued.Count > 0)
+    @if (ShowQueueSummary && _queued.Count > 0)
     {
         <div style="display:flex; align-items:center; justify-content:space-between;
             padding:8px 12px; border-radius:8px;
@@ -144,6 +144,12 @@
 
     /// <summary>Compact single-line layout — use inside a form row.</summary>
     [Parameter] public bool Compact { get; set; }
+
+    /// <summary>
+    /// The "1 file selected" chip. Right where a Save button follows; wrong where picking a file
+    /// uploads it, because it reads as waiting for one.
+    /// </summary>
+    [Parameter] public bool ShowQueueSummary { get; set; } = true;
 
     /// <summary>Called with the full list of selected files after each pick.</summary>
     [Parameter] public EventCallback<IReadOnlyList<IBrowserFile>> OnFilesSelected { get; set; }

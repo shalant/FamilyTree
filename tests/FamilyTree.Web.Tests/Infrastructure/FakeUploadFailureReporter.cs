@@ -23,3 +23,14 @@ public sealed class UnreadableFile(long size = 1024) : IBrowserFile
     public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default)
         => throw new IOException("NotReadableError: The requested file could not be read");
 }
+
+public sealed class ReadableFile : IBrowserFile
+{
+    public string Name => "new.jpg";
+    public DateTimeOffset LastModified => DateTimeOffset.UnixEpoch;
+    public long Size => 3;
+    public string ContentType => "image/jpeg";
+
+    public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default)
+        => new MemoryStream([1, 2, 3]);
+}

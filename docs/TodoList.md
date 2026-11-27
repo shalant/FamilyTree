@@ -27,6 +27,28 @@
 - [ ] Remove the test data: "Testy McTesters", "Test2 Test2", their photos, the `+test3` account
       and unused test invites.
 
+## Admin "Problems" list (idea, 2026-11-26, not decided)
+
+Asked after a member's save was refused and nothing recorded it. Worth having before the next
+invite: today a relative's failed attempt is only known if they say so.
+
+- [ ] Record every red toast (nearly all go through `ToastService.Error`) in a new table: who,
+      when, page, person involved, message, technical error. Needs a migration.
+- [ ] Super-user-only Admin > Problems tab: newest first in local time, repeats grouped with a
+      count, mark as dealt with. Delete entries after 90 days (messages can name relatives).
+- [ ] Decide email: recommended only for unexpected errors and failed uploads, rate-limited.
+      The alternative is an email for every red toast, which is quicker to build but would also
+      send ordinary refusals (impossible dates, missing names).
+- Not covered by toasts: inline errors, dropped connections, frozen pages. Include crashes.
+
+## Photo upload gave no feedback (2026-11-26)
+
+- [x] Fixed (`fix/photo-upload-feedback`): on a phone a person's Photos page showed only "1 file
+      selected" while uploading, which read as waiting for a Save button. It now says "Uploading
+      your photo…", says that photos save as soon as they're chosen, and drops the chip. The
+      desktop wording in the empty state and the "Browse files" pill on touch screens are gone.
+      Not yet checked on a phone.
+
 ## Phone walkthrough fixes (2026-11-20)
 
 Found by Doug walking the story-invite flow on a real phone, 2026-11-19.

@@ -2642,3 +2642,18 @@ img.ft-photo { color: transparent; font-size: 0; }
     .ft-on-pointer { display: none; }
     .ft-on-touch { display: inline; }
 }
+
+.ft-upload-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--ft-text-muted);
+    text-align: center;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .ft-browse-pill { display: none !important; }
+}

@@ -98,7 +98,19 @@ else
                                  Hint="JPG, PNG, WebP · max 8 MB each. HEIC works only if your browser can convert it"
                                  Accept="image/*"
                                  Multiple="true"
+                                 ShowQueueSummary="false"
                                  OnFilesSelected="OnPhotosSelected" />
+                <div class="ft-upload-status" role="status">
+                    @if (_uploadingCount > 0)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+                        <span>Uploading @(_uploadingCount == 1 ? "your photo" : $"{_uploadingCount} photos")… please stay on this page.</span>
+                    }
+                    else
+                    {
+                        <span>Photos are saved as soon as you choose them.</span>
+                    }
+                </div>
             </div>
 
             @if (_photos.Any())
@@ -167,9 +179,6 @@ else
                     <MudIcon Icon="@Icons.Material.Outlined.PhotoLibrary"
                              Style="font-size:40px; display:block; margin:0 auto 10px;" />
                     <div style="font-size:14px;">No photos yet</div>
-                    <div style="font-size:12px; margin-top:4px;">
-                        Drag photos above or click to browse
-                    </div>
                 </div>
             }
         }
@@ -337,6 +346,9 @@ else
 
     private string? _profilePhotoUrl;
 
+    // Photos still on their way up. Until 2026-11-26 nothing on the page showed an upload running.
+    private int _uploadingCount;
+
     // A photo's name for a screen reader: its caption, else its file name.
     private static string PhotoName(PhotoItem photo) =>
         string.IsNullOrWhiteSpace(photo.Caption) ? photo.FileName : photo.Caption;
@@ -443,6 +455,8 @@ else
     private async Task OnPhotosSelected(IReadOnlyList<IBrowserFile> files)
     {
         var fileList = files.ToList();
+        _uploadingCount += fileList.Count;
+        StateHasChanged();
         for (int i = 0; i < fileList.Count; i++)
         {
             var file = fileList[i];
@@ -482,6 +496,11 @@ else
             {
                 Toast.Error(UploadFailure.MessageFor(file.Size, MaxPhotoBytes));
                 await UploadFailures.ReportAsync(file, MaxPhotoBytes, ex);
+            }
+            finally
+            {
+                _uploadingCount--;
+                StateHasChanged();
             }
         }
         StateHasChanged();
