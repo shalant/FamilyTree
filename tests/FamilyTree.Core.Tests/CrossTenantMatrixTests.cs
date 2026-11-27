@@ -301,6 +301,15 @@ public class CrossTenantMatrixTests
     }
 
     [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    public async Task Person_GetEditAccessAsync_FamilyBPerson_Fails(Caller c)
+    {
+        var w = await SeedAsync();
+        var r = await PersonSvc(w, w.As(c)).GetEditAccessAsync(w.B1);
+        r.Success.Should().BeFalse();
+        r.Message.Should().NotContainAny(BNames);
+    }
+
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Person_SetProfilePhotoAsync_FamilyBPerson_FailsAndLeavesItUnchanged(Caller c)
     {
         var w = await SeedAsync();

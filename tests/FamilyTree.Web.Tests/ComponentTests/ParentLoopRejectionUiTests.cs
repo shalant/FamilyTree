@@ -95,6 +95,8 @@ class RejectingPersonService(PersonDto person, string failureMessage) : IPersonS
 
     public Task<ServiceResponse<List<PersonDto>>> GetAllForUserAsync(Guid userId, CancellationToken ct = default)
         => throw new NotImplementedException();
+    public Task<ServiceResponse<FamilyTree.Shared.Enums.PersonEditAccess>> GetEditAccessAsync(Guid id, CancellationToken ct = default)
+        => Task.FromResult(ServiceResponse<FamilyTree.Shared.Enums.PersonEditAccess>.Ok(FamilyTree.Shared.Enums.PersonEditAccess.Full));
     public Task<ServiceResponse> SetProfilePhotoAsync(Guid personId, Guid mediumId, CancellationToken ct = default)
         => throw new NotImplementedException();
     public Task<ServiceResponse> DeleteAsync(Guid id, CancellationToken ct = default)

@@ -51,6 +51,7 @@ public class MediumServiceTests
         var familyId = Guid.NewGuid();
         var personId = Guid.NewGuid();
         var mediumId = Guid.NewGuid();
+        var uploader = Guid.NewGuid();
         const string url = "https://fake-blob/a.jpg";
         var profileUrl = deletingTheProfilePhoto ? url : "https://fake-blob/other.jpg";
         await using (var ctx = dbFactory.CreateDbContext())
@@ -63,19 +64,64 @@ public class MediumServiceTests
             ctx.Media.Add(new Medium
             {
                 Id = mediumId, PersonId = personId, Url = url, FileName = "a.jpg",
-                MimeType = "image/jpeg", Type = "photo",
+                MimeType = "image/jpeg", Type = "photo", CreatedBy = uploader,
             });
             await ctx.SaveChangesAsync();
         }
         var service = new MediumService(
             dbFactory, new FakeBlobStorageService(), NullLogger<MediumService>.Instance,
-            new FakeAuditLogService(), new FakeCurrentUserService { UserId = Guid.NewGuid(), FamilyId = familyId });
+            new FakeAuditLogService(), new FakeCurrentUserService { UserId = uploader, FamilyId = familyId });
 
         var result = await service.DeleteAsync(mediumId);
 
         Assert.True(result.Success, result.Message);
         await using var check = dbFactory.CreateDbContext();
         Assert.Equal(deletingTheProfilePhoto ? null : profileUrl, check.People.Single().ProfilePhotoUrl);
+    }
+
+    // Decided 2026-11-26: a Member deletes only what they added; admins delete anything.
+    // A row with no recorded uploader counts as someone else's.
+    [Theory]
+    [InlineData("uploader", true, true)]
+    [InlineData("other member", true, false)]
+    [InlineData("other member", false, false)]
+    [InlineData("admin", true, true)]
+    [InlineData("super-user", true, true)]
+    public async Task DeleteAsync_IsForTheUploaderAndAdmins(string who, bool uploaderRecorded, bool allowed)
+    {
+        var dbFactory = new TestDbContextFactory();
+        var familyId = Guid.NewGuid();
+        var personId = Guid.NewGuid();
+        var mediumId = Guid.NewGuid();
+        var uploader = Guid.NewGuid();
+        await using (var ctx = dbFactory.CreateDbContext())
+        {
+            ctx.People.Add(new Person { Id = personId, FirstName = "Test", LastName = "Person", FamilyId = familyId });
+            ctx.Media.Add(new Medium
+            {
+                Id = mediumId, PersonId = personId, Url = "https://fake-blob/a.jpg", FileName = "a.jpg",
+                MimeType = "image/jpeg", Type = "photo", CreatedBy = uploaderRecorded ? uploader : null,
+            });
+            await ctx.SaveChangesAsync();
+        }
+        var user = new FakeCurrentUserService
+        {
+            UserId = who == "uploader" ? uploader : Guid.NewGuid(),
+            FamilyId = familyId,
+            IsAdmin = who == "admin",
+            IsSuperUser = who == "super-user",
+        };
+        var service = new MediumService(
+            dbFactory, new FakeBlobStorageService(), NullLogger<MediumService>.Instance,
+            new FakeAuditLogService(), user);
+
+        var listed = await service.GetByPersonIdAsync(personId);
+        var result = await service.DeleteAsync(mediumId);
+
+        Assert.Equal(allowed, Assert.Single(listed.Data!).CanDelete);
+        Assert.Equal(allowed, result.Success);
+        await using var check = dbFactory.CreateDbContext();
+        Assert.Equal(allowed ? 0 : 1, check.Media.Count());
     }
 
     [Fact]

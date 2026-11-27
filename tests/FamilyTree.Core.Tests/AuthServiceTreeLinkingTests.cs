@@ -338,6 +338,28 @@ public class AuthServiceTreeLinkingTests
         reloaded!.PersonId.Should().Be(personId);
     }
 
+    // The linked person is the one a Member may edit (2026-11-26), so no re-linking.
+    [Fact]
+    public async Task LinkUserToTreeAsync_AccountAlreadyLinked_CannotMoveToSomeoneElse()
+    {
+        var (service, factory, userManager) = CreateSut();
+        var user = await CreateExistingUserAsync(userManager, "link@example.com");
+        await PutInFamilyAsync(factory, user.Id);
+        var rose = new Person { FirstName = "Rose", LastName = "Small", FamilyId = TestFamilyId };
+        var ray = new Person { FirstName = "Ray", LastName = "Small", FamilyId = TestFamilyId };
+        await using (var ctx = factory.CreateDbContext())
+        {
+            ctx.People.AddRange(rose, ray);
+            await ctx.SaveChangesAsync();
+        }
+        (await service.LinkUserToTreeAsync(user.Id, rose.Id, null, null)).Success.Should().BeTrue();
+
+        var result = await service.LinkUserToTreeAsync(user.Id, ray.Id, null, null);
+
+        result.Success.Should().BeFalse();
+        (await userManager.FindByIdAsync(user.Id.ToString()))!.PersonId.Should().Be(rose.Id);
+    }
+
     // Regression for 2026-07-08: two different accounts both named "Elliot Rosenberg"
     // meant the duplicate-detection modal could offer an already-claimed Person as a
     // "is this you?" match, and LinkUserToTreeAsync used to let SQL Server's

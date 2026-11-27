@@ -13,10 +13,16 @@
 - [x] Fixed (`fix/member-photos`): a Member couldn't choose a profile photo. Any family member now
       can (`SetProfilePhotoAsync`), and deleting a profile photo clears it on the person. The
       rest of a person stays Admin-only. Not yet checked live.
-- [ ] A Member's Edit person page still refuses on Save, including a profile photo picked there
-      with "Use as profile". Decide whether members may edit their own person.
-- [ ] Any member can delete any family photo or record, and edit its caption. Decide whether to
-      limit that to the uploader and Admins.
+- [x] Fixed (`fix/member-edit-rules`): a Member can now edit their own record (name, dates,
+      places, notes, email, gender, profile photo). Family links and deleting stay Admin-only,
+      and someone else's Edit page says so instead of refusing on Save. An account that is
+      already linked can no longer re-link itself. Not yet checked live.
+- [x] Fixed (`fix/member-edit-rules`): any member could delete any family photo or record. A
+      Member now deletes only what they uploaded; Admins delete anything. Captions are still
+      editable by anyone in the family. Not yet checked live.
+- [ ] A newly registered, unlinked account can claim any unclaimed person at the "Who are you?"
+      step, and can then edit that record. Use Admin > Users "Who is this?" on invites, or
+      decide on an approval step.
 - [ ] Admin > Audit log shows unlabelled UTC times and ID fragments instead of names.
 - [ ] Remove the test data: "Testy McTesters", "Test2 Test2", their photos, the `+test3` account
       and unused test invites.

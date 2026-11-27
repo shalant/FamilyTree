@@ -11,4 +11,6 @@ public class MediumDto
     public string? Type { get; set; }
     public DateTime? CreatedAt { get; set; }
     public byte[]? RowVersion { get; set; }
+    /// <summary>Whether the caller may delete it; the service checks again.</summary>
+    public bool CanDelete { get; set; }
 }

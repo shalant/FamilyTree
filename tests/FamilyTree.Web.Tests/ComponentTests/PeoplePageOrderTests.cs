@@ -55,6 +55,8 @@ public class PeoplePageOrderTests : ComponentTestBase
         public Task<ServiceResponse<PersonDto>> GetByIdAsync(Guid id, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<ServiceResponse<PersonDto>> CreateAsync(PersonUpsertDto dto, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<ServiceResponse<PersonDto>> UpdateAsync(Guid id, PersonUpsertDto dto, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<ServiceResponse<FamilyTree.Shared.Enums.PersonEditAccess>> GetEditAccessAsync(Guid id, CancellationToken ct = default)
+            => Task.FromResult(ServiceResponse<FamilyTree.Shared.Enums.PersonEditAccess>.Ok(FamilyTree.Shared.Enums.PersonEditAccess.Full));
         public Task<ServiceResponse> SetProfilePhotoAsync(Guid personId, Guid mediumId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<ServiceResponse> DeleteAsync(Guid id, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<ServiceResponse> RestoreAsync(Guid id, CancellationToken ct = default) => throw new NotImplementedException();

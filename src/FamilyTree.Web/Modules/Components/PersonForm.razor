@@ -170,11 +170,14 @@
                                             Use as profile
                                         </button>
                                     }
-                                    <button type="button" class="ft-photo-tile__action ft-photo-tile__action--remove"
-                                            aria-label="@($"Remove photo: {photo.FileName}")"
-                                            @onclick="@(() => DeletePhoto(photo))">
-                                        Remove
-                                    </button>
+                                    @if (photo.CanDelete)
+                                    {
+                                        <button type="button" class="ft-photo-tile__action ft-photo-tile__action--remove"
+                                                aria-label="@($"Remove photo: {photo.FileName}")"
+                                                @onclick="@(() => DeletePhoto(photo))">
+                                            Remove
+                                        </button>
+                                    }
                                 </div>
                             </div>
                         }
@@ -285,6 +288,12 @@
         </MudStack>
     </MudPaper>
 
+    @if (LockRelationships)
+    {
+        <div class="ft-relationships-hint">Family links are managed by an admin.</div>
+    }
+    else
+    {
     <!-- Relationships Card -->
     <MudPaper Elevation="0" Class="pa-5" Style="background:var(--ft-surface-card); border-radius:12px;">
         @* The five pickers used to sit open between the name and the notes, so adding someone by name
@@ -498,6 +507,7 @@
         </div>
         }
     </MudPaper>
+    }
 
     <!-- Notes Card -->
     <MudPaper Elevation="0" Class="pa-5" Style="background:var(--ft-surface-card); border-radius:12px;">
@@ -560,6 +570,8 @@
 @code {
     [Parameter] public PersonUpsertDto? Initial { get; set; }
     [Parameter] public Guid? EditingId { get; set; }
+    /// <summary>A Member editing themselves: family links are an admin's to change.</summary>
+    [Parameter] public bool LockRelationships { get; set; }
     [Parameter] public List<PersonDto> AllPeople { get; set; } = [];
     [Parameter] public string SubmitLabel { get; set; } = "Save";
     [Parameter] public EventCallback<PersonUpsertDto> OnSubmit { get; set; }

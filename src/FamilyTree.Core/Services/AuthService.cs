@@ -736,6 +736,11 @@ public class AuthService(
             if (userFamilyId is null)
                 return ServiceResponse<Guid?>.Fail("Your account isn't assigned to a family yet.");
 
+            // Your own person is the one you may edit, so an account links itself once. A
+            // wrong link is fixed by the super-user (LinkPersonAsync).
+            if (user.PersonId.HasValue && user.PersonId != personId)
+                return ServiceResponse<Guid?>.Fail("Your account is already linked to someone on the tree.");
+
             if (personId.HasValue)
             {
                 var existingPerson = await ctx.People

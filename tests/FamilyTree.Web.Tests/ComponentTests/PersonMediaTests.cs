@@ -112,6 +112,20 @@ public class PersonMediaTests : ComponentTestBase
         cut.FindAll(".ft-photo-tile__action").Select(b => b.TextContent.Trim()).Should().Contain("Remove");
     }
 
+    [Fact]
+    public void SomeoneElsesPhoto_HasNoRemoveButton()
+    {
+        Services.AddSingleton<IPersonService>(new FakePersonServiceForMedia(
+            new PersonDto { Id = PersonId, FirstName = "Ada", LastName = "Arden" }));
+        Services.AddSingleton<IMediumService>(new FakeMediumServiceForMedia { CanDelete = false });
+        RenderComponent<MudPopoverProvider>();
+
+        var cut = RenderComponent<PersonMedia>(p => p.Add(x => x.Id, PersonId));
+
+        cut.FindAll(".ft-photo-tile__action--remove").Should().BeEmpty();
+        cut.FindAll("button").Should().Contain(b => b.TextContent.Contains("Use as profile"));
+    }
+
     // The Add/Edit Person form's photo tiles had the same 22px unlabelled ✕ in the corner.
     [Fact]
     public void PersonForm_HasNoUnlabelledCornerCloseButtonOnPhotos()
@@ -160,6 +174,8 @@ class FakePersonServiceForMedia(PersonDto person) : IPersonService
         => throw new NotImplementedException();
     public List<Guid> ProfilePhotos { get; } = [];
 
+    public Task<ServiceResponse<FamilyTree.Shared.Enums.PersonEditAccess>> GetEditAccessAsync(Guid id, CancellationToken ct = default)
+        => Task.FromResult(ServiceResponse<FamilyTree.Shared.Enums.PersonEditAccess>.Ok(FamilyTree.Shared.Enums.PersonEditAccess.Full));
     public Task<ServiceResponse> SetProfilePhotoAsync(Guid personId, Guid mediumId, CancellationToken ct = default)
     {
         ProfilePhotos.Add(personId);
@@ -175,9 +191,11 @@ class FakePersonServiceForMedia(PersonDto person) : IPersonService
 
 class FakeMediumServiceForMedia : IMediumService
 {
+    public bool CanDelete { get; init; } = true;
+
     public Task<ServiceResponse<List<MediumDto>>> GetByPersonIdAsync(Guid personId, CancellationToken ct = default)
         => Task.FromResult(ServiceResponse<List<MediumDto>>.Ok(
-            [new MediumDto { Id = Guid.NewGuid(), PersonId = personId, Url = "/media/photo.jpg", FileName = "photo.jpg", Type = "photo" }]));
+            [new MediumDto { Id = Guid.NewGuid(), PersonId = personId, Url = "/media/photo.jpg", FileName = "photo.jpg", Type = "photo", CanDelete = CanDelete }]));
 
     public Task<ServiceResponse<List<MediumDto>>> GetAllAsync(CancellationToken ct = default)
         => throw new NotImplementedException();

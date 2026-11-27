@@ -316,3 +316,13 @@ stamp check alone threw on them). `AuthSetupTests`, `SecurityStampRevalidationTe
 4. **Minor data exposed publicly** → check `Person.IsMinorOverride` and `BirthDate`; audit `PersonService` visibility tier logic
 5. **Blob storage exposed** → regenerate storage SAS key; audit Azure blob access logs
 6. **Secrets committed to git** → rotate immediately; use `git filter-repo` to remove from history; assume compromised
+
+## Member write permissions (2026-11-26)
+
+- A Member may update only the person their account is linked to, never its family links, and may
+  not delete people. The link is read from the database, not the `PersonId` claim.
+- Any family member may set a profile photo and add media. Only the uploader or an Admin may delete
+  a photo or record. Captions are not restricted.
+- `LinkUserToTreeAsync` refuses to move an already-linked account; the super-user fixes a wrong link.
+- Open: an unlinked account can claim any unclaimed person in its family, which now grants edit
+  rights on that record.
