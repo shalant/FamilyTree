@@ -58,6 +58,10 @@
            The services refuse family Admins too; hiding the tabs just avoids an error. *@
         @if (_isSuperUser)
         {
+            <MudTabPanel Text="Problems" Icon="@Icons.Material.Outlined.ReportProblem">
+                <ProblemsTab />
+            </MudTabPanel>
+
             <MudTabPanel Text="Users" Icon="@Icons.Material.Outlined.Group">
                 <UsersTab />
             </MudTabPanel>

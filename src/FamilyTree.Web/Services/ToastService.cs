@@ -17,6 +17,11 @@ public sealed class ToastService
     public IReadOnlyList<ToastMessage> Toasts => _toasts;
     public event Action? OnChanged;
 
+    private readonly IToastProblemRecorder? _problems;
+
+    // Every red toast is also reported to the site owner (Admin > Problems).
+    public ToastService(IToastProblemRecorder? problems = null) => _problems = problems;
+
     public void Show(ToastType type, string message, string? title = null, int? duration = null)
     {
         // Safety net for a recurring bug class (overlapping OnAfterRenderAsync calls, a
@@ -25,6 +30,9 @@ public sealed class ToastService
         // ever reaching the screen.
         if (_toasts.Any(t => t.Type == type && t.Message == message && t.Title == title))
             return;
+
+        if (type == ToastType.Error)
+            _problems?.Record(message);
 
         var ms = duration ?? (type == ToastType.Error ? 8000 : 5000);
         _toasts.Add(new ToastMessage(Guid.NewGuid(), type, message, title, ms));

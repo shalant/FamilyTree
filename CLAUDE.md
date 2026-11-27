@@ -250,6 +250,8 @@ depth, which would remove the fragile birth-year inference machinery entirely.
 - **`UpdateAsync` replaces every field and link with what it's sent**, so a page saving a loaded person must start from `PersonMapper.ToUpsertDto(person)` and change only what it means to, never build the DTO by hand. Until 2026-10-25 PersonMedia's "Use as profile" deleted the person's former marriages and sibling links that way, and PersonEdit cleared their email.
 - **Restore brings back a person's links except those to someone still deleted**, which are handed to that person (their `DeletedAt` is set to theirs) and come back with them. It refuses a parent link made impossible meanwhile (`PlausibilityRules`, loops). Since 2026-10-25 (B7).
 
+**Problem reports** (2026-11-26): every `ToastType.Error` toast and every `LogError` ends up in Admin > Problems (`ProblemRecording.cs`, super-user only); only logged errors email. So log at Error only for real faults, report failures to users with an error toast, and add any new token-bearing route to `ProblemText`.
+
 ## Testing & Quality Strategy
 
 This project follows Uncle Bob Martin's approach to AI-assisted development: **don't read agent-generated code directly; surround agents with rigorous constraints instead.** Confidence in code comes from the gauntlet it's run through, not from subjective review.

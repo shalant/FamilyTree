@@ -27,19 +27,18 @@
 - [ ] Remove the test data: "Testy McTesters", "Test2 Test2", their photos, the `+test3` account
       and unused test invites.
 
-## Admin "Problems" list (idea, 2026-11-26, not decided)
+## Admin "Problems" list (2026-11-26)
 
-Asked after a member's save was refused and nothing recorded it. Worth having before the next
-invite: today a relative's failed attempt is only known if they say so.
+Asked after a member's save was refused and nothing recorded it.
 
-- [ ] Record every red toast (nearly all go through `ToastService.Error`) in a new table: who,
-      when, page, person involved, message, technical error. Needs a migration.
-- [ ] Super-user-only Admin > Problems tab: newest first in local time, repeats grouped with a
-      count, mark as dealt with. Delete entries after 90 days (messages can name relatives).
-- [ ] Decide email: recommended only for unexpected errors and failed uploads, rate-limited.
-      The alternative is an email for every red toast, which is quicker to build but would also
-      send ordinary refusals (impossible dates, missing names).
-- Not covered by toasts: inline errors, dropped connections, frozen pages. Include crashes.
+- [x] Built the small version (`feat/admin-problems`, migration `AddProblems`): every red toast
+      (who, when, page, person) and every error the server logs (source, technical detail) goes to
+      a new table, listed under Admin > Problems for the super-user, in local time, kept 90 days.
+      Only logged errors send email, at most one per 15 minutes. Tokens are stripped from pages
+      and messages. Not yet checked live.
+- [ ] Later, if the list proves noisy or thin: group repeats, mark as dealt with, name the user on
+      server errors.
+- Not covered: inline errors, sign-in errors, a dropped connection or a frozen page.
 
 ## Photo upload gave no feedback (2026-11-26)
 

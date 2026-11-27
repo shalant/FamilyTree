@@ -20,6 +20,8 @@ window.ftSubmitFormById = (formId) => {
 window.ftOpenUrl = (url) =>
     window.open(url, '_blank', 'noopener,noreferrer');
 
+window.ftTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+
 window.ftSetTheme = (theme) =>
     document.documentElement.setAttribute('data-theme', theme);
 
