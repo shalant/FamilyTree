@@ -12,10 +12,13 @@ public abstract class ComponentTestBase : TestContext
     // super-user-only UI (e.g. the layout engine picker).
     protected FakeCurrentUserService CurrentUser { get; } = new();
 
+    protected FakeUploadFailureReporter UploadFailures { get; } = new();
+
     protected ComponentTestBase()
     {
         // App services
         Services.AddSingleton<ToastService>();
+        Services.AddSingleton<IUploadFailureReporter>(UploadFailures);
         Services.AddSingleton<IFamilyTreeLayoutEngine, FamilyTreeLayoutEngine>();
         Services.AddSingleton<ICurrentUserService>(CurrentUser);
         Services.AddSingleton(new LayoutEngineSelector(

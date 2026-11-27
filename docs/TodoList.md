@@ -2,6 +2,25 @@
 
 ---
 
+## Smoke test findings (2026-11-26)
+
+- [x] Fixed (`fix/member-photos`): a photo the phone couldn't read showed "Upload failed: ...
+      NotReadableError ..." on the person form (private browser window; the same photo uploaded in
+      a normal Firefox window, cause not confirmed). The form and the Photos page now show a plain
+      message and a toast, and email `Ops:AlertEmail` (else `SuperUser:Email`), at most once per
+      person per 15 minutes; a too-big file gets its own message and no email
+      (`UploadFailureReporter`). A failed record upload is now caught too.
+- [x] Fixed (`fix/member-photos`): a Member couldn't choose a profile photo. Any family member now
+      can (`SetProfilePhotoAsync`), and deleting a profile photo clears it on the person. The
+      rest of a person stays Admin-only. Not yet checked live.
+- [ ] A Member's Edit person page still refuses on Save, including a profile photo picked there
+      with "Use as profile". Decide whether members may edit their own person.
+- [ ] Any member can delete any family photo or record, and edit its caption. Decide whether to
+      limit that to the uploader and Admins.
+- [ ] Admin > Audit log shows unlabelled UTC times and ID fragments instead of names.
+- [ ] Remove the test data: "Testy McTesters", "Test2 Test2", their photos, the `+test3` account
+      and unused test invites.
+
 ## Phone walkthrough fixes (2026-11-20)
 
 Found by Doug walking the story-invite flow on a real phone, 2026-11-19.

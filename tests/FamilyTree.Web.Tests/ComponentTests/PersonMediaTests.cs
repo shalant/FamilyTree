@@ -3,7 +3,9 @@ using FamilyTree.Core.Services;
 using FamilyTree.Shared;
 using FamilyTree.Shared.DTOs.Medium;
 using FamilyTree.Shared.DTOs.Person;
+using FamilyTree.Web.Modules.Components;
 using FamilyTree.Web.Modules.Pages;
+using FamilyTree.Web.Services;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
@@ -20,16 +22,13 @@ public class PersonMediaTests : ComponentTestBase
 {
     private static readonly Guid PersonId = Guid.NewGuid();
 
+    // Since 2026-11-26 it calls SetProfilePhotoAsync, which any member may use and which
+    // touches nothing else on the person.
     [Fact]
-    public void UseAsProfile_KeepsTheRestOfThePerson()
+    public void UseAsProfile_SetsOnlyThePhoto()
     {
-        var person = new PersonDto
-        {
-            Id = PersonId, FirstName = "Ada", LastName = "Arden", Email = "ada@example.com",
-            ParentIds = [Guid.NewGuid()], SpouseIds = [Guid.NewGuid()], FormerSpouseIds = [Guid.NewGuid()],
-            ChildIds = [Guid.NewGuid()], SiblingIds = [Guid.NewGuid()],
-        };
-        var people = new FakePersonServiceForMedia(person);
+        var people = new FakePersonServiceForMedia(
+            new PersonDto { Id = PersonId, FirstName = "Ada", LastName = "Arden" });
         Services.AddSingleton<IPersonService>(people);
         Services.AddSingleton<IMediumService>(new FakeMediumServiceForMedia());
         RenderComponent<MudPopoverProvider>();
@@ -37,14 +36,26 @@ public class PersonMediaTests : ComponentTestBase
         var cut = RenderComponent<PersonMedia>(p => p.Add(x => x.Id, PersonId));
         cut.FindAll("button").First(b => b.TextContent.Contains("Use as profile")).Click();
 
-        var sent = people.Updates.Should().ContainSingle().Subject;
-        sent.ProfilePhotoUrl.Should().Be("/media/photo.jpg");
-        sent.FormerSpouseIds.Should().Equal(person.FormerSpouseIds);
-        sent.SiblingIds.Should().Equal(person.SiblingIds);
-        sent.Email.Should().Be("ada@example.com");
-        sent.ParentIds.Should().Equal(person.ParentIds);
-        sent.SpouseIds.Should().Equal(person.SpouseIds);
-        sent.ChildIds.Should().Equal(person.ChildIds);
+        people.ProfilePhotos.Should().ContainSingle().Which.Should().Be(PersonId);
+        people.Updates.Should().BeEmpty();
+    }
+
+    [Fact]
+    [Trait("Category", "Regression")]
+    public async Task UnreadablePhoto_ShowsPlainToast_AndTellsTheAdmin()
+    {
+        Services.AddSingleton<IPersonService>(new FakePersonServiceForMedia(
+            new PersonDto { Id = PersonId, FirstName = "Ada", LastName = "Arden" }));
+        Services.AddSingleton<IMediumService>(new FakeMediumServiceForMedia());
+        RenderComponent<MudPopoverProvider>();
+        var cut = RenderComponent<PersonMedia>(p => p.Add(x => x.Id, PersonId));
+        var zone = cut.FindComponent<MediaUploadZone>();
+
+        await cut.InvokeAsync(() => zone.Instance.OnFilesSelected.InvokeAsync([new UnreadableFile()]));
+
+        var toast = Services.GetRequiredService<ToastService>().Toasts.Should().ContainSingle().Subject;
+        toast.Message.Should().StartWith("That photo couldn't be opened").And.NotContain("NotReadableError");
+        UploadFailures.Reports.Should().ContainSingle();
     }
 
     // Found live 2026-10-24: a photo that failed to load showed as an empty box with the
@@ -147,8 +158,13 @@ class FakePersonServiceForMedia(PersonDto person) : IPersonService
         => throw new NotImplementedException();
     public Task<ServiceResponse<PersonDto>> CreateAsync(PersonUpsertDto dto, CancellationToken ct = default)
         => throw new NotImplementedException();
+    public List<Guid> ProfilePhotos { get; } = [];
+
     public Task<ServiceResponse> SetProfilePhotoAsync(Guid personId, Guid mediumId, CancellationToken ct = default)
-        => throw new NotImplementedException();
+    {
+        ProfilePhotos.Add(personId);
+        return Task.FromResult(ServiceResponse.Ok());
+    }
     public Task<ServiceResponse> DeleteAsync(Guid id, CancellationToken ct = default)
         => throw new NotImplementedException();
     public Task<ServiceResponse> RestoreAsync(Guid id, CancellationToken ct = default)
