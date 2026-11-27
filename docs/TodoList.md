@@ -27,6 +27,20 @@
 - [ ] Remove the test data: "Testy McTesters", "Test2 Test2", their photos, the `+test3` account
       and unused test invites.
 
+## Admin "Problems" list (idea, 2026-11-26, not decided)
+
+Asked after a member's save was refused and nothing recorded it. Worth having before the next
+invite: today a relative's failed attempt is only known if they say so.
+
+- [ ] Record every red toast (nearly all go through `ToastService.Error`) in a new table: who,
+      when, page, person involved, message, technical error. Needs a migration.
+- [ ] Super-user-only Admin > Problems tab: newest first in local time, repeats grouped with a
+      count, mark as dealt with. Delete entries after 90 days (messages can name relatives).
+- [ ] Decide email: recommended only for unexpected errors and failed uploads, rate-limited.
+      The alternative is an email for every red toast, which is quicker to build but would also
+      send ordinary refusals (impossible dates, missing names).
+- Not covered by toasts: inline errors, dropped connections, frozen pages. Include crashes.
+
 ## Phone walkthrough fixes (2026-11-20)
 
 Found by Doug walking the story-invite flow on a real phone, 2026-11-19.
