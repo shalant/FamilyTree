@@ -35,7 +35,7 @@
                 </div>
                 <MudIconButton Icon="@Icons.Material.Filled.Close"
                                Size="Size.Small"
-                               Style="color:var(--ft-gray-300);"
+                               Style="color:var(--ft-text-muted);"
                                OnClick="() => OnClose.InvokeAsync()" />
             </div>
 
@@ -83,7 +83,7 @@
                     {
                         <div style="display:flex; align-items:center; gap:9px;">
                             <MudIcon Icon="@GenderIcon(Person.Gender)"
-                                     Style="font-size:16px; color:var(--ft-gray-300);" />
+                                     Style="font-size:16px; color:var(--ft-text-muted);" />
                             <span style="font-size:13px; color:var(--ft-gray-500);">
                                 @Person.Gender
                             </span>
@@ -93,7 +93,7 @@
                     {
                         <div style="display:flex; align-items:flex-start; gap:9px;">
                             <MudIcon Icon="@Icons.Material.Outlined.Cake"
-                                     Style="font-size:16px; color:var(--ft-gray-300); margin-top:1px;" />
+                                     Style="font-size:16px; color:var(--ft-text-muted); margin-top:1px;" />
                             <span style="font-size:13px; color:var(--ft-gray-700); line-height:1.5;">
                                 Born @Person.BirthDate.Value.ToString("d MMM yyyy")
                                 @if (!string.IsNullOrWhiteSpace(Person.BirthPlace))
@@ -107,7 +107,7 @@
                     {
                         <div style="display:flex; align-items:center; gap:9px;">
                             <MudIcon Icon="@Icons.Material.Outlined.Cake"
-                                     Style="font-size:16px; color:var(--ft-gray-300);" />
+                                     Style="font-size:16px; color:var(--ft-text-muted);" />
                             <span style="font-size:13px; color:var(--ft-gray-400);">@Person.BirthPlace</span>
                         </div>
                     }
@@ -115,7 +115,7 @@
                     {
                         <div style="display:flex; align-items:flex-start; gap:9px;">
                             <MudIcon Icon="@Icons.Material.Outlined.EventBusy"
-                                     Style="font-size:16px; color:var(--ft-gray-300); margin-top:1px;" />
+                                     Style="font-size:16px; color:var(--ft-text-muted); margin-top:1px;" />
                             <span style="font-size:13px; color:var(--ft-gray-700); line-height:1.5;">
                                 Died @Person.DeathDate.Value.ToString("d MMM yyyy")
                                 @if (!string.IsNullOrWhiteSpace(Person.DeathPlace))
@@ -129,7 +129,7 @@
                     {
                         <div style="display:flex; align-items:center; gap:9px;">
                             <MudIcon Icon="@Icons.Material.Outlined.EventBusy"
-                                     Style="font-size:16px; color:var(--ft-gray-300);" />
+                                     Style="font-size:16px; color:var(--ft-text-muted);" />
                             <span style="font-size:13px; color:var(--ft-gray-400);">@Person.DeathPlace</span>
                         </div>
                     }
@@ -137,7 +137,7 @@
                     {
                         <div style="display:flex; align-items:center; gap:9px;">
                             <MudIcon Icon="@Icons.Material.Outlined.Person"
-                                     Style="font-size:16px; color:var(--ft-gray-300);" />
+                                     Style="font-size:16px; color:var(--ft-text-muted);" />
                             <span style="font-size:13px; color:var(--ft-gray-500);">
                                 @(Person.IsDeceased ? "Lived" : "Age") @Person.Age
                             </span>
@@ -152,8 +152,8 @@
                         @foreach (var group in _related.GroupBy(r => r.Kind))
                         {
                             <div style="margin-bottom:14px;">
-                                <div style="font-size:10px; letter-spacing:0.08em;
-                                    text-transform:uppercase; color:var(--ft-gray-300);
+                                <div style="font-size:11px; letter-spacing:0.08em;
+                                    text-transform:uppercase; color:var(--ft-text-muted);
                                     margin-bottom:5px;">
                                     @Pluralize(group.Key, group.Count())
                                 </div>
@@ -171,7 +171,7 @@
                                         </span>
                                         @if (rel.Person.BirthDate.HasValue)
                                         {
-                                            <span style="font-size:11px; color:var(--ft-gray-300);
+                                            <span style="font-size:11px; color:var(--ft-text-muted);
                                                 flex-shrink:0; margin-left:8px;">
                                                 @rel.Person.BirthDate.Value.Year
                                             </span>
@@ -187,8 +187,8 @@
                 @if (!string.IsNullOrWhiteSpace(Person.BiographyNotes))
                 {
                     <div style="margin-top:4px; margin-bottom:8px;">
-                        <div style="font-size:10px; letter-spacing:0.08em;
-                            text-transform:uppercase; color:var(--ft-gray-300);
+                        <div style="font-size:11px; letter-spacing:0.08em;
+                            text-transform:uppercase; color:var(--ft-text-muted);
                             margin-bottom:6px;">
                             Notes
                         </div>
@@ -204,8 +204,8 @@
                     border-top:0.5px solid var(--ft-line-border);">
                     <div style="display:flex; align-items:center;
                         justify-content:space-between; margin-bottom:10px;">
-                        <div style="font-size:10px; letter-spacing:0.08em;
-                            text-transform:uppercase; color:var(--ft-gray-300);">
+                        <div style="font-size:11px; letter-spacing:0.08em;
+                            text-transform:uppercase; color:var(--ft-text-muted);">
                             Stories
                         </div>
                         <div style="display:flex; align-items:center; gap:12px;">
@@ -248,7 +248,7 @@
                                         line-height:1.55; margin:0 0 4px;">
                                         @story.Body
                                     </p>
-                                    <div style="font-size:11px; color:var(--ft-gray-300);">
+                                    <div style="font-size:11px; color:var(--ft-text-muted);">
                                         @(story.AuthorDisplayName ?? story.AuthorName ?? "Unknown")
                                         · @story.CreatedAt.ToString("d MMM yyyy")
                                     </div>
@@ -269,8 +269,8 @@
                     border-top:0.5px solid var(--ft-line-border);">
                     <div style="display:flex; align-items:center;
                         justify-content:space-between; margin-bottom:10px;">
-                        <div style="font-size:10px; letter-spacing:0.08em;
-                            text-transform:uppercase; color:var(--ft-gray-300);">
+                        <div style="font-size:11px; letter-spacing:0.08em;
+                            text-transform:uppercase; color:var(--ft-text-muted);">
                             Photos &amp; records
                         </div>
                         <div style="display:flex; align-items:center; gap:10px;">

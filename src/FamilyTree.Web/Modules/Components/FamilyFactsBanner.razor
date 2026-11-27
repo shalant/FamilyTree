@@ -136,16 +136,8 @@
         if (ages.Count >= 4)
             facts.Add($"The average age of living family members is {(int)ages.Average()} years.");
 
-        // Biography snippet
-        var withBio = people.Where(p => !string.IsNullOrWhiteSpace(p.BiographyNotes)).ToList();
-        if (withBio.Count > 0)
-        {
-            var pick    = withBio[_rng.Next(withBio.Count)];
-            var snippet = pick.BiographyNotes!.Length > 85
-                ? pick.BiographyNotes[..85].TrimEnd() + "…"
-                : pick.BiographyNotes;
-            facts.Add($"{pick.FirstName}: \"{snippet}\"");
-        }
+        // Never quote BiographyNotes here: they can hold painful family history, which must
+        // not surface at random, cut mid-sentence, in a rotating header.
 
         return facts.Distinct().Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
     }
