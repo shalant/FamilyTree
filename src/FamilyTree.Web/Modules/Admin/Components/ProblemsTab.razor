@@ -1,0 +1,101 @@
+@using FamilyTree.Core.Models
+@using FamilyTree.Core.Services
+@using MudBlazor
+
+@inject IProblemService Problems
+@inject IJSRuntime JS
+
+<div style="padding:16px;">
+    <MudText Class="mb-3 ft-admin-secondary">
+        Red messages people saw, and errors the server logged. Times are @_zoneLabel. Kept for 90 days.
+        Refresh the page for newer ones.
+    </MudText>
+
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error">@_error</MudAlert>
+    }
+    else if (_problems is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Success" />
+    }
+    else if (_problems.Count == 0)
+    {
+        <MudText>Nothing has gone wrong yet.</MudText>
+    }
+    else
+    {
+        <MudTable Items="_problems" Dense="true" Elevation="0" RowsPerPage="25" Breakpoint="Breakpoint.Sm">
+            <HeaderContent>
+                <MudTh>When</MudTh>
+                <MudTh>Who</MudTh>
+                <MudTh>Where</MudTh>
+                <MudTh>What happened</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="When" Style="white-space:nowrap;">@Local(context.Problem.OccurredAt)</MudTd>
+                <MudTd DataLabel="Who">@(context.Problem.UserEmail ?? (context.Problem.Kind == Problem.Unexpected ? "Server" : "Signed out"))</MudTd>
+                <MudTd DataLabel="Where">
+                    <div>@(context.Problem.Page ?? context.Problem.Source)</div>
+                    @if (context.PersonName is not null)
+                    {
+                        <div class="ft-admin-secondary">@context.PersonName</div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="What happened" Style="overflow-wrap:anywhere;">
+                    @if (context.Problem.Kind == Problem.Unexpected)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error">Unexpected</MudChip>
+                    }
+                    <span>@context.Problem.Message</span>
+                    @if (context.Problem.Detail is not null)
+                    {
+                        <details>
+                            <summary class="ft-admin-secondary">Technical detail</summary>
+                            <pre style="white-space:pre-wrap; font-size:12px;">@context.Problem.Detail</pre>
+                        </details>
+                    }
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    }
+</div>
+
+@code {
+    private List<ProblemView>? _problems;
+    private string? _error;
+    private TimeZoneInfo _zone = TimeZoneInfo.Utc;
+    private string _zoneLabel = "UTC";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Problems.GetRecentAsync();
+        if (result.Success) _problems = result.Data!;
+        else _error = result.Message;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var id = await JS.InvokeAsync<string?>("ftTimeZone");
+            if (id is not null && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var zone))
+            {
+                _zone = zone;
+                _zoneLabel = "your local time";
+                StateHasChanged();
+            }
+        }
+        catch (JSException)
+        {
+            // Stays labelled UTC.
+        }
+    }
+
+    private string Local(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), _zone).ToString("MMM d, h:mm tt");
+}

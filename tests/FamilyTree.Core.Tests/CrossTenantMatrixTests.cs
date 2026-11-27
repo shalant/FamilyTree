@@ -301,6 +301,14 @@ public class CrossTenantMatrixTests
     }
 
     [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
+    public async Task Problem_GetRecentAsync_IsForTheSiteOwnerOnly(Caller c)
+    {
+        var w = await SeedAsync();
+        var r = await new ProblemService(w.Db, NullLogger<ProblemService>.Instance, w.As(c)).GetRecentAsync();
+        r.Success.Should().BeFalse();
+    }
+
+    [Theory, InlineData(Caller.MemberA), InlineData(Caller.AdminA)]
     public async Task Person_GetEditAccessAsync_FamilyBPerson_Fails(Caller c)
     {
         var w = await SeedAsync();

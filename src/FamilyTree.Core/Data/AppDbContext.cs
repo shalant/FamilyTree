@@ -23,6 +23,7 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<UserMessage> UserMessages => Set<UserMessage>();
     public DbSet<Story> Stories => Set<Story>();
     public DbSet<StoryInvite> StoryInvites => Set<StoryInvite>();
+    public DbSet<Problem> Problems => Set<Problem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -240,6 +241,20 @@ public partial class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(b => b.Id).HasDefaultValueSql("newsequentialid()");
             e.Property(b => b.Note).HasMaxLength(500);
             e.Property(b => b.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        // ── PROBLEM ───────────────────────────────────────────────────────────
+        modelBuilder.Entity<Problem>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.Kind).HasMaxLength(20).IsRequired();
+            e.Property(p => p.UserEmail).HasMaxLength(256);
+            e.Property(p => p.Page).HasMaxLength(300);
+            e.Property(p => p.Message).HasMaxLength(1000).IsRequired();
+            e.Property(p => p.Source).HasMaxLength(200);
+            e.Property(p => p.Detail).HasMaxLength(4000);
+            e.HasIndex(p => p.OccurredAt);
+            e.ToTable("Problems");
         });
 
         // ── USER MESSAGE ──────────────────────────────────────────────────────

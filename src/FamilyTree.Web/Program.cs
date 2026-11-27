@@ -167,6 +167,12 @@ builder.Services.AddScoped<IDataCheckService, DataCheckService>();
 builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ToastService>();
+// Admin > Problems: red toasts and logged errors (ProblemRecording.cs).
+builder.Services.AddSingleton<ProblemQueue>();
+builder.Services.AddSingleton<ILoggerProvider, ProblemLoggerProvider>();
+builder.Services.AddHostedService<ProblemWriter>();
+builder.Services.AddScoped<IToastProblemRecorder, ToastProblemRecorder>();
+builder.Services.AddScoped<IProblemService, ProblemService>();
 builder.Services.AddSingleton<UploadAlertThrottle>();
 builder.Services.AddScoped<IUploadFailureReporter, UploadFailureReporter>();
 builder.Services.AddScoped<TreeContextService>();
