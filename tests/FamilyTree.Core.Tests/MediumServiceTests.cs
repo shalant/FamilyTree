@@ -40,6 +40,44 @@ public class MediumServiceTests
         }
     }
 
+    // A Member can't call PersonService.UpdateAsync, so deleting the profile photo has to
+    // clear it on the person here (2026-11-26).
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task DeleteAsync_ClearsTheProfilePhotoOnlyIfItWasThatPhoto(bool deletingTheProfilePhoto)
+    {
+        var dbFactory = new TestDbContextFactory();
+        var familyId = Guid.NewGuid();
+        var personId = Guid.NewGuid();
+        var mediumId = Guid.NewGuid();
+        const string url = "https://fake-blob/a.jpg";
+        var profileUrl = deletingTheProfilePhoto ? url : "https://fake-blob/other.jpg";
+        await using (var ctx = dbFactory.CreateDbContext())
+        {
+            ctx.People.Add(new Person
+            {
+                Id = personId, FirstName = "Test", LastName = "Person", FamilyId = familyId,
+                ProfilePhotoUrl = profileUrl,
+            });
+            ctx.Media.Add(new Medium
+            {
+                Id = mediumId, PersonId = personId, Url = url, FileName = "a.jpg",
+                MimeType = "image/jpeg", Type = "photo",
+            });
+            await ctx.SaveChangesAsync();
+        }
+        var service = new MediumService(
+            dbFactory, new FakeBlobStorageService(), NullLogger<MediumService>.Instance,
+            new FakeAuditLogService(), new FakeCurrentUserService { UserId = Guid.NewGuid(), FamilyId = familyId });
+
+        var result = await service.DeleteAsync(mediumId);
+
+        Assert.True(result.Success, result.Message);
+        await using var check = dbFactory.CreateDbContext();
+        Assert.Equal(deletingTheProfilePhoto ? null : profileUrl, check.People.Single().ProfilePhotoUrl);
+    }
+
     [Fact]
     public async Task CreateAsync_SmallImage_UploadsUnchanged()
     {

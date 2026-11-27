@@ -8,6 +8,8 @@
 @inject IMediumService MediumService
 @inject IJSRuntime JS
 @inject IDialogService DialogService
+@inject FamilyTree.Web.Services.ToastService Toast
+@inject FamilyTree.Web.Services.IUploadFailureReporter UploadFailures
 
 <MudStack Spacing="4" Class="ft-person-form" Style="margin:auto; max-width:680px; font-family:var(--ft-font-body);">
 
@@ -678,7 +680,20 @@
             for (int i = 0; i < files.Count; i++)
             {
                 var file = files[i];
-                var (bytes, mime) = await CompressOrReadAsync(file, "photo-upload", i, fallbackMaxSize);
+                byte[] bytes;
+                string mime;
+                try
+                {
+                    (bytes, mime) = await CompressOrReadAsync(file, "photo-upload", i, fallbackMaxSize);
+                }
+                catch (Exception ex)
+                {
+                    // One unreadable file doesn't stop the rest.
+                    _uploadError = FamilyTree.Web.Services.UploadFailure.MessageFor(file.Size, fallbackMaxSize);
+                    Toast.Error(_uploadError);
+                    await UploadFailures.ReportAsync(file, fallbackMaxSize, ex);
+                    continue;
+                }
 
                 if (EditingId.HasValue)
                 {
@@ -711,9 +726,11 @@
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _uploadError = $"Upload failed: {ex.Message}";
+            // MediumService reports its own failures in result.Message; this is the unexpected.
+            _uploadError = "Something went wrong while uploading. Please try again.";
+            Toast.Error(_uploadError);
         }
         finally
         {

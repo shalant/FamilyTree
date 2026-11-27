@@ -3,7 +3,6 @@
 
 @using FamilyTree.Shared.DTOs.Person
 @using FamilyTree.Shared.DTOs.Medium
-@using FamilyTree.Core.Mappers
 @using FamilyTree.Core.Services
 @using FamilyTree.Web.Modules.Components
 @using FamilyTree.Web.Modules.Dialogs
@@ -16,6 +15,7 @@
 @inject ToastService Toast
 @inject IDialogService DialogService
 @inject IJSRuntime JS
+@inject IUploadFailureReporter UploadFailures
 
 <PageTitle>@(_person?.FirstName ?? "Person")'s media — ArborKin</PageTitle>
 
@@ -323,6 +323,9 @@ else
 
     // ── Photos ───────────────────────────────────────────────────────────
 
+    private const long MaxPhotoBytes = 8L * 1024 * 1024;
+    private const long MaxRecordBytes = 50L * 1024 * 1024;
+
     private MediaUploadZone? _photoZone;
     private List<PhotoItem> _photos = [];
 
@@ -466,7 +469,8 @@ else
             }
             catch (Exception ex)
             {
-                Toast.Error($"Error uploading {file.Name}: {ex.Message}");
+                Toast.Error(UploadFailure.MessageFor(file.Size, MaxPhotoBytes));
+                await UploadFailures.ReportAsync(file, MaxPhotoBytes, ex);
             }
         }
         StateHasChanged();
@@ -487,7 +491,7 @@ else
         }
 
         using var ms = new MemoryStream();
-        await file.OpenReadStream(8L * 1024 * 1024).CopyToAsync(ms);
+        await file.OpenReadStream(MaxPhotoBytes).CopyToAsync(ms);
         return (ms.ToArray(), file.ContentType);
     }
 
@@ -534,14 +538,11 @@ else
 
     private async Task SetProfilePhoto(PhotoItem photo)
     {
-        if (_person is null) return;
-        var dto = PersonMapper.ToUpsertDto(_person);
-        dto.ProfilePhotoUrl = photo.Url;
-        var result = await PersonService.UpdateAsync(Id, dto);
+        // Not UpdateAsync, which only Admins may call: any family member can change a photo.
+        var result = await PersonService.SetProfilePhotoAsync(Id, photo.Id);
         if (result.Success)
         {
             _profilePhotoUrl = photo.Url;
-            _person = result.Data!;
             Toast.Success("Profile photo updated");
         }
         else
@@ -565,18 +566,9 @@ else
         if (result.Success)
         {
             _photos.Remove(photo);
+            // MediumService clears the person's profile photo with it.
             if (_profilePhotoUrl == photo.Url)
-            {
-                // Clear the profile photo since it no longer exists
-                var dto = PersonMapper.ToUpsertDto(_person!);
-                dto.ProfilePhotoUrl = null;
-                var clearResult = await PersonService.UpdateAsync(Id, dto);
-                if (clearResult.Success)
-                {
-                    _profilePhotoUrl = null;
-                    _person = clearResult.Data!;
-                }
-            }
+                _profilePhotoUrl = null;
             Toast.Success("Photo deleted");
         }
         else
@@ -604,7 +596,7 @@ else
         _savingRecord = true;
         try
         {
-            using var stream = _pendingRecordFile.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+            using var stream = _pendingRecordFile.OpenReadStream(maxAllowedSize: MaxRecordBytes);
 
             var dto = new MediumUpsertDto
             {
@@ -640,6 +632,12 @@ else
                 Toast.Error($"Failed to save record: {result.Message}");
             }
             ResetRecordForm();
+        }
+        catch (Exception ex)
+        {
+            // Uncaught, this ended the circuit.
+            Toast.Error(UploadFailure.MessageFor(_pendingRecordFile!.Size, MaxRecordBytes, "file"));
+            await UploadFailures.ReportAsync(_pendingRecordFile, MaxRecordBytes, ex);
         }
         finally
         {

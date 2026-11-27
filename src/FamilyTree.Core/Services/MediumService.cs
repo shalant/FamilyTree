@@ -249,6 +249,17 @@ public class MediumService(
 
             _ = await blobStorage.DeleteAsync(medium.Url, ct);
 
+            // A profile photo that no longer exists must not stay on the person. Done here
+            // because a Member can't call PersonService.UpdateAsync to clear it.
+            var owner = await ctx.People.FirstOrDefaultAsync(
+                p => p.Id == medium.PersonId && p.ProfilePhotoUrl == medium.Url, ct);
+            if (owner is not null)
+            {
+                owner.ProfilePhotoUrl = null;
+                owner.UpdatedAt = DateTime.UtcNow;
+                owner.UpdatedBy = currentUser.UserId;
+            }
+
             ctx.Media.Remove(medium);
             await ctx.SaveChangesAsync(ct);
 

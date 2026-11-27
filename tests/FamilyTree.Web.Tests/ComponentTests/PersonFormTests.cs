@@ -46,6 +46,23 @@ public class PersonFormTests : ComponentTestBase
         GetInitials(cut).Should().BeEmpty();
     }
 
+    // Found on a phone 2026-11-26: the form showed "Upload failed: ... NotReadableError ...".
+    [Fact]
+    [Trait("Category", "Regression")]
+    public async Task UnreadablePhoto_ShowsPlainMessageAndToast_AndTellsTheAdmin()
+    {
+        var cut = RenderComponent<PersonForm>();
+        var input = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.InputFile>();
+
+        await cut.InvokeAsync(() => input.Instance.OnChange.InvokeAsync(
+            new Microsoft.AspNetCore.Components.Forms.InputFileChangeEventArgs([new UnreadableFile()])));
+
+        cut.Markup.Should().Contain("be opened. Save it to your device first").And.NotContain("NotReadableError");
+        Services.GetRequiredService<FamilyTree.Web.Services.ToastService>().Toasts.Should().ContainSingle()
+            .Which.Message.Should().StartWith("That photo couldn't be opened");
+        UploadFailures.Reports.Should().ContainSingle();
+    }
+
     private static string GetInitials(IRenderedComponent<PersonForm> cut)
     {
         var property = typeof(PersonForm).GetProperty("Initials",

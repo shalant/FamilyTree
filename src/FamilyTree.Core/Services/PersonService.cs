@@ -431,10 +431,9 @@ public class PersonService(
             if (person is null)
                 return ServiceResponse.Fail($"Person {personId} not found.");
 
+            // Any family member may change a profile photo (decided 2026-11-26); the rest
+            // of a person stays Admin-only (UpdateAsync). ScopedPeople keeps it to the family.
             var userId = currentUser.UserId;
-            var isCreator = userId.HasValue && person.CreatedBy == userId;
-            if (!currentUser.IsSuperUser && !currentUser.IsAdmin && !isCreator)
-                return ServiceResponse.Fail("You do not have permission to update this person.");
 
             var medium = await ctx.Media.AsNoTracking()
                 .FirstOrDefaultAsync(m => m.Id == mediumId && m.PersonId == personId, ct);

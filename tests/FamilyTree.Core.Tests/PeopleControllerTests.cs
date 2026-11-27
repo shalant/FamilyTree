@@ -498,7 +498,7 @@ public class PersonServiceTests
     }
 
     [Fact]
-    public async Task SetProfilePhotoAsync_MemberWhoDidNotCreateThePerson_IsRefused()
+    public async Task SetProfilePhotoAsync_MemberWhoDidNotCreateThePerson_CanSetTheirPhoto()
     {
         var familyId = Guid.NewGuid();
         var (creatorService, factory, _) = CreateSut(userId: Guid.NewGuid(), familyId: familyId, isAdmin: false);
@@ -507,6 +507,22 @@ public class PersonServiceTests
 
         var otherMember = new FakeCurrentUserService { UserId = Guid.NewGuid(), FamilyId = familyId };
         var service = new PersonService(factory, NullLogger<PersonService>.Instance, new FakeAuditLogService(), otherMember);
+        var result = await service.SetProfilePhotoAsync(created.Data.Id, mediumId);
+
+        result.Success.Should().BeTrue(result.Message);
+        await using var ctx = factory.CreateDbContext();
+        ctx.People.Single().ProfilePhotoUrl.Should().Be("https://fake-blob/bill.jpg");
+    }
+
+    [Fact]
+    public async Task SetProfilePhotoAsync_MemberOfAnotherFamily_IsRefused()
+    {
+        var (creatorService, factory, _) = CreateSut(userId: Guid.NewGuid(), isAdmin: false);
+        var created = await creatorService.CreateAsync(new PersonUpsertDto { FirstName = "Bill", LastName = "Small" });
+        var mediumId = await AddPhotoAsync(factory, created.Data!.Id, "https://fake-blob/bill.jpg");
+
+        var outsider = new FakeCurrentUserService { UserId = Guid.NewGuid(), FamilyId = Guid.NewGuid() };
+        var service = new PersonService(factory, NullLogger<PersonService>.Instance, new FakeAuditLogService(), outsider);
         var result = await service.SetProfilePhotoAsync(created.Data.Id, mediumId);
 
         result.Success.Should().BeFalse();
