@@ -126,6 +126,33 @@ public class PersonMediaTests : ComponentTestBase
         cut.FindAll("button").Should().Contain(b => b.TextContent.Contains("Use as profile"));
     }
 
+    // Found on a phone 2026-11-26: the upload ran with nothing on screen but "1 file selected",
+    // which looked like it was waiting for a Save button.
+    [Fact]
+    [Trait("Category", "Regression")]
+    public async Task WhileAPhotoUploads_ThePageSaysSo()
+    {
+        var pending = new TaskCompletionSource<ServiceResponse<MediumDto>>();
+        Services.AddSingleton<IPersonService>(new FakePersonServiceForMedia(
+            new PersonDto { Id = PersonId, FirstName = "Ada", LastName = "Arden" }));
+        Services.AddSingleton<IMediumService>(new FakeMediumServiceForMedia { Upload = pending.Task });
+        RenderComponent<MudPopoverProvider>();
+        var cut = RenderComponent<PersonMedia>(p => p.Add(x => x.Id, PersonId));
+        cut.Find(".ft-upload-status").TextContent.Should().Contain("saved as soon as you choose them");
+        var zone = cut.FindComponent<MediaUploadZone>();
+
+        var upload = cut.InvokeAsync(() => zone.Instance.OnFilesSelected.InvokeAsync([new ReadableFile()]));
+
+        cut.WaitForAssertion(() => cut.Find(".ft-upload-status").TextContent.Should().Contain("Uploading your photo"));
+        zone.Instance.ShowQueueSummary.Should().BeFalse();
+
+        pending.SetResult(ServiceResponse<MediumDto>.Ok(
+            new MediumDto { Id = Guid.NewGuid(), Url = "/media/new.jpg", FileName = "new.jpg", Type = "photo" }));
+        await upload;
+
+        cut.Find(".ft-upload-status").TextContent.Should().NotContain("Uploading");
+    }
+
     // The Add/Edit Person form's photo tiles had the same 22px unlabelled ✕ in the corner.
     [Fact]
     public void PersonForm_HasNoUnlabelledCornerCloseButtonOnPhotos()
@@ -192,6 +219,7 @@ class FakePersonServiceForMedia(PersonDto person) : IPersonService
 class FakeMediumServiceForMedia : IMediumService
 {
     public bool CanDelete { get; init; } = true;
+    public Task<ServiceResponse<MediumDto>>? Upload { get; init; }
 
     public Task<ServiceResponse<List<MediumDto>>> GetByPersonIdAsync(Guid personId, CancellationToken ct = default)
         => Task.FromResult(ServiceResponse<List<MediumDto>>.Ok(
@@ -202,7 +230,7 @@ class FakeMediumServiceForMedia : IMediumService
     public Task<ServiceResponse<MediumDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
         => throw new NotImplementedException();
     public Task<ServiceResponse<MediumDto>> CreateAsync(MediumUpsertDto dto, Stream fileStream, CancellationToken ct = default)
-        => throw new NotImplementedException();
+        => Upload ?? throw new NotImplementedException();
     public Task<ServiceResponse<MediumDto>> UpdateAsync(Guid id, MediumUpsertDto dto, CancellationToken ct = default)
         => throw new NotImplementedException();
     public Task<ServiceResponse> DeleteAsync(Guid id, CancellationToken ct = default)

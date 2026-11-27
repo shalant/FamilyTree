@@ -41,6 +41,14 @@ invite: today a relative's failed attempt is only known if they say so.
       send ordinary refusals (impossible dates, missing names).
 - Not covered by toasts: inline errors, dropped connections, frozen pages. Include crashes.
 
+## Photo upload gave no feedback (2026-11-26)
+
+- [x] Fixed (`fix/photo-upload-feedback`): on a phone a person's Photos page showed only "1 file
+      selected" while uploading, which read as waiting for a Save button. It now says "Uploading
+      your photo…", says that photos save as soon as they're chosen, and drops the chip. The
+      desktop wording in the empty state and the "Browse files" pill on touch screens are gone.
+      Not yet checked on a phone.
+
 ## Phone walkthrough fixes (2026-11-20)
 
 Found by Doug walking the story-invite flow on a real phone, 2026-11-19.
