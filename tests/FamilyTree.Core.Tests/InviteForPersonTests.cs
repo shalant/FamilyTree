@@ -73,6 +73,34 @@ public class InviteForPersonTests
     }
 
     [Fact]
+    public async Task InvitedPersonName_IsGivenForAnOpenInvite_AndNotOnceUsed()
+    {
+        var (svc, factory, _) = CreateSut();
+        var personId = await SeedPersonAsync(factory, FamilyA);
+        var invite = await svc.CreateInviteAsync("cousin@example.com", personId);
+
+        (await svc.GetInvitedPersonNameAsync(invite.Data)).Data
+            .Should().Be(new InvitedPersonName("Cousin", "Eisenberg"));
+        (await svc.GetInvitedPersonNameAsync(Guid.NewGuid())).Data.Should().BeNull();
+
+        (await svc.RegisterAsync("Cousin", "Eisenberg", "cousin@example.com", Password, invite.Data))
+            .Success.Should().BeTrue();
+
+        (await svc.GetInvitedPersonNameAsync(invite.Data)).Data.Should().BeNull("a used link tells nobody anything");
+    }
+
+    [Fact]
+    public async Task InvitedPersonName_IsWithheld_WhenThePersonWasClaimedMeanwhile()
+    {
+        var (svc, factory, users) = CreateSut();
+        var personId = await SeedPersonAsync(factory, FamilyA);
+        var invite = await svc.CreateInviteAsync("cousin@example.com", personId);
+        await users.CreateAsync(new AppUser { UserName = "other@example.com", Email = "other@example.com", PersonId = personId, CreatedAt = DateTime.UtcNow }, Password);
+
+        (await svc.GetInvitedPersonNameAsync(invite.Data)).Data.Should().BeNull();
+    }
+
+    [Fact]
     public async Task InviteWithoutAPerson_LeavesTheAccountUnlinked()
     {
         var (svc, _, users) = CreateSut();

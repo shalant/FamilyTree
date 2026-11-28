@@ -308,8 +308,22 @@
             if (_invite != null)
             {
                 _email = _invite.Email;
+                await PrefillInvitedNameAsync(_invite);
                 await LoadPendingStorySubjectAsync(_invite.Email);
             }
+        }
+    }
+
+    // The inviter already said who this is (Admin > Users, "Who is this?"), so don't make them
+    // type it. The fields stay editable: the tree may hold a formal name they don't go by.
+    private async Task PrefillInvitedNameAsync(UserInvite invite)
+    {
+        if (invite.PersonId is null) return;
+        var result = await AuthService.GetInvitedPersonNameAsync(invite.Id);
+        if (result is { Success: true, Data: { } name })
+        {
+            _firstName = name.FirstName;
+            _lastName = name.LastName;
         }
     }
 

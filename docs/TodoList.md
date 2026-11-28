@@ -2,6 +2,12 @@
 
 ---
 
+## "Who is this?" invite walkthrough (2026-11-27)
+
+- [x] Fixed (`fix/invite-prefill-name`): sign-up from an invite that named a person still showed
+      empty First/Last name boxes. They are now filled from that person and stay editable. A used,
+      expired or claimed invite gives no name. Google sign-up unchanged. Not yet checked live.
+
 ## Smoke test findings (2026-11-26)
 
 - [x] Fixed (`fix/member-photos`): a photo the phone couldn't read showed "Upload failed: ...
