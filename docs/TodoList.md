@@ -10,9 +10,9 @@
 - [x] Checked live (phone, before the fix above): the invite skipped "Who are you?" and opened
       the tree centred on the invited person; as that Member, editing their own record was allowed
       and editing someone else's was refused. The used invite left Pending invites.
-- [ ] The relationship pickers on Add/Edit Person list only the first 25 names, with nothing to
-      say there are more, so a later name looks missing until it is typed
-      (`RelationshipSearchCap`).
+- [x] Fixed (`fix/invite-prefill-name`): the relationship pickers on Add/Edit Person listed only
+      the first 25 names with nothing to say there were more, so a later name looked missing. The
+      list now ends with "Type to find more". Not yet checked live.
 - [x] Added (`fix/invite-prefill-name`): a Refresh button on Admin that reloads the showing tab;
       the tabs otherwise load once (`AdminRefreshTests`). Not yet checked live.
 
