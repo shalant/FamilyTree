@@ -3,6 +3,8 @@ using FamilyTree.Shared;
 
 namespace FamilyTree.Core.Services;
 
+public sealed record InvitedPersonName(string FirstName, string LastName);
+
 public interface IAuthService
 {
     Task<ServiceResponse<Guid>> RegisterAsync(string firstName, string lastName, string email, string password, Guid? inviteId = null);
@@ -44,6 +46,12 @@ public interface IAuthService
     Task<ServiceResponse<List<UserInvite>>>      GetPendingInvitesAsync();
     Task<ServiceResponse>                        CancelInviteAsync(Guid inviteId);
     Task<ServiceResponse<UserInvite?>>           ValidateInviteAsync(Guid inviteId);
+    /// <summary>
+    /// The name of the person an open invite is for, to pre-fill the sign-up form. Anonymous:
+    /// only the holder of the invite ID can ask. Null when the invite names nobody, is no longer
+    /// open, or the person has since been claimed or removed.
+    /// </summary>
+    Task<ServiceResponse<InvitedPersonName?>>    GetInvitedPersonNameAsync(Guid inviteId);
     string                                       GetRegistrationMode();
 
     Task<ServiceResponse>                        SaveFocusPersonAsync(Guid userId, Guid? personId);

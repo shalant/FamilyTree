@@ -87,6 +87,23 @@ public class RegisterToastTests : ComponentTestBase
         cut.Find(".auth-hint").TextContent.Should().NotContain("family@example.com");
         cut.Find("input[type=email]").GetAttribute("value").Should().Be("family@example.com");
     }
+
+    // Found by Doug 2026-11-27 walking a "Who is this?" invite: the admin had already named the
+    // person, yet sign-up showed empty name boxes.
+    [Fact]
+    [Trait("Category", "Regression")]
+    public void NameFields_ArePrefilled_WhenTheInviteNamesAPerson()
+    {
+        RegisterFakes(pendingStory: null);
+        _authService.Invite!.PersonId = Guid.NewGuid();
+        _authService.InvitedName = new InvitedPersonName("Cousin", "Eisenberg");
+        NavigateWithInvite();
+
+        var cut = RenderComponent<Register>();
+
+        var values = cut.FindAll("input").Select(i => i.GetAttribute("value")).ToList();
+        values.Should().Contain("Cousin").And.Contain("Eisenberg");
+    }
 }
 
 // Only ValidateInviteAsync/GetRegistrationMode are exercised by Register.razor's
@@ -99,6 +116,10 @@ class FakeAuthService : IAuthService
     public string GetRegistrationMode() => "Open";
     public Task<ServiceResponse<UserInvite?>> ValidateInviteAsync(Guid inviteId)
         => Task.FromResult(ServiceResponse<UserInvite?>.Ok(Invite));
+
+    public InvitedPersonName? InvitedName { get; set; }
+    public Task<ServiceResponse<InvitedPersonName?>> GetInvitedPersonNameAsync(Guid inviteId)
+        => Task.FromResult(ServiceResponse<InvitedPersonName?>.Ok(InvitedName));
 
     public Task<ServiceResponse<Guid>> RegisterAsync(string firstName, string lastName, string email, string password, Guid? inviteId = null)
         => RegisteredUserId is { } id

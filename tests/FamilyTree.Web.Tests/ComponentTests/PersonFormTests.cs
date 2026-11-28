@@ -14,6 +14,8 @@ namespace FamilyTree.Web.Tests.ComponentTests;
 
 public class PersonFormTests : ComponentTestBase
 {
+    private readonly IRenderedComponent<MudPopoverProvider> _popovers;
+
     public PersonFormTests()
     {
         Services.AddSingleton<IMediumService>(new FakeMediumServiceForPersonForm());
@@ -21,7 +23,7 @@ public class PersonFormTests : ComponentTestBase
         // MudSelect (Gender) and MudDatePicker resolve popovers through the shared
         // PopoverService — it throws "Missing <MudPopoverProvider />" unless one has
         // rendered first (same requirement as CustomAppBarTests' MudAutocomplete/MudMenu).
-        RenderComponent<MudPopoverProvider>();
+        _popovers = RenderComponent<MudPopoverProvider>();
     }
 
     // Regression for the "tofu glyph" bug (docs/TodoList.md, golden-path walkthrough):
@@ -61,6 +63,27 @@ public class PersonFormTests : ComponentTestBase
         Services.GetRequiredService<FamilyTree.Web.Services.ToastService>().Toasts.Should().ContainSingle()
             .Which.Message.Should().StartWith("That photo couldn't be opened");
         UploadFailures.Reports.Should().ContainSingle();
+    }
+
+    // Found live 2026-11-27: the parent picker stopped at the 25th name with nothing to say so,
+    // and a later person looked as if they weren't on the tree.
+    [Theory]
+    [Trait("Category", "Regression")]
+    [InlineData(25, false)]
+    [InlineData(26, true)]
+    public async Task RelationshipPicker_SaysThereAreMore_WhenTheListIsCut(int people, bool hint)
+    {
+        var all = Enumerable.Range(1, people)
+            .Select(i => new PersonDto { Id = Guid.NewGuid(), FirstName = $"Person{i:00}", LastName = "Small" })
+            .ToList();
+        var cut = RenderComponent<PersonForm>(p => p.Add(f => f.AllPeople, all));
+        await ClickAsync(cut.FindAll("button").First(b => b.TextContent.Contains("Add relationships") || b.TextContent.Contains("Show")));
+        var picker = cut.FindComponents<MudAutocomplete<PersonDto>>()[0];
+
+        await cut.InvokeAsync(() => picker.Instance.OpenMenuAsync());
+
+        _popovers.WaitForAssertion(() => _popovers.Markup.Should().Contain("Person25"));
+        _popovers.Markup.Contains("Type to find more").Should().Be(hint);
     }
 
     private static string GetInitials(IRenderedComponent<PersonForm> cut)

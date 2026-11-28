@@ -137,6 +137,8 @@ internal sealed class FakeAuthService : IAuthService
         => Task.FromResult(ServiceResponse.Fail("Not implemented in test mock"));
     public Task<ServiceResponse<UserInvite?>> ValidateInviteAsync(Guid inviteId)
         => Task.FromResult(ServiceResponse<UserInvite?>.Ok(null));
+    public Task<ServiceResponse<InvitedPersonName?>> GetInvitedPersonNameAsync(Guid inviteId)
+        => Task.FromResult(ServiceResponse<InvitedPersonName?>.Ok(null));
     public string GetRegistrationMode() => "Open";
     public Task<ServiceResponse> SaveFocusPersonAsync(Guid userId, Guid? personId)
         => Task.FromResult(ServiceResponse.Ok());

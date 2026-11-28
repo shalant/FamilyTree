@@ -455,6 +455,33 @@ public class AuthService(
         }
     }
 
+    public async Task<ServiceResponse<InvitedPersonName?>> GetInvitedPersonNameAsync(Guid inviteId)
+    {
+        try
+        {
+            await using var ctx = await dbFactory.CreateDbContextAsync();
+            var invite = await ctx.UserInvites.FirstOrDefaultAsync(i =>
+                i.Id == inviteId
+                && i.AcceptedAt == null
+                && i.CancelledAt == null
+                && i.ExpiresAt > DateTime.UtcNow);
+            if (invite?.PersonId is not { } personId
+                || await ctx.Users.AnyAsync(u => u.PersonId == personId))
+                return ServiceResponse<InvitedPersonName?>.Ok(null);
+
+            var name = await ctx.People
+                .Where(p => p.Id == personId && p.FamilyId == invite.FamilyId)
+                .Select(p => new InvitedPersonName(p.FirstName, p.LastName))
+                .FirstOrDefaultAsync();
+            return ServiceResponse<InvitedPersonName?>.Ok(name);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "GetInvitedPersonNameAsync failed for inviteId {InviteId}", inviteId);
+            return ServiceResponse<InvitedPersonName?>.Fail("Failed to read the invite.");
+        }
+    }
+
     public async Task<ServiceResponse> SaveFocusPersonAsync(Guid userId, Guid? personId)
     {
         try

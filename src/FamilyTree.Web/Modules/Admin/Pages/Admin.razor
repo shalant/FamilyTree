@@ -26,14 +26,21 @@
 
 <div style="padding:24px; max-width:1400px; margin:auto;">
 
-    <div style="margin-bottom:24px;">
-        <div style="font-size:22px; font-weight:600; font-style:italic;
-            font-family:var(--ft-font-display); color:var(--ft-green-800); line-height:1.2;">
-            Admin
+    <div style="margin-bottom:24px; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+        <div>
+            <div style="font-size:22px; font-weight:600; font-style:italic;
+                font-family:var(--ft-font-display); color:var(--ft-green-800); line-height:1.2;">
+                Admin
+            </div>
+            <div style="font-size:13px; color:var(--ft-gray-400); margin-top:2px;">
+                ArborKin system management
+            </div>
         </div>
-        <div style="font-size:13px; color:var(--ft-gray-400); margin-top:2px;">
-            ArborKin system management
-        </div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="ft-admin-refresh"
+                   StartIcon="@Icons.Material.Outlined.Refresh"
+                   OnClick="() => _reload++">
+            Refresh
+        </MudButton>
     </div>
 
     <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="true"
@@ -41,15 +48,15 @@
              @bind-ActivePanelIndex="_activeTab">
 
         <MudTabPanel Text="Dashboard" Icon="@Icons.Material.Outlined.SpaceDashboard">
-            <DashboardTab />
+            <DashboardTab @key="_reload" />
         </MudTabPanel>
 
         <MudTabPanel Text="Deleted" Icon="@Icons.Material.Outlined.DeleteSweep">
-            <DeletedTab />
+            <DeletedTab @key="_reload" />
         </MudTabPanel>
 
         <MudTabPanel Text="Data check" Icon="@Icons.Material.Outlined.FactCheck">
-            <DataCheckTab />
+            <DataCheckTab @key="_reload" />
         </MudTabPanel>
 
         @* SuperUser-only (finding S2, docs/security.md): Users exposes every family's
@@ -59,29 +66,29 @@
         @if (_isSuperUser)
         {
             <MudTabPanel Text="Problems" Icon="@Icons.Material.Outlined.ReportProblem">
-                <ProblemsTab />
+                <ProblemsTab @key="_reload" />
             </MudTabPanel>
 
             <MudTabPanel Text="Users" Icon="@Icons.Material.Outlined.Group">
-                <UsersTab />
+                <UsersTab @key="_reload" />
             </MudTabPanel>
 
             <MudTabPanel Text="Audit log" Icon="@Icons.Material.Outlined.History">
-                <AuditLogTab />
+                <AuditLogTab @key="_reload" />
             </MudTabPanel>
 
             <MudTabPanel Text="Activity" Icon="@Icons.Material.Outlined.BarChart">
-                <ActivityTab />
+                <ActivityTab @key="_reload" />
             </MudTabPanel>
 
             @* Messages: every family writes to the owner's one inbox (UserMessageService). *@
             <MudTabPanel Text="Messages" Icon="@Icons.Material.Outlined.MailOutline">
-                <MessagesTab />
+                <MessagesTab @key="_reload" />
             </MudTabPanel>
         }
 
         <MudTabPanel Text="Stories" Icon="@Icons.Material.Outlined.AutoStories">
-            <StoriesTab />
+            <StoriesTab @key="_reload" />
         </MudTabPanel>
 
     </MudTabs>
@@ -91,6 +98,8 @@
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
     private int _activeTab;
+    // Bumped by Refresh: a new @key makes the showing tab start over and reload its data.
+    private int _reload;
     private bool _isSuperUser;
 
     protected override async Task OnInitializedAsync()

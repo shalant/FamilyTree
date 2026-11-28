@@ -336,6 +336,7 @@
                 <MudAutocomplete @ref="_parentAc"
                                  T="PersonDto"
                                  MaxItems="RelationshipSearchCap"
+                                 MoreItemsTemplate="@MoreNamesHint"
                                  SearchFunc="SearchParents"
                                  ValueChanged="AddParent"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -371,6 +372,7 @@
                 <MudAutocomplete @ref="_spouseAc"
                                  T="PersonDto"
                                  MaxItems="RelationshipSearchCap"
+                                 MoreItemsTemplate="@MoreNamesHint"
                                  SearchFunc="SearchSpouses"
                                  ValueChanged="AddSpouse"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -406,6 +408,7 @@
                 <MudAutocomplete @ref="_formerSpouseAc"
                                  T="PersonDto"
                                  MaxItems="RelationshipSearchCap"
+                                 MoreItemsTemplate="@MoreNamesHint"
                                  SearchFunc="SearchFormerSpouses"
                                  ValueChanged="AddFormerSpouse"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -441,6 +444,7 @@
                 <MudAutocomplete @ref="_siblingAc"
                                  T="PersonDto"
                                  MaxItems="RelationshipSearchCap"
+                                 MoreItemsTemplate="@MoreNamesHint"
                                  SearchFunc="SearchSiblings"
                                  ValueChanged="AddSibling"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -476,6 +480,7 @@
                 <MudAutocomplete @ref="_childAc"
                                  T="PersonDto"
                                  MaxItems="RelationshipSearchCap"
+                                 MoreItemsTemplate="@MoreNamesHint"
                                  SearchFunc="SearchChildren"
                                  ValueChanged="AddChild"
                                  ToStringFunc="@(p => p?.FullName ?? "")"
@@ -831,24 +836,23 @@
 
     // ── relationship search ────────────────────────────────────────
     // Ordered by relevance (name-start matches before mid-name matches, then
-    // alphabetically) and capped generously rather than at 8 — a family with more
-    // than a handful of same-surname members (e.g. searching "Rosenberg") used to
-    // silently hide anyone past the 8th match with no indication more existed.
-    // MaxItems is also set explicitly below on each <MudAutocomplete>, since its own
-    // default would otherwise re-clip whatever this returns.
+    // alphabetically). Every match is returned: each <MudAutocomplete> clips the list to
+    // MaxItems itself, which is how it knows to say there are more. Truncating here made a
+    // later name look as if it didn't exist (found live 2026-11-27).
     private static IEnumerable<PersonDto> FilterPeople(IEnumerable<PersonDto> people, string value)
     {
         if (string.IsNullOrWhiteSpace(value))
-            return people.OrderBy(p => p.FullName, StringComparer.OrdinalIgnoreCase).Take(RelationshipSearchCap);
+            return people.OrderBy(p => p.FullName, StringComparer.OrdinalIgnoreCase);
 
         return people
             .Where(p => p.FullName.Contains(value, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(p => p.FullName.StartsWith(value, StringComparison.OrdinalIgnoreCase))
-            .ThenBy(p => p.FullName, StringComparer.OrdinalIgnoreCase)
-            .Take(RelationshipSearchCap);
+            .ThenBy(p => p.FullName, StringComparer.OrdinalIgnoreCase);
     }
 
     private const int RelationshipSearchCap = 25;
+
+    private RenderFragment MoreNamesHint => @<div class="ft-more-names" style="padding:8px 16px; font-size:13px; color:var(--ft-text-muted);">Type to find more</div>;
 
     private Task<IEnumerable<PersonDto>> SearchParents(string value, CancellationToken _) =>
         Task.FromResult(FilterPeople(
