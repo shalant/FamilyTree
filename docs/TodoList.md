@@ -9,7 +9,10 @@
       expired or claimed invite gives no name. Google sign-up unchanged. Not yet checked live.
 - [x] Checked live (phone, before the fix above): the invite skipped "Who are you?" and opened
       the tree centred on the invited person; as that Member, editing their own record was allowed
-      and editing someone else's was refused. Admin > Users after sign-up: not yet confirmed.
+      and editing someone else's was refused. The used invite left Pending invites.
+- [ ] The relationship pickers on Add/Edit Person list only the first 25 names, with nothing to
+      say there are more, so a later name looks missing until it is typed
+      (`RelationshipSearchCap`).
 - [x] Added (`fix/invite-prefill-name`): a Refresh button on Admin that reloads the showing tab;
       the tabs otherwise load once (`AdminRefreshTests`). Not yet checked live.
 
@@ -35,8 +38,8 @@
       step, and can then edit that record. Use Admin > Users "Who is this?" on invites, or
       decide on an approval step.
 - [ ] Admin > Audit log shows unlabelled UTC times and ID fragments instead of names.
-- [ ] Remove the test data: "Testy McTesters", "Test2 Test2", their photos, the `+test3` account
-      and unused test invites.
+- [ ] Remove the test data: "Testy McTesters" (linked as a sibling of two real people), "Test2
+      Test2", their photos, the `+test3` and `+test4` accounts and unused test invites.
 
 ## Admin "Problems" list (2026-11-26)
 
@@ -46,7 +49,8 @@ Asked after a member's save was refused and nothing recorded it.
       (who, when, page, person) and every error the server logs (source, technical detail) goes to
       a new table, listed under Admin > Problems for the super-user, in local time, kept 90 days.
       Only logged errors send email, at most one per 15 minutes. Tokens are stripped from pages
-      and messages. Not yet checked live.
+      and messages. Checked live 2026-11-27: a refused save was listed with time, user, page,
+      person and message. No problem email has been sent yet (only logged errors send one).
 - [ ] Later, if the list proves noisy or thin: group repeats, mark as dealt with, name the user on
       server errors.
 - Not covered: inline errors, sign-in errors, a dropped connection or a frozen page.
