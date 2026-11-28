@@ -7,6 +7,11 @@
 - [x] Fixed (`fix/invite-prefill-name`): sign-up from an invite that named a person still showed
       empty First/Last name boxes. They are now filled from that person and stay editable. A used,
       expired or claimed invite gives no name. Google sign-up unchanged. Not yet checked live.
+- [x] Checked live (phone, before the fix above): the invite skipped "Who are you?" and opened
+      the tree centred on the invited person; as that Member, editing their own record was allowed
+      and editing someone else's was refused. Admin > Users after sign-up: not yet confirmed.
+- [x] Added (`fix/invite-prefill-name`): a Refresh button on Admin that reloads the showing tab;
+      the tabs otherwise load once (`AdminRefreshTests`). Not yet checked live.
 
 ## Smoke test findings (2026-11-26)
 
